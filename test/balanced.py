@@ -127,7 +127,6 @@ def test_to_hypergraph():
             Braid(x, y), Twist(y), Twist(x), Braid(y, x))
     for representation in (Hypergraph, CMap):
         assert representation.twist(x).boxes == (Twist(x), )
-    x = symmetric.Ty('x')
     assert symmetric.Hypergraph.twist(x) == symmetric.Hypergraph.id(x)
     assert symmetric.CMap.twist(x) == symmetric.CMap.id(x)
 

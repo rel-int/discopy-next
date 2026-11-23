@@ -362,7 +362,8 @@ class Hypergraph[category](
             wires: Wiring, spider_types: SpiderTypes | None = None,
             offsets: tuple[int | None, ...] | None = None,
             phases: Phases | None = None, _scan: bool = True):
-        self.dom, self.cod, self.boxes = dom, cod, boxes
+        cast = self.category.ob.cast_ty
+        self.dom, self.cod, self.boxes = cast(dom), cast(cod), boxes
         dom_wires, box_wires, cod_wires = wires
         if _scan:
             self.scan_wires(wires)
@@ -378,7 +379,7 @@ class Hypergraph[category](
 
         new_index = relabeling(flat_wires, spider_types.keys())
         self.spider_types = tuple(
-            spider_types[s].unwind() for s in new_index)
+            cast(spider_types[s]).unwind() for s in new_index)
         phases = phases or {}
         if not isinstance(phases, Mapping):
             phases = dict(enumerate(phases))

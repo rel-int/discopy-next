@@ -98,7 +98,7 @@ class Ty[natural](Pregroup, TestableGeneric):
     Integer types are parameterised by natural types, e.g.
 
     >>> from discopy.abc import Nat
-    >>> assert Ty == Ty[pivotal.Ty] and Ty[Nat].natural == Nat
+    >>> assert Ty == Ty[ribbon.Ty] and Ty[Nat].natural == Nat
 
     The prefix operator ``-`` reverses positive and negative, e.g.
 
@@ -121,7 +121,7 @@ class Ty[natural](Pregroup, TestableGeneric):
         """ The default :attr:`natural` types, for the class itself. """
         return (cls.natural, )
 
-    natural = pivotal.Ty
+    natural = ribbon.Ty
     negatives = staticmethod(reversed)
 
     unitality = Pregroup.unitality.inapplicable(messages.PAIR_TYPES)

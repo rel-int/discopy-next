@@ -341,6 +341,17 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         return cls(atoms)  # ty: ignore[too-many-positional-arguments]
 
     @classmethod
+    def cast_ty(cls, other):
+        """
+        An element of another monoid read as one of this monoid: unchanged
+        by default, and the type with the same wires for the types of two
+        levels of the hierarchy, see :meth:`discopy.monoidal.Ty.cast_ty`.
+
+        >>> assert Nat.cast_ty(2) == 2
+        """
+        return other
+
+    @classmethod
     def whisker(cls: type[C1], other: C0 | C1) -> C1:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.

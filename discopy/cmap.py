@@ -273,6 +273,8 @@ class CMap[category](
             self, dom: "Ty", cod: "Ty", boxes: "tuple[Box, ...]",
             edges: Iterable[int],
             loops: "tuple[Ty, ...]" = (), *, check: bool = True):
+        cast = self.category.ob.cast_ty
+        dom, cod, loops = cast(dom), cast(cod), tuple(map(cast, loops))
         assert_isinstance(dom, self.category.ob)
         assert_isinstance(cod, self.category.ob)
         for box in boxes:

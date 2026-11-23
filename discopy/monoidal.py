@@ -653,6 +653,19 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return cls.ar(inside=(), dom=dom, cod=dom, _scan=False)
 
     @classmethod
+    def cast(cls, atoms) -> Self:
+        """
+        The type of a tuple of wires or of a single one, a type of another
+        level being read as one of this level, see :meth:`cast_ty`.
+
+        Example
+        -------
+        >>> from discopy import braided
+        >>> assert braided.Ty.cast(Ty('x')) == braided.Ty.cast('x')
+        """
+        return super().cast(cls.cast_ty(atoms))
+
+    @classmethod
     def cast_ty(cls, other):
         """
         A type of another level of the hierarchy read as one of this level:

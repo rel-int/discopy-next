@@ -11,6 +11,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Layer
     Diagram
     Box
@@ -76,7 +78,20 @@ from discopy.abc import (
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
-    Wire, Ty)
+    Wire)
+
+
+@factory
+class Ty(ribbon.Ty, symmetric.Ty):
+    """ A compact type, i.e. a ribbon type and a symmetric one. """
+
+
+@factory
+class Nat(ribbon.Nat, symmetric.Nat, Ty):
+    """ A natural number ``n`` seen as a compact type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 class Layer(symmetric.Layer, pivotal.Layer):
@@ -90,8 +105,8 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
 
     Parameters:
         inside(Layer) : The layers of the diagram.
-        dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
+        dom (Ty) : The domain of the diagram, i.e. its input.
+        cod (Ty) : The codomain of the diagram, i.e. its output.
     """
     # A hypergraph is faithful from symmetric categories on.
     snake_equations = CompactCategory.snake_equations
@@ -122,8 +137,8 @@ class Box(symmetric.Box, ribbon.Box, Diagram):
 
     Parameters:
         name (str) : The name of the box.
-        dom (pivotal.Ty) : The domain of the box, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the box, i.e. its output.
+        dom (Ty) : The domain of the box, i.e. its input.
+        cod (Ty) : The codomain of the box, i.e. its output.
     """
 
 
@@ -132,8 +147,8 @@ class Cup(ribbon.Cup, Box):
     A compact cup is a ribbon cup in a compact diagram.
 
     Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
+        left (Ty) : The atomic type.
+        right (Ty) : Its adjoint.
     """
 
 
@@ -142,8 +157,8 @@ class Cap(ribbon.Cap, Box):
     A compact cap is a ribbon cap in a compact diagram.
 
     Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
+        left (Ty) : The atomic type.
+        right (Ty) : Its adjoint.
     """
 
 
@@ -152,7 +167,7 @@ class Permutation(symmetric.Permutation, Box):
     A compact permutation is a symmetric permutation in a compact category.
 
     Parameters:
-        dom (pivotal.Ty) : The domain, i.e. the wires to permute.
+        dom (Ty) : The domain, i.e. the wires to permute.
         perm : The permutation as a :class:`finset.Permutation` or a list.
     """
     def rotate(self, left=False):
@@ -168,8 +183,8 @@ class Swap(Permutation, symmetric.Swap, ribbon.Braid, Box):
     A compact swap is a symmetric swap and a ribbon braid.
 
     Parameters:
-        left (pivotal.Ty) : The type on the top left and bottom right.
-        right (pivotal.Ty) : The type on the top right and bottom left.
+        left (Ty) : The type on the top left and bottom right.
+        right (Ty) : The type on the top right and bottom left.
     """
 
 
@@ -195,8 +210,8 @@ class Functor(symmetric.Functor, ribbon.Functor):
     A compact functor is both a symmetric functor and a ribbon functor.
 
     Parameters:
-        ob_map (Mapping[pivotal.Ty, pivotal.Ty]) :
-            Map from atomic :class:`pivotal.Ty` to :code:`cod.ob`.
+        ob_map (Mapping[Ty, Ty]) :
+            Map from atomic :class:`Ty` to :code:`cod.ob`.
         ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
         cod (Category) : The codomain of the functor.
     """

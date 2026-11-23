@@ -274,15 +274,17 @@ def test_trees_written_by_main_keep_their_bytes():
 
 def test_types_shared_between_levels_load_as_those_of_their_level():
     """ The fixtures are the diagrams below as `main` wrote them while the
-    levels from `spacial` to `comarkov` shared the types of `monoidal` or
-    of `feedback`: they load equal to the diagrams built now, with the
-    types of their level (rel-int/discopy-next#679). """
+    levels from `spacial` to `comarkov` shared the types of `monoidal` or of
+    `feedback`, and `ribbon` and `compact` those of `pivotal`: they load
+    equal to the diagrams built now, with the types of their level, as do
+    the trees of a hypergraph and of a map (rel-int/discopy-next#679). """
     import importlib
+    from discopy import compact, symmetric
     with open("test/fixtures/shared_types.jsonl") as file:
-        trees = file.read().splitlines()
+        *trees, graph, cmap = file.read().splitlines()
     with open("test/fixtures/pickles/shared_types.pickle", "rb") as file:
         pickles = pickle.load(file)
-    assert len(trees) == len(pickles) == 6
+    assert len(trees) == len(pickles) == 8
     for raw, (level, old) in zip(trees, pickles.items()):
         module = importlib.import_module(f"discopy.{level}")
         x, y = module.Ty('x'), module.Ty('y')
@@ -290,6 +292,12 @@ def test_types_shared_between_levels_load_as_those_of_their_level():
         assert f"{level}.Ty" not in raw
         assert loads(raw) == f @ x >> g == old
         assert type(old.dom) is module.Ty is type(loads(raw).dom)
+    assert "symmetric.Ty" not in graph and "compact.Ty" not in cmap
+    assert loads(graph) == pickles["symmetric"].to_hypergraph()
+    x = compact.Ty('x')
+    assert loads(cmap) == compact.Box('f', x, x).to_map()
+    assert type(loads(graph).spider_types[0]) is symmetric.Ty
+
 
 @pytest.mark.parametrize('data', [
     (1, 2), ((1, (2, )), [3, (4, 5j)]), {'key': (), 'other': [()]},
