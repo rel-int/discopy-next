@@ -1298,18 +1298,24 @@ def test_interpolate_keeps_boxes_apart():
 def test_interpolate_keeps_wires_out_of_boxes():
     """
     Across one interchanger no wire crosses another or a box, including a
-    wire that passes beside the box that moves: found by discopy-lean.
+    wire that passes beside the box that moves, and a state under an effect
+    that must go left of it: found by discopy-lean.
     """
     x, unit = monoidal.Ty('x'), monoidal.Ty()
     f0, f1 = monoidal.Box('f0', unit, x), monoidal.Box('f1', unit, x ** 3)
     f2 = monoidal.Box('f2', unit, unit)
-    source = f0 >> f1 @ x >> f2 @ x @ x @ x @ x
-    a, b = source.to_drawing(), source.interchange(1, 2).to_drawing()
-    for k in range(21):
-        frame = a.interpolate(b, k / 20)
-        frame.add_box_corners()
-        shape = frame.shape()
-        assert not shape["crossings"] and not shape["through"]
+    effect, state = monoidal.Box('e', x ** 2, unit), monoidal.Box('s', unit, x)
+    pair = monoidal.Box('p', unit, x ** 2)
+    for source, i in [
+            (f0 >> f1 @ x >> f2 @ x @ x @ x @ x, 1),
+            (effect @ x >> state @ x >> pair @ x @ x >> x @ x @ pair @ x @ x,
+             0)]:
+        a, b = source.to_drawing(), source.interchange(i, i + 1).to_drawing()
+        for k in range(21):
+            frame = a.interpolate(b, k / 20)
+            frame.add_box_corners()
+            shape = frame.shape()
+            assert not shape["crossings"] and not shape["through"]
 
 
 def test_slide_passes_behind_the_box():

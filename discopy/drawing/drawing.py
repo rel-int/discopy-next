@@ -729,8 +729,11 @@ which to_drawing recomputes.
         This is a planar isotopy, see
         :meth:`discopy.monoidal.Equation.path`: the two boxes move apart
         (:meth:`apart`), swap their rows and move back, so they never
-        overlap. When the drawings are not an interchanger apart, this is
-        :meth:`slide`.
+        overlap. The box moved to the right is the one for which both ends
+        pushed apart are still feasible drawings of their diagrams, see
+        :meth:`is_feasible`, e.g. a state that goes from under an effect to
+        the left of it moves left. When the drawings are not an
+        interchanger apart, this is :meth:`slide`.
 
         Parameters:
             other : The drawing to move to.
@@ -773,8 +776,15 @@ which to_drawing recomputes.
         end = {mapping[node]: p for node, p in other.positions.items()}
         stops = [start, end]
         if swap:
-            left, right = sorted(swap, key=lambda j: (
-                self.centre(j).x + other.centre(swap[j]).x, j))
+            orders = sorted(
+                [sorted(swap), sorted(swap)[::-1]], key=lambda order: (
+                    self.centre(order[1]).x - self.centre(order[0]).x
+                    + other.centre(swap[order[1]]).x
+                    - other.centre(swap[order[0]]).x) < 0)
+            left, right = next((
+                (j, k) for j, k in orders
+                if self.apart(j, k).is_feasible(self) and other.apart(
+                    swap[j], swap[k]).is_feasible(other)), orders[0])
             stops[1:1] = [dict(self.apart(left, right).positions), {
                 mapping[node]: p for node, p in other.apart(
                     swap[left], swap[right]).positions.items()}]
