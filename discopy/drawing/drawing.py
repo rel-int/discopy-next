@@ -928,11 +928,13 @@ which to_drawing recomputes.
     def apart(self, left: int, right: int, gap: float = .5) -> Drawing:
         """
         The drawing with box ``right`` pushed right, if need be, until box
-        ``left`` is ``gap`` left of it, with every node on its rows right of
-        it. Along an interchanger, :meth:`interpolate` moves the two boxes
-        apart, swaps their rows and moves them back: while they swap, the
-        right edge of the one and the left edge of the other move linearly,
-        so they never overlap.
+        ``left`` is ``gap`` left of it, with every node right of its left
+        edge but those of box ``left`` and those beyond it, i.e. on the side
+        away from box ``right`` and under it, whose wires never pass box
+        ``right``. Along an interchanger, :meth:`interpolate` moves the two
+        boxes apart, swaps their rows and moves them back: while they swap,
+        the right edge of the one and the left edge of the other move
+        linearly, so they never overlap.
 
         Parameters:
             left : The index of the box to keep on the left.
@@ -947,14 +949,20 @@ which to_drawing recomputes.
         >>> drawing.rectangle(1)[1].x + .5 == drawing.rectangle(0)[0].x
         True
         """
-        (edge, low), (_, high) = self.rectangle(right)
-        shift = self.rectangle(left)[1].x + gap - edge
+        (edge, _), (_, top) = self.rectangle(right)
+        (_, low), (end, high) = self.rectangle(left)
+        shift = end + gap - edge
         if shift <= 0:
             return self
+
+        def beyond(p):
+            return p.y < low if top > high else p.y > high
+
         result = self.relabel_nodes(positions={
             node: p.shift(x=shift) for node, p in self.positions.items()
-            if low <= p.y <= high and p.x >= edge
-            or node.data.get("j") == right})
+            if node.data.get("j") == right or p.x >= edge
+            and node.data.get("j") != left
+            and (p.x > end or not beyond(p))})
         result.width = self.width + shift
         return result
 

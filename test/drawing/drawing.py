@@ -1295,6 +1295,23 @@ def test_interpolate_keeps_boxes_apart():
             assert x1 <= u0 or u1 <= x0 or y1 <= v0 or v1 <= y0
 
 
+def test_interpolate_keeps_wires_out_of_boxes():
+    """
+    Across one interchanger no wire crosses another or a box, including a
+    wire that passes beside the box that moves: found by discopy-lean.
+    """
+    x, unit = monoidal.Ty('x'), monoidal.Ty()
+    f0, f1 = monoidal.Box('f0', unit, x), monoidal.Box('f1', unit, x ** 3)
+    f2 = monoidal.Box('f2', unit, unit)
+    source = f0 >> f1 @ x >> f2 @ x @ x @ x @ x
+    a, b = source.to_drawing(), source.interchange(1, 2).to_drawing()
+    for k in range(21):
+        frame = a.interpolate(b, k / 20)
+        frame.add_box_corners()
+        shape = frame.shape()
+        assert not shape["crossings"] and not shape["through"]
+
+
 def test_slide_passes_behind_the_box():
     from discopy import braided
     x, y, z, w = map(braided.Ty, "xyzw")

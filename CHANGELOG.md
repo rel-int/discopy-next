@@ -17,8 +17,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   by `naturality` (`Drawing.slide`), where the crossings pass behind the box
   halfway. Tweened, its port-to-port wires are vertical at both ends
   (`draw(smooth_wires=True)`). Across an
-  interchanger the two boxes move apart (`Drawing.apart`), swap rows and move
-  back, so that they never overlap. A gif
+  interchanger the two boxes move apart (`Drawing.apart`, with every wire
+  beside the one that moves), swap rows and move back, so that no box overlaps
+  another and no wire crosses one. A gif
   tweened so is an isotopy between the drawings. `Diagram.normalization`
   lists the steps `normal_form` takes ([next#706]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
