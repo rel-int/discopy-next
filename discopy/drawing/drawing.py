@@ -809,8 +809,9 @@ which to_drawing recomputes.
         inside the box, behind it: a port on a strand of the box goes to the
         port of the box that strand leads to, so that its wires only shrink,
         a port wired out of the crossings to the point of the box nearest the
-        other end of its wire, every other port to the centre of the box, and
-        the node of each crossing between its inputs and outputs.
+        other end of its wire, every other port to the middle of the side of
+        the box where its ports go, and the node of each crossing between its
+        inputs and outputs.
 
         Parameters:
             other : The drawing to move to.
@@ -906,7 +907,9 @@ which to_drawing recomputes.
                                 and n not in ends_of:
                             ends_of[n] = middle[labels[k][port]]
                             queue.append(n)
-        centre = Point((left + right) / 2, (low + high) / 2)
+        centre = Point((left + right) / 2, sum(
+            p.y for p in ends_of.values()) / len(ends_of)
+            if ends_of else (low + high) / 2)
 
         def behind(node, _):
             if node in ends_of:

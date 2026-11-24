@@ -1120,8 +1120,10 @@ class Backend(ABC):
             return
         # Keep the shadow roughly the same height, e.g. for a double braid,
         # by widening the (relative) gap when the braid is short.
+        # A short braid, e.g. one shrinking along an isotopy, has a gap that
+        # shrinks with it, so that its strand under is not cut to pieces.
         height = abs(left[0][1] - left[1][1])
-        gap = min(0.3, 0.1 / height) if height else 0.3
+        gap = min(0.3, 0.1 / height, 0.9 * height) if height else 0
         # The left wire goes under the right one unless the box is dagger.
         over, under = (left, right) if box.is_dagger else (right, left)
         self.draw_braid_strand(*under, middle, gap=gap, adaptive=adaptive)
