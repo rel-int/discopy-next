@@ -59,9 +59,7 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # ``--check`` does not block on them; ``generate`` already falls back to a link
 # page for any notebook that fails to execute. An entry whose issue is closed
 # has stopped being evidence: re-run the notebook before trusting it.
-KNOWN_BROKEN = {
-    "optyx/readme_example": ISSUES + "442",
-}
+KNOWN_BROKEN: dict[str, str] = {}
 
 IFRAME = """\
 .. raw:: html

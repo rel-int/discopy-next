@@ -44,6 +44,7 @@ DisCoPy documentation
     :hidden:
 
     notebooks/optyx/what_is_a_channel
+    notebooks/optyx/readme_example
     notebooks/optyx/fixpoints
     notebooks/optyx/feed_forward_example
     notebooks/optyx/linear_logic
