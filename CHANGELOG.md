@@ -817,6 +817,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `interaction.Diagram` declares `dagger_involution` and
+  `dagger_monoidality` broken with "Feedback has no dagger", as it does
+  `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
+  integer diagram has no dagger, so the property matrix found a
+  counterexample to each under `explore` ([next#701]).
+
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
   property matrix draws such terms: a naming of the kappa terms may reuse a
@@ -2594,6 +2600,7 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
