@@ -582,7 +582,7 @@ class Lexicon(Functor):
 
         def terms(cod, n):
             if (cod, n) not in language:
-                language[cod, n] = [] if n == 0 else [
+                language[cod, n] = [] if n <= 0 else [
                     pair for constant, value in values.items()
                     for pair in applied(constant, value, constant.cod, cod, n)]
             return language[cod, n]
