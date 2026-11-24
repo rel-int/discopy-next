@@ -547,6 +547,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `interaction.Diagram` declares `dagger_involution` and
+  `dagger_monoidality` broken with "Feedback has no dagger", as it does
+  `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
+  integer diagram has no dagger, so the property matrix found a
+  counterexample to each under `explore` ([next#701]).
+
+- `interaction.Ty.strategy` draws each side of an integer type with at most
+  two generators, enough to tell the conventions of cups and caps apart: the
+  terms of the laws on integer diagrams grow with the square of the width of
+  their types, and the four slowest cells of the property matrix,
+  `interaction.Diagram[compact.Diagram]`'s `adjunction`,
+  `transpose_contravariance`, `rotate_contravariance` and `pivotality`, go
+  from about 123 to 36–54 seconds ([next#709]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
@@ -1994,6 +2007,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest/test_corpus.py` replays a committed corpus of terms written by hand
+  or by a language model, `proptest/corpus/`, against the laws of the property
+  matrix, deterministically and offline, with a first corpus for
+  `symmetric.Diagram`: shapes the strategies draw rarely or never, e.g. boxes
+  that share a name or carry `data`, bubbles and multi-wire feedback. A pilot
+  on `symmetric`, `compact` and `Int` found no counterexample beyond those
+  already declared ([next#707]).
 - The `proptest` workflow runs every cell at `pr`'s twenty examples under
   `--hypothesis-seed=0` on `main` too, with one worker per vCPU, and no longer
   runs nightly: `explore`'s thousand examples per cell had cancelled every run
@@ -2600,10 +2620,13 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#706]: https://github.com/rel-int/discopy-next/pull/706
+[next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
+[next#709]: https://github.com/rel-int/discopy-next/pull/709
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
