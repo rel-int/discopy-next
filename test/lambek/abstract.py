@@ -1,4 +1,5 @@
 import doctest
+import textwrap
 from pathlib import Path
 from random import Random
 
@@ -349,3 +350,22 @@ def test_english_to_lean():
     _, statement = text.split("[DecidableEq S.Ob] :\n")
     statement, _ = statement.split("\n    := ")
     assert printed.split() == statement.split()
+
+
+def test_lean_to_english():
+    "The theorem of English.lean parses back to the sentence it documents."
+    from discopy.lambek import abstract
+    namespace = vars(abstract).copy()
+    for example in doctest.DocTestParser().get_examples(abstract.__doc__):
+        exec(example.source, namespace)  # pylint: disable=exec-used
+    lean = Path(__file__).parents[2] / "discolean" / "DisCoLean"\
+        / "Statements" / "English.lean"
+    text = lean.read_text(encoding="utf-8")
+    sentence = text.split("/-- ")[1].split(".")[0]
+    _, statement = text.split("[DecidableEq S.Ob] :\n")
+    statement, _ = statement.split("\n    := ")
+    english, to_lean, printer, words, s = (namespace[name] for name in (
+        "english", "to_lean", "lean", "words", "s"))
+    readings = to_lean.parse(textwrap.dedent(statement), s, 6, printer)
+    assert sentence in [
+        " ".join(words(english(reading))()([])) for reading in readings]

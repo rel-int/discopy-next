@@ -277,6 +277,33 @@ DisCoPy diagrams are the arrows of the free premonoidal category
   ∧ ∀ (C : StrictPremonoidal) (F G : Functor (Diagram.premonoidal S) C),
     (∀ x, F.ob [x] = G.ob [x]) →
     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
+
+From Lean to English
+--------------------
+
+The same two lexicons read the other way explain a Lean statement in English:
+parse it with the Lean side, :meth:`Lexicon.parse`, and print its parses with
+the English side. Nothing in Lean says DisCoPy or picks an article, those
+words go to identities, so a statement has as many readings as the depth
+allows those words to repeat, and its English is a set of paraphrases:
+
+>>> theorem = lean(to_lean(sentence(PREMONOIDAL)))()
+>>> readings = to_lean.parse(theorem, s, 6, lean)
+>>> explanations = [" ".join(words(english(r))()([])) for r in readings]
+>>> len(explanations)
+32
+>>> assert "DisCoPy diagrams are the arrows of the free premonoidal category"\\
+...     in explanations
+>>> print(min(explanations, key=len))
+diagrams are arrows of free premonoidal category
+
+Only the kind tells the statements apart, so the one Lean refutes reads back
+as the same paraphrases with *monoidal*:
+
+>>> refuted = lean(to_lean(sentence(MONOIDAL)))()
+>>> assert sorted(" ".join(words(english(r))()([]))
+...               for r in to_lean.parse(refuted, s, 6, lean)) == sorted(
+...     x.replace("premonoidal", "monoidal") for x in explanations)
 """
 
 from __future__ import annotations
@@ -510,6 +537,62 @@ class Lexicon(Functor):
     discopy.utils.AxiomError: Expected a term of type y for a, got ...
     """
     dom = cod = Diagram
+
+    def parse(self, target, start: Ty, depth: int,
+              functor: closed.Functor) -> list[Term]:
+        """
+        The abstract terms of type ``start``, with constants nested at most
+        ``depth`` deep, that the lexicon then ``functor`` send to ``target``:
+        parsing inverts a lexicon, and gives a list since a lexicon need not
+        be injective, de Groote's section 5.
+
+        The terms are generated from the constants of the lexicon, its
+        ``ar_map`` being a mapping, and evaluated bottom up: ``functor`` sends
+        the image of each constant to a :class:`discopy.python.Function` once,
+        and the value of an application is the application of their values,
+        since a functor preserves it.
+
+        Parameters:
+            target : The value to parse, e.g. a string.
+            start : The abstract type of the terms, e.g. sentences.
+            depth : The largest number of nested constants.
+            functor : A functor into :class:`discopy.python.Function`.
+
+        Example
+        -------
+        >>> from discopy.python import Function
+        >>> n, s, e, t = map(Ty, "nset")
+        >>> bank, shore, visit = n("bank"), n("shore"), (n >> s)("visit")
+        >>> RIVER, VISIT = e("RIVER"), (e >> t)("VISIT")
+        >>> semantics = Lexicon(ob_map={n: e, s: t}, ar_map={
+        ...     bank: RIVER, shore: RIVER, visit: VISIT})
+        >>> show = Functor({e: str, t: str}, {
+        ...     RIVER: lambda: "river", VISIT: lambda: lambda x: f"visit {x}"},
+        ...     cod=Function)
+        >>> print(*semantics.parse("visit river", s, 2, show), sep="\\n")
+        visit(bank)
+        visit(shore)
+        """
+        values = {constant: functor(self(constant))()
+                  for constant in self.ar_map.mapping}
+        language: dict[tuple[Ty, int], list] = {}
+
+        def terms(cod, n):
+            if (cod, n) not in language:
+                language[cod, n] = [] if n == 0 else [
+                    pair for constant, value in values.items()
+                    for pair in applied(constant, value, constant.cod, cod, n)]
+            return language[cod, n]
+
+        def applied(term, value, dom, cod, n):
+            if dom == cod:
+                yield term, value
+            if len(dom) == 1 and isinstance(exp := dom.inside[0], closed.Exp):
+                for arg, arg_value in terms(exp.exponent, n - 1):
+                    yield from applied(
+                        term(arg), value(arg_value), exp.base, cod, n)
+        return [term for term, value in terms(start, depth)
+                if value == target]
 
 
 CMap = cmap.CMap[Diagram]
