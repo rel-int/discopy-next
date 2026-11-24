@@ -550,7 +550,10 @@ class Lexicon(Functor):
         ``ar_map`` being a mapping, and evaluated bottom up: ``functor`` sends
         the image of each constant to a :class:`discopy.python.Function` once,
         and the value of an application is the application of their values,
-        since a functor preserves it.
+        since a functor preserves it, unpacked when the argument is several
+        wires. The terms are constants applied to such terms, with no
+        abstraction: a higher-order lexicon, e.g. a tree-adjoining grammar
+        with an argument ``lambda x: B(x)(C)``, has parses it does not find.
 
         Parameters:
             target : The value to parse, e.g. a string.
@@ -588,9 +591,11 @@ class Lexicon(Functor):
             if dom == cod:
                 yield term, value
             if len(dom) == 1 and isinstance(exp := dom.inside[0], closed.Exp):
+                wires = len(functor(self(exp.exponent)))
                 for arg, arg_value in terms(exp.exponent, n - 1):
-                    yield from applied(
-                        term(arg), value(arg_value), exp.base, cod, n)
+                    yield from applied(term(arg), value(
+                        *arg_value) if wires != 1 else value(arg_value),
+                        exp.base, cod, n)
         return [term for term, value in terms(start, depth)
                 if value == target]
 

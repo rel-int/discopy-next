@@ -369,3 +369,14 @@ def test_lean_to_english():
     readings = to_lean.parse(textwrap.dedent(statement), s, 6, printer)
     assert sentence in [
         " ".join(words(english(reading))()([])) for reading in readings]
+
+
+def test_parse_unpacks_wires():
+    "An argument of two wires is passed as two values, as evaluation does."
+    n, s = Ty("n"), Ty("s")
+    a, f = n("a"), (n >> s)("f")
+    lexicon = Lexicon({n: n, s: s}, {a: a, f: f})
+    functor = Functor({n: (int, int), s: int}, {
+        a: lambda: (1, 2), f: lambda: lambda x, y: x - y}, cod=Function)
+    assert functor(f(a))() == -1
+    assert lexicon.parse(-1, s, 2, functor) == [f(a)]
