@@ -629,8 +629,13 @@ class Backend(ABC):
         height ``middle``. The strand is vertical at both ends and diagonal in
         between, so that two strands cross at a right angle rather than meeting
         flat. If ``gap`` is non-zero the strand is broken around the crossing,
-        i.e. it goes under the other strand.
+        i.e. it goes under the other strand. A strand that lies above or
+        below ``middle``, e.g. in a crossing shrinking along an isotopy,
+        crosses its own middle height instead, so that it never bends back.
         """
+        if not min(source[1], target[1]) <= middle <= max(
+                source[1], target[1]):
+            middle = (source[1] + target[1]) / 2
         control = self.braid_strand(source, target, middle)
         if not gap:
             return self.draw_bezier(control, adaptive=adaptive)

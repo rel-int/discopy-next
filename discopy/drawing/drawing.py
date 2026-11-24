@@ -806,13 +806,14 @@ which to_drawing recomputes.
         shrink into the box until ``t = .5``, the drawing then takes the
         edges of ``other`` and they grow out of the other side of the box,
         while every other node moves in a straight line: halfway, they are
-        inside the box, behind it, or at the dot of a spider, into which its
-        legs shrink too: a port on a strand of the box goes to the
+        inside the box, behind it, or around the dot of a spider, into which
+        its legs shrink: a port on a strand of the box goes to the
         port of the box that strand leads to, so that its wires only shrink,
         a port wired out of the crossings to the point of the box nearest the
-        other end of its wire, every other port to the middle of the side of
-        the box where its ports go, and the node of each crossing between its
-        inputs and outputs.
+        other end of its wire, every other port to where its strand leaves
+        the crossings, and the node of each crossing between its inputs and
+        outputs. So a wire passing a spider halfway is one strand under its
+        dot, broken around it as a braid is, and the dot keeps its legs.
 
         Parameters:
             other : The drawing to move to.
@@ -884,7 +885,7 @@ which to_drawing recomputes.
         if box.box.draw_as_spider:
             dot = middle[labels[0][box]]
             (left, low), (right, high) = (
-                dot.shift(-.05, -.05), dot.shift(.05, .05))
+                dot.shift(-.2, -.2), dot.shift(.2, .2))
             middle.update({label: dot for label in middle
                            if label.data.get("j") == labels[0][box].j})
         k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
@@ -914,9 +915,6 @@ which to_drawing recomputes.
                                 and n not in ends_of:
                             ends_of[n] = middle[labels[k][port]]
                             queue.append(n)
-        centre = Point((left + right) / 2, sum(
-            p.y for p in ends_of.values()) / len(ends_of)
-            if ends_of else (low + high) / 2)
 
         def behind(node, _):
             if node in ends_of:
@@ -934,7 +932,12 @@ which to_drawing recomputes.
             q = next((middle[labels[k][n]] for n in itertools.chain(
                 drawing.graph.predecessors(node),
                 drawing.graph.successors(node))
-                if n in labels[k] and n.kind != "box"), centre)
+                if n in labels[k] and n.kind != "box"), None)
+            if q is None:
+                while node not in labels[k]:
+                    node = next(drawing.graph.successors(
+                        strand(node) if node.kind == "box_dom" else node))
+                q = middle[labels[k][node]]
             return Point(min(max(q.x, left), right), min(max(q.y, low), high))
 
         return drawing.relabel_nodes(positions={

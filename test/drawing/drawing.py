@@ -1333,7 +1333,7 @@ def test_slide_passes_behind_the_box():
                if node.data.get("j") not in (None, j))
 
 
-def test_slide_through_a_spider_meets_at_its_dot():
+def test_slide_through_a_spider_passes_behind_its_dot():
     from discopy import braided
     x, y, z, w = map(braided.Ty, "xyzw")
     f = braided.Box('f', x, y @ z, draw_as_spider=True)
@@ -1342,6 +1342,8 @@ def test_slide_through_a_spider_meets_at_its_dot():
     middle = a.slide(b, .5)
     dot, = (p for node, p in middle.positions.items()
             if node.kind == "box" and node.box.name == "f")
-    assert all(abs(p.x - dot.x) < .06 and abs(p.y - dot.y) < .06
-               for node, p in middle.positions.items()
-               if node.data.get("j") is not None)
+    for node, p in middle.positions.items():
+        if node.data.get("j") is not None:
+            distance = max(abs(p.x - dot.x), abs(p.y - dot.y))
+            assert distance > .15 if str(node.data.get("x")) == "w"\
+                else distance < .06
