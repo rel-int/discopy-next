@@ -829,9 +829,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modules removed from optyx: it was the prototype of the light-cone bound
   that `optyx.utils.misc.get_max_dim_for_box` computes for
   `Diagram.to_tensor`, now unit-tested ([next#249]).
+- Four optyx notebooks: `compile_to_semm` and `Compiler`, which repeated each
+  other and the doctest of `optyx.compiler.semm.compile_to_semm`, and
+  `optyx-vqe-experiment` and `bosonic-vqe-2`, whose gradient descent
+  `bose_hubbard` keeps. `pandas`, which only `optyx-vqe-experiment` imported,
+  leaves the `notebooks` extra ([next#715]).
 
 ### Fixed
 
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, executes
+  and is listed under "Optyx notebooks": its sweep of the contraction's `chi`
+  starts at 2, since at `chi=1` quimb's QR divides by zero ([next#442]), and
+  takes the median of three contractions per `chi` instead of ten. It leaves
+  `KNOWN_BROKEN`, which is now empty ([next#715]).
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
   property matrix draws such terms: a naming of the kappa terms may reuse a
@@ -2624,6 +2634,7 @@ for the changelog of `1.2.1` and earlier.
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
+[next#715]: https://github.com/rel-int/discopy-next/pull/715
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
