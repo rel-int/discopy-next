@@ -130,11 +130,22 @@ class Ty[natural](Pregroup, TestableGeneric):
     cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
 
     @classmethod
-    def strategy(cls, **params):
-        """ Generate pairs of :attr:`natural` types. """
+    def strategy(cls):
+        """
+        Generate pairs of :attr:`natural` types of at most two generators
+        each: two tell the conventions of cups and caps apart, while the
+        terms of the laws on integer diagrams grow with the square of the
+        width of their types.
+
+        >>> from hypothesis import find
+        >>> from discopy.compact import Ty as T
+        >>> pair = find(Ty[T].strategy(), lambda x: len(x.positive) > 1)
+        >>> assert len(pair.positive) == 2
+        """
         from hypothesis import strategies as st
 
-        types = cls.natural.strategy(**params)
+        types = st.lists(cls.natural.generator_strategy(), max_size=2).map(
+            lambda xs: cls.natural().tensor(*xs))
         return st.tuples(types, types).map(lambda pair: cls(*pair))
 
     @classmethod
@@ -348,6 +359,9 @@ class Diagram[natural](
         # pylint: disable-next=import-outside-toplevel  # they import this
         from discopy import compact, symmetric
         return (symmetric.Diagram, compact.Diagram)
+
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
 
     ar = classproperty(lambda cls: cls)
     natural = ribbon.Diagram
