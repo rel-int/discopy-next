@@ -832,6 +832,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `bang.Diagram` declares `dagger_involution` and `dagger_contravariance`
+  failing, since every structural box but the exchange has no dagger, and
+  `proptest/corpus/bang.py` replays them on the structural boxes its strategy
+  does not draw ([next#721]).
+
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
   property matrix draws such terms: a naming of the kappa terms may reuse a
@@ -2624,6 +2629,7 @@ for the changelog of `1.2.1` and earlier.
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
+[next#721]: https://github.com/rel-int/discopy-next/pull/721
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
