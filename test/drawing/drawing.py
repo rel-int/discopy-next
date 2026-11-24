@@ -1348,3 +1348,21 @@ def test_slide_through_a_spider_keeps_its_legs():
                       for node, p in drawing.positions.items()
                       if node.data.get("j") == j)
     assert all(legs(a.slide(b, t)) == legs(a) for t in (.25, .5, .75))
+
+
+def test_slide_through_a_spider_leaves_the_braid_behind():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z, draw_as_spider=True)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+
+    def heights(t):
+        drawing = a.slide(b, t)
+        dot, = (p.y for node, p in drawing.positions.items()
+                if node.kind == "box" and node.box.name == "f")
+        braid, = (p.y for node, p in drawing.positions.items()
+                  if node.kind == "box" and node.box.is_crossing)
+        return dot, braid
+    (dot0, braid0), (dot1, braid1) = heights(.6), heights(.8)
+    assert dot1 < dot0 and braid1 >= braid0

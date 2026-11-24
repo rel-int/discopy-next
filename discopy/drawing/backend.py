@@ -983,9 +983,11 @@ class Backend(ABC):
 
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
-        # With smooth wires, the strands over and the legs of spiders are
-        # drawn again last, each over a halo, see :meth:`draw_halo`.
+        # With smooth wires, the strands over, the wires that go on from them
+        # and the legs of spiders are drawn last, each over a halo, see
+        # :meth:`draw_halo`.
         overs = [] if params.get("smooth_wires") else None
+        over_ports = set()
         for node in graph.nodes:
             if node.kind != "box":
                 continue
@@ -993,6 +995,10 @@ class Backend(ABC):
                 self.draw_permutation(graph.positions, node)
             elif node.box.is_crossing:
                 self.draw_braid(graph.positions, node, overs)
+                if getattr(node.box, "draw_as_braid", False):
+                    right, left = self.crossing_wires(node)
+                    over_ports.update(
+                        left if node.box.is_dagger else right)
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
@@ -1011,18 +1017,23 @@ class Backend(ABC):
             if params.get("smooth_wires") and not (
                     bend_out or bend_in or is_frame_boundary):
                 middle = (source_position[1] + target_position[1]) / 2
-                self.draw_bezier(
-                    [source_position, (source_position[0], middle),
-                     (target_position[0], middle), target_position],
-                    adaptive=self.on_neutral_canvas(typ))
+                points = [source_position, (source_position[0], middle),
+                          (target_position[0], middle), target_position]
+                if overs is not None and not over_ports.isdisjoint(
+                        (source, target)):
+                    overs.append((points, self.on_neutral_canvas(typ)))
+                else:
+                    self.draw_bezier(
+                        points, adaptive=self.on_neutral_canvas(typ))
                 continue
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),
                 adaptive=self.on_neutral_canvas(typ))
-            if overs is not None and any(
+            if overs is not None and (any(
                     n.kind == "box" and n.box.draw_as_spider
-                    for n in (source, target)):
+                    for n in (source, target))
+                    or not over_ports.isdisjoint((source, target))):
                 mid = (target_position[0], source_position[1]) if bend_out\
                     else (source_position[0], target_position[1])
                 overs.append(([source_position] + [

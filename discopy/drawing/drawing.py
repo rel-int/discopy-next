@@ -814,8 +814,11 @@ which to_drawing recomputes.
         end of its wire, every other port where its strand leaves the
         crossings, and the node of each crossing the middle of its inputs
         and outputs, or for a spider the corner of the box around its legs
-        on the side of the other end of its wire. So a wire passing a spider
-        goes under it, hidden near its legs with ``smooth_wires``,
+        on the side of the other end of its wire. Through a spider, only the
+        ports on its legs follow it: the other nodes of the crossings move
+        straight to where they are halfway, so the braid stays behind while
+        the dot passes, rather than sticking to it. So a wire passing a
+        spider goes under it, hidden near its legs with ``smooth_wires``,
         see :meth:`discopy.drawing.backend.Backend.draw_halo`.
 
         Parameters:
@@ -959,15 +962,26 @@ which to_drawing recomputes.
 
             return current, {node: behind(node, None)
                              for node in drawing.nodes
-                             if node not in labels[k]}
+                             if node not in labels[k]}, set(ends_of)
 
-        current, anchor = anchors(s)
-        _, start = anchors(0)
+        current, anchor, on_legs = anchors(s)
+        _, start, _ = anchors(0)
+        _, fixed, _ = anchors(1)
         shrink = max(0, 1 - 2 * s)
+        sliding = next(
+            node for node, label in labels[k].items()
+            if label.kind == "box" and label.data.get("j") in touched)
+
+        def position(node, p):
+            if node in labels[k]:
+                return current[labels[k][node]]
+            if node in on_legs or not sliding.box.draw_as_spider:
+                return anchor[node].shift(
+                    shrink ** 2 * (p.x - start[node].x),
+                    shrink * (p.y - start[node].y))
+            return between(p, fixed[node], 1 - shrink ** 2)
         return drawing.relabel_nodes(positions={
-            node: current[labels[k][node]] if node in labels[k]
-            else anchor[node].shift(shrink ** 2 * (p.x - start[node].x),
-                                    shrink * (p.y - start[node].y))
+            node: position(node, p)
             for node, p in drawing.positions.items()}).resized(self, other, t)
 
     def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
