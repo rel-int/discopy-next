@@ -47,15 +47,11 @@ DisCoPy documentation
     notebooks/optyx/fixpoints
     notebooks/optyx/feed_forward_example
     notebooks/optyx/linear_logic
-    notebooks/optyx/compile_to_semm
-    notebooks/optyx/optyx-vqe-experiment
-    notebooks/optyx/bosonic-vqe-2
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
     notebooks/optyx/strict_sloppy
     notebooks/optyx/zw_examples
     notebooks/optyx/bose_hubbard
-    notebooks/optyx/Compiler
     notebooks/optyx/distributed-412-code
     notebooks/optyx/distributed-422-code
 
