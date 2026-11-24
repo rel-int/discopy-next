@@ -69,15 +69,21 @@ def test_a_picture_has_no_dagger():
         drawing.dagger()
 
 
-@pytest.mark.parametrize("params", [
-    {}, {"to_tikz": True}, {"format": "typst"}])
-def test_every_backend_draws_waypoints(tmp_path, params):
+def test_waypoints_are_drawn_as_curves(tmp_path):
     drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
-    suffix = {"to_tikz": ".tikz", "format": ".svg"}
-    path = tmp_path / ("out" + next(
-        (suffix[k] for k in params), ".png"))
-    if params.get("format") == "typst":
+    waypoints = [(u, v) for u, v in drawing.edges
+                 if "wire" in (u.kind, v.kind)]
+    drawing.draw(path=str(tmp_path / "out.tikz"), to_tikz=True)
+    assert (tmp_path / "out.tikz").read_text().count(
+        ".. controls") == len(waypoints) > 0
+
+
+@pytest.mark.parametrize("params", [{}, {"format": "typst"}])
+def test_every_backend_draws_waypoints(tmp_path, params):
+    if params:
         pytest.importorskip("typst")
+    drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
+    path = tmp_path / ("out.svg" if params else "out.png")
     drawing.draw(path=str(path), **params)
     assert path.exists() and path.stat().st_size
 
