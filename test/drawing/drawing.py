@@ -1333,17 +1333,18 @@ def test_slide_passes_behind_the_box():
                if node.data.get("j") not in (None, j))
 
 
-def test_slide_through_a_spider_passes_behind_its_dot():
+def test_slide_through_a_spider_keeps_its_legs():
     from discopy import braided
     x, y, z, w = map(braided.Ty, "xyzw")
     f = braided.Box('f', x, y @ z, draw_as_spider=True)
     source = w @ f >> braided.Diagram.braid(w, y @ z)
     a, b = source.to_drawing(), source.naturality(0).to_drawing()
-    middle = a.slide(b, .5)
-    dot, = (p for node, p in middle.positions.items()
-            if node.kind == "box" and node.box.name == "f")
-    for node, p in middle.positions.items():
-        if node.data.get("j") is not None:
-            distance = max(abs(p.x - dot.x), abs(p.y - dot.y))
-            assert distance > .15 if str(node.data.get("x")) == "w"\
-                else distance < .06
+
+    def legs(drawing):
+        box, = (node for node in drawing.box_nodes if node.box.name == "f")
+        dot, j = drawing.positions[box], box.j
+        return sorted((node.kind, node.data.get("i"),
+                       round(p.x - dot.x, 6), round(p.y - dot.y, 6))
+                      for node, p in drawing.positions.items()
+                      if node.data.get("j") == j)
+    assert all(legs(a.slide(b, t)) == legs(a) for t in (.25, .5, .75))

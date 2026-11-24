@@ -806,14 +806,17 @@ which to_drawing recomputes.
         shrink into the box until ``t = .5``, the drawing then takes the
         edges of ``other`` and they grow out of the other side of the box,
         while every other node moves in a straight line: halfway, they are
-        inside the box, behind it, or around the dot of a spider, into which
-        its legs shrink: a port on a strand of the box goes to the
-        port of the box that strand leads to, so that its wires only shrink,
-        a port wired out of the crossings to the point of the box nearest the
+        inside the box or behind it, and a spider moves its dot and its legs
+        together, which keep their shape: a port on a strand of the box goes
+        to the port of the box that strand leads to, so that its wires only
+        shrink, a port wired out of the crossings to the point of the box
+        nearest the
         other end of its wire, every other port to where its strand leaves
         the crossings, and the node of each crossing between its inputs and
-        outputs. So a wire passing a spider halfway is one strand under its
-        dot, broken around it as a braid is, and the dot keeps its legs.
+        outputs, or for a spider the corner of the box around its legs on
+        the side of the other end of its wire. So a wire passing a spider
+        goes under it, hidden near its dot and legs with ``smooth_wires``,
+        see :meth:`discopy.drawing.backend.Backend.draw_halo`.
 
         Parameters:
             other : The drawing to move to.
@@ -882,12 +885,11 @@ which to_drawing recomputes.
         (left, low), (right, high) = self.relabel_nodes(positions={
             node: middle[label] for node, label in labels[0].items()
         }).rectangle(box.j)
-        if box.box.draw_as_spider:
-            dot = middle[labels[0][box]]
-            (left, low), (right, high) = (
-                dot.shift(-.2, -.2), dot.shift(.2, .2))
-            middle.update({label: dot for label in middle
-                           if label.data.get("j") == labels[0][box].j})
+        dot = middle[labels[0][box]]
+        legs = [p for label, p in middle.items()
+                if label.data.get("j") == labels[0][box].j]
+        width = max(abs(p.x - dot.x) for p in legs) + .25
+        height = max(abs(p.y - dot.y) for p in legs) or .25
         k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
         drawing = ends[k]
         boxes = {node.j: node.box for node in drawing.box_nodes}
@@ -919,6 +921,8 @@ which to_drawing recomputes.
         def behind(node, _):
             if node in ends_of:
                 return ends_of[node]
+            if node.kind == "box" and box.box.draw_as_spider:
+                return dot
             if node.kind == "box":
                 ports = {kind: [
                     behind(n, None) for n in drawing.nodes
@@ -933,6 +937,12 @@ which to_drawing recomputes.
                 drawing.graph.predecessors(node),
                 drawing.graph.successors(node))
                 if n in labels[k] and n.kind != "box"), None)
+            if box.box.draw_as_spider:
+                if q is None:
+                    return dot
+                return dot.shift(
+                    width if q.x > dot.x else -width,
+                    height if q.y > dot.y else -height)
             if q is None:
                 while node not in labels[k]:
                     node = next(drawing.graph.successors(

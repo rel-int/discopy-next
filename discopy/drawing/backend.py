@@ -48,7 +48,7 @@ from matplotlib import cbook
 from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
 from matplotlib.testing.exceptions import ImageComparisonFailure
-from matplotlib.patches import PathPatch, Patch
+from matplotlib.patches import Circle, PathPatch, Patch
 from matplotlib.path import Path
 from PIL import Image, ImageSequence
 
@@ -513,6 +513,17 @@ class Backend(ABC):
         adapt to a dark page, see :meth:`Matplotlib.dark_gid`. """
         # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, source[0], target[0])
+
+    def draw_halo(self, source, target, bend_out=False, bend_in=False):
+        """
+        Hides the crossings under the leg of a spider from ``source`` to
+        ``target``, drawn as :meth:`draw_wire` draws it, or near its dot
+        when ``source == target``, as a braid hides
+        its strand under, e.g. a wire passing behind a spider as it slides
+        through it along an isotopy, see
+        :meth:`discopy.drawing.Drawing.slide`. Only with ``smooth_wires``,
+        and only :class:`Matplotlib` draws it.
+        """
 
     def draw_bezier(self, points, adaptive=True):
         """ Draws a cubic Bezier curve from a list of four control points. """
@@ -979,6 +990,18 @@ class Backend(ABC):
                 self.draw_permutation(graph.positions, node)
             elif node.box.is_crossing:
                 self.draw_braid(graph.positions, node)
+        if params.get("smooth_wires"):
+            for node in graph.nodes:
+                if node.kind == "box" and node.box.draw_as_spider:
+                    self.draw_halo(graph.positions[node],
+                                   graph.positions[node])
+            for source, target in graph.edges():
+                if source.kind == "box" and source.box.draw_as_spider:
+                    self.draw_halo(graph.positions[source],
+                                   graph.positions[target], bend_out=True)
+                elif target.kind == "box" and target.box.draw_as_spider:
+                    self.draw_halo(graph.positions[source],
+                                   graph.positions[target], bend_in=True)
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
@@ -1127,10 +1150,13 @@ class Backend(ABC):
         # by widening the (relative) gap when the braid is short.
         # A short braid, e.g. one shrinking along an isotopy, has a gap that
         # shrinks with it, so that its strand under is not cut to pieces.
+        # It has no gap once the strand over it has shrunk to a point.
         height = abs(left[0][1] - left[1][1])
-        gap = min(0.3, 0.1 / height, 0.9 * height) if height else 0
         # The left wire goes under the right one unless the box is dagger.
         over, under = (left, right) if box.is_dagger else (right, left)
+        gap = min(0.3, 0.1 / height, 0.9 * height, abs(
+            over[0][0] - over[1][0]) + abs(over[0][1] - over[1][1]))\
+            if height else 0
         self.draw_braid_strand(*under, middle, gap=gap, adaptive=adaptive)
         self.draw_braid_strand(*over, middle, adaptive=adaptive)
 
@@ -2337,6 +2363,18 @@ class Matplotlib(Backend):
                 gid=self.dark_gid("stroke")
                 if adaptive and linewidth else None))
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
+
+    def draw_halo(self, source, target, bend_out=False, bend_in=False):
+        if source == target:
+            self.axis.add_patch(Circle(
+                source, .15, facecolor='white', edgecolor='none'))
+            return
+        mid = (target[0], source[1]) if bend_out else (source[0], target[1])
+        self.axis.add_patch(PathPatch(
+            Path([source, mid, target],
+                 [Path.MOVETO, Path.CURVE3, Path.CURVE3]),
+            facecolor='none', edgecolor='white', capstyle='butt',
+            linewidth=8 * self.linewidth))
 
     def draw_bezier(self, points, adaptive=True):
         path = Path(
