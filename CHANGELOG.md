@@ -95,6 +95,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `discolean/DisCoLean/Statements/English.lean` proves ([next#622]).
+- `lambek.abstract.Lexicon.parse` inverts a lexicon, so the grammar reads that
+  Lean statement back to English, and `Lexicon.likelihood` scores a reading
+  under a probabilistic grammar counted in a treebank, the best of them
+  being one explanation; in the Lean lexicon *the* is now an equation and a uniqueness, a bare object an
+  embedding ([next#713]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -541,6 +546,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- The README has a How section: DisCoPy began as an implementation of
+  DisCoCat and QNLP models, and it links that application to
+  `discopy.lambek`, where discopy.org links it to lambeq ([next#714]).
+
+- `interaction.Diagram` declares `dagger_involution` and
+  `dagger_monoidality` broken with "Feedback has no dagger", as it does
+  `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
+  integer diagram has no dagger, so the property matrix found a
+  counterexample to each under `explore` ([next#701]).
 
 - `interaction.Ty.strategy` draws each side of an integer type with at most
   two generators, enough to tell the conventions of cups and caps apart: the
@@ -1996,6 +2011,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest/test_corpus.py` replays a committed corpus of terms written by hand
+  or by a language model, `proptest/corpus/`, against the laws of the property
+  matrix, deterministically and offline, with a first corpus for
+  `symmetric.Diagram`: shapes the strategies draw rarely or never, e.g. boxes
+  that share a name or carry `data`, bubbles and multi-wire feedback. A pilot
+  on `symmetric`, `compact` and `Int` found no counterexample beyond those
+  already declared ([next#707]).
 - The `proptest` workflow runs every cell at `pr`'s twenty examples under
   `--hypothesis-seed=0` on `main` too, with one worker per vCPU, and no longer
   runs nightly: `explore`'s thousand examples per cell had cancelled every run
@@ -2602,11 +2624,15 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
+[next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
 [next#711]: https://github.com/rel-int/discopy-next/pull/711
+[next#713]: https://github.com/rel-int/discopy-next/pull/713
+[next#714]: https://github.com/rel-int/discopy-next/pull/714
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
