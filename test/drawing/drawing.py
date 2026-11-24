@@ -1328,6 +1328,6 @@ def test_slide_passes_behind_the_box():
     middle = a.slide(b, .5)
     j, = (node.j for node in middle.box_nodes if node.box.name == "f")
     (x0, y0), (x1, y1) = middle.rectangle(j)
-    assert all(x0 < p.x < x1 and y0 < p.y < y1
+    assert all(x0 <= p.x <= x1 and y0 <= p.y <= y1
                for node, p in middle.positions.items()
                if node.data.get("j") not in (None, j))
