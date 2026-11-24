@@ -5,5 +5,5 @@
 - [x] Rank the live cells and publish 30 picks, each with its reason and predicted counterexample
 - [x] Hunt the picks: explore-budget Hypothesis and hand-written candidates
 - [x] Control: the same explore budget on 30 random live cells
-- [ ] File each counterexample as an issue, declare its law failing, add its entry to the corpus
+- [x] File each counterexample as an issue, declare its law failing, add its entry to the corpus, filed as #716
 - [ ] Record the result on #43
