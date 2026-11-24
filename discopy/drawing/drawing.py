@@ -430,7 +430,6 @@ which to_drawing recomputes.
     cod_nodes = property(lambda self: self.nodes_of_kind("cod"))
     box_dom_nodes = property(lambda self: self.nodes_of_kind("box_dom"))
     box_cod_nodes = property(lambda self: self.nodes_of_kind("box_cod"))
-    wire_nodes = property(lambda self: self.nodes_of_kind("wire"))
 
     def __init__(
             self, inside, dom, cod, boxes=(), width=0, height=0, _check=True):
@@ -478,8 +477,8 @@ which to_drawing recomputes.
                 assert target.kind == "box_cod"
             elif source.kind == "box_dom":
                 assert target.kind == "box"
-            elif source.kind in ("dom", "box_cod", "wire"):
-                assert target.kind in ("cod", "box_dom", "wire")
+            elif source.kind in ("dom", "box_cod"):
+                assert target.kind in ("cod", "box_dom")
             else:
                 raise ValueError(f"Wrong edge {source} -> {target}")
 
@@ -491,7 +490,7 @@ which to_drawing recomputes.
             (y for (_, y) in self.positions.values()), default=0)
 
         assert set(self.positions.keys()) == set(self.nodes) == set(
-            self.dom_nodes + self.cod_nodes + self.wire_nodes) | set(
+            self.dom_nodes + self.cod_nodes) | set(
                 self.box_dom_nodes + self.box_nodes + self.box_cod_nodes)
         assert all(isinstance(x, Point) for x in self.positions.values())
 
@@ -1257,8 +1256,6 @@ which to_drawing recomputes.
         other_mapping.update({
             n: n.shift_j(len(self.boxes))
             for n in other.nodes if "box" in n.kind})
-        other_mapping.update({
-            n: n.shift_i(len(self.wire_nodes)) for n in other.wire_nodes})
 
         result = self.relabel_nodes(mapping, positions, _check=False).union(
                 other.relabel_nodes(other_mapping), dom, cod, _check=False)
@@ -1345,8 +1342,6 @@ which to_drawing recomputes.
         mapping = {
             n: n.shift_j(len(self.boxes))
             for n in other.nodes if "box" in n.kind}
-        mapping.update({
-            n: n.shift_i(len(self.wire_nodes)) for n in other.wire_nodes})
         mapping.update({n: n.shift_i(len(self.dom)) for n in other.dom_nodes})
         mapping.update({n: n.shift_i(len(self.cod)) for n in other.cod_nodes})
         if self.height < other.height:
@@ -1409,7 +1404,6 @@ which to_drawing recomputes.
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({
             n: Node("dom", i=i, x=n.x) for i, n in enumerate(self.cod_nodes)})
-        mapping.update({n: n for n in self.wire_nodes})
         graph = nx.relabel_nodes(self.graph, mapping).reverse()
         inside = PlaneGraph(graph, positions={
             mapping[n]: Point(x, self.height - y)

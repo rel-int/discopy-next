@@ -38,4 +38,4 @@ the plane, and the backends that render them.
     discopy.drawing.typst_ast
     discopy.drawing.widget
     discopy.drawing.nicer
-    discopy.drawing.layout
+    discopy.drawing.optimiser

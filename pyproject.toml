@@ -65,7 +65,7 @@ quantum = ["discopy[quantum]"]
 lambek = ["discopy[lambek]"]
 optyx = ["discopy[optyx]"]
 typst = ["discopy[typst]"]
-layout = ["discopy[layout]"]
+optimiser = ["discopy[optimiser]"]
 all = [
     { include-group = "dev" },
     { include-group = "docs" },
@@ -75,7 +75,7 @@ all = [
     { include-group = "lambek" },
     { include-group = "optyx" },
     { include-group = "typst" },
-    { include-group = "layout" },
+    { include-group = "optimiser" },
 ]
 
 [project.optional-dependencies]
@@ -121,7 +121,7 @@ optyx = [
     "sympy",
 ]
 test = [
-    "discopy[layout,lambek,notebooks,optyx,quantum]",
+    "discopy[optimiser,lambek,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",
@@ -159,7 +159,7 @@ docs  = [
 typst = [
     "typst >= 0.15.0",
 ]
-layout = [
+optimiser = [
     "osqp>=1.1.3",
 ]
 

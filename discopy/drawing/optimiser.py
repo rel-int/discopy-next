@@ -29,6 +29,11 @@ Summary
     :toctree:
 
     OpenQP
+    Optimised
+    Waypoints
+    Matplotlib
+    TikZ
+    Typst
 
 .. autosummary::
     :template: function.rst
@@ -44,9 +49,9 @@ Example
 >>> f, g = Box('f', x, x ** 3), Box('g', x ** 2, x)
 >>> u, v = Box('u', Ty(), x ** 3), Box('v', x ** 6, Ty())
 >>> diagram = u >> g @ f >> x @ f @ x @ x >> v
->>> diagram.draw(doctest="docs/_static/drawing/layout-before.svg")
+>>> diagram.draw(doctest="docs/_static/drawing/optimiser-before.svg")
 
-.. image:: /_static/drawing/layout-before.svg
+.. image:: /_static/drawing/optimiser-before.svg
     :align: center
 
 Where the drawing of a box stretches the boxes around it until its wires
@@ -55,9 +60,9 @@ are vertical, its open program stretches them as much as it needs to:
 >>> drawing = to_drawing(diagram)  # doctest: +EXTRA
 >>> drawing.width, diagram.to_drawing().width
 (6.0, 6.5)
->>> drawing.draw(doctest="docs/_static/drawing/layout-after.svg")
+>>> drawing.draw(doctest="docs/_static/drawing/optimiser-after.svg")
 
-.. image:: /_static/drawing/layout-after.svg
+.. image:: /_static/drawing/optimiser-after.svg
     :align: center
 """
 
@@ -70,6 +75,7 @@ import numpy as np
 
 from discopy import messages, monoidal
 from discopy.abc import MonoidalCategory
+from discopy.drawing import backend
 from discopy.drawing.drawing import (
     Drawing, Node, PlaneGraph, Point, trailing_margin)
 from discopy.utils import assert_iscomposable, factory, unbiased
@@ -79,6 +85,103 @@ Linear = tuple[tuple[int, float], ...]
 
 MARGIN = 0.25
 """ The height above and below the band of a layer where its wires bend. """
+
+
+class Waypoints(backend.Backend):  # pylint: disable=abstract-method
+    """
+    A backend mixin that draws the wires of an :class:`Optimised` drawing:
+    each edge from or to a waypoint as a cubic Bezier, along the ``tangent``
+    of a waypoint that has one, else vertical half way down, and every
+    other edge as its backend does.
+    """
+    def draw_wires(self, graph, **params):
+        """ Draw the edges at a waypoint, then the others as before. """
+        rest = graph.relabel_nodes()
+        for source, target in sorted(graph.edges, key=repr):
+            if "wire" not in (source.kind, target.kind):
+                continue
+            rest.graph.remove_edge(source, target)
+            start, end = graph.positions[source], graph.positions[target]
+            if source.kind in ("dom", "box_cod"):
+                self.draw_wire_label(source.x, *start, **params)
+            self.draw_bezier(
+                [start, *controls(source, target, start, end), end],
+                adaptive=self.on_neutral_canvas(
+                    getattr(source, "x", None) or getattr(target, "x", None)))
+        super().draw_wires(rest, **params)
+
+
+def controls(source, target, start, end) -> tuple:
+    """
+    The two inner control points of the Bezier of a wire between two nodes
+    at two points, see :class:`Waypoints`.
+    """
+    middle = (start[1] + end[1]) / 2
+    first = (start[0] + source.tangent[0], start[1] + source.tangent[1])\
+        if hasattr(source, "tangent") else (start[0], middle)
+    second = (end[0] - target.tangent[0], end[1] - target.tangent[1])\
+        if hasattr(target, "tangent") else (end[0], middle)
+    return first, second
+
+
+class Optimised(Drawing):
+    """
+    The drawing an optimiser lays out: a :class:`Drawing` whose wires go
+    through waypoints, nodes of kind ``wire``, drawn by a backend with
+    :class:`Waypoints`. It is a picture, not a morphism of drawings: it is
+    not composed, and it has no dagger.
+    """
+    wire_nodes = property(lambda self: self.nodes_of_kind("wire"))
+
+    def dagger(self):
+        raise NotImplementedError(messages.OPTIMISED_DAGGER)
+
+    def framed(self) -> Drawing:
+        result = Optimised(
+            PlaneGraph(self.graph.copy(), dict(self.positions)), self.dom,
+            self.cod, self.boxes, self.width, self.height, _check=False)
+        result.add_box_corners()
+        return result
+
+    @backend.matplotlib_context()
+    def draw(self, **params):
+        """
+        Draw with the backend asked for, as :meth:`Drawing.draw` does, with
+        :class:`Waypoints` mixed in.
+        """
+        params.setdefault("asymmetry", self.asymmetry())
+        if params.get("format") == "typst":
+            path, compare = backend.doctest_or_path(
+                params.pop("path", None), params.pop("doctest", None))
+            show = params.pop("show", True)
+            compare = params.pop("compare", False) or compare
+            return Typst(**params).draw(
+                self.framed(), **params).output(
+                    path=path, show=show, compare=compare, **params)
+        if params.get("to_tikz", False):
+            params.setdefault("backend", TikZ(
+                use_tikzstyles=params.get("use_tikzstyles", None)))
+        else:
+            aspect = params.get(
+                "aspect", "auto" if "figsize" in params else "equal")
+            params.setdefault("backend", Matplotlib(
+                figsize=params.get("figsize", None if aspect == "auto" else (
+                    self.width or 1, self.height or 1)),
+                linewidth=params.get("linewidth", 1),
+                format=params.get("format", None)))
+        return backend.draw(self.framed(), **params)
+
+
+class Matplotlib(Waypoints, backend.Matplotlib):
+    """ The matplotlib backend, with :class:`Waypoints`. """
+
+
+class TikZ(Waypoints, backend.TikZ):
+    """ The TikZ backend, with :class:`Waypoints`. """
+
+
+class Typst(Waypoints, backend.Typst):
+    """ The Typst backend, with :class:`Waypoints`. """
 
 
 @factory
@@ -390,7 +493,7 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
         return OpenQP.id(self.dom, half) >> self >> OpenQP.id(self.cod, half)
 
     def solve(self, width: float = 1., bend: float = 1.,
-              square: float = .25) -> Drawing:
+              square: float = .25) -> Optimised:
         """
         The drawing that minimises its cost, with its left extent at zero, by
         `OSQP <https://osqp.org>`_: the width of the drawing and of each of
@@ -458,7 +561,7 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
                 result.info.status))
         return self.to_drawing([round(float(v), 6) + 0. for v in result.x])
 
-    def to_drawing(self, values) -> Drawing:
+    def to_drawing(self, values) -> Optimised:
         """
         The drawing at a value of the variables, its left extent at zero.
 
@@ -472,8 +575,8 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
         graph.add_nodes_from(positions)
         graph.add_edges_from(self.edges)
         width = max([values[self.right]] + [p.x for p in positions.values()])
-        return Drawing(PlaneGraph(graph, positions), self.dom, self.cod,
-                       self.boxes, width, self.height)
+        return Optimised(PlaneGraph(graph, positions), self.dom, self.cod,
+                         self.boxes, width, self.height, _check=False)
 
     @staticmethod
     def functor(dom: type | None = None):
@@ -490,7 +593,7 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
             dom or monoidal.Diagram, OpenQP)
 
 
-def to_drawing(diagram: monoidal.Diagram, **weights: float) -> Drawing:
+def to_drawing(diagram: monoidal.Diagram, **weights: float) -> Optimised:
     """
     The drawing of a diagram laid out by its open program, see
     :meth:`OpenQP.solve`.

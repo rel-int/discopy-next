@@ -3,7 +3,7 @@ from hypothesis import given, settings
 
 from discopy import monoidal
 from discopy.monoidal import Ty, Box
-from discopy.drawing.layout import OpenQP, to_drawing
+from discopy.drawing.optimiser import OpenQP, to_drawing
 
 pytest.importorskip("osqp")
 
@@ -62,10 +62,24 @@ def test_one_box_at_a_time():
         OpenQP.from_drawing((Box('f', x, x) @ Box('g', x, x)).to_drawing())
 
 
-def test_dagger_reflects_waypoints():
+def test_a_picture_has_no_dagger():
     drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
     assert drawing.wire_nodes
-    assert drawing.dagger().dagger() == drawing
+    with pytest.raises(NotImplementedError):
+        drawing.dagger()
+
+
+@pytest.mark.parametrize("params", [
+    {}, {"to_tikz": True}, {"format": "typst"}])
+def test_every_backend_draws_waypoints(tmp_path, params):
+    drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
+    suffix = {"to_tikz": ".tikz", "format": ".svg"}
+    path = tmp_path / ("out" + next(
+        (suffix[k] for k in params), ".png"))
+    if params.get("format") == "typst":
+        pytest.importorskip("typst")
+    drawing.draw(path=str(path), **params)
+    assert path.exists() and path.stat().st_size
 
 
 def test_weights_are_not_negative():

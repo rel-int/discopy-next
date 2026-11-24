@@ -9,13 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `discopy.drawing.layout`: a monoidal functor from diagrams to `OpenQP`,
-  the category of open quadratic programs over the abscissas of a drawing,
-  where composition identifies the boundary variables and adds the costs
-  and tensor adds a separation constraint. `layout.to_drawing` solves it
-  with OSQP, the optional extra `layout`, keeping the isotopy class and
+- `discopy.drawing.optimiser`, a layout apart from `Diagram.draw`, which
+  is unchanged: a monoidal functor from diagrams to `OpenQP`, the category
+  of open quadratic programs over the abscissas of a drawing, where
+  composition identifies the boundary variables and adds the costs and
+  tensor adds a separation constraint. `optimiser.to_drawing` solves it with
+  OSQP, the optional extra `optimiser`, keeping the isotopy class and
   weighing the straightness of the wires against the width of the drawing
-  and of its boxes ([next#688]).
+  and of its boxes, and returns an `optimiser.Optimised` drawing whose wires
+  go through waypoints ([next#688]).
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
   Bill does too.*, each reading a `closed` lambda term sent by a functor

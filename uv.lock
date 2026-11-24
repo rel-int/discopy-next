@@ -933,9 +933,6 @@ lambek = [
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
-layout = [
-    { name = "osqp" },
-]
 notebooks = [
     { name = "anywidget" },
     { name = "ipykernel" },
@@ -945,6 +942,9 @@ notebooks = [
     { name = "pandas" },
     { name = "seaborn" },
     { name = "tqdm" },
+]
+optimiser = [
+    { name = "osqp" },
 ]
 optyx = [
     { name = "cotengra" },
@@ -1032,7 +1032,7 @@ typst = [
 [package.dev-dependencies]
 all = [
     { name = "coverage" },
-    { name = "discopy", extra = ["docs", "lambek", "layout", "notebooks", "optyx", "quantum", "tensor", "typst"] },
+    { name = "discopy", extra = ["docs", "lambek", "notebooks", "optimiser", "optyx", "quantum", "tensor", "typst"] },
     { name = "egglog" },
     { name = "hypothesis" },
     { name = "marimo" },
@@ -1065,11 +1065,11 @@ docs = [
 lambek = [
     { name = "discopy", extra = ["lambek"] },
 ]
-layout = [
-    { name = "discopy", extra = ["layout"] },
-]
 notebooks = [
     { name = "discopy", extra = ["notebooks"] },
+]
+optimiser = [
+    { name = "discopy", extra = ["optimiser"] },
 ]
 optyx = [
     { name = "discopy", extra = ["optyx"] },
@@ -1090,7 +1090,7 @@ requires-dist = [
     { name = "cotengra", marker = "extra == 'optyx'" },
     { name = "cotengra", marker = "extra == 'tensor'" },
     { name = "coverage", marker = "extra == 'test'" },
-    { name = "discopy", extras = ["lambek", "layout", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
+    { name = "discopy", extras = ["lambek", "notebooks", "optimiser", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks", "optyx"], marker = "extra == 'docs'" },
     { name = "graphix", marker = "extra == 'optyx'", specifier = ">=0.4" },
     { name = "hypothesis", marker = "extra == 'test'" },
@@ -1110,7 +1110,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "opt-einsum", marker = "extra == 'optyx'" },
     { name = "opt-einsum", marker = "extra == 'tensor'" },
-    { name = "osqp", marker = "extra == 'layout'", specifier = ">=1.1.3" },
+    { name = "osqp", marker = "extra == 'optimiser'", specifier = ">=1.1.3" },
     { name = "pandas", marker = "extra == 'notebooks'" },
     { name = "pennylane", marker = "extra == 'quantum'", specifier = ">=0.45.0" },
     { name = "pennylane-qiskit", marker = "extra == 'quantum'", specifier = ">=0.45.0" },
@@ -1154,15 +1154,15 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'lambek'" },
     { name = "typst", marker = "extra == 'typst'", specifier = ">=0.15.0" },
 ]
-provides-extras = ["tensor", "quantum", "lambek", "optyx", "test", "notebooks", "docs", "typst", "layout"]
+provides-extras = ["tensor", "quantum", "lambek", "optyx", "test", "notebooks", "docs", "typst", "optimiser"]
 
 [package.metadata.requires-dev]
 all = [
     { name = "coverage" },
     { name = "discopy", extras = ["docs"] },
     { name = "discopy", extras = ["lambek"] },
-    { name = "discopy", extras = ["layout"] },
     { name = "discopy", extras = ["notebooks"] },
+    { name = "discopy", extras = ["optimiser"] },
     { name = "discopy", extras = ["optyx"] },
     { name = "discopy", extras = ["quantum"] },
     { name = "discopy", extras = ["tensor"] },
@@ -1195,8 +1195,8 @@ dev = [
 ]
 docs = [{ name = "discopy", extras = ["docs"] }]
 lambek = [{ name = "discopy", extras = ["lambek"] }]
-layout = [{ name = "discopy", extras = ["layout"] }]
 notebooks = [{ name = "discopy", extras = ["notebooks"] }]
+optimiser = [{ name = "discopy", extras = ["optimiser"] }]
 optyx = [{ name = "discopy", extras = ["optyx"] }]
 quantum = [{ name = "discopy", extras = ["quantum"] }]
 tensor = [{ name = "discopy", extras = ["tensor"] }]

@@ -242,6 +242,8 @@ LAYOUT_NOT_A_BOX = (
     "a frame.")
 LAYOUT_INFEASIBLE = "The open program of this diagram is {}."
 LAYOUT_WEIGHTS = "The weights of a layout cannot be negative."
+OPTIMISED_DAGGER = (
+    "An optimised drawing has no dagger: lay out the dagger of the diagram.")
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")

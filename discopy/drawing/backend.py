@@ -987,15 +987,6 @@ class Backend(ABC):
             if any(n.kind == "box" and n.box.is_crossing
                    for n in (source, target)):
                 continue  # crossings are drawn on their own
-            if "wire" in (source.kind, target.kind):
-                middle = (source_position[1] + target_position[1]) / 2
-                self.draw_bezier([
-                    source_position, (source_position[0], middle),
-                    (target_position[0], middle), target_position],
-                    adaptive=self.on_neutral_canvas(
-                        getattr(source, 'x', None)
-                        or getattr(target, 'x', None)))
-                continue  # a waypoint of a layout, see drawing.layout
             bend_out, bend_in = source.kind == "box", target.kind == "box"
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             self.draw_wire(
