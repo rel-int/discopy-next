@@ -70,7 +70,7 @@ Drawn with ``tween`` frames, two interchangers take one scalar around the
 other:
 
 >>> _ = (s0 >> s1).to_gif(
-...     s1 >> s0, s0 >> s1, tween=12, timestep=60,
+...     s1 >> s0, s0 >> s1, tween=12, timestep=60, loop=True,
 ...     doctest="docs/_static/monoidal/EckmannHilton.gif")
 
 .. image:: /_static/monoidal/EckmannHilton.gif

@@ -162,7 +162,9 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         move apart. The wires between two ports are then drawn vertical at
         both ends, i.e. with :code:`smooth_wires=True`.
     loop : bool, optional
-        Whether to loop, default is :code:`False`
+        Whether to loop, default is :code:`False`, going back to the first
+        diagram by playing the gif backwards unless it ends where it starts,
+        e.g. the loop of an Eckmann-Hilton argument.
     params : any, optional
         Passed to :meth:`Diagram.draw`.
     """
@@ -186,7 +188,9 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
             tmp_path = os.path.join(directory, f'{i}.png')
             _diagram.draw(path=tmp_path, **dict(params, show=False))
             frames.append(Image.open(tmp_path))
-        if loop:
+        if loop and diagrams and diagrams[-1] == diagram:
+            frames = frames[:-1]
+        elif loop:
             frames = frames + frames[::-1]
 
         def save(actual_path):
