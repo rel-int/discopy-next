@@ -18,4 +18,4 @@
 
 - [x] README.md: a How section after Features, the discopy.org sentence pointed at discopy.lambek
 - [x] CHANGELOG.md: a bullet under [Unreleased] naming this pull request
-- [ ] Open the pull request with the template's Why, What and How
+- [WIP] @T-fce99082-2026-11-24 10:39 Open the pull request with the template's Why, What and How
