@@ -17,7 +17,6 @@ Summary
     Arrow
     Box
     Id
-    Sum
     Bubble
     Functor
     Transformation
@@ -124,7 +123,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import suppress
-from functools import total_ordering, cached_property, reduce
+from functools import total_ordering, reduce
 from inspect import signature
 from itertools import count
 from typing import (
@@ -149,7 +148,6 @@ from discopy.utils import (  # noqa: F401
     MappingOrCallable,
     assert_isinstance,
     assert_iscomposable,
-    assert_isparallel,
     get_origin,
     identity,
 )
@@ -157,6 +155,8 @@ from discopy.utils import (  # noqa: F401
 if TYPE_CHECKING:
     import sympy
     from hypothesis import strategies as st
+    from discopy.kleisli.monad import Monad
+    from discopy.monad.algebra import Algebra
 
 dumps, loads = utils.dumps, utils.loads
 
@@ -457,7 +457,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     see :class:`monoidal.Nat`.
     """
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
+    sum_factory: ClassVar[type[formal_sum.Sum]]
     bubble_factory: ClassVar[type["Bubble"]]
     ob = Ob
 
@@ -587,7 +587,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> assert Arrow.id() == Id() == Id(Ob())
         >>> assert Arrow.id('x') == Id('x') == Id(Ob('x'))
         """
-        if any(isinstance(other, Sum) for other in others):
+        if any(isinstance(other, formal_sum.Sum) for other in others):
             return self.sum_factory((self, )).then(*others)
         return super().then(*others)
 
@@ -601,6 +601,50 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
             cod : The codomain of the empty sum.
         """
         return cls.sum_factory((), dom, cod)
+
+    @classmethod
+    def algebra(cls, monad: Monad, dom: Ob, cod: Ob) -> Algebra:
+        """
+        The algebra of a monad on the arrows from ``dom`` to ``cod``, by which
+        a functor into arrows extends to the change of base of its domain,
+        see :class:`discopy.enriched.Functor`: the formal
+        :class:`~discopy.sum.Sum` of a list of arrows, for the
+        :attr:`~discopy.kleisli.monad.List` monad.
+
+        Parameters:
+            monad : The monad, the list monad alone here.
+            dom : The domain of the arrows.
+            cod : The codomain of the arrows.
+
+        Raises:
+            TypeError : For any monad but the list monad.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import List
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f, g = Box('f', x, y), Box('g', x, y)
+        >>> total = Arrow.algebra(List, x, y)
+        >>> assert total([f, g]) == f + g and total([]) == Arrow.zero(x, y)
+        >>> assert total.unitality(f) and total.associativity([[f], [], [g]])
+
+        The algebra is named by its homset, so that two homsets have two:
+
+        >>> total
+        monad.algebra.Algebra[List]('sum x -> y', cat.Arrow)
+        >>> assert total != Arrow.algebra(List, y, x)
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import cat
+        from discopy.kleisli.monad import List
+        # pylint: disable-next=import-outside-toplevel  # they import cat
+        from discopy.monad import algebra
+        if monad != List:
+            raise TypeError(messages.NO_ALGEBRA.format(
+                factory_name(cls), monad))
+        dom, cod = map(cls.cast_ob, (dom, cod))
+        return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
+            f"sum {dom} -> {cod}", cls,
+            lambda arrows: sum(arrows, cls.zero(dom, cod)))
 
     def bubble(self, *args, **kwargs) -> Bubble:
         """ Unary operator on homsets. """
@@ -898,135 +942,6 @@ class Box(Arrow):
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
         data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
         return cls(name=name, dom=dom, cod=cod, data=data, is_dagger=is_dagger)
-
-
-class Sum(Box):
-    """
-    A sum is a tuple of arrows :code:`terms` with the same domain and codomain.
-
-    Parameters:
-        terms : The terms of the formal sum.
-        dom : The domain of the formal sum.
-        cod : The codomain of the formal sum.
-
-    Example
-    -------
-    >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
-    >>> f, g = Box('f', x, y), Box('g', y, z)
-    >>> unit = Sum((), x, y)
-    >>> assert f + unit == f == unit + f
-    >>> assert f >> (g + g) == (f >> g) + (f >> g) == (f + f) >> g
-
-    Important
-    ---------
-    Domain and codomain are optional only if the terms are non-empty.
-
-    Note
-    ----
-    The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
-    """
-    serialised_attrs = ("terms", "dom", "cod")
-
-    def __init__(
-            self, terms: tuple[Arrow, ...],
-            dom: Ob | None = None, cod: Ob | None = None):
-        terms = tuple(terms)
-        if not terms and (dom is None or cod is None):
-            raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
-        dom = terms[0].dom if dom is None else dom
-        cod = terms[0].cod if cod is None else cod
-        unit = Sum((), dom, cod) if terms else None
-        for arrow in terms:
-            assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
-        self.terms = terms
-        super().__init__("", dom, cod)
-        del self.name
-
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        """ The name of a sum is its :code:`repr`, computed when needed. """
-        str_args = "" if self.terms\
-            else f", dom={repr(self.dom)}, cod={repr(self.cod)}"
-        return factory_name(type(self))\
-            + f"(terms={repr(self.terms)}{str_args})"
-
-    @property
-    def is_generator(self):
-        return len(self.terms) == 1 and self.terms[0].is_generator
-
-    @property
-    def generator(self):
-        return self.terms[0].generator if self.is_generator else None
-
-    def setoid(self):
-        """ Ensure that a singleton sum is in fact equal to its only term. """
-        return self.terms[0].setoid() if len(self.terms) == 1 else (
-            factory_key(type(self)), self.terms, self.dom, self.cod)
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return " + ".join(f"({arrow})" for arrow in self.terms)\
-            if self.terms else\
-            f"{factory_name(type(self))}((), {self.dom}, {self.cod})"
-
-    def atoms(self) -> list:
-        """ The atoms of a sum: those of its boundary and of its terms. """
-        return self.dom.atoms() + self.cod.atoms() + [
-            atom for term in self.terms for atom in term.atoms()]
-
-    def __add__(self, other):
-        assert_isparallel(self, other)
-        other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        return self.sum_factory(
-            (*self.terms, *other.terms), self.dom, self.cod)
-
-    def __iter__(self):
-        for arrow in self.terms:
-            yield arrow
-
-    def __len__(self):
-        return len(self.terms)
-
-    @unbiased
-    def then(self, other):
-        assert_iscomposable(self, other)
-        other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        terms = tuple(f.then(g) for f in self.terms for g in other.terms)
-        return self.sum_factory(terms, self.dom, other.cod)
-
-    def dagger(self):
-        terms = tuple(f.dagger() for f in self.terms)
-        return self.sum_factory(terms, self.cod, self.dom)
-
-    @property
-    def free_symbols(self):
-        return {x for box in self.terms for x in box.free_symbols}
-
-    def subs(self, *args):
-        terms = tuple(f.subs(*args) for f in self.terms)
-        return self.sum_factory(terms, self.dom, self.cod)
-
-    def lambdify(self, *symbols, **kwargs):
-        return lambda *xs: self.sum_factory(
-            tuple(box.lambdify(*symbols, **kwargs)(*xs) for box in self.terms),
-            dom=self.dom, cod=self.cod)
-
-    def to_tree(self):
-        return {
-            'factory': factory_name(type(self)),
-            'terms': [t.to_tree() for t in self.terms],
-            'dom': self.dom.to_tree(),
-            'cod': self.cod.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        terms = tuple(map(from_tree, tree['terms']))
-        return cls(terms=terms, dom=dom, cod=cod)
 
 
 class Bubble(Box):
@@ -1432,7 +1347,7 @@ which JSON cannot hold.
             if isinstance(result, tuple) and not issubclass(origin, Nat):
                 return self.cod.ob(*result)
             return self.cod.ob(result)
-        if isinstance(other, Sum):
+        if isinstance(other, formal_sum.Sum):
             return sum(map(self, other.terms),
                        self.cod.zero(self(other.dom), self(other.cod)))
         if isinstance(other, Bubble) and hasattr(self.cod, other.method):
@@ -1661,7 +1576,6 @@ which JSON cannot hold.
 
 Ob.equation_factory = Equation
 Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
-Arrow.sum_factory = Sum
 Arrow.bubble_factory = Bubble
 Arrow.functor_factory = Functor
 Id = Arrow.id
@@ -2262,20 +2176,22 @@ class TermBase(Serialisable, AlphaEquivalence):
 
     @classmethod
     def generate(cls, cod: Ob, choices: Sequence[int], types: Sequence[Ob],
-                 letters: Sequence[str]) -> TermBase:
+                 letters: Sequence[str | None]) -> TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, one
         per node and leaves once it runs out: a variable, free and named
         ``v0`` or bound by a kappa, under fresh constants ``c0, c1, ...``,
         each one applied or the body of a statement. The variable bound at
         each level is named by the letter at that level, so that one
-        sequence of choices under two namings gives alpha-equivalent terms.
+        sequence of choices under two namings gives alpha-equivalent terms,
+        see :meth:`bound_name`.
 
         Parameters:
             cod : The codomain of the term.
             choices : The choices, consumed one per node.
             types : The types the variables are drawn from.
-            letters : The letters naming the bound variables.
+            letters : The letters naming the bound variables, see
+                :meth:`bound_name`.
 
         Example
         -------
@@ -2285,6 +2201,8 @@ class TermBase(Serialisable, AlphaEquivalence):
         x(lambda a0: let(c1(a0), lambda b1: c0(b1)))
         >>> print(TermBase.generate(y, [0, 1, 1], [x, y], "ab"))
         c0(v0)
+        >>> print(TermBase.generate(y, choices, [x, y], [None]))
+        x(lambda x0: let(c1(x0), lambda x0: c0(x0)))
         """
         left, fresh = iter(choices), count()
 
@@ -2303,16 +2221,50 @@ class TermBase(Serialisable, AlphaEquivalence):
             if kind == "apply":
                 return constant(typ, cod)(state(variable, typ, level))
             bound = cls.variable_factory(
-                f"{letters[level % len(letters)]}{level}", typ)
+                cls.bound_name(letters, level, variable), typ)
             return cls.kappa_factory(
                 (bound, ), state(bound, cod, level + 1))(
                     state(variable, typ, level))
 
         dom = choose(types)
         if choose((True, False)):
-            variable = cls.variable_factory(f"{letters[0]}0", dom)
+            variable = cls.variable_factory(cls.bound_name(letters, 0), dom)
             return cls.kappa_factory((variable, ), state(variable, cod, 1))
         return state(cls.variable_factory("v0", dom), cod, 0)
+
+    @staticmethod
+    def bound_name(letters: Sequence[str | None], level: int,
+                   shadowed: Variable | None = None) -> str:
+        """
+        The name of the variable bound at a level: its letter and the level,
+        or the name of the variable it ``shadowed`` when the letter is
+        ``None``, i.e. one the expression of its :func:`let` uses up, which
+        the body cannot see, so that the term is alpha-equivalent to the one
+        of any other letter.
+
+        Example
+        -------
+        >>> x = Variable('x0', Ob('x'))
+        >>> assert TermBase.bound_name("ab", 1, x) == "b1"
+        >>> assert TermBase.bound_name([None], 1, x) == "x0"
+        >>> assert TermBase.bound_name([None], 1) == "x1"
+        """
+        letter = letters[level % len(letters)]
+        if letter is None and shadowed is not None:
+            return shadowed.name
+        return f"{'x' if letter is None else letter}{level}"
+
+    @classmethod
+    def namings(cls) -> st.SearchStrategy[list[str | None]]:
+        """
+        Generate the letters naming the bound variables, one per level, or
+        ``None`` to shadow a variable, see :meth:`bound_name`: as often as
+        not, every variable that can shadow one does.
+        """
+        from hypothesis import strategies as st
+
+        return st.just([None]) | st.lists(
+            st.sampled_from(("x", "y", "z", None)), min_size=1, max_size=3)
 
     @classmethod
     def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
@@ -2552,12 +2504,14 @@ type y.
     def contractible(func: TermBase, arg: TermBase) -> bool:
         """
         Whether a function applied to an argument is a redex to contract:
-        the kappa of a variable of the type of the argument, binding none
-        of its free variables.
+        the kappa of a variable of the type of the argument, whose other
+        variables, still bound once it is substituted, capture none of the
+        free variables of the argument. The variable itself may be one of
+        them, which it shadows, e.g. in ``let(f(a), lambda a: g(a))``.
         """
         return isinstance(func, Kappa) and func.head is not None\
-            and func.head.cod == arg.cod\
-            and not set(func.variables).intersection(arg.freevars)
+            and func.head.cod == arg.cod and not set(func.variables)\
+            .difference([func.head]).intersection(arg.freevars)
 
     def normal_form(self):
         func, arg = self.func.normal_form(), self.arg.normal_form()
@@ -2871,3 +2825,8 @@ Arrow.term_factory = TermBase
 TermBase.equivalence_factory = AlphaEquation
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+
+# pylint: disable-next=wrong-import-position,ungrouped-imports  # a cat.Box
+from discopy import sum as formal_sum  # noqa: E402
+
+__getattr__ = utils.deprecated_alias(__name__, {"Sum": "discopy.sum.Sum"})

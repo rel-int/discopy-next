@@ -20,7 +20,6 @@ Summary
     Layer
     Diagram
     Box
-    Sum
     Bubble
     Functor
     Match
@@ -169,6 +168,7 @@ from typing import (
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
+from discopy import sum as formal_sum
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
 # pylint: disable-next=unused-import  # the redex a term prints as
@@ -1445,7 +1445,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         messages.NO_PLANAR_NORMAL_FORM)
 
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
+    sum_factory: ClassVar[type[formal_sum.Sum]]
     bubble_factory: ClassVar[type["Bubble"]]
     functor_factory: ClassVar[type["Functor"]]
     ob = Ty
@@ -1579,7 +1579,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         if not others:
             return self
         for other in others:
-            if isinstance(other, Sum):
+            if isinstance(other, formal_sum.Sum):
                 return self.sum_factory((self, )).tensor(*others)
             assert_isinstance(other, self.ar)
             assert_isinstance(self, other.ar)
@@ -2523,50 +2523,6 @@ class Box(cat.Box, Diagram):
         return Drawing.from_box(self)
 
 
-class Sum(cat.Sum, Box):
-    """
-    A sum is a tuple of diagrams :code:`terms`
-    with the same domain and codomain.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-
-    Example
-    -------
-    >>> f = Box('f', 'x', 'x')
-    >>> print(f @ (f + f))
-    (f @ x >> x @ f) + (f @ x >> x @ f)
-    """
-    @property
-    def size(self):
-        return 1
-
-    def tensor(self, *others):
-        """
-        The tensor of sums distributes over the sum, i.e. its terms are the
-        ``n``-ary tensors of one term from each factor.
-
-        >>> f = Box('f', 'x', 'x')
-        >>> assert (f + f) @ (f + f) == sum(4 * [f @ f])
-        """
-        if not others:
-            return self
-        sums = [
-            other if isinstance(other, Sum) else self.sum_factory((other, ))
-            for other in others]
-        dom = self.dom.tensor(*(other.dom for other in sums))
-        cod = self.cod.tensor(*(other.cod for other in sums))
-        terms = tuple(
-            term.tensor(*rest) for term in self.terms
-            for rest in itertools.product(
-                *(other.terms for other in sums)))
-        return self.sum_factory(terms, dom, cod)
-
-    to_drawing = Diagram.to_drawing
-
-
 class Bubble(cat.Bubble, Box):
     """
     A bubble is a box with diagrams :code:`args` inside and an optional pair of
@@ -2964,7 +2920,7 @@ Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
 Diagram.box_factory = Box
-Diagram.sum_factory = Sum
+Diagram.sum_factory = formal_sum.Sum[Diagram]
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -3089,7 +3045,7 @@ class TermBase(cat.TermBase):
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> cat.TermBase:
+                 letters: Sequence[str | None]) -> cat.TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
         :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
@@ -3485,7 +3441,7 @@ class Sampler:
     terms: type[TermBase]
     choices: Iterator[int]
     types: Sequence[Ty]
-    letters: Sequence[str]
+    letters: Sequence[str | None]
     counter: Iterator[int] = field(default_factory=count)
 
     def choose(self, options: Sequence):
@@ -3500,10 +3456,14 @@ class Sampler:
             f"c{next(self.counter)}", category.ob().tensor(*dom),
             category.ob().tensor(*cod)))
 
-    def bound(self, level: int, cod: Ty) -> cat.Variable:
-        """ The variable bound at a given level, named by its letter. """
+    def bound(self, level: int, cod: Ty,
+              shadowed: cat.Variable | None = None) -> cat.Variable:
+        """
+        The variable bound at a given level, named by its letter or after
+        the variable it shadows, see :meth:`discopy.cat.TermBase.bound_name`.
+        """
         return self.terms.variable_factory(
-            f"{self.letters[level % len(self.letters)]}{level}", cod)
+            self.terms.bound_name(self.letters, level, shadowed), cod)
 
     def shuffle(self, bound: tuple) -> tuple:
         """
@@ -3544,8 +3504,10 @@ class Sampler:
         left, middle, right = self.split(bound, 3)
         types = [
             self.choose(self.types) for _ in range(self.choose((1, 0, 2)))]
+        used_up = [x for x in dict.fromkeys(middle) if x not in left + right]
         variables = tuple(
-            self.bound(level + i, typ) for i, typ in enumerate(types))
+            self.bound(level + i, typ, next(iter(used_up[i:]), None))
+            for i, typ in enumerate(types))
         inside = self.shuffle(left + variables + right)
         expression = self.state(types[0], middle, level) if len(types) == 1\
             else self.spine(types, middle)
@@ -3558,4 +3520,5 @@ Diagram.term_factory = TermBase
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
-__getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
+__getattr__ = deprecated_alias(
+    __name__, {"PRO": "Nat", "Sum": Diagram.sum_factory})

@@ -987,36 +987,12 @@ class Backend(ABC):
             if any(n.kind == "box" and n.box.is_crossing
                    for n in (source, target)):
                 continue  # crossings are drawn on their own
-            if "wire" in (source.kind, target.kind):
-                self.draw_bezier([
-                    source_position, *self.wire_controls(
-                        source, target, source_position, target_position),
-                    target_position],
-                    adaptive=self.on_neutral_canvas(
-                        getattr(source, 'x', None)
-                        or getattr(target, 'x', None)))
-                continue  # a waypoint of a layout, see drawing.layout
             bend_out, bend_in = source.kind == "box", target.kind == "box"
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),
                 adaptive=self.on_neutral_canvas(typ))
-
-    @staticmethod
-    def wire_controls(source, target, source_position, target_position):
-        """
-        The control points of a wire from or to a waypoint of a layout:
-        along the ``tangent`` of a waypoint that has one, see
-        :mod:`discopy.drawing.planar`, else vertical, half way down.
-        """
-        middle = (source_position[1] + target_position[1]) / 2
-        (sx, sy), (tx, ty) = source_position, target_position
-        first = (sx + source.tangent[0], sy + source.tangent[1])\
-            if hasattr(source, "tangent") else (sx, middle)
-        second = (tx - target.tangent[0], ty - target.tangent[1])\
-            if hasattr(target, "tangent") else (tx, middle)
-        return first, second
 
     def fill_fold(self, outer, inner, color):
         """

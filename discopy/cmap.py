@@ -71,7 +71,8 @@ from discopy.abc import (
     TracedCategory,
 )
 from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
-from discopy.cat import Ob, Sum
+from discopy.cat import Ob
+from discopy.sum import Sum
 from discopy.python.finset import Permutation
 from discopy.utils import (
     AxiomError,

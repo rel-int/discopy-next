@@ -213,7 +213,6 @@ The regions of a crossing follow its strands, see
 from __future__ import annotations
 
 import itertools
-import math
 from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
@@ -431,7 +430,6 @@ which to_drawing recomputes.
     cod_nodes = property(lambda self: self.nodes_of_kind("cod"))
     box_dom_nodes = property(lambda self: self.nodes_of_kind("box_dom"))
     box_cod_nodes = property(lambda self: self.nodes_of_kind("box_cod"))
-    wire_nodes = property(lambda self: self.nodes_of_kind("wire"))
 
     def __init__(
             self, inside, dom, cod, boxes=(), width=0, height=0, _check=True):
@@ -479,8 +477,8 @@ which to_drawing recomputes.
                 assert target.kind == "box_cod"
             elif source.kind == "box_dom":
                 assert target.kind == "box"
-            elif source.kind in ("dom", "box_cod", "wire"):
-                assert target.kind in ("cod", "box_dom", "wire")
+            elif source.kind in ("dom", "box_cod"):
+                assert target.kind in ("cod", "box_dom")
             else:
                 raise ValueError(f"Wrong edge {source} -> {target}")
 
@@ -492,7 +490,7 @@ which to_drawing recomputes.
             (y for (_, y) in self.positions.values()), default=0)
 
         assert set(self.positions.keys()) == set(self.nodes) == set(
-            self.dom_nodes + self.cod_nodes + self.wire_nodes) | set(
+            self.dom_nodes + self.cod_nodes) | set(
                 self.box_dom_nodes + self.box_nodes + self.box_cod_nodes)
         assert all(isinstance(x, Point) for x in self.positions.values())
 
@@ -622,9 +620,6 @@ which to_drawing recomputes.
             box_dom_nodes, box_cod_nodes = ([
                     Node(kind, i=i, j=j, x=x) for i, x in enumerate(xs)]
                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)])
-            if getattr(box, "angle", 0):
-                self.add_rotated_corners(j, box, box_dom_nodes + box_cod_nodes)
-                continue
             xs = [self.positions[n].x for n in box_dom_nodes + box_cod_nodes]
             left, right = min(xs + [box_x]) - 0.25, max(xs + [box_x]) + 0.25
             half = max(box.height / 2 - 0.25, 0.25)
@@ -641,27 +636,6 @@ which to_drawing recomputes.
                     continue
             self.positions[box_node] = Point(
                 (right + left) / 2, self.positions[box_node].y)
-
-    def add_rotated_corners(self, j, box, ports):
-        """
-        Draw the corners of a box rotated by its ``angle`` around its node,
-        as :meth:`add_box_corners` draws those of an upright box in the
-        frame of the box, see :mod:`discopy.drawing.planar`.
-        """
-        centre = self.positions[Node("box", j=j, box=box)]
-        cos, sin = math.cos(box.angle), math.sin(box.angle)
-        xs = [cos * (p.x - centre.x) + sin * (p.y - centre.y)
-              for p in map(self.positions.__getitem__, ports)]
-        left, right = min(xs + [0]) - 0.25, max(xs + [0]) + 0.25
-        half = max(box.height / 2 - 0.25, 0.25)
-        if box.min_width and right - left < box.min_width:
-            left, right = (left + right - box.min_width) / 2, (
-                left + right + box.min_width) / 2
-        self.add_nodes({
-            Node(f"box-corner-{a}{b}", j=j): Point(
-                centre.x + cos * x - sin * y, centre.y + sin * x + cos * y)
-            for a, x in enumerate([left, right])
-            for b, y in enumerate([-half, half])})
 
     def ordered_nodes(self) -> list[Node]:
         """
@@ -1282,8 +1256,6 @@ which to_drawing recomputes.
         other_mapping.update({
             n: n.shift_j(len(self.boxes))
             for n in other.nodes if "box" in n.kind})
-        other_mapping.update({
-            n: n.shift_i(len(self.wire_nodes)) for n in other.wire_nodes})
 
         result = self.relabel_nodes(mapping, positions, _check=False).union(
                 other.relabel_nodes(other_mapping), dom, cod, _check=False)
@@ -1370,8 +1342,6 @@ which to_drawing recomputes.
         mapping = {
             n: n.shift_j(len(self.boxes))
             for n in other.nodes if "box" in n.kind}
-        mapping.update({
-            n: n.shift_i(len(self.wire_nodes)) for n in other.wire_nodes})
         mapping.update({n: n.shift_i(len(self.dom)) for n in other.dom_nodes})
         mapping.update({n: n.shift_i(len(self.cod)) for n in other.cod_nodes})
         if self.height < other.height:
@@ -1434,10 +1404,6 @@ which to_drawing recomputes.
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({
             n: Node("dom", i=i, x=n.x) for i, n in enumerate(self.cod_nodes)})
-        mapping.update({
-            n: Node("wire", **dict(n.data, tangent=(
-                -n.tangent[0], n.tangent[1]))) if hasattr(n, "tangent")
-            else n for n in self.wire_nodes})
         graph = nx.relabel_nodes(self.graph, mapping).reverse()
         inside = PlaneGraph(graph, positions={
             mapping[n]: Point(x, self.height - y)
