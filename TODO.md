@@ -2,4 +2,4 @@
 
 - [x] Lexicon.parse: the preimage of an image under a lexicon, bounded by depth, evaluated bottom-up through a functor
 - [x] lambek.abstract docs: From Lean to English, reading the theorem of discolean/DisCoLean/Statements/English.lean back to English
-- [ ] tests and changelog
+- [WIP] @T-51181a9c-2026-11-24 08:38 tests and changelog
