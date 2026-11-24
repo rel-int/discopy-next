@@ -187,6 +187,9 @@ OVERLAPPING_BOXES = (
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+STRUCTURAL_HAS_NO_DAGGER = (
+    "A structural box but the exchange has no dagger: !L* has no rule from "
+    "its codomain back to its domain.")
 LAXATOR_ARITY = (
     "A laxator takes two types, or none for the unit, got {}.")
 NOT_BANGED = (
