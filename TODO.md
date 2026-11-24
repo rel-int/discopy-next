@@ -16,6 +16,6 @@
 >
 > When the pull request is open, reply to the thread that spawned you with its URL, the sentence as it now reads, and where it landed.
 
-- [WIP] @T-fce99082-2026-11-24 10:38 README.md: a How section after Features, the discopy.org sentence pointed at discopy.lambek
+- [x] README.md: a How section after Features, the discopy.org sentence pointed at discopy.lambek
 - [ ] CHANGELOG.md: a bullet under [Unreleased] naming this pull request
 - [ ] Open the pull request with the template's Why, What and How
