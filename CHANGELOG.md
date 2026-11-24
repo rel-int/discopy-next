@@ -540,8 +540,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - The README has a How section: DisCoPy began as an implementation of
-  DisCoCat and QNLP, which now lives in `discopy.lambek`, where
-  discopy.org's points at lambeq ([next#714]).
+  DisCoCat and QNLP models, and it links that application to
+  `discopy.lambek`, where discopy.org links it to lambeq ([next#714]).
 
 - `interaction.Diagram` declares `dagger_involution` and
   `dagger_monoidality` broken with "Feedback has no dagger", as it does
