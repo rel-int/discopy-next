@@ -2,4 +2,4 @@
 
 - [x] Delete compile_to_semm.md, Compiler.md, optyx-vqe-experiment.md and bosonic-vqe-2.md with their toctree lines and references
 - [x] List readme_example in the Optyx toctree and make it execute, out of KNOWN_BROKEN
-- [ ] CHANGELOG entry
+- [x] CHANGELOG entry
