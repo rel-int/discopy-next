@@ -68,7 +68,7 @@ jobs:
       run:
         uv run ty check --exit-zero-on-warning
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest has served an image with no graphviz in its sources (#595)
     # Backstop against a job that reports nothing for hours (#591), at ~2x
     # the worst this job has taken rather than at it: 40 against the 20.3
     # minutes of the slowest of the 90 test jobs of main's last 30 build
@@ -124,7 +124,7 @@ jobs:
       run:
         uv run python docs/export_notebooks.py --check --jobs 4
   docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest has served an image with no graphviz in its sources (#595)
     timeout-minutes: 45   # backstop: a pull request's build takes ~5 min without notebooks; main's renders every notebook one after another, ~13 min more (#445)
     strategy:
       matrix:

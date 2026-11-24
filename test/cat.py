@@ -8,6 +8,7 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
+from discopy.sum import Sum
 from discopy.utils import AxiomError
 
 
@@ -576,10 +577,10 @@ def test_Sum():
         Sum((f, g))
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
-        == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+        == "sum.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
     lazy = Sum((f, f))
     assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
-        == f"cat.Sum(terms=({f!r}, {f!r}))"
+        == f"sum.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
@@ -673,7 +674,7 @@ def box_classes():
 
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
-    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
+    "{sum,markov}.Sum": "c((box(c, x, y, v), ))",
     "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
     "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
@@ -710,10 +711,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
-    "biclosed.Bang": "c(box(c, x, y, v))",
-    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
-    "biclosed.Exchange": "c(x, y, True)",
-    "biclosed.Laxator": "c(x, y)",
+    "bang.Bang": "c(box(c, x, y, v))",
+    "bang.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "bang.Exchange": "c(x, y, True)",
+    "bang.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
@@ -1010,7 +1011,10 @@ def test_term_normal_form():
     assert x(lambda a: closed(f(a))).normal_form()\
         == x(lambda a: g(f(a)))
     assert g.expand() == y(lambda x: g(x)) and a.expand() == a
-    for term in (statement, closed, g, a, h(g(f(a)))):
+    k = Constant(Box('k', x, x))
+    shadowed = x(lambda a: let(k(a), lambda a: k(a)))
+    assert shadowed.normal_form() == x(lambda a: k(k(a)))
+    for term in (statement, closed, g, a, h(g(f(a))), shadowed):
         assert TermBase.normal_form_completeness(term)
         assert TermBase.eta(term) and TermBase.reading(term)
         assert loads(dumps(term)) == term
