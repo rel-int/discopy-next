@@ -179,7 +179,7 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         Drawn with ``tween`` frames, a box slides through the braids, see
         :meth:`discopy.drawing.Drawing.slide`:
 
-        >>> g, w = Box('g', x, y @ z), Ty('w')
+        >>> g, w = Box('g', x, y @ z, draw_as_spider=True), Ty('w')
         >>> source = w @ g >> Diagram.braid(w, y @ z)
         >>> _ = source.to_gif(
         ...     source.naturality(0), tween=12, timestep=80, loop=True,

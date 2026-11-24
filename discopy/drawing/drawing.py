@@ -806,7 +806,8 @@ which to_drawing recomputes.
         shrink into the box until ``t = .5``, the drawing then takes the
         edges of ``other`` and they grow out of the other side of the box,
         while every other node moves in a straight line: halfway, they are
-        inside the box, behind it: a port on a strand of the box goes to the
+        inside the box, behind it, or at the dot of a spider, into which its
+        legs shrink too: a port on a strand of the box goes to the
         port of the box that strand leads to, so that its wires only shrink,
         a port wired out of the crossings to the point of the box nearest the
         other end of its wire, every other port to the middle of the side of
@@ -880,6 +881,12 @@ which to_drawing recomputes.
         (left, low), (right, high) = self.relabel_nodes(positions={
             node: middle[label] for node, label in labels[0].items()
         }).rectangle(box.j)
+        if box.box.draw_as_spider:
+            dot = middle[labels[0][box]]
+            (left, low), (right, high) = (
+                dot.shift(-.05, -.05), dot.shift(.05, .05))
+            middle.update({label: dot for label in middle
+                           if label.data.get("j") == labels[0][box].j})
         k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
         drawing = ends[k]
         boxes = {node.j: node.box for node in drawing.box_nodes}

@@ -1331,3 +1331,17 @@ def test_slide_passes_behind_the_box():
     assert all(x0 <= p.x <= x1 and y0 <= p.y <= y1
                for node, p in middle.positions.items()
                if node.data.get("j") not in (None, j))
+
+
+def test_slide_through_a_spider_meets_at_its_dot():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z, draw_as_spider=True)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+    middle = a.slide(b, .5)
+    dot, = (p for node, p in middle.positions.items()
+            if node.kind == "box" and node.box.name == "f")
+    assert all(abs(p.x - dot.x) < .06 and abs(p.y - dot.y) < .06
+               for node, p in middle.positions.items()
+               if node.data.get("j") is not None)

@@ -15,7 +15,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   by `Drawing.interpolate`, which raises unless the two are one move apart:
   an interchanger, or a box sliding through the braids or swaps next to it
   by `naturality` (`Drawing.slide`), where the crossings pass behind the box
-  halfway. Tweened, its port-to-port wires are vertical at both ends
+  halfway, or through the dot of a box drawn as a spider, whose legs shrink
+  into it. Tweened, its port-to-port wires are vertical at both ends
   (`draw(smooth_wires=True)`). Across an
   interchanger the two boxes move apart (`Drawing.apart`, with every wire
   beside the one that moves), swap rows and move back, so that no box overlaps
