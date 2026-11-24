@@ -3,6 +3,7 @@ import DisCoLean.Coherence
 import DisCoLean.Drawing
 import DisCoLean.EGraph
 import DisCoLean.Isotopy
+import DisCoLean.Layout
 import DisCoLean.Mathlib
 import DisCoLean.Premonoidal
 import DisCoLean.Statements

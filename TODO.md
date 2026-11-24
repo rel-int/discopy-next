@@ -9,5 +9,10 @@
 
 - [x] The layered drawing, one box per layer and wires on a unit grid, sends every diagram to a plane graph and composition to stacking: `Diagram.drawing`
 - [ ] Interchange on the layered drawing: the two drawings of an interchanger are isotopic, by a tween through a strip where both boxes sit side by side
-- [ ] Model `to_drawing` of a whole diagram, and compose the steps of `Equation.path` into an isotopy between any two drawings of one diagram
+> make space
+
+- [x] Model the `make_space` layout of `to_drawing`: `make_space`, `then` with its loop, `tensor`, boxes and identities, and prove the layout of every diagram plane: `MakeSpace`, `Diagram.layout_fit`
+- [ ] The layout of every diagram is aligned at every junction, from the lengths of the boundaries
+- [ ] `stretch`, `reposition_box_cod` and `align_box_cod` in the model
+- [ ] Compose the steps of `Equation.path` into an isotopy between any two drawings of one diagram
 - [x] Changelog entry
