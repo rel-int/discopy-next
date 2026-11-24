@@ -64,7 +64,7 @@ from functools import cached_property
 from typing import Callable, ClassVar, Self
 
 from discopy import monoidal, messages
-from discopy.abc import LinearCategory, MonoidalCategory
+from discopy.abc import DaggerCategory, LinearCategory, MonoidalCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -211,6 +211,10 @@ class Diagram(monoidal.Diagram, LinearCategory):
     laxator_factory: ClassVar[type["Laxator"]]
 
     ob = Ty
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.STRUCTURAL_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.STRUCTURAL_HAS_NO_DAGGER)
 
     def bang(self) -> Diagram:
         """
