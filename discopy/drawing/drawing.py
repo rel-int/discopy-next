@@ -806,8 +806,11 @@ which to_drawing recomputes.
         shrink into the box until ``t = .5``, the drawing then takes the
         edges of ``other`` and they grow out of the other side of the box,
         while every other node moves in a straight line: halfway, they are
-        drawn inside the box, so that each strand that crosses it goes in at
-        one corner and out at the other, behind it.
+        inside the box, behind it: a port on a strand of the box goes to the
+        port of the box that strand leads to, so that its wires only shrink,
+        a port wired out of the crossings to the point of the box nearest the
+        other end of its wire, every other port to the centre of the box, and
+        the node of each crossing between its inputs and outputs.
 
         Parameters:
             other : The drawing to move to.
@@ -828,7 +831,7 @@ which to_drawing recomputes.
         >>> assert a.slide(b, 0) == a and a.slide(b, 1) == b
         >>> middle = a.slide(b, .5)
         >>> for node in middle.box_nodes: print(node, middle.positions[node])
-        Node('box', box=Braid(x, x), j=0) Point(x=1.0, y=1.0)
+        Node('box', box=Braid(x, x), j=0) Point(x=1.0, y=1.25)
         Node('box', box=f, j=1) Point(x=1.0, y=1.0)
         """
         ends = (self, other)
@@ -878,19 +881,55 @@ which to_drawing recomputes.
         }).rectangle(box.j)
         k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
         drawing = ends[k]
-        group = [p for node, p in drawing.positions.items()
-                 if node.data.get("j") in moving[k]]
-        x0, x1 = min(p.x for p in group), max(p.x for p in group)
-        y0, y1 = min(p.y for p in group), max(p.y for p in group)
+        boxes = {node.j: node.box for node in drawing.box_nodes}
 
-        def behind(p):
-            return Point(
-                left + (right - left) * (.1 + .8 * (p.x - x0) / (x1 - x0)),
-                low + (high - low) * (.1 + .8 * (p.y - y0) / (y1 - y0)))
+        def strand(node):
+            indices = boxes[node.j].permutation_indices\
+                if boxes[node.j].draw_as_permutation else (1, 0)
+            kind, i = ("box_cod", indices.index(node.i))\
+                if node.kind == "box_dom" else ("box_dom", indices[node.i])
+            return Node(kind, i=i, j=node.j, x=boxes[node.j].dom[i]
+                        if kind == "box_dom" else boxes[node.j].cod[i])
+
+        ends_of = {}
+        for port in drawing.nodes:
+            if port in labels[k] and port.kind != "box"\
+                    and labels[k][port].data.get("j") in touched:
+                queue = [port]
+                while queue:
+                    node = queue.pop()
+                    for n in itertools.chain(drawing.graph.predecessors(node),
+                                             drawing.graph.successors(node),
+                                             [strand(node)]
+                                             if node in ends_of else []):
+                        if n.data.get("j") in moving[k] and n.kind != "box"\
+                                and n not in ends_of:
+                            ends_of[n] = middle[labels[k][port]]
+                            queue.append(n)
+        centre = Point((left + right) / 2, (low + high) / 2)
+
+        def behind(node, _):
+            if node in ends_of:
+                return ends_of[node]
+            if node.kind == "box":
+                ports = {kind: [
+                    behind(n, None) for n in drawing.nodes
+                    if n.kind == kind and n.data.get("j") == node.j]
+                    for kind in ("box_dom", "box_cod")}
+                return Point(
+                    sum(p.x for side in ports.values() for p in side) / sum(
+                        map(len, ports.values())),
+                    (min(p.y for p in ports["box_dom"])
+                     + max(p.y for p in ports["box_cod"])) / 2)
+            q = next((middle[labels[k][n]] for n in itertools.chain(
+                drawing.graph.predecessors(node),
+                drawing.graph.successors(node))
+                if n in labels[k] and n.kind != "box"), centre)
+            return Point(min(max(q.x, left), right), min(max(q.y, low), high))
 
         return drawing.relabel_nodes(positions={
             node: between(p, middle[labels[k][node]] if node in labels[k]
-                          else behind(p), s)
+                          else behind(node, p), s)
             for node, p in drawing.positions.items()}).resized(self, other, t)
 
     def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
