@@ -150,7 +150,7 @@ class Waypoints(backend.Backend):  # pylint: disable=abstract-method
     def draw_wires(self, graph, **params):
         """ Draw the edges at a waypoint, then the others as before. """
         rest = graph.relabel_nodes()
-        for source, target in sorted(graph.edges, key=repr):
+        for source, target in list(graph.edges):
             if "wire" not in (source.kind, target.kind):
                 continue
             rest.graph.remove_edge(source, target)
@@ -222,6 +222,7 @@ class Optimised(Drawing):
             PlaneGraph(self.graph.copy(), dict(self.positions)), self.dom,
             self.cod, self.boxes, self.width, self.height, _check=False)
         result.add_box_corners()
+        result.frame_dual_rail()
         return result
 
     @backend.matplotlib_context()
