@@ -534,6 +534,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `interaction.Diagram` declares `dagger_involution` and
+  `dagger_monoidality` broken with "Feedback has no dagger", as it does
+  `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
+  integer diagram has no dagger, so the property matrix found a
+  counterexample to each under `explore` ([next#701]).
+
 - `interaction.Ty.strategy` draws each side of an integer type with at most
   two generators, enough to tell the conventions of cups and caps apart: the
   terms of the laws on integer diagrams grow with the square of the width of
@@ -816,12 +822,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
-
-- `interaction.Diagram` declares `dagger_involution` and
-  `dagger_monoidality` broken with "Feedback has no dagger", as it does
-  `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
-  integer diagram has no dagger, so the property matrix found a
-  counterexample to each under `explore` ([next#701]).
 
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
