@@ -48,7 +48,7 @@ from matplotlib import cbook
 from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
 from matplotlib.testing.exceptions import ImageComparisonFailure
-from matplotlib.patches import Circle, PathPatch, Patch
+from matplotlib.patches import PathPatch, Patch
 from matplotlib.path import Path
 from PIL import Image, ImageSequence
 
@@ -514,13 +514,12 @@ class Backend(ABC):
         # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, source[0], target[0])
 
-    def draw_halo(self, source, target, bend_out=False, bend_in=False):
+    def draw_halo(self, points):
         """
-        Hides the crossings under the leg of a spider from ``source`` to
-        ``target``, drawn as :meth:`draw_wire` draws it, or near its dot
-        when ``source == target``, as a braid hides
-        its strand under, e.g. a wire passing behind a spider as it slides
-        through it along an isotopy, see
+        Hides what lies under the cubic Bezier with control ``points``, a
+        little wider than its stroke, so that a wire drawn under it is broken
+        by the same gap wherever it passes, e.g. under the strand over of a
+        braid or the leg of a spider sliding through it along an isotopy, see
         :meth:`discopy.drawing.Drawing.slide`. Only with ``smooth_wires``,
         and only :class:`Matplotlib` draws it.
         """
@@ -565,8 +564,14 @@ class Backend(ABC):
         """
         The four control points of the cubic Bezier drawn by
         :meth:`draw_braid_strand`, i.e. a strand from ``source`` to ``target``
-        crossing the horizontal line at height ``middle``.
+        crossing the horizontal line at height ``middle``. A strand that lies
+        above or below ``middle``, e.g. in a crossing shrinking along an
+        isotopy, crosses its own middle height instead, so that it never
+        bends back.
         """
+        if not min(source[1], target[1]) <= middle <= max(
+                source[1], target[1]):
+            middle = (source[1] + target[1]) / 2
         return [
             source, Point(source[0], middle), Point(target[0], middle), target]
 
@@ -640,13 +645,8 @@ class Backend(ABC):
         height ``middle``. The strand is vertical at both ends and diagonal in
         between, so that two strands cross at a right angle rather than meeting
         flat. If ``gap`` is non-zero the strand is broken around the crossing,
-        i.e. it goes under the other strand. A strand that lies above or
-        below ``middle``, e.g. in a crossing shrinking along an isotopy,
-        crosses its own middle height instead, so that it never bends back.
+        i.e. it goes under the other strand.
         """
-        if not min(source[1], target[1]) <= middle <= max(
-                source[1], target[1]):
-            middle = (source[1] + target[1]) / 2
         control = self.braid_strand(source, target, middle)
         if not gap:
             return self.draw_bezier(control, adaptive=adaptive)
@@ -983,25 +983,16 @@ class Backend(ABC):
 
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
+        # With smooth wires, the strands over and the legs of spiders are
+        # drawn again last, each over a halo, see :meth:`draw_halo`.
+        overs = [] if params.get("smooth_wires") else None
         for node in graph.nodes:
             if node.kind != "box":
                 continue
             if node.box.draw_as_permutation:
                 self.draw_permutation(graph.positions, node)
             elif node.box.is_crossing:
-                self.draw_braid(graph.positions, node)
-        if params.get("smooth_wires"):
-            for node in graph.nodes:
-                if node.kind == "box" and node.box.draw_as_spider:
-                    self.draw_halo(graph.positions[node],
-                                   graph.positions[node])
-            for source, target in graph.edges():
-                if source.kind == "box" and source.box.draw_as_spider:
-                    self.draw_halo(graph.positions[source],
-                                   graph.positions[target], bend_out=True)
-                elif target.kind == "box" and target.box.draw_as_spider:
-                    self.draw_halo(graph.positions[source],
-                                   graph.positions[target], bend_in=True)
+                self.draw_braid(graph.positions, node, overs)
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
@@ -1029,6 +1020,19 @@ class Backend(ABC):
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),
                 adaptive=self.on_neutral_canvas(typ))
+            if overs is not None and any(
+                    n.kind == "box" and n.box.draw_as_spider
+                    for n in (source, target)):
+                mid = (target_position[0], source_position[1]) if bend_out\
+                    else (source_position[0], target_position[1])
+                overs.append(([source_position] + [
+                    tuple(a + 2 * (m - a) / 3 for a, m in zip(end, mid))
+                    for end in (source_position, target_position)]
+                    + [target_position], self.on_neutral_canvas(typ)))
+        for points, _ in overs or ():
+            self.draw_halo(points)
+        for points, adaptive in overs or ():
+            self.draw_bezier(points, adaptive=adaptive)
 
     def fill_fold(self, outer, inner, color):
         """
@@ -1131,11 +1135,14 @@ class Backend(ABC):
         side = dom if getattr(box, "draw_as_dual_rail_cup", False) else cod
         return [(side[0], side[3]), (side[1], side[2])]
 
-    def draw_braid(self, positions, node):
+    def draw_braid(self, positions, node, overs=None):
         """
         Draws a braid or a swap as its two wires crossing diagonally, so that
         they meet at a right angle. A braid (over/under) breaks the wire that
-        goes under; a symmetric swap simply crosses both wires.
+        goes under; a symmetric swap simply crosses both wires. Given a list
+        ``overs``, a braid draws its strand under whole and appends the
+        control points of its strand over, for :meth:`draw_wires` to draw
+        it last over a halo.
         """
         box = node.box
         right, left = [(positions[dom], positions[cod])
@@ -1154,6 +1161,10 @@ class Backend(ABC):
         height = abs(left[0][1] - left[1][1])
         # The left wire goes under the right one unless the box is dagger.
         over, under = (left, right) if box.is_dagger else (right, left)
+        if overs is not None:
+            self.draw_braid_strand(*under, middle, adaptive=adaptive)
+            overs.append((self.braid_strand(*over, middle), adaptive))
+            return
         gap = min(0.3, 0.1 / height, 0.9 * height, abs(
             over[0][0] - over[1][0]) + abs(over[0][1] - over[1][1]))\
             if height else 0
@@ -2364,17 +2375,12 @@ class Matplotlib(Backend):
                 if adaptive and linewidth else None))
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
 
-    def draw_halo(self, source, target, bend_out=False, bend_in=False):
-        if source == target:
-            self.axis.add_patch(Circle(
-                source, .15, facecolor='white', edgecolor='none'))
-            return
-        mid = (target[0], source[1]) if bend_out else (source[0], target[1])
+    def draw_halo(self, points):
         self.axis.add_patch(PathPatch(
-            Path([source, mid, target],
-                 [Path.MOVETO, Path.CURVE3, Path.CURVE3]),
+            Path(list(points),
+                 [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]),
             facecolor='none', edgecolor='white', capstyle='butt',
-            linewidth=8 * self.linewidth))
+            linewidth=7 * self.linewidth))
 
     def draw_bezier(self, points, adaptive=True):
         path = Path(

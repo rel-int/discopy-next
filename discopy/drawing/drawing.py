@@ -805,17 +805,17 @@ which to_drawing recomputes.
         :meth:`discopy.braided.Diagram.naturality`. The crossings that move
         shrink into the box until ``t = .5``, the drawing then takes the
         edges of ``other`` and they grow out of the other side of the box,
-        while every other node moves in a straight line: halfway, they are
-        inside the box or behind it, and a spider moves its dot and its legs
-        together, which keep their shape: a port on a strand of the box goes
-        to the port of the box that strand leads to, so that its wires only
-        shrink, a port wired out of the crossings to the point of the box
-        nearest the
-        other end of its wire, every other port to where its strand leaves
-        the crossings, and the node of each crossing between its inputs and
-        outputs, or for a spider the corner of the box around its legs on
-        the side of the other end of its wire. So a wire passing a spider
-        goes under it, hidden near its dot and legs with ``smooth_wires``,
+        while every other node moves in a straight line, and a spider moves
+        its dot and its legs together, which keep their shape. The nodes of
+        the crossings follow, from where they start, the points they shrink
+        to in the current frame: a port on a strand of the box the port of
+        the box that strand leads to, so that its wires only shrink, a port
+        wired out of the crossings the point of the box nearest the other
+        end of its wire, every other port where its strand leaves the
+        crossings, and the node of each crossing the middle of its inputs
+        and outputs, or for a spider the corner of the box around its legs
+        on the side of the other end of its wire. So a wire passing a spider
+        goes under it, hidden near its legs with ``smooth_wires``,
         see :meth:`discopy.drawing.backend.Backend.draw_halo`.
 
         Parameters:
@@ -880,16 +880,6 @@ which to_drawing recomputes.
                 n for n, label in labels[1].items()
                 if label == labels[0][node])], .5)
             for node, p in self.positions.items() if node in labels[0]}
-        box = next(node for node, label in labels[0].items()
-                   if label.kind == "box" and label.data.get("j") in touched)
-        (left, low), (right, high) = self.relabel_nodes(positions={
-            node: middle[label] for node, label in labels[0].items()
-        }).rectangle(box.j)
-        dot = middle[labels[0][box]]
-        legs = [p for label, p in middle.items()
-                if label.data.get("j") == labels[0][box].j]
-        width = max(abs(p.x - dot.x) for p in legs) + .25
-        height = max(abs(p.y - dot.y) for p in legs) or .25
         k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
         drawing = ends[k]
         boxes = {node.j: node.box for node in drawing.box_nodes}
@@ -902,57 +892,82 @@ which to_drawing recomputes.
             return Node(kind, i=i, j=node.j, x=boxes[node.j].dom[i]
                         if kind == "box_dom" else boxes[node.j].cod[i])
 
-        ends_of = {}
-        for port in drawing.nodes:
-            if port in labels[k] and port.kind != "box"\
-                    and labels[k][port].data.get("j") in touched:
-                queue = [port]
-                while queue:
-                    node = queue.pop()
-                    for n in itertools.chain(drawing.graph.predecessors(node),
-                                             drawing.graph.successors(node),
-                                             [strand(node)]
-                                             if node in ends_of else []):
-                        if n.data.get("j") in moving[k] and n.kind != "box"\
-                                and n not in ends_of:
-                            ends_of[n] = middle[labels[k][port]]
-                            queue.append(n)
+        def anchors(s):
+            current = {labels[k][node]: between(p, middle[labels[k][node]], s)
+                       for node, p in drawing.positions.items()
+                       if node in labels[k]}
+            box = next(node for node, label in labels[k].items()
+                       if label.kind == "box"
+                       and label.data.get("j") in touched)
+            (left, low), (right, high) = drawing.relabel_nodes(positions={
+                node: current[label] for node, label in labels[k].items()
+            }).rectangle(box.j)
+            dot = current[labels[k][box]]
+            legs = [p for label, p in current.items()
+                    if label.data.get("j") == labels[k][box].j]
+            width = max(abs(p.x - dot.x) for p in legs) + .25
+            height = max(abs(p.y - dot.y) for p in legs) or .25
 
-        def behind(node, _):
-            if node in ends_of:
-                return ends_of[node]
-            if node.kind == "box" and box.box.draw_as_spider:
-                return dot
-            if node.kind == "box":
-                ports = {kind: [
-                    behind(n, None) for n in drawing.nodes
-                    if n.kind == kind and n.data.get("j") == node.j]
-                    for kind in ("box_dom", "box_cod")}
-                return Point(
-                    sum(p.x for side in ports.values() for p in side) / sum(
-                        map(len, ports.values())),
-                    (min(p.y for p in ports["box_dom"])
-                     + max(p.y for p in ports["box_cod"])) / 2)
-            q = next((middle[labels[k][n]] for n in itertools.chain(
-                drawing.graph.predecessors(node),
-                drawing.graph.successors(node))
-                if n in labels[k] and n.kind != "box"), None)
-            if box.box.draw_as_spider:
-                if q is None:
+            ends_of = {}
+            for port in drawing.nodes:
+                if port in labels[k] and port.kind != "box"\
+                        and labels[k][port].data.get("j") in touched:
+                    queue = [port]
+                    while queue:
+                        node = queue.pop()
+                        for n in itertools.chain(
+                                drawing.graph.predecessors(node),
+                                drawing.graph.successors(node),
+                                [strand(node)] if node in ends_of else []):
+                            if n.data.get("j") in moving[k]\
+                                    and n.kind != "box" and n not in ends_of:
+                                ends_of[n] = current[labels[k][port]]
+                                queue.append(n)
+
+            def behind(node, _):
+                if node in ends_of:
+                    return ends_of[node]
+                if node.kind == "box" and box.box.draw_as_spider:
                     return dot
-                return dot.shift(
-                    width if q.x > dot.x else -width,
-                    height if q.y > dot.y else -height)
-            if q is None:
-                while node not in labels[k]:
-                    node = next(drawing.graph.successors(
-                        strand(node) if node.kind == "box_dom" else node))
-                q = middle[labels[k][node]]
-            return Point(min(max(q.x, left), right), min(max(q.y, low), high))
+                if node.kind == "box":
+                    ports = {kind: [
+                        behind(n, None) for n in drawing.nodes
+                        if n.kind == kind and n.data.get("j") == node.j]
+                        for kind in ("box_dom", "box_cod")}
+                    return Point(
+                        sum(p.x for side in ports.values() for p in side)
+                        / sum(map(len, ports.values())),
+                        (min(p.y for p in ports["box_dom"])
+                         + max(p.y for p in ports["box_cod"])) / 2)
+                q = next((current[labels[k][n]] for n in itertools.chain(
+                    drawing.graph.predecessors(node),
+                    drawing.graph.successors(node))
+                    if n in labels[k] and n.kind != "box"), None)
+                if box.box.draw_as_spider:
+                    if q is None:
+                        return dot
+                    return dot.shift(
+                        width if q.x > dot.x else -width,
+                        height if q.y > dot.y else -height)
+                if q is None:
+                    while node not in labels[k]:
+                        node = next(drawing.graph.successors(
+                            strand(node) if node.kind == "box_dom" else node))
+                    q = current[labels[k][node]]
+                return Point(min(max(q.x, left), right),
+                             min(max(q.y, low), high))
 
+            return current, {node: behind(node, None)
+                             for node in drawing.nodes
+                             if node not in labels[k]}
+
+        current, anchor = anchors(s)
+        _, start = anchors(0)
+        shrink = max(0, 1 - 2 * s)
         return drawing.relabel_nodes(positions={
-            node: between(p, middle[labels[k][node]] if node in labels[k]
-                          else behind(node, p), s)
+            node: current[labels[k][node]] if node in labels[k]
+            else anchor[node].shift(shrink ** 2 * (p.x - start[node].x),
+                                    shrink * (p.y - start[node].y))
             for node, p in drawing.positions.items()}).resized(self, other, t)
 
     def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
