@@ -178,6 +178,9 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
             for attr in ("width", "height"))
+    if tween > 1:
+        params.setdefault("xlim", (0, max(step.width for step in steps)))
+        params.setdefault("ylim", (0, max(step.height for step in steps)))
     with TemporaryDirectory() as directory:
         for i, _diagram in enumerate(steps):
             tmp_path = os.path.join(directory, f'{i}.png')

@@ -15,9 +15,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   by `Drawing.interpolate`, which raises unless the two are one move apart:
   an interchanger, or a box sliding through the braids or swaps next to it
   by `naturality` (`Drawing.slide`), where the crossings pass behind the box
-  halfway, or through the dot of a box drawn as a spider, whose legs shrink
-  into it. Tweened, its port-to-port wires are vertical at both ends
-  (`draw(smooth_wires=True)`). Across an
+  halfway, or through the dot of a box drawn as a spider, which slides
+  rigidly while the braid stays behind and passes under its legs. Tweened,
+  its port-to-port wires are vertical at both ends and the strands over a
+  braid are drawn over a halo (`draw(smooth_wires=True)`), and every frame
+  keeps the same axes, which `draw` now passes on as `xlim` and `ylim`.
+  `Diagram.to_gif` draws the Eckmann-Hilton loop of two scalars. Across an
   interchanger the two boxes move apart (`Drawing.apart`, with every wire
   beside the one that moves), swap rows and move back, so that no box overlaps
   another and no wire crosses one. A gif

@@ -152,6 +152,7 @@ def draw(graph: Drawing, **params):
         tikz_options=params.get('tikz_options', None),
         show=params.get('show', True), aspect=aspect,
         margins=params.get('margins', DEFAULT['margins']),
+        xlim=params.get('xlim', None), ylim=params.get('ylim', None),
         compare=compare,
         tol=params.get('tol', DEFAULT['plt_tol']))
 

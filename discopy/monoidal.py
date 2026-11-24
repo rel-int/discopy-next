@@ -66,6 +66,13 @@ We can check the Eckmann-Hilton argument, up to interchanger.
 >>> assert s0 @ s1 == s0 >> s1 == (s1 @ s0).interchange(0, 1)
 >>> assert s1 @ s0 == s1 >> s0 == (s0 @ s1).interchange(0, 1)
 
+Drawn with ``tween`` frames, two interchangers take one scalar around the
+other:
+
+>>> _ = (s0 >> s1).to_gif(
+...     s1 >> s0, s0 >> s1, tween=12, timestep=60,
+...     doctest="docs/_static/monoidal/EckmannHilton.gif")
+
 .. image:: /_static/monoidal/EckmannHilton.gif
     :align: center
 
