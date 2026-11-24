@@ -287,7 +287,8 @@ def cosine_similarity(SU, SV):
 from cotengra import HyperCompressedOptimizer
 
 # cosine similarity between exact and approximate contraction for each chi;
-# chi=1 truncates every bond to rank one and quimb's QR divides by zero (#442)
+# chi=1 truncates every bond to rank one and quimb's QR divides by zero,
+# rel-int/discopy-next#442
 errors = []
 for chi in range(2, 6):
     optimiser = HyperCompressedOptimizer(
