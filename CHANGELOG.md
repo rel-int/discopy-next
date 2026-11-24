@@ -1988,6 +1988,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest/test_corpus.py` replays a committed corpus of terms written by hand
+  or by a language model, `proptest/corpus/`, against the laws of the property
+  matrix, deterministically and offline, with a first corpus for
+  `symmetric.Diagram`: shapes the strategies draw rarely or never, e.g. boxes
+  that share a name or carry `data`, bubbles and multi-wire feedback. A pilot
+  on `symmetric`, `compact` and `Int` found no counterexample beyond those
+  already declared ([next#707]).
 - The `proptest` workflow runs every cell at `pr`'s twenty examples under
   `--hypothesis-seed=0` on `main` too, with one worker per vCPU, and no longer
   runs nightly: `explore`'s thousand examples per cell had cancelled every run
@@ -2596,6 +2603,7 @@ for the changelog of `1.2.1` and earlier.
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
+[next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
