@@ -2678,8 +2678,10 @@ class Bubble(cat.Bubble, Box):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
-            height = max(arg.height for arg in args)
-            nested = tuple(arg.stretch(height - arg.height) for arg in args)
+            framed = [arg.framed() for arg in args]
+            height = max(arg.height for arg in framed)
+            nested = tuple(
+                arg.stretch(height - arg.height) for arg in framed)
             width = sum(arg.width for arg in nested)
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0

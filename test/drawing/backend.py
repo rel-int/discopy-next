@@ -778,3 +778,20 @@ def test_left_to_right_labels_legend_and_dagger():
     bubble.to_drawing().dagger().draw(backend=down)
     assert up.heights['f'] > up.heights['g']
     assert down.heights['f'] < down.heights['g']
+
+
+def test_bubble_drawn_in_another_direction_fits_its_framed_args():
+    from discopy.monoidal import Bubble
+    from discopy.ribbon import DualRailCup, Ty as RTy
+
+    class Across(Bubble):
+        draw_left_to_right = True
+
+    x = RTy('x')
+    arg = DualRailCup(x @ x, x.r @ x.r)
+    drawing = Across(arg, dom=Ty(), cod=Ty()).to_drawing()
+    nested, = drawing.boxes[0].nested
+    framed = arg.to_drawing().framed()
+    assert framed.width != arg.to_drawing().width
+    assert nested.width == framed.width
+    assert drawing.height >= nested.width + 1

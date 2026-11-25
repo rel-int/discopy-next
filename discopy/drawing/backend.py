@@ -1204,7 +1204,7 @@ class Backend(ABC):
         wires plug into the edges of the background, and a daggered box
         reflects them, the last on top.
         """
-        nested = [drawing.framed() for drawing in box.nested]
+        nested = box.nested
         width = sum(drawing.width for drawing in nested)
         height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
