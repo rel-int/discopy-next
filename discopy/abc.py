@@ -62,7 +62,7 @@ Summary
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from inspect import signature
@@ -342,6 +342,19 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     def __rmatmul__(self: C1, other):
         return self.whisker(other).tensor(self)
 
+    @classmethod
+    def alphabet(cls: type[C1]) -> Iterable[C1] | None:
+        """
+        The atoms the formation rules start from, in a canonical order: a
+        tuple when they are finitely many, an unbounded iterator otherwise,
+        and :obj:`None` when the class does not say. Every other element is
+        formed from them by the rules of :attr:`constructors`, e.g. the
+        adjoints of a :class:`Pregroup`, so an adjoint is not an atom.
+
+        >>> assert Nat.alphabet() == (Nat(1), )
+        """
+        return None
+
     @Unit
     def ax[X: Obj[C0]](cls: type[C1], x: Var[C0, X]) -> Hom[C1, X, X]:
         """ The formation rule of :class:`Unit`: the unit at a colour. """
@@ -542,6 +555,11 @@ class Nat(Monoid["Nat"]):
         from hypothesis import strategies as st
 
         return st.integers(min_value=0, max_value=max_size).map(cls)
+
+    @classmethod
+    def alphabet(cls) -> tuple[Nat, ...]:
+        """ The one atom, ``Nat(1)``. """
+        return (cls(1), )
 
     @classmethod
     def generator_strategy(cls, **_):

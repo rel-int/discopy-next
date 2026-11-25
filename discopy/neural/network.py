@@ -136,6 +136,12 @@ class Dims(monoidal.Ty):
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
+    @classmethod
+    def alphabet(cls) -> None:
+        """ No alphabet is stated: an atom is the shape of a tensor, any
+        :class:`Dim`, see :meth:`discopy.abc.ColouredMonoid.alphabet`. """
+        return None
+
     def __init__(self, *inside: int | Dim, **kwargs):
         inside = kwargs.pop('inside', inside)
         super().__init__(

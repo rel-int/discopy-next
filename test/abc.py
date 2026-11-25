@@ -105,3 +105,17 @@ def test_DaggerMonoidalCategory_keeps_its_type_parameters():
 
     assert [position(param, DaggerMonoidalCategory)
             for param in DaggerMonoidalCategory.__type_params__] == [0, 1]
+
+
+def test_alphabets():
+    from itertools import islice
+    from discopy.abc import ColouredMonoid
+    from discopy.testable import Testable
+    for cls in Testable.enrolled():
+        if not issubclass(cls, ColouredMonoid) or cls.alphabet() is None:
+            continue
+        atoms = cls.alphabet()
+        atoms = atoms if isinstance(atoms, tuple) else tuple(islice(atoms, 4))
+        assert atoms and len(set(atoms)) == len(atoms), cls
+        assert all(isinstance(atom, cls) and atom.is_atomic
+                   for atom in atoms), cls

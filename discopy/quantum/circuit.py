@@ -71,7 +71,8 @@ Examples
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+import itertools
 from typing import ClassVar
 
 from discopy import feedback, messages, tensor, frobenius
@@ -207,6 +208,18 @@ class Ty(frobenius.Ty):
     Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def alphabet(cls) -> Iterable[Ty]:
+        """
+        The digits and qudits of every dimension from two, a digit before a
+        qudit, unboundedly many.
+
+        >>> from itertools import islice
+        >>> assert list(islice(Ty.alphabet(), 2)) == [bit, qubit]
+        """
+        return (cls(atom(n)) for n in itertools.count(2)
+                for atom in (Digit, Qudit))
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):

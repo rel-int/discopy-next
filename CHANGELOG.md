@@ -28,6 +28,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `markov` and `comarkov` fail on their copies, discards, merges and noises
   ([next#730]).
 
+- `abc.ColouredMonoid.alphabet` gives the atoms the formation rules start from, in a canonical
+  order: a tuple when finitely many, e.g. the uncoloured wires named after
+  `testable.GENERATORS` of a free `Ty`, `Nat(1)` or the Python types of `List[type]`, an
+  unbounded iterator otherwise, e.g. `Dim(n)` from two or the digits and qudits of a circuit, and
+  `None` when a class does not say.
+
 - The equations of the objects are axioms of their classes: `abc.Pregroup` states
   `adjoint_involution`, `adjoint_contravariance_left` and `_right`, `residuation_over` and
   `residuation_under`, and `abc.DelayMonoid` `delay_monoidality` and `delay_unit`, so that the
