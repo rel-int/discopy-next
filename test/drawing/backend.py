@@ -997,3 +997,15 @@ def test_left_to_right_labels_stand_on_their_point_in_tikz(tmp_path):
         to_tikz=True, fontsize_types=2, path=str(path))
     tikz = path.read_text()
     assert "anchor=south west" in tikz and "anchor=north west" not in tikz
+
+
+def test_label_contrast_through_two_turns_reflected():
+    from types import SimpleNamespace
+    from discopy.drawing.backend import Matplotlib, Point, Transposed
+
+    graph = SimpleNamespace(width=1, height=1)
+    outside = Transposed(Matplotlib(), Point(0, 0), graph)
+    inside = Transposed(outside, Point(0, 0), graph, flip=True)
+    assert inside.turns == 2 and not inside.cod_is_after()
+    typ = SimpleNamespace(dom="white", cod="black")
+    assert inside.label_background(typ) == "black"

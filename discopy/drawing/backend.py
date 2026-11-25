@@ -1586,9 +1586,11 @@ class Transposed(Backend):
         return (y1 > y0) if self.turns % 2 else (x1 > x0)
 
     def label_background(self, typ):
-        """ The region a wire label lies on: above its wire after an odd
-        number of turns, right of it otherwise. """
-        return getattr(typ, "cod" if self.cod_is_after() else "dom", None)
+        """ The region a wire label lies on: the side of its wire it is
+        lifted to after an odd number of turns, else its ``cod`` as when
+        no turn is drawn through, since only an odd turn moves it. """
+        return getattr(typ, "cod" if self.cod_is_after() or not (
+            self.turns % 2) else "dom", None)
 
     def draw_wire_label(self, x, i, j, **params):
         self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
