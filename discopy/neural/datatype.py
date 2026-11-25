@@ -9,8 +9,9 @@ is given by its constructors
 :math:`c_i : A_i \\otimes S^{\\otimes s_i} \\to S`, a :class:`Datatype`.
 Its terms are the diagrams built from the constructors by composition and
 tensor alone, with the data :math:`A_i` as inputs. An algebra
-is a functor out of them, the fold of a term is its image, and the
-uniqueness of the homomorphism is functoriality: see :class:`Algebra`.
+is a functor out of them, the fold of a term is its image, and without
+parameters it is the unique one out of the terms, by functoriality: see
+:class:`Algebra`.
 
 .. autosummary::
     :template: class.rst
@@ -45,8 +46,10 @@ where the parameter is copied twice or discarded.
 Dually, a coalgebra :math:`S \\to F(S)` of :math:`F(S) = (I \\to O \\times S)`
 (Mealy), :math:`O \\times (I \\to S)` (Moore) or :math:`O \\times S` (unfold)
 is a cell from an input and the delayed state to an output and the state, a
-:class:`Machine`. Its unfold, the unique homomorphism into the final
-coalgebra, is the feedback of the cell, whose semantics are the monoidal
+:class:`Machine`. Its unfold is the feedback of the cell, the unique map into
+the final coalgebra without parameters. With parameters, the tied map is the
+homomorphism whose 2-cell is the copy of the parameters (App. J), a choice and
+not forced. The semantics are the monoidal
 streams of :mod:`discopy.stream`: the first steps are a finite diagram with
 one box for each time step and one initial state as input. A
 :class:`Coalgebra` is a functor out of them, sending every time step of a box
@@ -370,7 +373,10 @@ class Algebra:
     """
     An algebra of a datatype: one image for each constructor in a category
     ``cod``, i.e. a functor out of the free category on the constructors.
-    Its fold sends a term to its image, which is the unique homomorphism.
+    Its fold sends a term to its image. Without parameters it is the unique
+    functor out of the terms. With parameters, the tied fold is the
+    homomorphism whose 2-cell is the copy of the parameters (App. J), a choice
+    and not forced: there is one for each choice of :math:`\\kappa`.
 
     When ``cod`` is a category of parametric maps, the algebra has one
     parameter :math:`P` for all its constructors, each of which uses it as
@@ -756,8 +762,10 @@ class Machine:
     A cell :math:`I \\otimes S^d \\to O \\otimes S` from an input and the
     delayed state to an output and the next state, the uncurried coalgebra of
     a Mealy, Moore or unfolding recurrent network. Its feedback is the
-    recurrent network, the unique homomorphism into the final coalgebra, see
+    recurrent network, the unfold into the final coalgebra, see
     `Categorical Deep Learning <https://arxiv.org/abs/2402.15332>`_, Figure 1.
+    Without parameters it is the unique map into it; with parameters, the tied
+    map has the copy of the parameters as 2-cell (App. J), a choice.
 
     The unrolled network takes the initial state :math:`S` once, as its first
     input, and the cell copies it where it needs to.
