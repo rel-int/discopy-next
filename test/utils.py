@@ -532,7 +532,7 @@ def test_deterministic_hashes():
     setoid or a `__hash__`, hashed in two interpreters with `PYTHONHASHSEED`
     fixed, see #479.
 
-    `tensor.Bubble` is absent because its setoid holds the function it maps
+    `tensor.Elementwise` is absent because its setoid holds the function it maps
     with, whose hash is an address of its own, see #506.
 
     A `List` of classes, i.e. `python.Ty`, is here rather than in

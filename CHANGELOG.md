@@ -544,6 +544,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
+  inside it, and the `method` a functor calls on their images, a generator
+  being a box with no args. The `Bubble` class of every module fuses into its
+  `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)`,
+  a box with `args=(f, )`, `isinstance(f, Bubble)` becomes `f.args`, and
+  `Bubble` stays an alias of `Box.from_args`. The function a tensor bubble
+  applies elementwise moves to `tensor.Elementwise`, the box
+  `tensor.Diagram.bubble` builds, and a plain tensor box carries none;
+  `biclosed.Application.args` is renamed `argument` ([next#729]).
+
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
   category, e.g. `Matrix`, no longer has them, and the function
@@ -2678,6 +2688,7 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
+[next#729]: https://github.com/rel-int/discopy-next/pull/729
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

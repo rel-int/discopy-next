@@ -40,7 +40,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     TermBase
     Variable
@@ -260,7 +259,7 @@ In the category of streams, this is just the identity.
 from __future__ import annotations
 
 from copy import copy
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy import sum as formal_sum
@@ -729,6 +728,8 @@ class Box(monoidal.Box, Diagram):
 
     def to_drawing(self):
         result = super().to_drawing()
+        if self.args:
+            return result
         if result.box.drawing_name:
             result.box.drawing_name += str_delayed(self.time_step)
         return result
@@ -741,7 +742,7 @@ class Box(monoidal.Box, Diagram):
         arguments it is built from, e.g. a swap, a copy or a controlled gate,
         is built from their delays, those of its types and its diagrams; any
         other box from its delayed boundary, one more time step on, drawn as
-        it is, e.g. a :class:`Bubble`, whose args stay as they are inside. A
+        it is, e.g. a box with args, which stay as they are inside. A
         :class:`Sum` is the sum of the delays of its terms.
 
         Parameters:
@@ -789,7 +790,39 @@ class Box(monoidal.Box, Diagram):
         return [atom.reset() if isinstance(atom, Box) and atom.time_step
                 else atom for atom in super().atoms()]
 
+    @classmethod
+    def from_args(cls, *args: Diagram, dom: Ty | None = None,
+                  cod: Ty | None = None, time_step: int = 0,
+                  **params) -> Self:
+        """
+        The box with some ``args``, its boundary that of its args delayed
+        ``time_step`` times unless given: a box with args delays as a box
+        does, its args stay as they are inside.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x, y)
+        >>> bubble = f.bubble().delay()
+        >>> assert bubble.args == (f, )
+        >>> assert (bubble.dom, bubble.cod) == (x.d, y.d)
+        >>> assert bubble.time_step == 1 and bubble.reset() == f.bubble()
+        >>> assert bubble == f.bubble(time_step=1) != f.delay().bubble()
+        >>> print(bubble)
+        (f).bubble().d
+        """
+        boundary = [
+            given if given is not None
+            else cls.common(args, attr).delay(time_step) if time_step
+            else cls.common(args, attr)
+            for attr, given in [("dom", dom), ("cod", cod)]]
+        return super().from_args(
+            *args, dom=boundary[0], cod=boundary[1], time_step=time_step,
+            **params)
+
     def __str__(self):
+        if self.args and self.time_step:
+            return str(self.reset()) + str_delayed(self.time_step)
         return super().__str__() + str_delayed(self.time_step)
 
     def __repr__(self):
@@ -805,7 +838,15 @@ class Box(monoidal.Box, Diagram):
         >>> from discopy.utils import dumps, loads
         >>> f = Box('f', Ty('x'), Ty('y')).delay()
         >>> assert loads(dumps(f)) == f
+
+        A delayed box with args is serialised as at time step zero, with its
+        time step, since its args are not delayed.
+
+        >>> bubble = Box('f', Ty('x'), Ty('y')).bubble().delay(2)
+        >>> assert loads(dumps(bubble)) == bubble
         """
+        if self.args and self.time_step:
+            return self.reset().to_tree() | {'time_step': self.time_step}
         tree = super().to_tree()
         if self.time_step:
             tree['time_step'] = self.time_step
@@ -813,6 +854,9 @@ class Box(monoidal.Box, Diagram):
 
     @classmethod
     def from_tree(cls, tree: dict) -> Box:
+        if 'args' in tree and tree.get('time_step'):
+            reset = {k: v for k, v in tree.items() if k != 'time_step'}
+            return cls.from_tree(reset).delay(tree['time_step'])
         result = super().from_tree(tree)
         result._time_step = tree.get(  # pylint: disable=protected-access
             'time_step', 0)
@@ -822,7 +866,7 @@ class Box(monoidal.Box, Diagram):
         return super().setoid() + (self.time_step, )
 
 
-class Feedback(Box, monoidal.Bubble):
+class Feedback(Box):
     """
     Feedback is a bubble that takes a diagram from `dom @ mem.delay()` to
     `cod @ mem`, or from `mem.delay() @ dom` to `mem @ cod` when `left`, and
@@ -863,8 +907,7 @@ class Feedback(Box, monoidal.Bubble):
         name = f"{type(self).__name__}({arg}"\
             + ("" if len(mem) == 1 else f", mem={mem}")\
             + (", left=True" if left else "") + ")"
-        monoidal.Bubble.__init__(self, arg, dom=dom, cod=cod)
-        monoidal.Box.__init__(self, name, dom, cod)
+        monoidal.Box.__init__(self, name, dom, cod, args=(arg, ))
 
     @staticmethod
     def fed_back(mem: Ty) -> Ty:
@@ -997,7 +1040,7 @@ class Trace(Feedback):
         return self.ar.to_drawing(self)
 
 
-class Head(monoidal.Bubble, Box):
+class Head(Box):
     """
     The head of a feedback diagram, interpreted as the first element followed
     by the identity stream on the empty type.
@@ -1012,9 +1055,8 @@ class Head(monoidal.Bubble, Box):
     def __init__(self, arg: Diagram, time_step=0):
         dom, cod = (
             getattr(x, self.part).delay(time_step) for x in [arg.dom, arg.cod])
-        monoidal.Bubble.__init__(self, arg, dom=dom, cod=cod)
-        Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
-                     time_step=time_step)
+        Box.__init__(self, f"({arg}).{self.part}", dom, cod,
+                     time_step=time_step, args=(arg, ))
 
     def dagger(self):
         """
@@ -1028,12 +1070,14 @@ class Head(monoidal.Bubble, Box):
         """
         return type(self)(self.arg.dagger(), self.time_step)
 
+    def __str__(self):
+        return self.name + str_delayed(self.time_step)
+
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
-    __str__ = Box.__str__
 
 
-class Tail(monoidal.Bubble, Box):
+class Tail(Box):
     """
     The tail of a feedback diagram, interpreted as the stream starting from the
     second time step with the identity on the empty type at the first step.
@@ -1045,10 +1089,9 @@ class Tail(monoidal.Bubble, Box):
     serialised_attrs = ("*args", "time_step")
     part = "tail"
 
-    __init__, dagger = Head.__init__, Head.dagger
+    __init__, dagger, __str__ = Head.__init__, Head.dagger, Head.__str__
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
-    __str__ = Box.__str__
 
 
 class FollowedBy(Box):
@@ -1079,6 +1122,7 @@ class FollowedBy(Box):
     >>> assert eq_up_to_F(FollowedBy(x), Id(x))
     """
     serialised_attrs = ("arg", "is_dagger", "time_step")
+    arg: Ty = None  # ty: ignore[invalid-assignment]  # shadows Box.arg
 
     def __init__(self, arg: Ty, is_dagger=False, time_step=0):
         self.arg = arg
@@ -1149,70 +1193,6 @@ class Sum(formal_sum.Sum, Box):
         return self.sum_factory(
             tuple(term.delay(n_steps) for term in self.terms),
             self.dom.delay(n_steps), self.cod.delay(n_steps))
-
-
-class Bubble(monoidal.Bubble, Box):
-    """
-    A feedback bubble is a monoidal bubble and a feedback box, which delays as
-    a box does: its boundary is delayed and its time step counts, its args
-    stay as they are inside.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        time_step (int) : The number of times the bubble has been delayed,
-            its boundary that of its args delayed as many times by default.
-        kwargs : Passed to :class:`monoidal.Bubble`.
-
-    Example
-    -------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f = Box('f', x, y)
-    >>> bubble = f.bubble().delay()
-    >>> assert bubble.args == (f, ) and (bubble.dom, bubble.cod) == (x.d, y.d)
-    >>> assert bubble.time_step == 1 and bubble.reset() == f.bubble()
-    >>> assert bubble == Bubble(f, time_step=1) != f.delay().bubble()
-    >>> print(bubble)
-    (f).bubble().d
-    """
-    serialised_attrs = monoidal.Bubble.serialised_attrs + ("time_step", )
-
-    def __init__(self, *args: Diagram, time_step: int = 0, **kwargs):
-        for attr in ("dom", "cod"):
-            if time_step and kwargs.get(attr) is None:
-                kwargs[attr] = self.common(args, attr).delay(time_step)
-        super().__init__(*args, **kwargs)
-        self.time_step = time_step
-
-    def __str__(self):
-        if not self.time_step:
-            return super().__str__()
-        return str(self.reset()) + str_delayed(self.time_step)
-
-    def __repr__(self):
-        if not self.time_step:
-            return super().__repr__()
-        return super().__repr__()[:-1] + f", time_step={self.time_step})"
-
-    def setoid(self):
-        return super().setoid() + (self.time_step, )
-
-    def to_tree(self) -> dict:
-        """
-        Serialise a bubble as the bubble at time step zero, with its time step.
-
-        >>> from discopy.utils import dumps, loads
-        >>> bubble = Box('f', Ty('x'), Ty('y')).bubble().delay(2)
-        >>> assert loads(dumps(bubble)) == bubble
-        """
-        if not self.time_step:
-            return super().to_tree()
-        return self.reset().to_tree() | {'time_step': self.time_step}
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        bubble = super().from_tree(tree)
-        return bubble.delay(tree['time_step']) if 'time_step' in tree\
-            else bubble
 
 
 class Functor(monoidal.Functor):
@@ -1307,7 +1287,6 @@ Diagram.trace_factory = Trace
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
@@ -1398,3 +1377,6 @@ __getattr__ = deprecated_alias(__name__, {
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

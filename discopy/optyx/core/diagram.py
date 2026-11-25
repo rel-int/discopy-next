@@ -1475,7 +1475,7 @@ def truncation_tensor(
     return tensor
 
 
-class Feedback(monoidal.Bubble, Box):
+class Feedback(Box):
     """
     A feedback loop connecting the last `mem` outputs of `arg`
     back to its last `mem` inputs, one time step later.
@@ -1551,9 +1551,9 @@ class Feedback(monoidal.Bubble, Box):
         if self.effect.dom != mem:
             raise AxiomError(
                 f"{self.effect} is not an effect on the memory {mem}")
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, method="feedback_operator")
-        Box.__init__(self, str(self), dom, cod)
+        self.args = (arg, )
+        Box.__init__(self, str(self), dom, cod, args=(arg, ),
+                     method="feedback_operator")
 
     def __str__(self):
         args = "" if self.mem == self.arg.cod[-1:] else f"mem={self.mem}"

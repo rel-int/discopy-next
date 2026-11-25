@@ -327,7 +327,7 @@ def test_deep_terms():
         sys.setrecursionlimit(limit)
     depth = 0
     while isinstance(term, Application):
-        depth, term = depth + 1, term.args
+        depth, term = depth + 1, term.argument
     assert depth == 6000
 
 

@@ -17,7 +17,7 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
+    Elementwise
     Permutation
     Swap
     Spider
@@ -392,10 +392,10 @@ class Sum(tensor.Sum[complex], Box):
     """
 
 
-class Bubble(tensor.Bubble[complex], Box):
+class Elementwise(tensor.Elementwise[complex], Box):
     """
-    A ZX bubble is a tensor bubble in a ZX diagram, which differentiates as
-    a ZX box does.
+    A ZX elementwise box is a tensor one in a ZX diagram, which
+    differentiates as a ZX box does.
 
     >>> bubble = Z(1, 1).bubble()
     >>> assert (bubble >> Z(1, 1)).eval() == bubble.eval()
@@ -674,7 +674,7 @@ H.color, H.shape = "yellow", "rectangle"
 SWAP = Swap(Nat(1), Nat(1))
 Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
-Diagram.bubble_factory = Bubble
+Diagram.elementwise_factory = Elementwise
 Diagram.permutation_factory = Permutation
 Id = Diagram.id
 
@@ -2008,3 +2008,6 @@ class Agenda:
 
 
 Diagram.hypergraph_factory = Hypergraph
+
+
+Bubble = Elementwise

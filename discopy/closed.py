@@ -56,7 +56,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     Equation
 
@@ -475,7 +474,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     @classmethod
     def box_to_term(cls, box, args):
         "The application of a box as a constant to variables for its inputs."
-        if isinstance(box, Bubble):
+        if box.args:
             raise AxiomError(f"{box} is a bubble, it has no term reading.")
         if not box.dom:
             return box.cod(box.name)
@@ -516,7 +515,8 @@ class Timed(Box):
         if time_step:
             self._time_step = time_step
             monoidal.Box.__init__(self, self.name, self.dom.delay(time_step),
-                                  self.cod.delay(time_step))
+                                  self.cod.delay(time_step), args=self.args,
+                                  method=self.method)
 
     time_step = property(lambda self: self._time_step)
 
@@ -724,18 +724,6 @@ class Sum(markov.Sum, biclosed.Sum, Box):
         return all(term.is_linear for term in self.terms)
 
 
-class Bubble(markov.Bubble, biclosed.Bubble, Box):
-    """
-    A closed bubble is a markov and biclosed bubble and a closed box, linear
-    as a closed box is, whatever its args. It has no term reading.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Diagram.copy(x).bubble(cod=x).is_linear
-    """
-
-
 class Functor(biclosed.Functor, markov.Functor):
     """
     A closed functor is a markov functor that preserves evaluation, currying
@@ -801,7 +789,6 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 
 Id = Diagram.id
@@ -1157,7 +1144,7 @@ class Application(TermBase, biclosed.Application):
     """
     serialised_attrs = biclosed.Application.serialised_attrs
     func: Term
-    args: Term
+    argument: Term
 
     def __init__(self, func: Term, args: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
@@ -1171,11 +1158,11 @@ class Application(TermBase, biclosed.Application):
     @property
     def is_linear(self):
         return not self.overlap\
-            and self.func.is_linear and self.args.is_linear
+            and self.func.is_linear and self.argument.is_linear
 
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
-        func, args = self.func, self.args
+        func, args = self.func, self.argument
         evaluate = functor.cod.ev(
             functor(func.cod.base), functor(func.cod.exponent))
         return self.weaken(functor, context)\
@@ -1184,12 +1171,12 @@ class Application(TermBase, biclosed.Application):
 
     def occurrences(self, variable):
         return self.func.occurrences(variable)\
-            + self.args.occurrences(variable)
+            + self.argument.occurrences(variable)
 
     def substitute(self, substitution):
         return type(self)(
             self.func.substitute(substitution),
-            self.args.substitute(substitution))
+            self.argument.substitute(substitution))
 
 
 class Abstraction(TermBase, biclosed.Abstraction):
@@ -1372,6 +1359,7 @@ class Projection(Compound):
     >>> assert Projection(Tuple(x, y), 1).cod == Y
     """
     serialised_attrs = ("arg", "index")
+    arg = None
 
     def __init__(self, arg: Term, index: int):
         assert_isinstance(arg, TermBase)
@@ -1832,7 +1820,7 @@ class Strategy:
         spine = []
         while isinstance(term, (Application, Abstraction)):
             if isinstance(term, Application):
-                spine.append(term.args)
+                spine.append(term.argument)
                 term = term.func
             elif spine:
                 if not self.spend():
@@ -1931,3 +1919,6 @@ for law in sorted(
 
 class Equation(markov.Equation):
     """ The :class:`markov.Equation` of closed diagrams. """
+
+
+Bubble = Box.from_args

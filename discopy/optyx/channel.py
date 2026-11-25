@@ -2007,7 +2007,7 @@ class Swap(Permutation, frobenius.Swap, Channel):
     dagger = frobenius.Swap.dagger
 
 
-class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
+class Feedback(Diagram, frobenius.Box):
     """
     A feedback loop connecting the last `mem` outputs of a channel diagram
     back to its last `mem` inputs, one time step later.
@@ -2063,9 +2063,9 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
         if self.effect.dom != mem:
             raise AxiomError(
                 f"{self.effect} is not an effect on the memory {mem}")
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, method="feedback_operator")
-        frobenius.Box.__init__(self, str(self), dom, cod)
+        self.args = (arg, )
+        frobenius.Box.__init__(self, str(self), dom, cod, args=(arg, ),
+                               method="feedback_operator")
 
     __str__ = diagram.Feedback.__str__
     __repr__ = diagram.Feedback.__repr__

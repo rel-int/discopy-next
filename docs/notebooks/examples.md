@@ -206,7 +206,12 @@ class Formula(frobenius.Diagram):
             ob_map=lambda _: Dim(size), ar_map=lambda f: model[f],
             cod=Tensor[bool])(self)
 
-class Cut(frobenius.Bubble, Formula): pass
+class Cut(frobenius.Box, Formula):
+    serialised_attrs = ("*args", )
+
+    def __init__(self, arg):
+        frobenius.Box.__init__(self, "", arg.dom, arg.cod, args=(arg, ))
+
 class Ligature(frobenius.Spider, Formula): pass
 class Predicate(frobenius.Box, Formula): pass
 

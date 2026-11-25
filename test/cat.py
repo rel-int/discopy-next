@@ -433,11 +433,12 @@ def test_total_ordering():
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
     assert repr((f).bubble())\
-        == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
+        == "cat.Box('', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),))"
     assert str(f.bubble()) == "(f).bubble()"
     named = f.bubble(name="N", method="m")
-    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
-        " name='N', method='m')"
+    assert repr(named) == "cat.Box('N', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),), method='m')"
     assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
     assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
     image = Functor.id()(f.bubble(data=42, is_dagger=True))
@@ -675,11 +676,7 @@ def box_classes():
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
     "{sum,markov}.Sum": "c((box(c, x, y, v), ))",
-    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
-    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
-    "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
-    "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
     "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
     "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
@@ -697,7 +694,6 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
-    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
@@ -741,7 +737,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "lambek.cfg.Rule": 'c(x @ y, x, "r")',
     "lambek.cfg.Word": 'c("w", x, y)',
     "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
-    "tensor.Bubble":
+    "{tensor,quantum.circuit,quantum.zx}.Elementwise":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
     "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
@@ -856,8 +852,7 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy}":
         "it has no stated rotation",
         "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
@@ -869,7 +864,7 @@ BROKEN = {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
         "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",
     },
 }

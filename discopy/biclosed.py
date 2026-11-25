@@ -22,7 +22,6 @@ Summary
     Coeval
     Curry
     Sum
-    Bubble
     Functor
     CMap
     TermBase
@@ -604,7 +603,7 @@ class Coeval(Box):
         return self.eval_factory(self.x, self.left)
 
 
-class Curry(monoidal.Bubble, Box):
+class Curry(Box):
     """
     The currying of a biclosed diagram.
 
@@ -631,9 +630,8 @@ class Curry(monoidal.Bubble, Box):
             cod = arg.cod << arg.dom[len(arg.dom) - n:]
         else:
             dom, cod = arg.dom[n:], arg.dom[:n] >> arg.cod
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, drawing_name="$\\Lambda$")
-        Box.__init__(self, name, dom, cod)
+        Box.__init__(self, name, dom, cod, args=(arg, ),
+                     drawing_name="$\\Lambda$")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r}, " \
@@ -686,19 +684,12 @@ class Sum(formal_sum.Sum, Box):
     """
 
 
-class Bubble(monoidal.Bubble, Box):
-    """
-    A biclosed bubble is a monoidal bubble and a biclosed box.
-    """
-
-
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 
 
 class Functor(monoidal.Functor):
@@ -1133,20 +1124,20 @@ class Application(TermBase):
 
     Attributes:
         func (Term): The function being applied.
-        args (Term): The arguments to which the function is applied.
+        argument (Term): The argument to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
-    serialised_attrs = ("func", "args", "left")
+    serialised_attrs = ("func", "argument", "left")
 
     def __init__(self, func: TermBase, args: TermBase, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
         if not func.cod.is_exp:
             raise TypeError(messages.NOT_EXPONENTIAL.format(func, func.cod))
-        self.func, self.args, self.left = func, args, left
-        if self.func.cod.exponent != self.args.cod:
+        self.func, self.argument, self.left = func, args, left
+        if self.func.cod.exponent != self.argument.cod:
             raise ValueError(
-                f"Expected {self.func.cod.exponent}, got {self.args.cod}")
+                f"Expected {self.func.cod.exponent}, got {self.argument.cod}")
         cod, fname, xname = func.cod.base, str(func), str(args)
         name = f"{xname}({fname}, left=True)" if left else f"{fname}({xname})"
         dom = self.__check_dom__(func, args, left)
@@ -1163,7 +1154,7 @@ class Application(TermBase):
     def eval(self, functor=None):
         functor = functor or self.functor
         func = self.func.eval(functor=functor)
-        args = self.args.eval(functor=functor)
+        args = self.argument.eval(functor=functor)
         base, exponent = self.func.cod.base, self.func.cod.exponent
         ev = functor.cod.ev(
             functor(base), functor(exponent), left=not self.left)
@@ -1172,16 +1163,16 @@ class Application(TermBase):
     def map(self, functor, context):
         return functor.cod.ob.application_factory(
             functor.map_term(self.func, context),
-            functor.map_term(self.args, context), self.left)
+            functor.map_term(self.argument, context), self.left)
 
     def __repr__(self):
-        func, args = repr(self.func), repr(self.args)
+        func, args = repr(self.func), repr(self.argument)
         left = ", left=True" if self.left else ""
         return factory_name(type(self)) + f"({func}, {args}{left})"
 
     def to_tree(self):
         return dict(factory=factory_name(type(self)), func=self.func.to_tree(),
-                    args=self.args.to_tree(), left=self.left)
+                    args=self.argument.to_tree(), left=self.left)
 
     @classmethod
     def from_tree(cls, tree):
@@ -1194,16 +1185,16 @@ class Application(TermBase):
         are, rather than when they print the same between the same types:
         a closed constant prints as its bare name, whatever its type.
         """
-        return factory_key(type(self)), self.func, self.args, self.left
+        return factory_key(type(self)), self.func, self.argument, self.left
 
     @property
     def constants(self):
-        return self.args.constants + self.func.constants if self.left\
-            else self.func.constants + self.args.constants
+        return self.argument.constants + self.func.constants if self.left\
+            else self.func.constants + self.argument.constants
 
     def atoms(self) -> list:
         """ The atoms of an application: those of its function and args. """
-        return self.func.atoms() + self.args.atoms()
+        return self.func.atoms() + self.argument.atoms()
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications on one side, functions and arguments alike. """
@@ -1212,8 +1203,8 @@ class Application(TermBase):
             return False
         return self.func.alpha_eq_under(
             scopes, [other.func for other in others], depth)\
-            and self.args.alpha_eq_under(
-                scopes, [other.args for other in others], depth)
+            and self.argument.alpha_eq_under(
+                scopes, [other.argument for other in others], depth)
 
 
 class Abstraction(TermBase):
@@ -1553,3 +1544,6 @@ class AlphaEquation(cat.AlphaEquation, Equation):
 TermBase.equivalence_factory = AlphaEquation
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+
+
+Bubble = Box.from_args

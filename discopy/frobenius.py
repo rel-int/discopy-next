@@ -30,7 +30,6 @@ Summary
     Permutation
     Swap
     Spider
-    Bubble
     Sum
     Feedback
     Trace
@@ -242,7 +241,6 @@ class Diagram(
     cap_factory: ClassVar[type["Cap"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
-    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
     layer_factory = Layer
@@ -882,19 +880,6 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Bubble(compact.Bubble, markov.Bubble, comarkov.Bubble, Box):
-    """
-    A Frobenius bubble is a compact, Markov and comarkov bubble and a
-    frobenius box, which keeps its flags as it rotates.
-
-    >>> x = Ty('x')
-    >>> noisy = Box('f', x, x).bubble(is_deterministic=False)
-    >>> assert noisy.r.l == noisy and not noisy.r.l.is_deterministic
-    """
-    serialised_attrs = compact.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-
 class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
     """
     A Frobenius sum is a sum of Frobenius diagrams.
@@ -931,7 +916,8 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
         if isinstance(other, Cospan)\
                 and not isinstance(other, symmetric.Permutation):
             return self(other.to_spiders())
-        if isinstance(other, (markov.Copy, Bubble)):
+        if isinstance(other, markov.Copy)\
+                or isinstance(other, Box) and other.args:
             return markov.Functor.__call__(self, other)
         if isinstance(other, comarkov.Merge):
             return comarkov.Functor.__call__(self, other)
@@ -1023,7 +1009,6 @@ Diagram.swap_factory = Swap
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.permutation_factory = Permutation
 Diagram.cospan_factory = Cospan
-Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
@@ -1039,3 +1024,6 @@ class Equation(compact.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args

@@ -406,7 +406,7 @@ class Machine[monad](NamedGeneric):
         term, env, stack = token.term, token.env, token.stack
         if isinstance(term, Application):
             return self.inject(
-                Down(term.func, env, (Arg(term.args, env), ) + stack))
+                Down(term.func, env, (Arg(term.argument, env), ) + stack))
         if isinstance(term, Abstraction):
             return self.inject(Up(Closure(term, env), stack))
         if isinstance(term, Variable):

@@ -36,7 +36,6 @@ Summary
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition
-    Bubble
     Functor
     CMap
 
@@ -199,15 +198,6 @@ class Curry(biclosed.Curry, Box):
     """
 
 
-class Bubble(biclosed.Bubble, Box):
-    """
-    A categorial bubble is a biclosed bubble and a categorial box.
-
-    >>> N = Ty('N')
-    >>> assert (Box('f', N, N).bubble() >> Box('g', N, N)).cod == N
-    """
-
-
 class ForwardCrossedComposition(BinaryBoxConstructor, Box):
     """ Forward crossed composition rule. """
     serialised_attrs = ("left", "right")
@@ -323,7 +313,7 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
 class FA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
-    serialised_attrs = ("func", "args")
+    serialised_attrs = ("func", "argument")
 
     def __init__(self, func, args):
         biclosed.Application.__init__(self, func, args, left=False)
@@ -334,12 +324,12 @@ class FA(TermBase, biclosed.Application):
         return cls(*map(from_tree, (tree['func'], tree['args'])))
 
     def simplify(self):
-        return self.func.simplify()(self.args.simplify())
+        return self.func.simplify()(self.argument.simplify())
 
 
 class BA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
-    serialised_attrs = ("args", "func")
+    serialised_attrs = ("argument", "func")
 
     def __init__(self, args, func):
         biclosed.Application.__init__(self, func, args, left=True)
@@ -350,10 +340,10 @@ class BA(TermBase, biclosed.Application):
         return cls(*map(from_tree, (tree['args'], tree['func'])))
 
     def simplify(self):
-        return self.args.simplify()(self.func.simplify(), left=True)
+        return self.argument.simplify()(self.func.simplify(), left=True)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.args!r}, {self.func!r})"
+        return factory_name(type(self)) + f"({self.argument!r}, {self.func!r})"
 
 
 class TypeRaising(TermBase):
@@ -728,7 +718,6 @@ def parse(sentence, k: int = 1, goal: Ty | None = None
 Id = Diagram.id
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.curry_factory = Curry
-Diagram.bubble_factory = Bubble
 Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable
@@ -738,3 +727,6 @@ Ty.application_factory =\
 Ty.abstraction_factory = Abstraction
 
 Ty.over_factory, Ty.under_factory = Over, Under
+
+
+Bubble = Box.from_args

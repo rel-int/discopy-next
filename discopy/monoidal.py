@@ -20,7 +20,6 @@ Summary
     Layer
     Diagram
     Box
-    Bubble
     Functor
     Match
     Equation
@@ -335,7 +334,8 @@ class Wire(cat.Ob):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
 
-    __str__ = cat.Box.__str__
+    def __str__(self):
+        return str(self.name) + ("[::-1]" if self.is_dagger else '')
 
     def to_tree(self):
         tree = super().to_tree()
@@ -1446,7 +1446,6 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 
     box_factory: ClassVar[type["Box"]]
     sum_factory: ClassVar[type[formal_sum.Sum]]
-    bubble_factory: ClassVar[type["Bubble"]]
     functor_factory: ClassVar[type["Functor"]]
     ob = Ty
     layer_factory = Layer
@@ -2461,21 +2460,94 @@ class Box(cat.Box, Diagram):
 
     .. image:: /_static/monoidal/coloured-box.svg
         :align: center
+
+    A box with args, i.e. a bubble, is drawn around its arg, as a square
+    when their boundaries differ in length, or as a frame with a slot for
+    each of its args, side by side or vertically.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
+    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
+    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
+
+    .. image:: /_static/monoidal/bubble-example.svg
+        :align: center
+
+    >>> b = f.bubble(g, h >> h[::-1], dom=x, cod=y @ y)
+    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
+
+    .. image:: /_static/monoidal/bubble-multiple-args.svg
+        :align: center
+
+    >>> b = f.bubble(g, h, dom=x, cod=y @ y, draw_vertically=True)
+    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
+
+    .. image:: /_static/monoidal/frame-vertical-args.svg
+        :align: center
+
+    Coloured frames distinguish their outside, frame and slot regions.
+
+    >>> red, blue = map(Colour, ("red", "blue"))
+    >>> x = Ty(Wire("x", red, blue))
+    >>> f = Box("f", x, x)
+    >>> frame = f.bubble(
+    ...     dom=Ty(Wire("boundary", blue, red)),
+    ...     cod=Ty(Wire("boundary", blue, red)),
+    ...     draw_as_frame=True)
+    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
+
+    .. image:: /_static/monoidal/coloured-frame.svg
+        :align: center
     """
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
+        draw_as_frame, draw_as_square, draw_vertically = (
+            params.pop("draw_as_frame", None),
+            params.pop("draw_as_square", None),
+            params.pop("draw_vertically", False))
         dom = dom if isinstance(dom, self.ob) else self.ob(dom)
         cod = cod if isinstance(cod, self.ob) else self.ob(cod)
         if (dom.dom, dom.cod) != (cod.dom, cod.cod):
             raise AxiomError(messages.NOT_GLOBULAR.format(
                 dom.dom, dom.cod, cod.dom, cod.cod))
+        if params.get("args") and params.get("drawing_name") is None\
+                and "drawing_name" not in vars(self):
+            params["drawing_name"] = ""
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in params:
                 setattr(self, attr, params.pop(attr))
         cat.Box.__init__(self, name, dom, cod, **params)
+        if self.args:
+            self.bubble_drawing(draw_as_frame, draw_as_square, draw_vertically)
         inside = () if self.is_identity\
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
+
+    def bubble_drawing(
+            self, draw_as_frame: bool | None, draw_as_square: bool | None,
+            draw_vertically: bool):
+        """
+        Set how a box with args is drawn: as a bubble around its one arg
+        when their boundaries have as many wires, else as a square, or as a
+        frame with a slot for each arg, side by side or vertically.
+
+        Parameters:
+            draw_as_frame : Whether to draw the box as a frame.
+            draw_as_square : Whether to draw the box as a square.
+            draw_vertically : Whether to draw the frame slots vertically.
+        """
+        self.draw_vertically = draw_vertically
+        if "frame_colour" not in vars(self):
+            self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
+        if len(self.args) == 1:
+            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
+                len(self.arg.dom), len(self.arg.cod))
+            self.draw_as_square = draw_as_square or not can_draw_as_bubble
+            self.draw_as_frame = draw_as_frame or (
+                not can_draw_as_bubble and not self.draw_as_square)
+        else:
+            self.draw_as_frame = True
+            self.draw_as_square = False
 
     def rebuild(self, **changes):
         """
@@ -2491,6 +2563,10 @@ class Box(cat.Box, Diagram):
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in vars(self) and attr not in vars(box):
                 setattr(box, attr, getattr(self, attr))
+        if self.args and box.args:
+            Box.bubble_drawing(
+                box, self.draw_as_frame, self.draw_as_square,
+                self.draw_vertically)
         return box
 
     is_identity = False
@@ -2517,101 +2593,12 @@ class Box(cat.Box, Diagram):
 
     @property
     def size(self):
-        return 1
-
-    def to_drawing(self):
-        return Drawing.from_box(self)
-
-
-class Bubble(cat.Bubble, Box):
-    """
-    A bubble is a box with diagrams :code:`args` inside and an optional pair of
-    types :code:`dom` and :code:`cod`.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        drawing_name (str) : The label to use when drawing, empty by default.
-        draw_as_square (bool) : Whether to draw the bubble as a square.
-        draw_as_frame (bool) : Whether to draw the bubble as a frame.
-        draw_vertically (bool) : Whether to draw the frame slots vertically.
-        kwargs : Passed to :class:`cat.Bubble`.
-
-    Raises:
-        ValueError : When dom (resp. cod) is None and the args do not all
-            have the same dom (resp. cod).
-
-    Examples
-    --------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
-    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
-    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
-
-    .. image:: /_static/monoidal/bubble-example.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h >> h[::-1], dom=x, cod=y @ y)
-    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
-
-    .. image:: /_static/monoidal/bubble-multiple-args.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h, dom=x, cod=y @ y, draw_vertically=True)
-    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
-
-    .. image:: /_static/monoidal/frame-vertical-args.svg
-        :align: center
-
-    Coloured frames distinguish their outside, frame and slot regions.
-
-    >>> red, blue = map(Colour, ("red", "blue"))
-    >>> x = Ty(Wire("x", red, blue))
-    >>> f = Box("f", x, x)
-    >>> frame = f.bubble(
-    ...     dom=Ty(Wire("boundary", blue, red)),
-    ...     cod=Ty(Wire("boundary", blue, red)),
-    ...     draw_as_frame=True)
-    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
-
-    .. image:: /_static/monoidal/coloured-frame.svg
-        :align: center
-
-    """
-    serialised_attrs = cat.Bubble.serialised_attrs + (
-        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
-
-    def __init__(
-            self, *args: Diagram,
-            drawing_name: str | None = None,
-            draw_as_frame: bool | None = None,
-            draw_as_square: bool | None = None,
-            draw_vertically=False, **kwargs):
-        cat.Bubble.__init__(self, *args, **kwargs)
-        Box.__init__(self, self.name, self.dom, self.cod,
-                     data=self.data, is_dagger=self.is_dagger)
-        self.drawing_name = "" if drawing_name is None else drawing_name
-        self.draw_vertically = draw_vertically
-        self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
-        can_draw_as_square = len(args) == 1
-        can_draw_as_bubble = (can_draw_as_square
-                              and len(self.dom) == len(self.arg.dom)
-                              and len(self.cod) == len(self.arg.cod))
-        if len(args) == 1:
-            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
-                len(self.arg.dom), len(self.arg.cod))
-            self.draw_as_square = draw_as_square or not can_draw_as_bubble
-            self.draw_as_frame = draw_as_frame or (
-                not can_draw_as_bubble and not self.draw_as_square)
-        else:
-            self.draw_as_frame = True
-            self.draw_as_square = False
-
-    @property
-    def size(self):
-        """ The number of boxes in a bubble, counting its arguments. """
+        """ The number of boxes in a box, counting its arguments. """
         return 1 + sum(arg.size for arg in self.args)
 
     def to_drawing(self):
+        if not self.args:
+            return Drawing.from_box(self)
         method = "frame" if self.draw_as_frame else "bubble"
         args = [arg.to_drawing() for arg in self.args]
         kwargs = dict(
@@ -2776,17 +2763,22 @@ class Functor(cat.Functor):
             for box_or_typ in tail:
                 result = result @ self(box_or_typ)
             return result
-        if isinstance(other, Bubble) and self.cod is Drawing:
+        if isinstance(other, Box) and other.args and self.cod is Drawing:
             return other.to_drawing()
-        if isinstance(other, Bubble) and other.method == "bubble"\
-                and issubclass(self.cod, Diagram):
-            factory = self.cod.bubble_factory
+        if isinstance(other, Box) and other.args\
+                and other.method == "bubble" and issubclass(self.cod, Diagram):
             kept = {
                 attr: getattr(other, attr) for attr in other.serialised_attrs
-                if attr in factory.serialised_attrs
-                and attr not in ("*args", "dom", "cod", "method")}
-            return factory(*map(self, other.args), dom=self(other.dom),
-                           cod=self(other.cod), **kept)
+                if attr in getattr(
+                    self.cod, "elementwise_factory", self.cod.box_factory
+                ).serialised_attrs
+                and attr not in (
+                    "*", "*args", "args", "dom", "cod", "method")} | {
+                attr: getattr(other, attr) for attr in (
+                    "drawing_name", "draw_as_frame", "draw_as_square",
+                    "draw_vertically")}
+            return self.cod.bubble(*map(self, other.args), dom=self(other.dom),
+                                   cod=self(other.cod), **kept)
         return super().__call__(other)
 
 
@@ -2921,7 +2913,6 @@ Diagram.to_gif = drawing.to_gif
 
 Diagram.box_factory = Box
 Diagram.sum_factory = formal_sum.Sum[Diagram]
-Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
@@ -3522,3 +3513,6 @@ TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
 __getattr__ = deprecated_alias(
     __name__, {"PRO": "Nat", "Sum": Diagram.sum_factory})
+
+
+Bubble = Box.from_args
