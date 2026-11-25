@@ -22,6 +22,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#TBD]).
 
+- `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
+  between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
+  `then`, horizontal composition `>>` and `@`, and `is_invertible`;
+  `para.UpToPermutation` compares maps up to the permutations of their
+  parameters and of their coparameters, decided by `para.isomorphic`, an
+  isomorphism of hypergraphs that keeps the boundary in order, so that the
+  laws of every para category that failed for want of a reparametrisation
+  now hold modulo it ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -567,6 +576,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- The seven laws of `para` that were declared failing, `bifunctoriality`,
+  `scalar_sliding`, `braid_naturality`, `trace_dinaturality_left`,
+  `trace_dinaturality_right`, `sliding` and `transpose_contravariance`, now
+  hold modulo invertible 2-cells, i.e. permutations of the parameters, and
+  `messages.PARA_REPARAM` is removed ([next#TBD]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
@@ -2704,6 +2719,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
