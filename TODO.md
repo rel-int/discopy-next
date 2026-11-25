@@ -27,4 +27,4 @@
 - [x] structural_boxes generates each level's Feedforward
 - [x] drop the failing dagger declarations that now hold; keep pivotal's rotate ones
 - [x] record the stream and rotate rulings on #710
-- [ ] CHANGELOG bullet and next-checks
+- [WIP] @T-51236a2e-2026-11-25 15:54 CHANGELOG bullet and next-checks
