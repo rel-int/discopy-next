@@ -261,7 +261,7 @@ def test_channels():
     torch.testing.assert_close(module(v), expected[:, 0, :])
 
 
-def network(equivariant, torch, action, middle=None):
+def network(equivariant, torch, action, middle=None, fast=False):
     """
     equivariant >> tanh >> equivariant >> tanh >> invariant, the middle
     layer being on the action ``middle`` if given.
@@ -269,7 +269,8 @@ def network(equivariant, torch, action, middle=None):
     points = Dims(action.size)
     tanh = para.Markov[Network].lift(
         Box("tanh", points, points, module=torch.tanh))
-    layer, invariant = equivariant.layer, Action.trivial(action.group)
+    layer = partial(equivariant.layer, fast=fast)
+    invariant = Action.trivial(action.group)
     middle = middle or action
     return layer(action, action) >> tanh >> layer(middle, middle) >> tanh\
         >> layer(action, invariant)
@@ -294,15 +295,17 @@ def test_composite():
     torch, equivariant = modules()
     torch.manual_seed(2)
     trivial = Action.trivial(Cyclic[6], 6)
-    for action, size in ((trivial, 78), (Cyclic[6].action(), 13),
-                         (Symmetric[6].action(), 5)):
-        module = compiled(torch, network(equivariant, torch, action))
-        assert sum(p.numel() for p in module.parameters()) == size
-        v = torch.randn(5, 6, 1, dtype=torch.float64)
-        assert module(v[..., 0]).shape == (5, )
-        assert equivariance_of(equivariant, module, action, v) < 1e-9
-        module(v[..., 0]).pow(2).sum().backward()
-        assert all(p.grad.abs().sum() > 0 for p in module.parameters())
+    for fast in (False, True):
+        for action, size in ((trivial, 78), (Cyclic[6].action(), 13),
+                             (Symmetric[6].action(), 5)):
+            module = compiled(
+                torch, network(equivariant, torch, action, fast=fast))
+            assert sum(p.numel() for p in module.parameters()) == size
+            v = torch.randn(5, 6, 1, dtype=torch.float64)
+            assert module(v[..., 0]).shape == (5, )
+            assert equivariance_of(equivariant, module, action, v) < 1e-9
+            module(v[..., 0]).pow(2).sum().backward()
+            assert all(p.grad.abs().sum() > 0 for p in module.parameters())
 
 
 def test_composite_untied():
@@ -331,3 +334,28 @@ def test_wreath():
         assert dense.orbits == orbits
         assert equivariant.equivariance(
             partial(dense, w=w), action, action, v) < 1e-9
+
+
+def test_fast_layer():
+    """
+    The fast layer has the parameters and the outputs of the dense one,
+    through a module, with a bias, channels and every kind of realisation.
+    """
+    torch, equivariant = modules()
+    module = importorskip("discopy.neural.torch").Module
+    torch.manual_seed(6)
+    symmetric, rotations = Symmetric[4].action(), Cyclic[6].action()
+    pairs = Symmetric[3].action().tensor(Symmetric[3].action())
+    for dom, cod, channels in (
+            (symmetric, symmetric, (3, 2)), (rotations, rotations, (2, 2)),
+            (symmetric, Action.trivial(symmetric.group), (2, 3)),
+            (Symmetric[3].action(), pairs, (1, 2))):
+        slow = equivariant.layer(dom, cod, channels, bias=True)
+        fast = equivariant.layer(dom, cod, channels, bias=True, fast=True)
+        assert (slow.dom, slow.cod, slow.param) == (
+            fast.dom, fast.cod, fast.param)
+        weights = [torch.randn(dim.inside, dtype=torch.float64)
+                   for dim in slow.param.inside]
+        v = torch.randn(5, *slow.dom.inside[0].inside, dtype=torch.float64)
+        torch.testing.assert_close(
+            module(fast, *weights)(v), module(slow, *weights)(v))

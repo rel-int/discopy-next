@@ -16,6 +16,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   parametric map of `neural` networks and `equivariance` the distance of a
   function to commuting with the group ([next#TBD]).
 
+- `neural.factorised` computes equivariant layers along the construction of
+  the group instead of on a dense matrix, checked equal to `Dense` in outputs
+  and gradients: `realise` picks `Pooling` for a side of one point, else
+  `Dense`, and `layer(..., fast=True)` uses it ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).

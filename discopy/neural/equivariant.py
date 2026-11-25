@@ -13,6 +13,7 @@ Summary
     :nosignatures:
     :toctree:
 
+    Realisation
     Dense
     Legs
 
@@ -24,6 +25,7 @@ Summary
         :toctree:
 
         tying
+        labels
         act
         layer
         equivariance
@@ -50,7 +52,8 @@ points:
 0.0
 
 Its legs are those of :class:`discopy.neural.network.Network`, with the
-unit dimensions dropped, see :class:`Legs`.
+unit dimensions dropped, see :class:`Legs`. The faster realisations of the
+same layers are in :mod:`discopy.neural.factorised`.
 """
 
 from __future__ import annotations
@@ -123,7 +126,95 @@ def act(image: Permutation, tensor: torch.Tensor) -> torch.Tensor:
     return tensor[..., list(image.dagger()), :]
 
 
-class Dense(torch.nn.Module):
+def labels(action: Action) -> numpy.ndarray:
+    """
+    The orbit of each point of an action, numbered in the order of the
+    least point of each orbit, see :meth:`Action.orbits`.
+
+    Parameters:
+        action : The action.
+
+    Example
+    -------
+    >>> from discopy.group import Symmetric
+    >>> labels(Action.trivial(Symmetric[3], 2)).tolist()
+    [0, 1]
+    >>> labels(Symmetric[3].action()).tolist()
+    [0, 0, 0]
+    """
+    index = numpy.empty(action.size, dtype=int)
+    for k, orbit in enumerate(action.orbits()):
+        index[list(orbit)] = k
+    return index
+
+
+class Realisation(torch.nn.Module):
+    """
+    A way to compute the equivariant linear maps from ``dom`` to ``cod``
+    with channels: the interface of :class:`Dense`, which every faster
+    realisation shares and agrees with, outputs and gradients.
+
+    The weights ``w`` of shape ``(orbits, D, C)`` are numbered as the orbits
+    of the pairs of points, see :func:`tying`, and never reordered. The
+    biases ``b`` of shape ``(bias_orbits, D)`` are numbered as the orbits
+    of the output points. A realisation numbers its orbits without calling
+    :func:`tying`, and exposes the table as :meth:`tying`.
+
+    Parameters:
+        dom : The action on the input points.
+        cod : The action on the output points.
+        orbits : The number of orbits on pairs of points, i.e. of weights.
+
+    Attributes:
+        orbits : The number of orbits on pairs of points, i.e. of weights.
+        bias_orbits : The number of orbits on output points, i.e. of biases.
+
+    Raises:
+        TypeError : If the actions are of different groups.
+
+    Example
+    -------
+    >>> import torch  # doctest: +EXTRA
+    >>> from discopy.group import Symmetric
+    >>> action = Symmetric[3].action()
+    >>> dense = Dense(action, action)
+    >>> isinstance(dense, Realisation), dense.bias_orbits
+    (True, 1)
+    >>> dense.bias(torch.zeros(1, 3, 1), torch.tensor([[2.]])).flatten()
+    tensor([2., 2., 2.])
+    """
+    def __init__(self, dom: Action, cod: Action, orbits: int):
+        super().__init__()
+        if dom.group is not cod.group:
+            raise TypeError(
+                f"Expected actions of {dom.group}, got {cod.group}.")
+        bias = labels(cod)
+        self.dom, self.cod, self.orbits = dom, cod, orbits
+        self.bias_orbits = int(bias.max()) + 1 if bias.size else 0
+        self.register_buffer(
+            "bias_index", torch.from_numpy(bias), persistent=False)
+
+    def tying(self) -> numpy.ndarray:
+        """
+        The orbit of each pair of points, of shape ``(cod.size, dom.size)``,
+        equal to the function :func:`tying`.
+        """
+        raise NotImplementedError
+
+    def bias(self, out: torch.Tensor, b: torch.Tensor | None) -> torch.Tensor:
+        """
+        Add the biases to an output, if any.
+
+        Parameters:
+            out : The output, of shape ``(..., |Y|, D)``.
+            b : The biases, of shape ``(bias_orbits, D)``, if any.
+        """
+        if b is None:
+            return out
+        return out + b[self.bias_index]  # ty: ignore[invalid-argument-type]
+
+
+class Dense(Realisation):
     """
     The dense realisation of the equivariant linear maps from ``dom`` to
     ``cod`` with channels, the group acting trivially on them: one
@@ -157,16 +248,14 @@ class Dense(torch.nn.Module):
     [2.0, 4.0, 1.0]
     """
     def __init__(self, dom: Action, cod: Action):
-        super().__init__()
-        self.dom, self.cod = dom, cod
         index = tying(dom, cod)
-        bias = tying(Action.trivial(cod.group), cod).reshape(-1)
-        self.orbits = int(index.max()) + 1 if index.size else 0
-        self.bias_orbits = int(bias.max()) + 1 if bias.size else 0
+        super().__init__(dom, cod, int(index.max()) + 1 if index.size else 0)
         self.register_buffer(
             "index", torch.from_numpy(index), persistent=False)
-        self.register_buffer(
-            "bias_index", torch.from_numpy(bias), persistent=False)
+
+    def tying(self) -> numpy.ndarray:
+        """ The gathered index of the weights, on the host. """
+        return self.index.cpu().numpy()  # ty: ignore[call-non-callable]
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
@@ -185,26 +274,35 @@ class Dense(torch.nn.Module):
             "yxdc,...xc->...yd",
             w[self.index],  # ty: ignore[invalid-argument-type]
             v)
-        if b is None:
-            return out
-        return out + b[self.bias_index]  # ty: ignore[invalid-argument-type]
+        return self.bias(out, b)
 
 
-class Legs(Dense):
+class Legs(torch.nn.Module):
     """
-    A :class:`Dense` layer on the tensors of the legs of a box, i.e. with
+    A :class:`Realisation` on the tensors of the legs of a box, i.e. with
     the unit dimensions dropped: with one input channel the points are the
     last axis, with one output channel so are the output points, and a
     single point has no axis at all. The weights and the biases are legs too,
     so their unit dimensions are dropped as well.
 
+    The module :mod:`discopy.neural.factorised` imports this one, so it is
+    imported inside the constructor to avoid an import cycle.
+
     Parameters:
         dom : The action on the input points.
         cod : The action on the output points.
         channels : The number of input and output channels ``(C, D)``.
+        fast : Whether to use the fastest realisation, see
+               :func:`discopy.neural.factorised.realise`, instead of
+               :class:`Dense`.
 
     Attributes:
+        realisation : The realisation the legs are of.
         channels : The number of input and output channels ``(C, D)``.
+        dom : The action on the input points.
+        cod : The action on the output points.
+        orbits : The number of orbits on pairs of points, i.e. of weights.
+        bias_orbits : The number of orbits on output points, i.e. of biases.
 
     Example
     -------
@@ -216,9 +314,15 @@ class Legs(Dense):
     tensor([2., 4., 1.])
     """
     def __init__(self, dom: Action, cod: Action,
-                 channels: tuple[int, int] = (1, 1)):
-        super().__init__(dom, cod)
+                 channels: tuple[int, int] = (1, 1), *, fast: bool = False):
+        super().__init__()
+        # pylint: disable=import-outside-toplevel,cyclic-import
+        from discopy.neural.factorised import realise
+        self.realisation = realise(dom, cod) if fast else Dense(dom, cod)
         self.channels = channels
+        self.dom, self.cod = dom, cod
+        self.orbits = self.realisation.orbits
+        self.bias_orbits = self.realisation.bias_orbits
 
     @staticmethod
     def restore(tensor: torch.Tensor, *shape: int) -> torch.Tensor:
@@ -256,7 +360,7 @@ class Legs(Dense):
             The output, of shape ``(..., |Y|, D)`` without unit axes.
         """
         c, d = self.channels
-        out = super().forward(
+        out = self.realisation(
             self.restore(v, self.dom.size, c),
             self.restore(w, self.orbits, d, c),
             None if b is None else self.restore(b, self.bias_orbits, d))
@@ -264,7 +368,9 @@ class Legs(Dense):
 
 
 def layer(dom: Action, cod: Action, channels: tuple[int, int] = (1, 1),
-          bias: bool = False, name: str = "W") -> para.Markov:
+          bias: bool = False, name: str = "W", *,
+          fast: bool = False) -> para.Markov:
+    # pylint: disable=too-many-arguments  # the realisation is a keyword
     """
     An equivariant layer as a parametric map, from the points of ``dom``
     with ``C`` channels each to those of ``cod`` with ``D`` channels each,
@@ -277,6 +383,9 @@ def layer(dom: Action, cod: Action, channels: tuple[int, int] = (1, 1),
         channels : The number of input and output channels ``(C, D)``.
         bias : Whether the layer has a bias.
         name : The name of its box.
+        fast : Whether to use the fastest realisation of the layer, see
+               :func:`discopy.neural.factorised.realise`: the parameter is
+               the same, and so is the output.
 
     Example
     -------
@@ -293,9 +402,14 @@ def layer(dom: Action, cod: Action, channels: tuple[int, int] = (1, 1),
 
     >>> layer(action, action).param
     Dims(Dim(2))
+
+    The fast layer has the same parameter and computes the same output:
+
+    >>> layer(action, action, fast=True).param
+    Dims(Dim(2))
     """
     c, d = channels
-    module = Legs(dom, cod, channels)
+    module = Legs(dom, cod, channels, fast=fast)
     param = Dims(Dim(module.orbits, d, c))
     if bias:
         param = param @ Dims(Dim(module.bias_orbits, d))
