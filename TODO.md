@@ -13,5 +13,5 @@
 - [x] Architecture diagram shows the syntax box only, prose updated
 - [x] split_memory and memory_size move to FeedbackCategory
 - [x] keyword_form becomes a FeedbackCategory method, Functions admonition dropped, callers and tests updated
-- [WIP] @T-1f2a1b14-2026-11-25 10:50 CHANGELOG bullet and next-checks gates
+- [x] CHANGELOG bullet and next-checks gates
 - [x] egraph listed under semantics in the docs, dropped from the diagram (follow-up point from USER)
