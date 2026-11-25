@@ -10,3 +10,4 @@
 
 - [x] Draw bang branching off monoidal in docs/api/architecture.html
 - [x] Changelog entry
+- [WIP] @T-dc6d2cec-2026-11-25 17:04 Rewrite discopy/bang.py's docstring sentence so it no longer compares bang to para or monad
