@@ -873,6 +873,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- `discopy.sum` goes, and `Sum` lives in each module again: `cat.Sum` is a box
+  of formal sums with their composition, `monoidal.Sum` adds the tensor and
+  each level's `Sum` subclasses its parent's. `Sum[C]` and the
+  `subscript_bases` hook of `NamedGeneric` go with it ([next#736]).
 - The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
   does not apply, now that a class with no tensor does not state it
   ([next#485]).
@@ -2715,6 +2719,7 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
+[next#736]: https://github.com/rel-int/discopy-next/pull/736
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
