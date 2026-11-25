@@ -6,7 +6,7 @@
 matrix, here for symmetric groups on tuples of points, by set partitions; the equivariant networks of *Categorical
 Deep Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332.)
 
-- [ ] `Partitions`: the layers of S_n between its natural action and its tensor square, one weight per set partition
-- [ ] `realise`: Pooling, Kronecker, then Partitions, then Dense
-- [ ] tests: equal to Dense in outputs and gradients, numbering, the partitions counted, refusals
-- [ ] CHANGELOG bullet
+- [x] `Partitions`: the layers of S_n between its natural action and its tensor square, one weight per set partition
+- [x] `realise`: Pooling, Kronecker, then Partitions, then Dense
+- [x] tests: equal to Dense in outputs and gradients, numbering, the partitions counted, refusals
+- [x] CHANGELOG bullet
