@@ -993,6 +993,7 @@ class Feedforward(Box, monoidal.Bubble):
 
     # pylint: disable-next=super-init-not-called  # Feedback's calls them
     def __init__(self, arg: Diagram, dom=None, cod=None, mem=None, left=False):
+        assert_isinstance(arg, self.ar)
         if mem is None:
             mem = arg.dom[:1] if left else arg.dom[-1:]
         # pylint: disable-next=non-parent-init-called  # the dual's boundary
@@ -1075,7 +1076,18 @@ class Trace(Feedback, Feedforward):
         >>> x = pivotal.Ty('x')
         >>> f = pivotal.Box('f', x @ x, x @ x)
         >>> assert pivotal.Trace(f).rotate() == f.rotate().trace(left=True)
+
+        A trace in a category with no rotation has none either:
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x, x @ x).trace().rotate()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: A trace rotates only in a pivotal category...
         """
+        if not hasattr(self.arg, "rotate"):
+            raise AxiomError(messages.TRACE_HAS_NO_ROTATION.format(
+                factory_name(self.ar)))
         return self.arg.rotate(left=left).trace(
             len(self.mem), left=not self.left)
 

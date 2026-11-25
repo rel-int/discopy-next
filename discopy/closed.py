@@ -792,8 +792,8 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
     feedback.structural_boxes(Diagram, Box)
-Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
-    lambda self: self.arg.is_linear)
+for cls in (Feedback, Feedforward, Head, Tail):
+    cls.is_linear = property(lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
 Diagram.pack_factory = Pack
 Diagram.unpack_factory = Unpack
