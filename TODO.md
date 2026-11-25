@@ -7,8 +7,8 @@ monoidal category acting on data in another, as in *Categorical Deep Learning is
 Architectures*, arXiv:2402.15332, where Para is defined for an actegory and Thm G.10 forces weight tying to be the
 diagonal when the weights are cartesian.)
 
-- [ ] `actegory.Action`: a strict action of a monoidal category on another, its laws as equations, `right` and `deterministic`
-- [ ] `actegory.Para`: identity, composition, reparametrisation over an action
-- [ ] tests: the self-action is `para`, the laws on deterministic weights acting on stochastic data, non-actions caught
-- [ ] weight tying is reparametrisation by copy: natural for deterministic maps, not for a sampled weight
-- [ ] docs and CHANGELOG bullet
+- [x] `actegory.Action`: a strict action of a monoidal category on another, its laws as equations, `right` and `deterministic`
+- [x] `actegory.Para`: identity, composition, reparametrisation over an action
+- [x] tests: the self-action is `para`, the laws on deterministic weights acting on stochastic data, non-actions caught
+- [x] weight tying is reparametrisation by copy: natural for deterministic maps, not for a sampled weight
+- [x] docs and CHANGELOG bullet
