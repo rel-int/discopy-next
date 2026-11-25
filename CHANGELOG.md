@@ -578,6 +578,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `argument`, in its trees too, and a tree with the old keys still loads
   ([next#729]).
 
+- In a left-to-right drawing, wire labels sit above their wires, and a line
+  separates each of the args nested in a box from the next, so that no two
+  regions meet without one ([next#733]).
+
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
   category, e.g. `Matrix`, no longer has them, and the function
@@ -2715,6 +2719,7 @@ for the changelog of `1.2.1` and earlier.
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#733]: https://github.com/rel-int/discopy-next/pull/733
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
