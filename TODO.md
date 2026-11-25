@@ -6,8 +6,8 @@
 acting contravariantly on parameters, under which the laws of parametric maps hold, as in *Categorical Deep
 Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332, where Para is a 2-category.)
 
-- [ ] `para.Cell`: a reparametrisation 2-cell between parallel maps, with identity, vertical and horizontal composition
-- [ ] `para.UpToPermutation`: maps equal up to an invertible 2-cell, decided by an isomorphism of hypergraphs that fixes the boundary
-- [ ] the laws declared failing up to reparametrisation now hold modulo `UpToPermutation`, in every para category
-- [ ] tests: negatives (output swaps, box data, port order, parameter vs boundary ports, adjoints), bounded searches
-- [ ] CHANGELOG bullet
+- [x] `para.Cell`: a reparametrisation 2-cell between parallel maps, with identity, vertical and horizontal composition
+- [x] `para.UpToPermutation`: maps equal up to an invertible 2-cell, decided by an isomorphism of hypergraphs that fixes the boundary
+- [x] the laws declared failing up to reparametrisation now hold modulo `UpToPermutation`, in every para category
+- [x] tests: negatives (output swaps, box data, port order, parameter vs boundary ports, adjoints), bounded searches
+- [x] CHANGELOG bullet
