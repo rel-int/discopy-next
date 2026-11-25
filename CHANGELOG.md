@@ -913,6 +913,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A frame drawn left to right keeps its name inside it, in its top left
+  corner, rather than lifted above its top side like a wire label, and a
+  bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
+  gradients in `tensor`'s product and chain rules; `Box`'s docstring draws
+  "concepts with attitude" from higher-order DisCoCat ([next#735]).
+
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
   `dagger` lambda set on the instance, so it pickles and so does every
@@ -2738,6 +2744,7 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
+[next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#737]: https://github.com/rel-int/discopy-next/pull/737
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
