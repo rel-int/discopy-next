@@ -35,6 +35,10 @@ the orbits of the group on pairs of points. :mod:`discopy.neural.augment`
 uses the same group on the data instead: random augmentation as a seeded
 Kleisli arrow, the Reynolds average of a function and the homomorphisms of
 :math:`G`-sets.
+symmetry group rather than along its tables.
+:mod:`discopy.neural.datatype` is the syntax of recursive networks: the
+terms of an inductive datatype such as lists or trees, and the algebras that
+fold them, with one tied parameter in a category of parametric maps.
 
 .. autosummary::
     :template: module.rst
@@ -54,6 +58,7 @@ Kleisli arrow, the Reynolds average of a function and the homomorphisms of
     equivariant
     factorised
     augment
+    datatype
 
 Note
 ----
