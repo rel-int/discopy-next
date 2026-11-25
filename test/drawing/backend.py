@@ -730,6 +730,7 @@ def test_bubble_of_coloured_args_drawn_in_another_direction():
 
 
 def test_left_to_right_labels_legend_and_dagger():
+    from discopy.config import BOX_DRAWING_ATTRIBUTES
     from discopy.drawing.backend import Backend
     from discopy.monoidal import Bubble, Colour, Diagram, Wire
     from discopy.utils import factory, text_width
@@ -766,6 +767,12 @@ def test_left_to_right_labels_legend_and_dagger():
     bubble = Bubble(
         Primitive('f', y, y), Primitive('g', y, y), frame_colour="red")
     assert bubble.dagger().frame_colour == "red"
+    default = BOX_DRAWING_ATTRIBUTES['frame_colour']
+    BOX_DRAWING_ATTRIBUTES['frame_colour'] = lambda _: "blue"
+    try:
+        assert Bubble(Primitive('f', y, y)).frame_colour == "blue"
+    finally:
+        BOX_DRAWING_ATTRIBUTES['frame_colour'] = default
     up, down = Recorder(), Recorder()
     bubble.to_drawing().draw(backend=up)
     bubble.to_drawing().dagger().draw(backend=down)

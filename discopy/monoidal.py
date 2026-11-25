@@ -2628,7 +2628,17 @@ class Bubble(cat.Bubble, Box):
     """
     serialised_attrs = cat.Bubble.serialised_attrs + (
         "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
-    frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](None)
+
+    @property
+    def frame_colour(self):
+        """ The colour of the frame, the default of
+        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        return vars(self).get(
+            "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
+
+    @frame_colour.setter
+    def frame_colour(self, colour):
+        vars(self)["frame_colour"] = colour
 
     def __init__(
             self, *args: Diagram,
