@@ -1064,3 +1064,43 @@ def test_frame_name_drawn_without_wire_labels():
         dom=x, cod=x, drawing_name="g", draw_as_frame=True
     ).draw(backend=recorder, wire_labels=False)
     assert "g" in recorder.texts and "x" not in recorder.texts
+
+
+def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts, self.frames = {}, []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = (j, params.get("verticalalignment"))
+
+        def draw_polygon(self, *points, **params):
+            self.frames.append([y for _, y in points])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    frame = Primitive('W', Ty(), n, args=(
+        Primitive('y', Ty(), n), Primitive('x', Ty(), n)), drawing_name="W",
+        draw_as_frame=True, draw_vertically=True)
+    for dagger in (False, True):
+        recorder = Recorder()
+        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        (drawing.dagger() if dagger else drawing).draw(backend=recorder)
+        j, alignment = recorder.texts["W"]
+        bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
+        assert alignment == ("bottom" if dagger else "top")
+        assert bottom < j < top

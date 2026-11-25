@@ -1593,10 +1593,11 @@ class Transposed(Backend):
 
     def draw_wire_label(self, x, i, j, **params):
         self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
-        # The name of a bubble labels its left side, which becomes its top:
-        # it stays hanging inside the bubble rather than lifted out of it.
-        self.lift = self.turns % 2 and not getattr(
-            x.inside[0], "always_draw_label", False)
+        # The name of a bubble labels its left side, which turns into its
+        # top or, reflected, its bottom: it stays inside, the side of its cod.
+        is_name = getattr(x.inside[0], "always_draw_label", False)
+        self.lift = self.turns % 2 and (
+            not is_name or self.cod_is_after())
         super().draw_wire_label(x, i, j, **params)
 
     def draw_text(self, text, i, j, **params):
