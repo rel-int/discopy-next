@@ -9,6 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.frobenius.TermBase` is the relational machine calculus of Barrett,
+  Castle and Heijltjes (LICS 2024): a value used as a term is its push, its
+  `dagger` its pop, `>>` a `Sequence`, `+` a `Choice`, `.star()` a `Star`,
+  `A.exists(lambda x: ...)` an `Exists`, `A(lambda x: ...)` kappa abstraction
+  and `t.at('a')` a push on another location. A term evaluates by running the
+  machine on spiders into a `Hypergraph`, `Diagram.to_term` reads any frobenius
+  diagram back in normal form, of any number of outputs, and the dagger of a
+  term evaluates to the new `Diagram.converse` ([next#734]).
+
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -2593,6 +2602,7 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#734]: https://github.com/rel-int/discopy-next/pull/734
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
