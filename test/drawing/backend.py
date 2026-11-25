@@ -695,3 +695,19 @@ def test_left_to_right_follows_the_category_and_keeps_arrows(tmp_path):
     path = tmp_path / "measure.tikz"
     Measure().draw(to_tikz=True, left_to_right=True, path=str(path))
     assert "->" in path.read_text()
+
+
+def test_bubble_of_args_drawn_in_different_directions():
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    with raises(ValueError):
+        Bubble(Box('f', x, x), Primitive('g', x, x)).to_drawing()

@@ -167,10 +167,13 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     if 'figsize' not in params:
+        attrs = ("width", "height")
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
-            for attr in ("width", "height"))
+            for attr in (attrs[::-1] if params["left_to_right"] else attrs))
     with TemporaryDirectory() as directory:
         for i, _diagram in enumerate(steps):
             tmp_path = os.path.join(directory, f'{i}.png')

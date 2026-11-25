@@ -2654,7 +2654,10 @@ class Bubble(cat.Bubble, Box):
 
     def to_drawing(self):
         args = [arg.to_drawing() for arg in self.args]
-        if type(self.args[0]).draw_left_to_right != self.draw_left_to_right:
+        directions = {type(arg).draw_left_to_right for arg in self.args}
+        if len(directions) > 1:
+            raise ValueError(messages.MIXED_DIRECTIONS.format(self))
+        if directions != {self.draw_left_to_right}:
             nested = args[0].tensor(*args[1:])
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
@@ -2662,8 +2665,10 @@ class Bubble(cat.Bubble, Box):
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
-                min_width=label + nested.height + .5,
-                height=nested.width + 1).to_drawing()
+                min_width=max(label + nested.height + .5,
+                              getattr(self, "min_width", 0)),
+                height=max(nested.width + 1,
+                           getattr(self, "height", 0))).to_drawing()
         method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
