@@ -19,6 +19,7 @@ Summary
     Swap
     Permutation
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -68,8 +69,7 @@ from typing import ClassVar
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
 from discopy import (
-    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
-    messages)
+    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction)
 from discopy.abc import (
     CompactCategory, DaggerMonoidalCategory, RigidCategory, SymmetricCategory)
 from discopy.cat import factory
@@ -219,8 +219,8 @@ CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
@@ -229,10 +229,6 @@ Diagram.permutation_factory = Permutation
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
-for name in (
-        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
-    setattr(interaction.Diagram[Diagram], name, getattr(
-        DaggerMonoidalCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
 interaction.Diagram[Diagram].dagger_involution_rigid\
     = DaggerMonoidalCategory.dagger_involution.weaken(within=RigidCategory)
 interaction.Diagram[Diagram].dagger_contravariance_rigid\

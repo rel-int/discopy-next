@@ -23,6 +23,7 @@ Summary
     Cup
     Cap
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -233,22 +234,20 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
             >> diagram @ traced_wire.r\
             >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
 
-    dagger_involution = DaggerCategory.dagger_involution.failing(
-        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution = DaggerCategory.dagger_involution
     dagger_involution_rigid = DaggerCategory.dagger_involution.weaken(
         within=RigidCategory)
-    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
-        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance
     dagger_contravariance_rigid = DaggerCategory.dagger_contravariance\
         .weaken(within=RigidCategory)
     dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
     rotate_contravariance = PivotalCategory.rotate_contravariance.failing(
-        messages.FEEDBACK_HAS_NO_DAGGER)
+        messages.FEEDBACK_HAS_NO_ROTATION)
     rotate_contravariance_rigid = PivotalCategory.rotate_contravariance\
         .weaken(within=RigidCategory)
     adjunction = PivotalCategory.adjunction.failing(
-        messages.FEEDBACK_HAS_NO_DAGGER)
+        messages.FEEDBACK_HAS_NO_ROTATION)
     adjunction_rigid = PivotalCategory.adjunction.weaken(within=RigidCategory)
     dagger_involution_monoidal = None
     dagger_contravariance_monoidal = None
@@ -355,8 +354,8 @@ class Functor(rigid.Functor, feedback.Functor):
     dom = cod = Diagram
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

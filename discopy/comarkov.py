@@ -21,6 +21,7 @@ Summary
     Merge
     Noise
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -75,7 +76,9 @@ from typing import ClassVar
 
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
 from discopy.cat import factory, kappa_calculus
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -121,6 +124,12 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
 
     map_agreement = monoidal.Diagram.map_agreement.failing(
         messages.MAP_HAS_NO_SPIDERS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
@@ -580,8 +589,8 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

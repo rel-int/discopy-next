@@ -9,6 +9,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
+  memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
+  feedforward of the dagger of its argument and back, and `Trace` subclasses
+  both. `Trace.rotate` is the trace of the rotated argument on the other
+  side; a feedback or a feedforward that is not a trace still has no
+  rotation. The dagger involution and contravariance of `feedback` and
+  `pivotal` diagrams hold, and so does the dagger monoidality of
+  `symmetric`, `frobenius` and `interaction` ones; the dagger laws of
+  `markov` and `comarkov` fail on their copies, discards, merges and noises
+  ([next#730]).
+
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -2692,6 +2703,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
+[next#730]: https://github.com/rel-int/discopy-next/pull/730
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

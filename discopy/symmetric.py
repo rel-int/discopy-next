@@ -17,6 +17,7 @@ Summary
     Box
     Swap
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -302,8 +303,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     """
     # A hypergraph is faithful from symmetric categories on.
     bifunctoriality = SymmetricCategory.bifunctoriality
-    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
-        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality
     dagger_monoidality_symmetric = DaggerMonoidalCategory.dagger_monoidality\
         .weaken(within=SymmetricCategory)
     braid_naturality = SymmetricCategory.braid_naturality
@@ -965,8 +965,8 @@ for level in (
         if isinstance(law, (Axiom, Rule)):
             setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail
