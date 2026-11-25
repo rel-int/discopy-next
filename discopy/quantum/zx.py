@@ -992,8 +992,8 @@ class Hypergraph(hypergraph.Hypergraph):
     def dagger(self) -> Hypergraph:
         return super().dagger().scaled(self.scalar.conjugate())
 
-    def trace(self, n=1, left=False) -> Hypergraph:
-        return self.keeps_scalar(super().trace(n, left))
+    def glue(self, n=1, left=False) -> Hypergraph:
+        return self.keeps_scalar(super().glue(n, left))
 
     def interchange(self, i: int, j: int) -> Hypergraph:
         return self.keeps_scalar(super().interchange(i, j))

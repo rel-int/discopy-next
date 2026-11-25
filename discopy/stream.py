@@ -70,7 +70,7 @@ diagram, interpreted in the category of streams of python types and functions.
     :align: center
 
 >>> cod = stream.Stream[python.Function]
->>> F = markov.Functor(
+>>> F = Functor(
 ...     ob_map={X: int},
 ...     ar_map={zero: cod.singleton(python.Function(lambda: 0, (), int)),
 ...         one: cod.singleton(python.Function(lambda: 1, (), int)),
