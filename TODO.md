@@ -12,7 +12,7 @@
 >
 > Do the work yourself and don't create other threads. When you open the PR, send a short note with its link to thread T-48aec84b-09cc-47fa-bf08-e9067aece821 with send_thread_message.
 
-- [ ] cat: `Box` takes `args` and `method`, `Arrow.bubble` builds a box with args, the functor sends one by `getattr(cod, method)`, `Bubble` an alias
+- [WIP] @T-14209019-2026-11-25 14:31 cat: `Box` takes `args` and `method`, `Arrow.bubble` builds a box with args, the functor sends one by `getattr(cod, method)`, `Bubble` an alias
 - [ ] every module's `Bubble` fuses into its `Box` and `bubble_factory` goes; `isinstance(f, Bubble)` becomes `f.args`
 - [ ] tensor: `Elementwise(Box)` carries `func`, a plain tensor `Box` none; the same in `quantum.circuit` and `quantum.zx`
 - [ ] tests, notebooks and ADRs follow; CHANGELOG bullet
