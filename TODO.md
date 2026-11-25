@@ -11,6 +11,6 @@
 
 - [x] discopy/hypergraph.py glue(0) is the identity
 - [WIP] @amp-T-f829d881-2026-11-25 21:17 discopy/abc.py GoISituation: bang preserves the swap
-- [ ] discopy/abc.py GoISituation: unit colaxator inverse
+- [WIP] @amp-T-f829d881-2026-11-25 21:17 discopy/abc.py GoISituation: unit colaxator inverse
 - [ ] docstrings, paper, changelog, pylint comment that still say delay or bang
 - [ ] --box=test/symmetric.py foliation tests with traces move to test/feedback.py
