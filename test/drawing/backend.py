@@ -914,3 +914,35 @@ def test_left_to_right_labels_above_wires_in_a_daggered_box():
         bottom = j - 10 / 72
         assert any(bottom - .125 <= y <= bottom for y in recorder.wires)
         assert color == "white"
+
+
+def test_labels_of_args_turned_back_top_to_bottom():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Wire
+
+    class Across(Bubble):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wires = [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            if len({x for x, _ in points}) == 1:
+                self.wires.append(points[0][0])
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") == "top":
+                self.labels.append((i, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Across(Box('f', x, x), dom=Ty(), cod=Ty()).draw(backend=recorder)
+    assert recorder.labels and recorder.wires
+    for i, color in recorder.labels:
+        assert any(0 < i - wire <= .125 for wire in recorder.wires)
+        assert color == "white"

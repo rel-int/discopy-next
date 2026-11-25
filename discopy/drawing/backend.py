@@ -1564,24 +1564,34 @@ class Transposed(Backend):
             SimpleNamespace(width=self.height, height=self.width),
             *args, **params)
 
+    @property
+    def turns(self) -> int:
+        """ The number of transpositions this backend draws through, two of
+        which cancel out, e.g. top-to-bottom args in a left-to-right box. """
+        return 1 + getattr(self.parent, "turns", 0)
+
     def label_background(self, typ):
         """ A label above its wire lies on the region right of the wire
-        when the drawing is reflected, on the one left of it otherwise. """
-        return getattr(typ, "cod" if self.flip else "dom", None)
+        when the drawing is reflected, on the one left of it otherwise; a
+        transposition that cancels out leaves it right of its wire. """
+        side = "cod" if self.flip or not self.turns % 2 else "dom"
+        return getattr(typ, side, None)
 
     def draw_wire_label(self, x, i, j, **params):
         self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
         super().draw_wire_label(x, i, j, **params)
 
     def draw_text(self, text, i, j, **params):
-        point = self.map((i, j))
-        if params.get("verticalalignment") == "top":
+        point, canvas = self.map((i, j)), self.parent
+        while isinstance(canvas, Transposed):
+            point, canvas = canvas.map(point), canvas.parent
+        if params.get("verticalalignment") == "top" and self.turns % 2:
             # A wire label hangs below its point, a textpad off its wire:
             # lift it above the wire, the textpad off it the other way.
             point = point.shift(y=(
                 params.get("fontsize") or DEFAULT["fontsize"]) / 72 + (
                     0 if self.flip else 2 * self.textpad))
-        self.parent.draw_text(text, *point, **params)
+        canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
         self.parent.draw_node(*self.map((i, j)), **params)
