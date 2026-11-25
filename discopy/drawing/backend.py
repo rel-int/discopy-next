@@ -1570,27 +1570,38 @@ class Transposed(Backend):
         which cancel out, e.g. top-to-bottom args in a left-to-right box. """
         return 1 + getattr(self.parent, "turns", 0)
 
+    def compose(self, point) -> tuple[Point, Backend]:
+        """ The image of a point through every transposition drawn through,
+        and the backend they draw on. """
+        point, canvas = self.map(point), self.parent
+        while isinstance(canvas, Transposed):
+            point, canvas = canvas.map(point), canvas.parent
+        return point, canvas
+
+    def cod_is_after(self) -> bool:
+        """ Whether the region right of a wire, its ``cod``, ends up above
+        it on the page, or right of it when the turns cancel out. """
+        (x0, y0), _ = self.compose((0, 0))
+        (x1, y1), _ = self.compose((1, 0))
+        return (y1 > y0) if self.turns % 2 else (x1 > x0)
+
     def label_background(self, typ):
-        """ A label above its wire lies on the region right of the wire
-        when the drawing is reflected, on the one left of it otherwise; a
-        transposition that cancels out leaves it right of its wire. """
-        side = "cod" if self.flip or not self.turns % 2 else "dom"
-        return getattr(typ, side, None)
+        """ The region a wire label lies on: above its wire after an odd
+        number of turns, right of it otherwise. """
+        return getattr(typ, "cod" if self.cod_is_after() else "dom", None)
 
     def draw_wire_label(self, x, i, j, **params):
         self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
         super().draw_wire_label(x, i, j, **params)
 
     def draw_text(self, text, i, j, **params):
-        point, canvas = self.map((i, j)), self.parent
-        while isinstance(canvas, Transposed):
-            point, canvas = canvas.map(point), canvas.parent
+        point, canvas = self.compose((i, j))
         if params.get("verticalalignment") == "top" and self.turns % 2:
             # A wire label hangs below its point, a textpad off its wire:
             # lift it above the wire, the textpad off it the other way.
             point = point.shift(y=(
                 params.get("fontsize") or DEFAULT["fontsize"]) / 72 + (
-                    0 if self.flip else 2 * self.textpad))
+                    0 if self.cod_is_after() else 2 * self.textpad))
         canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):

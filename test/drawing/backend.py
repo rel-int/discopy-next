@@ -946,3 +946,37 @@ def test_labels_of_args_turned_back_top_to_bottom():
     for i, color in recorder.labels:
         assert any(0 < i - wire <= .125 for wire in recorder.wires)
         assert color == "white"
+
+
+def test_label_contrast_through_three_turns_reflected_outside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Across(Bubble):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.colours = []
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") == "top":
+                self.colours.append(params["color"])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Bubble(Across(Bubble(Primitive('f', x, x)))).to_drawing().dagger().draw(
+        backend=recorder)
+    assert recorder.colours and set(recorder.colours) == {"white"}
