@@ -8,4 +8,4 @@
 
 - [x] zx.H is self-adjoint by `is_dagger=None`, which `zx.Box` reads in `dagger`, `__repr__` and `to_tree`, so it pickles and its repr and tree stay transparent
 - [x] a corpus entry for the `pickling` cells of `zx.Diagram` and `zx.Hypergraph`, a Hadamard and a red spider
-- [ ] CHANGELOG bullet with the PR number, and the gates of next-checks
+- [x] CHANGELOG bullet with the PR number, and the gates of next-checks
