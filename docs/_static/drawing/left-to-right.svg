@@ -58,7 +58,7 @@ z
    </g>
    <g id="dark-fill-1">
     <!-- x -->
-    <g transform="translate(58.5 84.098438) scale(0.1 -0.1)">
+    <g transform="translate(58.5 65.098438) scale(0.1 -0.1)">
      <defs>
       <path id="DejaVuSans-78" d="M 3513 3500 
 L 2247 1797 
@@ -81,13 +81,13 @@ z
    </g>
    <g id="dark-fill-3">
     <!-- x -->
-    <g transform="translate(130.5 48.098438) scale(0.1 -0.1)">
+    <g transform="translate(130.5 29.098438) scale(0.1 -0.1)">
      <use xlink:href="#DejaVuSans-78"/>
     </g>
    </g>
    <g id="dark-fill-5">
     <!-- x -->
-    <g transform="translate(130.5 120.098438) scale(0.1 -0.1)">
+    <g transform="translate(130.5 101.098438) scale(0.1 -0.1)">
      <use xlink:href="#DejaVuSans-78"/>
     </g>
    </g>

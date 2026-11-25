@@ -1201,8 +1201,9 @@ class Backend(ABC):
         on a background of the box's ``frame_colour``, see
         :class:`Transposed`, centred in the space right of the box's label,
         and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of the background, and a daggered box
-        reflects them, the last on top.
+        wires plug into the edges of the background, a line separates each
+        from the next, so that no two regions meet without one, and a
+        daggered box reflects them, the last on top.
         """
         nested = box.nested
         width = sum(drawing.width for drawing in nested)
@@ -1220,6 +1221,10 @@ class Backend(ABC):
                            else y + width - offset)
             Transposed(self, origin, drawing, flip=box.is_dagger)\
                 .draw_drawing(drawing, **params)
+            if offset < width:
+                edge = y + offset if box.is_dagger else y + width - offset
+                self.draw_bezier([Point(x + t * height / 3, edge)
+                                  for t in range(4)], adaptive=False)
         return Point((left + start) / 2, centre[1])
 
     @staticmethod
@@ -1555,10 +1560,12 @@ class Transposed(Backend):
 
     def draw_text(self, text, i, j, **params):
         point = self.map((i, j))
-        if self.flip and params.get("verticalalignment") == "top":
-            # A wire label hangs below its point, lift it above its wire.
-            point = point.shift(
-                y=(params.get("fontsize") or DEFAULT["fontsize"]) / 72)
+        if params.get("verticalalignment") == "top":
+            # A wire label hangs below its point, a textpad off its wire:
+            # lift it above the wire, the textpad off it the other way.
+            point = point.shift(y=(
+                params.get("fontsize") or DEFAULT["fontsize"]) / 72 + (
+                    0 if self.flip else 2 * DEFAULT["textpad"][0]))
         self.parent.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):

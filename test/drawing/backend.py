@@ -795,3 +795,42 @@ def test_bubble_drawn_in_another_direction_fits_its_framed_args():
     assert framed.width != arg.to_drawing().width
     assert nested.width == framed.width
     assert drawing.height >= nested.width + 1
+
+
+def test_left_to_right_separates_args_and_lifts_labels():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.beziers, self.labels, self.wires = [], [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            self.beziers.append(([tuple(p) for p in points], adaptive))
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") == "top":
+                self.labels.append(j)
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    recorder = Recorder()
+    Bubble(Primitive('f', x, x), Primitive('g', x, x)).draw(backend=recorder)
+    assert [ps for ps, adaptive in recorder.beziers if not adaptive
+            and len({y for _, y in ps}) == 1] != []
+
+    recorder = Recorder()
+    (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)
+    wire_y = recorder.beziers[0][0][0][1]
+    assert recorder.labels and all(j > wire_y for j in recorder.labels)
