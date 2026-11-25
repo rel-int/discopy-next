@@ -86,8 +86,8 @@ from discopy.utils import classproperty, factory, unbiased
 
 FREE_CATEGORIES = (
     "monoidal", "spacial", "feedback", "braided", "balanced", "symmetric",
-    "markov", "comarkov", "biclosed", "rigid", "pivotal", "ribbon", "compact",
-    "closed", "frobenius")
+    "markov", "comarkov", "bang", "biclosed", "rigid", "pivotal", "ribbon",
+    "compact", "closed", "frobenius")
 """
 The modules whose ``Diagram`` is a free category an axiom is drawn in, from
 the most general, see :func:`free_category`.
