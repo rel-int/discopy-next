@@ -5,7 +5,8 @@ DisCoPy's computational core: concrete categories (functions, matrices,
 tensors, constraint satisfaction problems, finite groups, representations of Hopf algebras)
 and constructions on categories (opposites, Kleisli categories of monads,
 change of base along a monad, streams, parametric maps, lenses, formal sums,
-the Int-construction).
+the Int-construction) and monoidal e-graphs, i.e. e-graphs of diagrams with
+sharing.
 
 .. autosummary::
     :template: module.rst
@@ -27,6 +28,7 @@ the Int-construction).
     discopy.sum
     discopy.lens
     discopy.interaction
+    discopy.egraph
 
 Drawing: a diagram's layout as a functor into labeled graphs embedded in
 the plane, and the backends that render them.
