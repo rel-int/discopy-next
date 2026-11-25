@@ -6,8 +6,8 @@
 feedback semantics of the unfolds of *Categorical Deep Learning is an Algebraic Theory of All Architectures*,
 arXiv:2402.15332, as an opt-in beside today's constant-input unrolling.)
 
-- [ ] `Unroll(rounds, sequence=True)`: one input and one output per round, the state threaded from zeros
-- [ ] `Network.unroll`, `to_function` and `to_lens` pass the option through; the default unchanged
-- [ ] nested traces merged by the vanishing law into one memory of several wires; other shapes refused clearly
-- [ ] tests: the old semantics as the new one on a constant input, hand-written loops, backpropagation through time
-- [ ] CHANGELOG bullet
+- [x] `Unroll(rounds, sequence=True)`: one input and one output per round, the state threaded from zeros
+- [x] `Network.unroll`, `to_function` and `to_lens` pass the option through; the default unchanged
+- [x] nested traces merged by the vanishing law into one memory of several wires; other shapes refused clearly
+- [x] tests: the old semantics as the new one on a constant input, hand-written loops, backpropagation through time
+- [x] CHANGELOG bullet
