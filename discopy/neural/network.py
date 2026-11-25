@@ -717,7 +717,7 @@ class Unroll(Functor):
         super().__init__(ob_map=lambda leg: leg, ar_map=lambda box: box)
 
     @staticmethod
-    def parts(other: Trace, body: Network) -> tuple[Network, Box]:
+    def parts(other, body: Network) -> tuple[Network, Box]:
         """
         The ``body`` of a trace with its legs in the order ``dom @ mem`` to
         ``cod @ mem`` (a left trace swaps them) and the :class:`Zeros` box
@@ -741,7 +741,7 @@ class Unroll(Functor):
                          vjp=Zeros(x, x))
 
     @staticmethod
-    def merged(other: Trace) -> Trace:
+    def merged(other):
         """
         The trace over one memory of several wires, given the trace of a
         trace: by the vanishing law of traced categories,
@@ -776,7 +776,7 @@ class Unroll(Functor):
         return Unroll.merged(type(other)(
             inner.arg, other.left, dom=other.dom, cod=other.cod, mem=mem))
 
-    def stream(self, other: Trace) -> Network:
+    def stream(self, other) -> Network:
         """
         The trace read as a stream of rounds, from ``dom ** rounds`` to
         ``cod ** rounds``: the input of round ``t`` at position ``t``, its
