@@ -2,5 +2,5 @@
 >
 > Move the diagram out of the `discopy.abc` docstring and onto the syntax page, `docs/api/syntax.rst`, with the sentence that describes it ("The diagram shows the syntax..."); leave the rest of the abc docstring. Check the built page and fix the links rather than leaving broken ones. The side-column question is still open with USER: do not restructure the table.
 
-- [WIP] @T-dc6d2cec-2026-11-25 17:24 Move the diagram and its sentence from discopy/abc.py to docs/api/syntax.rst, links checked on the built page
+- [x] Move the diagram and its sentence from discopy/abc.py to docs/api/syntax.rst, links checked on the built page
 - [ ] Changelog entry
