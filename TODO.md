@@ -3,4 +3,4 @@
 - [x] Stop CI (the notebook check and the docs build) from executing docs/notebooks/optyx/readme_example.md, keeping the file
 - [x] Keep it in the sidebar as a link page, and say so in the PR
 - [x] CHANGELOG bullet
-- [ ] Run next-checks
+- [x] Run next-checks
