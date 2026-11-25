@@ -1004,7 +1004,7 @@ class Hypergraph[category](
         >>> f.glue(3)
         Traceback (most recent call last):
         ...
-        ValueError: ...
+        ValueError: Cannot split 3 atoms off f.
         """
         assert_istraceable(self, n, left)
         if n == 0:
