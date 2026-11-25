@@ -848,6 +848,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
+  box of `quantum.circuit` and of optyx already carries, rather than by a
+  `dagger` lambda set on the instance, so it pickles and so does every
+  hypergraph of a red spider; `zx.Box` reads the flag in `dagger`, `__repr__`
+  and `to_tree`, and `proptest/corpus/zx.py` replays both `pickling` cells
+  ([next#725]).
+
 - `bang.Diagram` declares `dagger_involution` and `dagger_contravariance`
   failing, since every structural box but the exchange has no dagger, and
   `proptest/corpus/bang.py` replays them on the structural boxes its strategy
@@ -2654,6 +2661,7 @@ for the changelog of `1.2.1` and earlier.
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
+[next#725]: https://github.com/rel-int/discopy-next/pull/725
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
