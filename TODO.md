@@ -16,4 +16,4 @@
 - [x] every module's `Bubble` fuses into its `Box` and `bubble_factory` goes; `isinstance(f, Bubble)` becomes `f.args`
 - [x] tensor: `Elementwise(Box)` carries `func`, a plain tensor `Box` none; the same in `quantum.circuit` and `quantum.zx`
 - [x] tests, notebooks and ADRs follow; CHANGELOG bullet
-- [WIP] @T-14209019-2026-11-25 16:28 run next-checks
+- [x] run next-checks
