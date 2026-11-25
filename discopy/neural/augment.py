@@ -75,7 +75,7 @@ MODULUS = 2 ** 63
 """ The keys of :class:`Augment` are seeds modulo this, to fit ``int64``. """
 
 
-def check(dom: Action, cod: Action) -> FiniteGroup:
+def check(dom: Action, cod: Action) -> type[FiniteGroup]:
     """
     The group of two actions, if it is the same.
 
@@ -122,7 +122,7 @@ def sample(group: type[FiniteGroup]) -> Callable[[int], tuple]:
     return inside
 
 
-def augment(dom: Action, cod: Action) -> Channel[Seed]:
+def augment(dom: Action, cod: Action) -> Channel:
     """
     The augmentation of a pair ``(x, y)`` of an input and a label, a Kleisli
     arrow of :data:`~discopy.kleisli.monad.Seed`: the same random element
@@ -156,7 +156,9 @@ def augment(dom: Action, cod: Action) -> Channel[Seed]:
             g, after = draw(seed)
             return (act(dom(g), x), act(cod(g), y)), after
         return computation
-    return Channel[Seed](inside, tuple, tuple)
+    # The parameter of a channel is a monad value, not a type.
+    return Channel[Seed](  # ty: ignore[invalid-type-form]
+        inside, tuple, tuple)
 
 
 class Augment(torch.nn.Module):
