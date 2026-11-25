@@ -11,7 +11,7 @@
 > Follow the repo's AGENTS.md and changelog convention. Reply to https://ampcode.com/threads/T-01a2123a-e6ca-715d-8fa5-ea931602b4f3 when the pull request is open, with its URL, or with what blocked you.
 
 - [x] Architecture diagram shows the syntax box only, prose updated
-- [WIP] @T-1f2a1b14-2026-11-25 10:31 split_memory and memory_size move to FeedbackCategory
+- [x] split_memory and memory_size move to FeedbackCategory
 - [WIP] @T-1f2a1b14-2026-11-25 10:31 keyword_form becomes a FeedbackCategory method, Functions admonition dropped, callers and tests updated
 - [ ] CHANGELOG bullet and next-checks gates
 - [WIP] @T-1f2a1b14-2026-11-25 10:50 egraph listed under semantics in the docs, dropped from the diagram (follow-up point from USER)
