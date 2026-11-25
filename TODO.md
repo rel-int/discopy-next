@@ -4,4 +4,4 @@
 - [x] Bubble: opt-in direction, drawn as one box with its args left to right inside
 - [x] Top level: draw(direction=...)
 - [x] Reproduce the Very big car figure as a doctest
-- [ ] Changelog, checks
+- [x] Changelog, checks
