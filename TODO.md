@@ -6,7 +6,7 @@
 > what is this formal_sum? sounds ugly let’s get rid of it
 
 - [x] cat: `cat.Sum(Box)` holds the terms, `+`, `then`, `dagger`, `subs`/`lambdify`, the tree and the drawing
-- [WIP] @T-14209019-2026-11-25 20:22 monoidal: `monoidal.Sum(cat.Sum, Box)` adds `tensor`; every module's `Sum` subclasses its parent module's, none `formal_sum`
+- [x] monoidal: `monoidal.Sum(cat.Sum, Box)` adds `tensor`; every module's `Sum` subclasses its parent module's, none `formal_sum`
 - [WIP] @T-14209019-2026-11-25 20:22 delete `discopy/sum.py`, `Sum[...]`, the `formal_sum` alias and the `subscript_bases` hook if nothing else uses it
 - [ ] tests, docs, notebooks and CHANGELOG follow; close #10 as superseded
 - [ ] run next-checks
