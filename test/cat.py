@@ -694,6 +694,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
     "feedback.Box": 'c("f", x, y, data=v).delay()',
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
@@ -846,7 +847,6 @@ BROKEN = {
         "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
@@ -856,10 +856,11 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
+        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy} "
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "it has no stated rotation",
-        "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "*.{Feedback,Feedforward,Trace}":
+        "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
     "subs": {
@@ -868,7 +869,8 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
+        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "a module has none",
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "its tree drops its func, which == compares",
     },
