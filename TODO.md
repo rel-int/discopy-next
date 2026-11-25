@@ -9,7 +9,7 @@
 > > [P3] CHANGELOG Added entry still describes `discopy.bang`.
 > > [P3] optyx/term.py `:mod:` references omit the `discopy.` prefix.
 
-- [WIP] @amp-T-f829d881-2026-11-25 21:17 discopy/hypergraph.py glue(0) is the identity
+- [x] discopy/hypergraph.py glue(0) is the identity
 - [ ] discopy/abc.py GoISituation: bang preserves the swap
 - [ ] discopy/abc.py GoISituation: unit colaxator inverse
 - [ ] docstrings, paper, changelog, pylint comment that still say delay or bang
