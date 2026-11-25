@@ -489,3 +489,25 @@ def test_constructors():
     assert feedback.Ty.form_delay(feedback.Ty('x')) == feedback.Ty('x').delay()
     assert bang.Ty.form_bang(bang.Ty('x')) == bang.Ty('x').bang()
     assert "form_l" not in compact.Diagram.rules
+
+
+def test_providers():
+    from hypothesis import given
+    from discopy.testable import PROVIDERS, Provider
+    law, x = Arrow.unitality, Ob('x')
+    f = Box('f', x, x)
+
+    def sequents(declaration, given_, params):
+        return st.just(({}, {"f": f})) if declaration == law else None
+    PROVIDERS.append(Provider("fixed", sequents))
+    try:
+        assert law.provider()[0] == "fixed"
+        assert Arrow.associativity.provider()[0] == "discopy"
+
+        @given(law.arguments())
+        def check(arguments):
+            assert arguments == {"f": f}
+        check()
+    finally:
+        PROVIDERS.pop()
+    assert law.provider()[0] == "discopy"

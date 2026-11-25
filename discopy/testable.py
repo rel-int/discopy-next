@@ -514,6 +514,29 @@ def inhabits(value, kind) -> bool:
     return isinstance(value, kind)
 
 
+@dataclass(frozen=True)
+class Provider:
+    """
+    A provider of sequents: a partial map from a bound declaration, the
+    variables ``given`` by name and the parameters of its strategy to a
+    strategy of its scope and arguments, or :obj:`None` where it has none,
+    e.g. a sampler reading tuned weights for the laws it has them for.
+    :meth:`Declaration.sequents` tries the :data:`PROVIDERS` in order before
+    drawing the sequents itself.
+
+    Parameters:
+        name : What the provider is called, see :meth:`Declaration.provider`.
+        sequents : The partial map, ``sequents(declaration, given, params)``.
+    """
+    name: str
+    sequents: Callable[[Any, dict | None, dict], Any]
+
+
+PROVIDERS: list[Provider] = []
+""" The providers :meth:`Declaration.sequents` tries first, in order, e.g.
+appended by a pytest plugin, see :class:`Provider`. """
+
+
 @dataclass
 class Declaration[**P, T]:
     """
@@ -703,7 +726,38 @@ class Declaration[**P, T]:
         """
         return substitute(self.annotations()["return"], scope)
 
+    def provider(self, given: dict | None = None, **params
+                 ) -> tuple[str, st.SearchStrategy[tuple]]:
+        """
+        The name of the provider that draws the sequents of the bound
+        declaration and its strategy: the first of :data:`PROVIDERS` with
+        one, else ``"discopy"`` and :meth:`drawn`.
+
+        >>> from discopy.cat import Arrow
+        >>> name, _ = Arrow.unitality.provider()
+        >>> name
+        'discopy'
+        >>> PROVIDERS.append(Provider("none", lambda *_: None))
+        >>> assert Arrow.unitality.provider()[0] == "discopy"
+        >>> _ = PROVIDERS.pop()
+        """
+        for provider in PROVIDERS:
+            strategy = provider.sequents(self, given, params)
+            if strategy is not None:
+                return provider.name, strategy
+        return "discopy", self.drawn(given, **params)
+
     def sequents(
+            self, given: dict | None = None, **params
+    ) -> st.SearchStrategy[tuple]:
+        """
+        Generate the scope and the arguments of the bound declaration, from
+        the first of :data:`PROVIDERS` that has a strategy for it, else by
+        :meth:`drawn`, see :meth:`provider`.
+        """
+        return self.provider(given, **params)[1]
+
+    def drawn(
             self, given: dict | None = None, **params
     ) -> st.SearchStrategy[tuple]:
         """

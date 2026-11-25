@@ -28,6 +28,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `markov` and `comarkov` fail on their copies, discards, merges and noises
   ([next#730]).
 
+- `testable.PROVIDERS` holds `Provider`s, partial maps from a declaration to a strategy of its
+  sequents, which `Declaration.sequents` tries in order before drawing them itself, so that a
+  plugin, e.g. a Boltzmann sampler, supplies the arguments of the laws it covers without patching
+  `Axiom.sequents`. `Declaration.provider` names the one that draws, and each cell of the
+  property matrix notes it.
+
 - The constructors of object expressions in `discopy.testable` are rules: `Constructor`
   subclasses `Rule`, and each constructor is the formation rule of the class of objects whose
   structure it is. The objects of a category are the morphisms of a coloured monoid, whose `cut`
