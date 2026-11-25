@@ -390,7 +390,7 @@ class ToStream(markov.Functor):
     @staticmethod
     def atom(atom: markov.Ty) -> stream.Ty:
         """ The sequence ``x0, x1, ...`` of an atom ``x``. """
-        return stream.Ty.sequence(str(atom))
+        return stream.Ty.sequence(stream.Ty.base(str(atom)))
 
     def box(self, box: markov.Box) -> stream.Stream:
         """ The sequence of boxes ``f0, f1, ...`` of a box ``f``. """
