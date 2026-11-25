@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pytest import raises
 
-from discopy import cat, comarkov, feedback, frobenius, monoidal, op
+from discopy import cat, comarkov, frobenius, monoidal, op
 from discopy.python import additive, finset
 from discopy.comarkov import *
 from discopy.matrix import Matrix

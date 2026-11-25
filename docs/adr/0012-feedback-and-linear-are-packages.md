@@ -19,8 +19,9 @@ which subclasses linear and feedback with extra methods for the reflexive object
 
 - `discopy.feedback` is a package: the monoidal level in its `__init__`, then `balanced`,
   `symmetric`, `markov`, `comarkov` and `closed`, each subclassing the ordinary module of the
-  same name and the feedback level above it. They are the only modules whose wires carry a time
-  step and whose diagrams have `delay`, `feedback`, `trace`, `head` and `tail`.
+  same name and the feedback level above it. Of the levels from `balanced` to `closed`, they are
+  the only ones whose wires carry a time step and whose diagrams have `delay`, `feedback`,
+  `trace`, `head` and `tail`; `pivotal` and the levels below it have them too, see below.
 - `discopy.balanced`, `symmetric`, `markov`, `comarkov` and `closed` are not feedback or traced.
   `abc.BalancedCategory` is no longer traced; `abc.BalancedTracedCategory` states the yanking that
   gives the twist, and `abc.RibbonCategory` extends it.
