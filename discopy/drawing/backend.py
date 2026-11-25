@@ -941,7 +941,7 @@ class Backend(ABC):
         when it is dark, see :meth:`Matplotlib.dark_gid`.
         """
         draw_label_anyway = params.get('draw_box_labels', True) and getattr(
-            x, "always_draw_label", False)
+            x.inside[0], "always_draw_label", False) and str(x.inside[0])
         if not params.get('wire_labels', True) and not draw_label_anyway:
             return
         if getattr(x.inside[0], "skip_label", False):
@@ -1549,7 +1549,7 @@ class Transposed(Backend):
     def __init__(self, parent: Backend, origin: Point, graph: Drawing,
                  flip=False):
         self.parent, self.origin, self.flip = parent, origin, flip
-        self.textpad = DEFAULT["textpad"][0]
+        self.textpad, self.lift = DEFAULT["textpad"][0], False
         self.width, self.height = graph.width, graph.height
         super().__init__()
 
@@ -1587,18 +1587,21 @@ class Transposed(Backend):
 
     def label_background(self, typ):
         """ The region a wire label lies on: the side of its wire it is
-        lifted to after an odd number of turns, else its ``cod`` as when
-        no turn is drawn through, since only an odd turn moves it. """
-        return getattr(typ, "cod" if self.cod_is_after() or not (
-            self.turns % 2) else "dom", None)
+        lifted to, else its ``cod`` as when no turn is drawn through. """
+        return getattr(typ, "cod" if self.cod_is_after() or not self.lift
+                       else "dom", None)
 
     def draw_wire_label(self, x, i, j, **params):
         self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
+        # The name of a bubble labels its left side, which becomes its top:
+        # it stays hanging inside the bubble rather than lifted out of it.
+        self.lift = self.turns % 2 and not getattr(
+            x.inside[0], "always_draw_label", False)
         super().draw_wire_label(x, i, j, **params)
 
     def draw_text(self, text, i, j, **params):
         point, canvas = self.compose((i, j))
-        if params.get("verticalalignment") == "top" and self.turns % 2:
+        if params.get("verticalalignment") == "top" and self.lift:
             # A wire label hangs below its point, a textpad off its wire:
             # stand it on a point the textpad above the wire instead, so
             # that each backend lifts it by its own font size.
