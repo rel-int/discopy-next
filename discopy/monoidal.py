@@ -2529,7 +2529,9 @@ class Box(cat.Box, Diagram):
         return 1
 
     def to_drawing(self):
-        if type(self).draw_left_to_right and "height" not in vars(self):
+        result = Drawing.from_box(self)
+        if type(self).draw_left_to_right and "height" not in vars(self)\
+                and not result.box.no_label:
             # The height of a box drawn left to right is its width on the page.
             box = copy(self)
             box.height = max(1, text_width(
@@ -2537,7 +2539,7 @@ class Box(cat.Box, Diagram):
             if "min_width" not in vars(self):
                 box.min_width = 0
             return Drawing.from_box(box)
-        return Drawing.from_box(self)
+        return result
 
 
 class Bubble(cat.Bubble, Box):
@@ -2626,6 +2628,7 @@ class Bubble(cat.Bubble, Box):
     """
     serialised_attrs = cat.Bubble.serialised_attrs + (
         "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
+    frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](None)
 
     def __init__(
             self, *args: Diagram,
@@ -2640,8 +2643,6 @@ class Bubble(cat.Bubble, Box):
                      data=self.data, is_dagger=self.is_dagger, **params)
         self.drawing_name = "" if drawing_name is None else drawing_name
         self.draw_vertically = draw_vertically
-        self.frame_colour = params.get(
-            'frame_colour', BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
         can_draw_as_square = len(args) == 1
         can_draw_as_bubble = (can_draw_as_square
                               and len(self.dom) == len(self.arg.dom)
