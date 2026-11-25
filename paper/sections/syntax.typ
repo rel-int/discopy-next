@@ -25,8 +25,8 @@ with more boxes, which states its axioms by inheriting a class of
   for the delay then vanishing, joining, strength, tightening and
   sliding. A traced category is the case where the delay is the
   identity: `abc.TracedCategory` is a subclass, and the module `traced`
-  is deprecated for this one. It is a package beside the hierarchy, with
-  a module for each level that carries a feedback or a trace:
+  is deprecated for this one. The `feedback` package has a module for
+  each level that carries a feedback or a trace:
   `feedback.balanced`, `symmetric`, `markov`, `comarkov` and `closed`.
 - `spacial` is the free spacial category @Selinger10, where a scalar on
   the left of a diagram is the same scalar on its right. A free scalar

@@ -419,7 +419,7 @@ class Eval(biclosed.Eval, Box):
     drawing_name = "__call__"
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a delay reads. """
+        """ The arguments of the constructor, which a pickle reads. """
         return self.x, self.left
 
     def __str__(self):
@@ -451,7 +451,7 @@ class Curry(biclosed.Curry, Box):
         return self.arg.is_linear
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a delay reads. """
+        """ The arguments of the constructor, which a pickle reads. """
         return self.arg, self.n, self.left
 
     def __str__(self):
@@ -481,7 +481,7 @@ class Pack(Box):
         super().__init__(f"Pack({cod})", dom, cod)
 
     def __getnewargs__(self):
-        """ The product type, which a delay reads. """
+        """ The product type, which a pickle reads. """
         return (getattr(self, self.side), )
 
     def dagger(self):

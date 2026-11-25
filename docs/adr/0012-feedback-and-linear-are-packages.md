@@ -56,4 +56,5 @@ which subclasses linear and feedback with extra methods for the reflexive object
 
 ## Status
 
-Accepted 2026-11-25, carried out by the pull request that adds this record.
+Accepted, 2026-11-25. [#737](https://github.com/rel-int/discopy-next/pull/737), which carries
+it out, is open.

@@ -640,7 +640,7 @@ class Permutation(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y, z = map(Ty, "xyz")
         >>> perm = Permutation(x @ y @ z, [2, 0, 1])

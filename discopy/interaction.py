@@ -358,6 +358,7 @@ class Diagram[natural](
         """
         # pylint: disable-next=import-outside-toplevel  # they import this
         from discopy import compact
+        # pylint: disable-next=import-outside-toplevel  # they import this
         from discopy.feedback import symmetric
         return (symmetric.Diagram, compact.Diagram)
 

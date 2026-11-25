@@ -252,7 +252,7 @@ class Cofunction(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Cofunction(x @ y, [1, 0, 0])

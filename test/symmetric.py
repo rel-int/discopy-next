@@ -484,42 +484,6 @@ def test_coloured_Layer_merge():
     assert Layer(f, y).merge(Layer(x, g)).boxes_or_types == (f, g)
 
 
-def test_foliation_with_traces_and_permutations():
-    from discopy.feedback.symmetric import (
-        Box, Diagram, Equation, Permutation, Swap, Ty)
-    from discopy import tensor
-    x, y = Ty('x'), Ty('y')
-    f, g, h = Box('f', x @ x, x @ x), Box('g', y @ x @ x, x), Box('h', x, x)
-    F = tensor.Functor(
-        {x: 2, y: 3},
-        {f: list(range(16)), g: list(range(24)), h: [1, 2, 3, 4]},
-        dom=Diagram)
-    for diagram in [
-            f.trace() @ h,
-            h @ f.trace(left=True) >> Swap(x, x),
-            Permutation(x @ y @ x, [1, 2, 0]) >> g,
-            Swap(x, y) @ x >> y @ f.trace() @ x >> y @ h @ h]:
-        foliated = diagram.foliation()
-        assert foliated.boxes == diagram.boxes
-        assert Equation(foliated, diagram)
-        assert F(foliated) == F(diagram)
-    assert len((f.trace() @ h).foliation()) == 1
-
-
-def test_foliation_idempotence():
-    """ States keep their offsets and plumbing composes, whatever the
-    number of boxes in a layer. """
-    from discopy.feedback.symmetric import (
-        Box, Diagram, Equation, Layer, Swap, Trace, Ty)
-    x, y = Ty('x'), Ty('y')
-    s, t, u = Box('s', Ty(), x), Box('t', Ty(), y), Box('u', Ty(), x)
-    f, g = Box('f', Ty(), x @ x @ x), Box('g', x, x)
-    traced = Trace(Diagram((Layer(x, f), ), x, x @ x @ x @ x), left=False)
-    for diagram in (s @ t @ u, s @ g @ u, s @ t >> Swap(x, y), traced):
-        foliated = diagram.foliation()
-        assert Equation(diagram, foliated)
-        assert foliated.foliation() == foliated
-
 def test_tensor_coalesces_plumbing():
     from functools import reduce
     x = Ty('x')

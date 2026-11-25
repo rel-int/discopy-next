@@ -241,7 +241,7 @@ class DualRailBraid(Box):
             is_dagger=is_dagger, draw_as_dual_rail_braid=True)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.left, self.right, self.is_dagger
 
@@ -294,7 +294,7 @@ class DualRailTwist(Box):
             is_dagger=is_dagger, draw_as_dual_rail_twist=True)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.dom, self.is_dagger
 
@@ -364,7 +364,7 @@ class Twist(Box):
         return type(self)(self.dom, not self.is_dagger)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.dom, self.is_dagger
 

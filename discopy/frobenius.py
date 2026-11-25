@@ -471,7 +471,7 @@ class Cospan(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Cospan(x @ y, [0, 1, 0], [1, 1])
@@ -792,7 +792,7 @@ class Spider(Box):
             self.affine = len(self.dom) == 1 and not self.phase
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
 
         >>> x = Ty('x')
         >>> spider = Spider(1, 2, x, .5)

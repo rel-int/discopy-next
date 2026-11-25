@@ -2423,8 +2423,10 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
     retracts. There is no standard name for a category with such an object,
     a C-monoid of Lambek and Scott being one object.
 
-    * ``T`` preserves the trace up to its monoidal structure, the
-      :meth:`laxator` and its inverse the :meth:`colaxator`, see
+    * ``T`` is strong symmetric monoidal, the :meth:`colaxator` inverting
+      the :meth:`laxator`, unit included, and sending the swap to the swap,
+      see :meth:`bang_symmetry`,
+    * ``T`` preserves the trace up to its monoidal structure, see
       :meth:`bang_trace`,
     * each of :meth:`reflexive_tensor`, :meth:`reflexive_unit` and
       :meth:`reflexive_bang` is a section into ``U`` and a retraction out of
@@ -2503,6 +2505,27 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
     ) -> Equation[Hom[C1, Bang[C1, Tensor[X, Y]], Bang[C1, Tensor[X, Y]]]]:
         """ The laxator is a retraction of the colaxator. """
         return cls.retract(cls.colaxator(x, y), cls.laxator(x, y))
+
+    @axiom
+    def laxator_unit_inverse(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The unit of the colaxator is a retraction of the laxator's. """
+        return cls.retract(cls.laxator(), cls.colaxator())
+
+    @axiom
+    def colaxator_unit_inverse(cls) -> Equation[Hom[
+            C1, Bang[C1, Unit[C0]], Bang[C1, Unit[C0]]]]:
+        """ The unit of the laxator is a retraction of the colaxator's. """
+        return cls.retract(cls.colaxator(), cls.laxator())
+
+    @axiom
+    def bang_symmetry[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Bang[C1, Tensor[Y, X]]]]:
+        """ The bang is symmetric monoidal: it sends the swap to the swap. """
+        return cls.equation_factory(
+            cls.swap(cls.banged(x), cls.banged(y)) >> cls.laxator(y, x),
+            cls.laxator(x, y) >> cls.swap(x, y).bang())
 
     @axiom
     def bang_trace[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
