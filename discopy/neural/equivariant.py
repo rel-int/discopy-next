@@ -181,8 +181,13 @@ class Dense(torch.nn.Module):
         Returns:
             The output, of shape ``(..., |Y|, D)``.
         """
-        out = torch.einsum("yxdc,...xc->...yd", w[self.index], v)
-        return out if b is None else out + b[self.bias_index]
+        out = torch.einsum(
+            "yxdc,...xc->...yd",
+            w[self.index],  # ty: ignore[invalid-argument-type]
+            v)
+        if b is None:
+            return out
+        return out + b[self.bias_index]  # ty: ignore[invalid-argument-type]
 
 
 class Legs(Dense):
@@ -259,7 +264,7 @@ class Legs(Dense):
 
 
 def layer(dom: Action, cod: Action, channels: tuple[int, int] = (1, 1),
-          bias: bool = False, name: str = "W") -> para.Markov[Network]:
+          bias: bool = False, name: str = "W") -> para.Markov:
     """
     An equivariant layer as a parametric map, from the points of ``dom``
     with ``C`` channels each to those of ``cod`` with ``D`` channels each,
