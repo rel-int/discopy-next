@@ -208,6 +208,8 @@ class Gather(nn.Module):
     >>> gather
     Gather((((0, 1), (2, 1)),), (2, 1))
     """
+    index: torch.Tensor
+
     def __init__(self, wired: tuple, sizes: tuple[int, ...]):
         super().__init__()
         self.wired, self.sizes = tuple(wired), tuple(sizes)
@@ -531,7 +533,7 @@ def of(net: PeerNet | FactorNet) -> Network:
                      {NODE: Dims(widths.dim, widths.y_dim)})
 
 
-def buckets(trace: Trace) -> tuple[list[Box], list[list[int]]]:
+def buckets(trace: Network) -> tuple[list[Box], list[list[int]]]:
     """
     The boxes of the round of a trace, as :func:`interpret` draws it, and the
     indices of those that share a name, a module and the legs they read and
@@ -579,7 +581,7 @@ def pooled(sizes: tuple[int, ...], found: list[tuple[int, int]]) -> tuple:
     return sources, tuple(starts[leg] + place for leg, place in found)
 
 
-def wires(trace: Trace) -> tuple[tuple, tuple[int, ...]]:
+def wires(trace: Network) -> tuple[tuple, tuple[int, ...]]:
     """
     The wiring of the stacked round of a trace: ``(reads, sizes)``, the
     arguments of :class:`Gather`. The ``k`` legs of one role of a bucket are
@@ -658,7 +660,7 @@ def stacked(tensors: tuple, widths: list[int], groups: list[list[int]]
         for group in groups for leg in range(widths[group[0]]))
 
 
-def pack(trace: Trace, given: tuple, memory: tuple) -> tuple[tuple, tuple]:
+def pack(trace: Network, given: tuple, memory: tuple) -> tuple[tuple, tuple]:
     """
     The legs of a trace as the legs of its :func:`stack`: for each bucket the
     legs it reads from the boundary, then those of the memory, each the
@@ -735,7 +737,7 @@ def routes(layer: list[Box]) -> list[int]:
                         *range(given[-1] + own[n], given[-1] + own[n + 1]))]
 
 
-def stack(trace: Trace) -> Trace:
+def stack(trace: Network) -> Network:
     """
     The trace with the boxes of each bucket stacked: the functor that sends
     a layer of ``k`` boxes ``f`` of one module and one shape, ``f ** k``, to
