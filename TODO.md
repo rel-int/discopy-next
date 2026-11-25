@@ -25,6 +25,6 @@
 - [WIP] @T-51236a2e-2026-11-25 15:06 Feedforward in discopy.feedback: Feedback.dagger and Feedforward.dagger are each other's
 - [WIP] @T-51236a2e-2026-11-25 15:06 Trace(Feedback, Feedforward), with Trace.rotate flipping the side of the loop
 - [WIP] @T-51236a2e-2026-11-25 15:06 structural_boxes generates each level's Feedforward
-- [ ] drop the failing dagger declarations that now hold; keep pivotal's rotate ones
+- [WIP] @T-51236a2e-2026-11-25 15:47 drop the failing dagger declarations that now hold; keep pivotal's rotate ones
 - [ ] record the stream and rotate rulings on #710
 - [ ] CHANGELOG bullet and next-checks
