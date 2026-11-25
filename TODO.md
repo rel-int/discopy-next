@@ -7,5 +7,5 @@
 - [WIP] @amp-T-f829d881-2026-11-25 18:56 `discopy.feedback` a package: the monoidal level in `__init__`, then `balanced`, `symmetric`, `markov`, `comarkov`, `closed` and the levels below that carry a delay
 - [WIP] @amp-T-f829d881-2026-11-25 18:56 the ordinary modules neither feedback nor traced: no time step, no `Trace` bubble; pivotal and below keep the trace their cups and caps give
 - [WIP] @amp-T-f829d881-2026-11-25 18:56 `discopy.bang` a package: one module per level that bangs
-- [ ] no feedback-of-bang, no bang-of-feedback
+- [WIP] @amp-T-f829d881-2026-11-25 18:56 no feedback-of-bang, no bang-of-feedback
 - [ ] tests, proptest matrix, docs and changelog follow
