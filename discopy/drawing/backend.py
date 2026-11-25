@@ -110,6 +110,9 @@ def draw(graph: Drawing, **params):
         return Typst(**params).draw(graph, **params).output(
             path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
+    left_to_right = params.get('left_to_right', False)
+    width, height = (graph.height, graph.width) if left_to_right\
+        else (graph.width, graph.height)
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
         if colours:
@@ -120,15 +123,16 @@ def draw(graph: Drawing, **params):
             margin_inches = DEFAULT['legend_margin']
             extra = legend_inches + margin_inches
             fig_width = params['figsize'][0] if 'figsize' in params\
-                else (graph.width or 1)
+                else (width or 1)
             if 'figsize' in params:
                 params['figsize'] = (fig_width + extra, params['figsize'][1])
-            space = params.get('legend_space', extra * graph.width / fig_width)
-            graph = graph.make_space(
-                space, graph.width, exclusive=True, copy=True)
-    left_to_right = params.get('left_to_right', False)
-    width, height = (graph.height, graph.width) if left_to_right\
-        else (graph.width, graph.height)
+            space = params.get('legend_space', extra * width / fig_width)
+            if left_to_right:  # The physical right of a transposed drawing.
+                width += space
+            else:
+                graph = graph.make_space(
+                    space, graph.width, exclusive=True, copy=True)
+                width = graph.width
     figsize = params.get('figsize', None if aspect == 'auto' else (
         width or 1, height or 1))
     backend = params.get('backend', None) or (
@@ -141,9 +145,13 @@ def draw(graph: Drawing, **params):
     max_v = max(graph.height, graph.width, 0.01)
     params['nodesize'] = round(params.get('nodesize', 1.) / sqrt(max_v), 3)
 
-    canvas = Transposed(backend, Point(0, 0), graph)\
-        if left_to_right else backend
-    canvas.draw_boundary(graph, **params)
+    if left_to_right:
+        backend.draw_boundary(
+            SimpleNamespace(width=width, height=height), **params)
+        canvas = Transposed(backend, Point(0, 0), graph)
+    else:
+        canvas = backend
+        canvas.draw_boundary(graph, **params)
     canvas.draw_drawing(graph, **params)
     if params.get('legend', False):
         backend.draw_legend(graph, **params)
