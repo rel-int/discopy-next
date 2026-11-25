@@ -411,6 +411,15 @@ class Kronecker(Realisation):
         fft : Whether to use the transform, ``None`` to choose by size.
         fft_from : The number of points of the cyclic axes from which the
                    transform is used, if ``fft`` is ``None``.
+        ranks : The shape of the tie, the ranks along the chains flattened
+                to one axis followed by the ranks along the cyclic axes.
+        tie : The orbit of each tuple of ranks, of shape ``ranks``, or
+              ``None`` if it numbers them in order: the weights are then
+              not gathered.
+        chains : The number of ranks along each chain, the first axes of
+                 the tie before they are flattened to one.
+        free : The axes each term sums the input over, counted from the end.
+        cyclic : The cyclic axes of the points, counted from the end.
 
     Raises:
         TypeError : If the action has no structure, or ``dom`` and ``cod``
@@ -449,10 +458,47 @@ class Kronecker(Realisation):
         if fft is False and len(self.axes(found)) > 3:
             raise TypeError("Expected at most three cyclic axes without "
                             f"the Fourier transform, got {found.shape}.")
-        table = found.table
+        table, factors = found.table, found.factors
         super().__init__(dom, cod, int(table.max()) + 1)
         self.structure, self.fft = found, fft
-        self.register_buffer("tie", torch.from_numpy(table), persistent=False)
+        chain = tuple(i for i, f in enumerate(factors) if not f.cyclic)
+        cyclic = tuple(i for i, f in enumerate(factors) if f.cyclic)
+        self.chains = tuple(table.shape[i] for i in chain)
+        self.ranks = (math.prod(self.chains),
+                      *(table.shape[i] for i in cyclic))
+        tie = table.transpose(chain + cyclic).reshape(self.ranks)
+        ordered = (tie.ravel() == numpy.arange(tie.size)).all()
+        self.register_buffer(
+            "tie", None if ordered else torch.from_numpy(
+                numpy.ascontiguousarray(tie)), persistent=False)
+        self.free = tuple(
+            self.block(found, depth)
+            for depth in orbitals(tuple(factors[i].shape for i in chain)))
+        self.cyclic = tuple(
+            a - len(found.shape) - 1 for a in self.axes(found))
+
+    @staticmethod
+    def block(found: Structure, depth: tuple[int, ...]) -> tuple[int, ...]:
+        """
+        The axes of the points that a term sums the input over, counted from
+        the end of the input: those outside the block of the points agreeing
+        to the depths along the chains, see :meth:`Block.of`.
+
+        Parameters:
+            found : The structure of the action.
+            depth : One depth for each chain.
+
+        Example
+        -------
+        >>> found = structure(Symmetric[3].action())
+        >>> Kronecker.block(found, (0, )), Kronecker.block(found, (1, ))
+        ((-2,), ())
+        """
+        depths = iter(depth)
+        agreed = tuple(1 if f.cyclic else next(depths) for f in found.factors)
+        layout = tuple(f.shape for f in found.factors)
+        return tuple(a - len(found.shape) - 1
+                     for a in Block.of(layout, agreed).free)
 
     @staticmethod
     def axes(found: Structure, offset: int = 0) -> tuple[int, ...]:
@@ -481,8 +527,7 @@ class Kronecker(Realisation):
                          % factor.shape[0] if factor.cyclic else
                          len(factor.shape) - numpy.cumprod(agree, 0).sum(0))
             start += len(factor.shape)
-        tie = self.tie.cpu().numpy()  # ty: ignore[call-non-callable]
-        return tie[tuple(ranks)]
+        return self.structure.table[tuple(ranks)]
 
     @staticmethod
     def pool(x: torch.Tensor, axes: tuple[int, ...]) -> torch.Tensor:
@@ -505,21 +550,20 @@ class Kronecker(Realisation):
             w : The weights, of shape ``(orbits, D, C)``.
             b : The biases, of shape ``(bias_orbits, D)``, if any.
         """
-        factors = self.structure.factors
         batch = v.shape[:-2]
         x = v.reshape(*batch, *self.structure.shape, v.shape[-1])
-        u = w[self.tie]  # ty: ignore[invalid-argument-type]
-        for axis, factor in enumerate(factors):
-            zero = torch.zeros_like(u.narrow(axis, 0, 1))
-            u = u if factor.cyclic else u.flip(axis).diff(
-                dim=axis, prepend=zero)
-        sizes = tuple(f.shape for f in factors if not f.cyclic)
-        out = sum(self.term(x, u, depth, len(batch))
-                  for depth in orbitals(sizes))
+        g = w if self.tie is None else w[self.tie]
+        g = g.reshape(*self.chains, *self.ranks[1:], *w.shape[-2:])
+        for axis in range(len(self.chains)):
+            g = g.flip(axis).diff(dim=axis, prepend=torch.zeros_like(
+                g.narrow(axis, 0, 1)))
+        u = g.reshape(*self.ranks, *w.shape[-2:])
+        out = functools.reduce(torch.add, (
+            self.term(x, free, k) for free, k in zip(self.free, u.unbind(0))))
         return self.bias(out.reshape(*batch, -1, out.shape[-1]), b)
 
-    def term(self, x: torch.Tensor, u: torch.Tensor,
-             depth: tuple[int, ...], offset: int) -> torch.Tensor:
+    def term(self, x: torch.Tensor, free: tuple[int, ...],
+             k: torch.Tensor) -> torch.Tensor:
         """
         The term of one tuple of depths: the sum of the input over the blocks
         of points agreeing to these depths along the chains, correlated
@@ -527,18 +571,10 @@ class Kronecker(Realisation):
 
         Parameters:
             x : The input, of shape ``(..., *shape, C)``.
-            u : The weights by depth, of shape ``(*ranks, D, C)``.
-            depth : One depth for each chain.
-            offset : The number of axes of ``x`` before the points.
+            free : The axes the blocks run over, counted from the end.
+            k : The weights of these depths, of shape ``(*sizes, D, C)``.
         """
-        factors, depths = self.structure.factors, iter(depth)
-        agreed = tuple(1 if f.cyclic else next(depths) for f in factors)
-        index = tuple(slice(None) if f.cyclic else a
-                      for f, a in zip(factors, agreed))
-        layout = tuple(f.shape for f in factors)
-        free = tuple(offset + a for a in Block.of(layout, agreed).free)
-        axes = self.axes(self.structure, offset)
-        return self.correlate(self.pool(x, free), u[index], axes)
+        return self.correlate(self.pool(x, free), k, self.cyclic)
 
     def correlate(self, p: torch.Tensor, k: torch.Tensor,
                   axes: tuple[int, ...]) -> torch.Tensor:
@@ -698,6 +734,15 @@ class Partitions(Realisation):
         q : The degree of the output, one or two.
         strings : The partitions of the ``q + p`` coordinates, one for each
                   orbit and in the order of their numbers.
+        mobius : The change of basis of :func:`mobius`, in the default float
+                 type.
+        plans : The equation and the inserted axes of each partition, see
+                :meth:`plan`.
+        groups : The partitions whose outputs share a block with the same
+                 inputs, which are added before they are spread, the smaller
+                 ones first.
+        diagonal : The partitions with two outputs in one block, which are
+                   added and put on the diagonal at once.
 
     Raises:
         TypeError : If an action is not of this form.
@@ -726,8 +771,46 @@ class Partitions(Realisation):
         strings = partitions(p + q, dom.group.n)
         super().__init__(dom, cod, len(strings))
         self.n, self.p, self.q, self.strings = dom.group.n, p, q, strings
-        self.register_buffer(
-            "mobius", torch.tensor(mobius(strings)), persistent=False)
+        self.register_buffer("mobius", torch.tensor(
+            mobius(strings), dtype=torch.get_default_dtype()),
+            persistent=False)
+        found = tuple(self.plan(string, q) for string in strings)
+        self.plans = tuple(plan[:2] for plan in found)
+        keys = tuple(plan[2] for plan in found)
+        self.groups = tuple(
+            tuple(i for i, key in enumerate(keys) if key == pattern)
+            for pattern in sorted(set(keys) - {None},
+                                  key=lambda flags: (sum(flags), flags)))
+        self.diagonal = tuple(i for i, key in enumerate(keys) if key is None)
+
+    @staticmethod
+    def plan(string: tuple[int, ...], q: int) -> tuple:
+        """
+        How to compute the operator of one partition: the equation of its
+        einsum, the axes to insert for the outputs that share no block with an
+        input, and the pattern of the output, which is the outputs that do
+        share one, or ``None`` if two outputs are in one block.
+
+        Parameters:
+            string : The partition, see :func:`partitions`.
+            q : The degree of the output.
+
+        Example
+        -------
+        >>> Partitions.plan((0, 0, 1), 1)
+        ('...ABc,dc->...Ad', (), (True,))
+        """
+        letters = "ABCD"
+        ins, outs = string[q:], tuple(dict.fromkeys(string[:q]))
+        shared = tuple(block for block in outs if block in ins)
+        left, right = (
+            "".join(letters[block] for block in blocks)
+            for blocks in (ins, shared))
+        flags = tuple(block in ins for block in outs)
+        inserted = tuple(i - len(outs) - 1 for i in reversed(range(len(outs)))
+                         if not flags[i])
+        return (f"...{left}c,dc->...{right}d", inserted,
+                None if q == 2 and len(outs) == 1 else flags)
 
     @staticmethod
     def degree(action: Action) -> int | None:
@@ -778,39 +861,57 @@ class Partitions(Realisation):
         inverse = self.mobius.to(w.dtype)
         product = inverse @ w.flatten(1)  # ty: ignore[unsupported-operator]
         u = product.reshape(w.shape)
-        out = sum(self.term(x, k, string)
-                  for k, string in zip(u, self.strings))
+        terms = tuple(self.term(x, k, plan)
+                      for k, plan in zip(u, self.plans))
+        parts = [self.total(terms, group) for group in self.groups]
+        if self.diagonal:
+            parts.append(self.embed(self.total(terms, self.diagonal)))
+        out = functools.reduce(torch.add, parts)
         return self.bias(out.reshape(*batch, -1, out.shape[-1]), b)
 
     def term(self, x: torch.Tensor, k: torch.Tensor,
-             string: tuple[int, ...]) -> torch.Tensor:
+             plan: tuple) -> torch.Tensor:
         """
-        The operator of one partition, mixing the channels by ``k``: a block
-        with an input and an output is an axis of the einsum, a block of
-        inputs only is summed, a block of outputs only is copied, and two
-        outputs in one block are put on a diagonal.
+        The operator of one partition before it is spread, mixing the
+        channels by ``k``: a block with an input and an output is an axis of
+        the einsum, a block of inputs only is summed, and a block of outputs
+        only is an axis of size one, to broadcast.
 
         Parameters:
             x : The input, of shape ``(..., n, ..., n, C)``, ``p`` axes of
                 size ``n``.
             k : The weights, of shape ``(D, C)``.
-            string : The partition, see :func:`partitions`.
+            plan : The equation and the inserted axes, see :meth:`plan`.
         """
-        letters = "ABCD"
-        ins, outs = string[self.q:], tuple(dict.fromkeys(string[:self.q]))
-        shared = tuple(block for block in outs if block in ins)
-        left, right = (
-            "".join(letters[block] for block in blocks)
-            for blocks in (ins, shared))
-        out = torch.einsum(f"...{left}c,dc->...{right}d", x, k)
-        start = out.ndim - len(shared) - 1
-        for i, block in enumerate(outs):
-            out = out if block in shared else out.unsqueeze(start + i)
-        out = out.expand(*out.shape[:start], *(self.n, ) * len(outs),
-                         out.shape[-1])
-        if self.q == 2 and len(outs) == 1:
-            return torch.diag_embed(out.movedim(-1, -2)).movedim(-3, -1)
+        equation, inserted = plan
+        out = torch.einsum(equation, x, k)
+        for axis in inserted:
+            out = out.unsqueeze(axis)
         return out
+
+    @staticmethod
+    def total(terms: tuple[torch.Tensor, ...],
+              group: tuple[int, ...]) -> torch.Tensor:
+        """
+        The sum of some terms, broadcast against each other.
+
+        Parameters:
+            terms : The terms of every partition.
+            group : The numbers of the partitions to add.
+        """
+        return functools.reduce(torch.add, (terms[i] for i in group))
+
+    def embed(self, out: torch.Tensor) -> torch.Tensor:
+        """
+        Put the terms of the partitions with two outputs in one block on the
+        diagonal.
+
+        Parameters:
+            out : The sum of their terms, of shape ``(..., 1, D)`` or
+                  ``(..., n, D)``.
+        """
+        out = out.expand(*out.shape[:-2], self.n, out.shape[-1])
+        return torch.diag_embed(out.movedim(-1, -2)).movedim(-3, -1)
 
 
 def realise(dom: Action, cod: Action) -> Realisation:
