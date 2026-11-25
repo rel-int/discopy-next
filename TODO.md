@@ -6,8 +6,8 @@
 matrix, here along the construction of the group from symmetric groups by products and wreath products; the
 equivariant networks of *Categorical Deep Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332.)
 
-- [ ] `structure`: the factors of an action of a product, wreath or power of symmetric groups, sizes checked first
-- [ ] `Kronecker`: the layer as a sum over tuples of orbits of poolings and broadcasts along the axes
-- [ ] `realise`: Pooling, then Kronecker, then Dense
-- [ ] tests: equal to Dense in outputs and gradients, same numbering, no orbit of pairs at scale
-- [ ] CHANGELOG bullet
+- [x] `structure`: the factors of an action of a product, wreath or power of symmetric groups, sizes checked first
+- [x] `Kronecker`: the layer as a sum over tuples of orbits of poolings and broadcasts along the axes
+- [x] `realise`: Pooling, then Kronecker, then Dense
+- [x] tests: equal to Dense in outputs and gradients, same numbering, no orbit of pairs at scale
+- [x] CHANGELOG bullet
