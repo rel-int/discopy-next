@@ -6,5 +6,5 @@
 > > [P3] This redirects every curated probe to `feedback.symmetric.Diagram`, leaving plain `discopy.symmetric.Diagram` without these rare-case corpus checks.
 
 - [WIP] @amp-T-f829d881-2026-11-25 21:28 test/comarkov.py drop the unused feedback import
-- [ ] ADR 0012 the levels with a time step include pivotal and below
+- [WIP] @amp-T-f829d881-2026-11-25 21:28 ADR 0012 the levels with a time step include pivotal and below
 - [ ] proptest/corpus/symmetric.py plain probes on symmetric, traced ones on feedback.symmetric
