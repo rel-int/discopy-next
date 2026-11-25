@@ -7,5 +7,5 @@
 > > Preserve arrowheads when transposing measurement symbols: `Transposed.draw_wire` ignores `style='->'`.
 
 - [x] Category direction in to_svg, to_png and to_typst
-- [ ] Asymmetry counts nested boxes
+- [x] Asymmetry counts nested boxes
 - [ ] Transposed keeps arrow-style wires
