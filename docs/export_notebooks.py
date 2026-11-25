@@ -26,7 +26,8 @@ It can also be run as a script::
     python docs/export_notebooks.py --check --jobs 4  # four at a time
 
 ``--check`` fails when a notebook does not execute, unless it is one of
-:data:`KNOWN_BROKEN`, which fail on a bug that an issue tracks.
+:data:`KNOWN_BROKEN`, which fail on a bug that an issue tracks. The notebooks
+of :data:`UNEXECUTED` never run unless named.
 """
 from __future__ import annotations
 
@@ -60,6 +61,11 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # page for any notebook that fails to execute. An entry whose issue is closed
 # has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN: dict[str, str] = {}
+
+# Notebooks that neither the docs build nor ``--check`` runs, unless named on
+# the command line: their page links to the source. The old optyx README takes
+# some four minutes and what it shows the other optyx notebooks show too.
+UNEXECUTED = {"optyx/readme_example"}
 
 IFRAME = """\
 .. raw:: html
@@ -185,10 +191,11 @@ def generate(*, strict: bool = False) -> None:
     When ``strict`` is false a notebook that fails to execute falls back to a
     link page instead of aborting the build. When the environment sets
     :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs and
-    every page is a link page.
+    every page is a link page, as is that of every notebook of
+    :data:`UNEXECUTED`.
     """
     for notebook in notebooks():
-        if os.environ.get(SKIP) == "1":
+        if os.environ.get(SKIP) == "1" or name_of(notebook) in UNEXECUTED:
             write_page(notebook, rendered=False, skipped=True)
             continue
         try:
@@ -225,8 +232,8 @@ def main() -> int:
         parser.error("--jobs must be at least 1")
 
     names = set(args.notebooks)
-    selected = [nb for nb in notebooks()
-                if not names or {nb.stem, name_of(nb)} & names]
+    selected = [nb for nb in notebooks() if {nb.stem, name_of(nb)} & names
+                or not names and name_of(nb) not in UNEXECUTED]
     unmatched = names.difference(
         *({nb.stem, name_of(nb)} for nb in selected))
     if not selected or unmatched:

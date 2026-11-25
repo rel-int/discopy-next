@@ -17,6 +17,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `drawing.backend.Transposed` draws through the reflection along the
   anti-diagonal, keeping the layout as it is ([next#728]).
 
+- `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
+  memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
+  feedforward of the dagger of its argument and back, and `Trace` subclasses
+  both. `Trace.rotate` is the trace of the rotated argument on the other
+  side; a feedback or a feedforward that is not a trace still has no
+  rotation. The dagger involution and contravariance of `feedback` and
+  `pivotal` diagrams hold, and so does the dagger monoidality of
+  `symmetric`, `frobenius` and `interaction` ones; the dagger laws of
+  `markov` and `comarkov` fail on their copies, discards, merges and noises
+  ([next#730]).
+
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -551,6 +562,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
+  `abc.FeedbackCategory`, so a monoidal category that is not a feedback
+  category, e.g. `Matrix`, no longer has them, and the function
+  `abc.keyword_form` is removed for the static method
+  `abc.FeedbackCategory.keyword_form`; a class that traces without being a
+  feedback category, e.g. `Matrix`, still takes the keyword form of `trace`. The architecture diagram of
+  `discopy.abc` shows the syntax alone, and the docs list `discopy.egraph`
+  under semantics ([next#726]).
 
 - `closed.Hypergraph` and `lambek.abstract.Hypergraph` declare
   `dagger_involution`, `dagger_contravariance` and `dagger_monoidality`
@@ -2044,6 +2064,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
+  run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
+  `--check` and the docs build, which give it a page linking to its source,
+  still listed under "Optyx notebooks", and naming it runs it ([next#727]).
+
 - `proptest/test_corpus.py` replays a committed corpus of terms written by hand
   or by a language model, `proptest/corpus/`, against the laws of the property
   matrix, deterministically and offline, with a first corpus for
@@ -2670,7 +2695,10 @@ for the changelog of `1.2.1` and earlier.
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
+[next#726]: https://github.com/rel-int/discopy-next/pull/726
+[next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
+[next#730]: https://github.com/rel-int/discopy-next/pull/730
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
