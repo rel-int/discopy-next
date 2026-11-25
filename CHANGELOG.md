@@ -9,6 +9,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `neural.diagram` reads a closed map as a network with a trace: `interpret`
+  for any map, `of` for a `PeerNet` or `FactorNet` whose round it reproduces,
+  `legs` for its state, and `wiring.ports` numbers the ports ([next#TBD]).
+
+- `neural.diagram.stack` sends the layer of boxes that share a module to one
+  box on a leading node axis, and the wiring between layers to an index
+  gather, one box per degree: the stacked image of a `FactorNet` is its
+  round, with a number of boxes that does not grow with the graph
+  ([next#TBD]).
+
 - `actegory.Action` is a strict right action of a monoidal category of
   parameters on a category of data, with its unit, multiplication and
   functoriality laws as equations, and `actegory.Para` the parametric maps
@@ -2755,6 +2765,7 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
 [next#TBD]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
@@ -2772,7 +2783,6 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
-[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

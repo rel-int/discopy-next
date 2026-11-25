@@ -32,12 +32,14 @@ UNIMPORTABLE = (
     "discopy/lambek/categorial/bobcat.py", "discopy/neural/torch.py",
     "discopy/neural/geometric.py", "discopy/neural/equivariant.py",
     "discopy/neural/factorised.py",
+    "discopy/neural/geometric.py", "discopy/neural/diagram.py",
     "discopy/neural/kernels.py",
     "discopy/neural/augment.py", "discopy/neural/kernels.py",
     "discopy/neural/cell.py", "discopy/neural/recursion.py",
     "discopy/neural/lattice.py", "discopy/neural/act.py",
     "discopy/neural/train.py",
     "discopy/drawing/widget.py",
+    "discopy/neural/train.py", "discopy/drawing/widget.py",
     "discopy/drawing/vision.py")
 
 # A package whose own import needs an extra, e.g. ``discopy.optyx``.

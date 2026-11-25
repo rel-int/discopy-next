@@ -47,6 +47,8 @@ Summary
         memberships
         primal
         routing
+        ports
+        where
         from_map
         chains
         unravel
@@ -252,6 +254,51 @@ def routing(factors, n_nodes: int | None = None) -> Routing:
                    to_nodes, degree, arity, valid, degrees)
 
 
+def ports(cmap: CMap) -> tuple[tuple[int, ...], ...]:
+    """
+    The ports of every box of a map, numbered as ``cmap.edges`` numbers
+    them: for each box, in order, the number of its port at each position of
+    its legs in logical order.
+
+    Parameters:
+        cmap : A map, e.g. one drawn by
+               :func:`~discopy.neural.signature.from_relation`.
+
+    Example
+    -------
+    >>> from discopy.frobenius import Box, CMap, Ty
+    >>> x = Ty("x")
+    >>> f, g = Box("f", Ty(), x ** 2), Box("g", Ty(), x ** 2)
+    >>> wired = CMap.from_wiring((f, g), [((0, 0), (1, 0)), ((0, 1), (1, 1))])
+    >>> ports(wired)
+    ((1, 0), (3, 2))
+    >>> wired.edges[1]
+    3
+    """
+    result, start = [], 0
+    for box in cmap.boxes:
+        offsets = CMap.logical_order(len(box.dom), len(box.cod))
+        result.append(tuple(start + offset for offset in offsets))
+        start += len(offsets)
+    return tuple(result)
+
+
+def where(rows: tuple[tuple[int, ...], ...]) -> dict[int, tuple[int, int]]:
+    """
+    The box and the position of every port number.
+
+    Parameters:
+        rows : The numbers of the ports of every box, see :func:`ports`.
+
+    Example
+    -------
+    >>> where(((1, 0), (3, 2)))[2]
+    (1, 1)
+    """
+    return {port: (index, position) for index, row in enumerate(rows)
+            for position, port in enumerate(row)}
+
+
 def from_map(cmap: CMap, node_name: str = NODE
              ) -> tuple[tuple[int, ...], ...]:
     """
@@ -304,19 +351,15 @@ def from_map(cmap: CMap, node_name: str = NODE
     """
     if cmap.dom or cmap.cod:
         raise ValueError("the map is not closed")
-    ports, box_at, start = [], {}, 0
-    for index, box in enumerate(cmap.boxes):
-        offsets = CMap.logical_order(len(box.dom), len(box.cod))
-        ports.append(tuple(start + offset for offset in offsets))
-        box_at.update((start + offset, index) for offset in offsets)
-        start += len(offsets)
+    rows = ports(cmap)
+    at = where(rows)
     nodes = {index: number for number, index in enumerate(
         i for i, box in enumerate(cmap.boxes) if box.name == node_name)}
     factors = [i for i in range(len(cmap.boxes)) if i not in nodes] \
         or list(nodes)
     table = []
     for index in factors:
-        others = [box_at[cmap.edges[port]] for port in ports[index]]
+        others = [at[cmap.edges[port]][0] for port in rows[index]]
         others = [other for other in others if other != index]
         if not all(other in nodes for other in others):
             raise ValueError(

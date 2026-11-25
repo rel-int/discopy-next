@@ -39,6 +39,9 @@ symmetry group rather than along its tables.
 :mod:`discopy.neural.datatype` is the syntax of recursive networks: the
 terms of an inductive datatype such as lists or trees, and the algebras that
 fold them, with one tied parameter in a category of parametric maps.
+symmetry group rather than along its tables. :mod:`discopy.neural.diagram`
+reads a wiring back as a network with a trace, whose rounds are those of
+the recursive networks.
 
 .. autosummary::
     :template: module.rst
@@ -59,6 +62,7 @@ fold them, with one tied parameter in a category of parametric maps.
     factorised
     augment
     datatype
+    diagram
 
 Note
 ----
