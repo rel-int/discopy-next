@@ -13,4 +13,4 @@
 - [x] discopy/abc.py GoISituation: bang preserves the swap
 - [x] discopy/abc.py GoISituation: unit colaxator inverse
 - [x] docstrings, paper, changelog, pylint comment that still say delay or bang
-- [ ] --box=test/symmetric.py foliation tests with traces move to test/feedback.py
+- [WIP] @amp-T-f829d881-2026-11-25 21:20 --box=test/symmetric.py foliation tests with traces move to test/feedback.py
