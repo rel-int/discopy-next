@@ -12,7 +12,7 @@
 
 - [x] 1: Join with time_step (reproduce first)
 - [x] 2, 8, 12: notebook Cuts rebuild and dagger
-- [WIP] @T-14209019-2026-11-25 16:36 3, 4: optyx Feedback round-trips its tree
+- [x] 3, 4: optyx Feedback round-trips its tree, filed as #731
 - [WIP] @T-14209019-2026-11-25 16:36 7, 11, 15: legacy Bubble trees load
 - [WIP] @T-14209019-2026-11-25 16:36 10, 13, 17: tensor and quantum Bubble is Elementwise.from_args; 16: Elementwise repr of data
 - [WIP] @T-14209019-2026-11-25 16:36 5, 6, 9, 14: alias test, changelog and ADR wording, Cut method
