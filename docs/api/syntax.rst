@@ -29,7 +29,6 @@ and the property tests that check their axioms.
     discopy.compact
     discopy.frobenius
     discopy.hypergraph
-    discopy.egraph
     discopy.cmap
     discopy.rewrite
 

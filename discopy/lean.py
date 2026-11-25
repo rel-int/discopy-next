@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import inspect
 import re
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Self, TypeVar, get_args, get_origin
 
@@ -66,6 +67,10 @@ LEAN_NAMES = {"then": "comp"}
 
 SORTS = {Obj: "Ob", Atom: "Ob"}
 """ The Lean type of a variable, from the sort its bound states. """
+
+
+CLASS: ContextVar[type | None] = ContextVar("CLASS", default=None)
+""" The class whose declaration is being evaluated, see :func:`apply`. """
 
 
 class Unsupported(Exception):
@@ -157,10 +162,43 @@ class Term:
 
 
 def apply(name, args, kwargs, sort) -> Term:
-    """ The term of a method applied, refusing keyword arguments. """
-    if kwargs:
-        raise Unsupported(f"it calls {name} with keywords {sorted(kwargs)}")
-    return Term(name, tuple(args), sort, True)
+    """
+    The term of a method applied. A call with keywords is an operation of its
+    own, named after the method and its keywords in the order given, their
+    values its last arguments: ``f.feedback(mem=m)`` is ``feedbackMem f m``.
+
+    >>> f, x, m = Term("f"), Term("x", sort="Ob"), Term("m", sort="Ob")
+    >>> term = f.feedback(dom=x, mem=m)
+    >>> print(term, ":", term.signature)
+    feedbackDomMem f x m : Hom → Ob → Ob → Hom
+    """
+    args = (*args, *defaults(name, args, kwargs))
+    for key, value in kwargs.items():
+        if not isinstance(value, Term):
+            raise Unsupported(f"it calls {name} with {key}={value!r}")
+    name += "".join(key.title().replace("_", "") for key in kwargs)
+    return Term(name, (*args, *kwargs.values()), sort, True)
+
+
+def defaults(name, args, kwargs) -> tuple:
+    """
+    The default numbers of a call with no keywords to a method of the class
+    being evaluated, see :data:`CLASS`, after its positional arguments, so
+    that ``f.delay()`` is ``f.delay(1)``. It stops at the first default
+    that is not a number, e.g. ``left=False`` of a trace.
+    """
+    function = getattr(CLASS.get(), name, None)
+    if kwargs or function is None:
+        return ()
+    parameters = list(inspect.signature(function).parameters.values())
+    result = []
+    for parameter in parameters[len(args):]:
+        default = parameter.default
+        if parameter.kind != parameter.POSITIONAL_OR_KEYWORD\
+                or not isinstance(default, int) or isinstance(default, bool):
+            break
+        result.append(default)
+    return tuple(result)
 
 
 class Symbolic:
@@ -299,7 +337,15 @@ def declaration(cls: type, decl: Declaration) -> Compiled:
     >>> print(compiled.output)
     Equation(comp (comp f g) h, comp f (comp g h))
     """
-    decl = decl.bind(cls)
+    token = CLASS.set(cls)
+    try:
+        return evaluate(cls, decl.bind(cls))
+    finally:
+        CLASS.reset(token)
+
+
+def evaluate(cls: type, decl: Declaration) -> Compiled:
+    """ The body of :func:`declaration`, with :data:`CLASS` set. """
     scope, binders = variables(cls, decl)
     arguments, premises, boundaries = {}, [], []
     for parameter in decl.parameters:
@@ -422,6 +468,17 @@ def method(cls: type, name: str) -> tuple[str, str]:
     return f"{name}Ob" if is_object_operation else name, " → ".join(sorts)
 
 
+def takes_keywords(function) -> bool:
+    """
+    Whether a method takes keyword-only arguments, so that each of its calls
+    with keywords is an operation of its own, see :func:`apply`, and the
+    method itself is not one.
+    """
+    parameters = inspect.signature(function).parameters.values()
+    return any(parameter.kind == parameter.KEYWORD_ONLY
+               for parameter in parameters)
+
+
 def operations(cls: type) -> dict[str, str]:
     """
     The signature of each operation of a class and of its bases: those its
@@ -434,7 +491,8 @@ def operations(cls: type) -> dict[str, str]:
              for item in compiled.operations().items()]
     found += [method(cls, name) for name, value in vars(cls).items()
               if getattr(getattr(value, "__func__", value),
-                         "__isabstractmethod__", False)]
+                         "__isabstractmethod__", False)
+              and not takes_keywords(getattr(cls, name))]
     for name, signature in found:
         if result.setdefault(name, signature) != signature:
             raise Unsupported(f"{name} is {result[name]} and {signature}")
@@ -563,12 +621,15 @@ def functor(cls: type, own: dict[str, str], declared: dict) -> str:
     class, extending those of its bases: its action ``ob`` on objects and
     ``map`` on morphisms preserve each operation of the class, under the
     premises of the rule that concludes it, if any, e.g. ``comp`` on
-    composable morphisms only, as ``cut`` concludes it.
+    composable morphisms only, as ``cut`` concludes it. A rule that fixes a
+    number, e.g. ``delaying`` the one time step of ``delay f 1``, does not:
+    the operation is preserved on every number.
     """
     name, parents = cls.__name__, bases(cls)
     fields = {}
     for decl, compiled in declared.values():
-        if isinstance(decl, Rule) and compiled.output.name in own:
+        if isinstance(decl, Rule) and compiled.output.name in own and all(
+                isinstance(arg, Term) for arg in compiled.output.args):
             sort = "ob" if compiled.output.sort == "Ob" else "map"
             source = Compiled(
                 compiled.binders, compiled.premises,

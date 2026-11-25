@@ -26,11 +26,35 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   between two ports are vertical at both ends (`draw(smooth_wires=True)`) and
   every frame keeps the same axes, which `draw` now passes on as `xlim` and
   `ylim` ([next#706]).
+- A category draws left to right when its `Diagram` class sets
+  `draw_left_to_right = True`, and a `Bubble` whose args are drawn in
+  another direction than its own category is drawn as one box with its args
+  across it, e.g. the "Very big car" figure of higher-order DisCoCat: the
+  terms top to bottom, their bodies left to right.
+  `drawing.backend.Transposed` draws through the reflection along the
+  anti-diagonal, keeping the layout as it is ([next#728]).
+
+- `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
+  memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
+  feedforward of the dagger of its argument and back, and `Trace` subclasses
+  both. `Trace.rotate` is the trace of the rotated argument on the other
+  side; a feedback or a feedforward that is not a trace still has no
+  rotation. The dagger involution and contravariance of `feedback` and
+  `pivotal` diagrams hold, and so does the dagger monoidality of
+  `symmetric`, `frobenius` and `interaction` ones; the dagger laws of
+  `markov` and `comarkov` fail on their copies, discards, merges and noises
+  ([next#730]).
+
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
+
+- `discopy.lean` compiles `abc.FeedbackCategory`: a call with keywords is an
+  operation of its own, named after the method and its keywords, e.g.
+  `feedbackDomCodMem`, and a call leaving a numeric default out passes it,
+  so that `f.delay()` is `delay f 1` ([next#723]).
 
 - `discolean/` models the terms of `cat` and `monoidal`: the five laws of
   `cat.TermBase` are proved on nameless terms, and a planar linear term of
@@ -104,6 +128,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `discolean/DisCoLean/Statements/English.lean` proves ([next#622]).
+- `lambek.abstract.Lexicon.parse` inverts a lexicon, so the grammar reads that
+  Lean statement back to English, and `Lexicon.likelihood` scores a reading
+  under a probabilistic grammar counted in a treebank, the best of them
+  being one explanation; in the Lean lexicon *the* is now an equation and a uniqueness, a bare object an
+  embedding ([next#713]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -551,6 +580,25 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
+  `abc.FeedbackCategory`, so a monoidal category that is not a feedback
+  category, e.g. `Matrix`, no longer has them, and the function
+  `abc.keyword_form` is removed for the static method
+  `abc.FeedbackCategory.keyword_form`; a class that traces without being a
+  feedback category, e.g. `Matrix`, still takes the keyword form of `trace`. The architecture diagram of
+  `discopy.abc` shows the syntax alone, and the docs list `discopy.egraph`
+  under semantics ([next#726]).
+
+- `closed.Hypergraph` and `lambek.abstract.Hypergraph` declare
+  `dagger_involution`, `dagger_contravariance` and `dagger_monoidality`
+  failing, as their categories do: a curry has no dagger. The strategy draws
+  no curry, so `proptest/corpus/hypergraph.py` gives one to each
+  ([next#722]).
+
+- The README has a How section: DisCoPy began as an implementation of
+  DisCoCat and QNLP models, and it links that application to
+  `discopy.lambek`, where discopy.org links it to lambeq ([next#714]).
+
 - `interaction.Diagram` declares `dagger_involution` and
   `dagger_monoidality` broken with "Feedback has no dagger", as it does
   `dagger_contravariance`: over `symmetric.Diagram` a feedback inside an
@@ -837,9 +885,31 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modules removed from optyx: it was the prototype of the light-cone bound
   that `optyx.utils.misc.get_max_dim_for_box` computes for
   `Diagram.to_tensor`, now unit-tested ([next#249]).
+- Four optyx notebooks: `compile_to_semm` and `Compiler`, which repeated each
+  other and the doctest of `optyx.compiler.semm.compile_to_semm`, and
+  `optyx-vqe-experiment` and `bosonic-vqe-2`, whose gradient descent
+  `bose_hubbard` keeps. `pandas`, which only `optyx-vqe-experiment` imported,
+  leaves the `notebooks` extra ([next#715]).
 
 ### Fixed
 
+- `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
+  box of `quantum.circuit` and of optyx already carries, rather than by a
+  `dagger` lambda set on the instance, so it pickles and so does every
+  hypergraph of a red spider; `zx.Box` reads the flag in `dagger`, `__repr__`
+  and `to_tree`, and `proptest/corpus/zx.py` replays both `pickling` cells
+  ([next#725]).
+
+- `bang.Diagram` declares `dagger_involution` and `dagger_contravariance`
+  failing, since every structural box but the exchange has no dagger, and
+  `proptest/corpus/bang.py` replays them on the structural boxes its strategy
+  does not draw ([next#721]).
+
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, executes
+  and is listed under "Optyx notebooks": its sweep of the contraction's `chi`
+  starts at 2, since at `chi=1` quimb's QR divides by zero ([next#442]), and
+  takes the median of three contractions per `chi` instead of ten. It leaves
+  `KNOWN_BROKEN`, which is now empty ([next#715]).
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
   property matrix draws such terms: a naming of the kappa terms may reuse a
@@ -2011,6 +2081,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
+  run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
+  `--check` and the docs build, which give it a page linking to its source,
+  still listed under "Optyx notebooks", and naming it runs it ([next#727]).
+
 - `proptest/test_corpus.py` replays a committed corpus of terms written by hand
   or by a language model, `proptest/corpus/`, against the laws of the property
   matrix, deterministically and offline, with a first corpus for
@@ -2624,13 +2699,24 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#722]: https://github.com/rel-int/discopy-next/issues/722
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#723]: https://github.com/rel-int/discopy-next/pull/723
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#706]: https://github.com/rel-int/discopy-next/pull/706
 [next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
+[next#713]: https://github.com/rel-int/discopy-next/pull/713
+[next#714]: https://github.com/rel-int/discopy-next/pull/714
+[next#715]: https://github.com/rel-int/discopy-next/pull/715
+[next#721]: https://github.com/rel-int/discopy-next/pull/721
+[next#725]: https://github.com/rel-int/discopy-next/pull/725
+[next#726]: https://github.com/rel-int/discopy-next/pull/726
+[next#727]: https://github.com/rel-int/discopy-next/pull/727
+[next#728]: https://github.com/rel-int/discopy-next/pull/728
+[next#730]: https://github.com/rel-int/discopy-next/pull/730
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

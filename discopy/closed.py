@@ -51,6 +51,7 @@ Summary
     Copy
     Discard
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -781,14 +782,18 @@ CMap = cmap.CMap[Diagram]
 
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
+for law in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
+        messages.CURRY_HAS_NO_DAGGER))
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
-Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
-    lambda self: self.arg.is_linear)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
+for cls in (Feedback, Feedforward, Head, Tail):
+    cls.is_linear = property(lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
 Diagram.pack_factory = Pack
 Diagram.unpack_factory = Unpack

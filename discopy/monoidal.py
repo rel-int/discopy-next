@@ -161,6 +161,7 @@ and a :class:`discopy.markov.Application` may use one twice.
 from __future__ import annotations
 
 import itertools
+from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -197,6 +198,7 @@ from discopy.utils import (
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
+    text_width,
     unbiased,
 )
 
@@ -1432,6 +1434,12 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
 
+    Attributes:
+        draw_left_to_right : Whether the diagrams of the class are drawn left
+            to right rather than top to bottom, a property of the category
+            rather than of any diagram: see :class:`Bubble` for diagrams of
+            one direction drawn inside the boxes of another.
+
     .. admonition:: Summary
 
         .. autosummary::
@@ -1453,6 +1461,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     sum_factory: ClassVar[type[formal_sum.Sum]]
     bubble_factory: ClassVar[type["Bubble"]]
     functor_factory: ClassVar[type["Functor"]]
+    draw_left_to_right: ClassVar[bool] = False
     ob = Ty
     layer_factory = Layer
 
@@ -2565,7 +2574,17 @@ class Box(cat.Box, Diagram):
         return 1
 
     def to_drawing(self):
-        return Drawing.from_box(self)
+        result = Drawing.from_box(self)
+        if type(self).draw_left_to_right and "height" not in vars(self)\
+                and not result.box.no_label:
+            # The height of a box drawn left to right is its width on the page.
+            box = copy(self)
+            box.height = max(1, text_width(
+                getattr(self, "drawing_name", self.name)) + 1)
+            if "min_width" not in vars(self):
+                box.min_width = 0
+            return Drawing.from_box(box)
+        return result
 
 
 class Bubble(cat.Bubble, Box):
@@ -2621,9 +2640,50 @@ class Bubble(cat.Bubble, Box):
     .. image:: /_static/monoidal/coloured-frame.svg
         :align: center
 
+    The diagrams of a category with ``draw_left_to_right`` are drawn left to
+    right, and a bubble whose args are drawn in another direction than its
+    own category is drawn as one box with its args across it, on a
+    background of its ``frame_colour``. This is how to draw "Very big car" in
+    higher-order DisCoCat :cite:p:`ToumiDeFelice25`: each word is a lambda
+    term, drawn top to bottom, whose body is a diagram, drawn left to right:
+
+    >>> @factory
+    ... class Body(Diagram):
+    ...     draw_left_to_right = True
+    >>> class Primitive(Box, Body):
+    ...     pass
+    >>> n, n_n = Ty('n'), Ty('n ← n')
+    >>> x, B = Primitive('x', Ty(), n), Primitive('B', n, n)
+    >>> C = Primitive('C', Ty(), n)
+    >>> style = dict(color="green", frame_colour="red")
+    >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
+    ...            color="green", height=2)
+    >>> big = Bubble(x >> B, dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
+    >>> car = Bubble(C, dom=Ty(), cod=n, **style)
+    >>> very_big = Bubble(x >> B >> B, dom=very.cod @ n_n, cod=n_n,
+    ...                   drawing_name="λx ·", **style)
+    >>> very_big_car = Bubble(C >> B >> B, dom=n_n @ n, cod=n, **style)
+    >>> diagram = (very @ big @ car).foliation()\\
+    ...     >> very_big @ n >> very_big_car
+    >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
+
+    .. image:: /_static/monoidal/very-big-car.svg
+        :align: center
+
     """
     serialised_attrs = cat.Bubble.serialised_attrs + (
         "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
+
+    @property
+    def frame_colour(self):
+        """ The colour of the frame, the default of
+        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        return vars(self).get(
+            "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
+
+    @frame_colour.setter
+    def frame_colour(self, colour):
+        vars(self)["frame_colour"] = colour
 
     def __init__(
             self, *args: Diagram,
@@ -2631,12 +2691,13 @@ class Bubble(cat.Bubble, Box):
             draw_as_frame: bool | None = None,
             draw_as_square: bool | None = None,
             draw_vertically=False, **kwargs):
+        params = {attr: kwargs.pop(attr)
+                  for attr in BOX_DRAWING_ATTRIBUTES if attr in kwargs}
         cat.Bubble.__init__(self, *args, **kwargs)
         Box.__init__(self, self.name, self.dom, self.cod,
-                     data=self.data, is_dagger=self.is_dagger)
+                     data=self.data, is_dagger=self.is_dagger, **params)
         self.drawing_name = "" if drawing_name is None else drawing_name
         self.draw_vertically = draw_vertically
-        self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
         can_draw_as_square = len(args) == 1
         can_draw_as_bubble = (can_draw_as_square
                               and len(self.dom) == len(self.arg.dom)
@@ -2657,8 +2718,27 @@ class Bubble(cat.Bubble, Box):
         return 1 + sum(arg.size for arg in self.args)
 
     def to_drawing(self):
-        method = "frame" if self.draw_as_frame else "bubble"
         args = [arg.to_drawing() for arg in self.args]
+        directions = {type(arg).draw_left_to_right for arg in self.args}
+        if len(directions) > 1:
+            raise ValueError(messages.MIXED_DIRECTIONS.format(self))
+        if directions != {self.draw_left_to_right}:
+            framed = [arg.framed() for arg in args]
+            height = max(arg.height for arg in framed)
+            nested = tuple(
+                arg.stretch(height - arg.height) for arg in framed)
+            width = sum(arg.width for arg in nested)
+            label = text_width(self.drawing_name) + .25\
+                if self.drawing_name else 0
+            return Box(
+                self.drawing_name, self.dom, self.cod, nested=nested,
+                color=getattr(self, "color", "white"),
+                frame_colour=self.frame_colour,
+                min_width=max(label + height + .5,
+                              getattr(self, "min_width", 0)),
+                height=max(width + 1,
+                           getattr(self, "height", 0))).to_drawing()
+        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
