@@ -136,6 +136,8 @@ def to_typst(diagram, **params):
     >>> assert 'import "@preview/cetz' in source
     >>> assert 'bezier' in source or 'line' in source
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().to_typst(**params)
 
 

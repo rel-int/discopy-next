@@ -1548,6 +1548,11 @@ class Transposed(Backend):
         since other backends bend wires vertically. """
         if linewidth == 0:
             return
+        if style is not None:  # e.g. the arrow of a measure, straight
+            self.parent.draw_wire(
+                self.map(source), self.map(target), style=style,
+                linewidth=linewidth, adaptive=adaptive)
+            return
         source, target = Point(*source), Point(*target)
         middle = Point(target.x, source.y) if bend_out\
             else Point(source.x, target.y)

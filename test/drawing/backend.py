@@ -671,3 +671,27 @@ def test_typst_draws_the_symbol_of_an_equation_as_its_label_alone():
     assert 'text("=", fill: rgb("#000000")' in source
     assert "circle(" not in source
     assert compiled(source, format="svg")
+
+
+def test_left_to_right_follows_the_category_and_keeps_arrows(tmp_path):
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.quantum.circuit import Measure
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    f = Primitive('f', x, x)
+    body = f >> Primitive('g', x, x @ x)
+    assert body.to_svg() == body.to_svg(left_to_right=True)\
+        != body.to_svg(left_to_right=False)
+    assert Bubble(f[::-1], dom=x, cod=x).to_drawing().asymmetry() == 0.125
+
+    path = tmp_path / "measure.tikz"
+    Measure().draw(to_tikz=True, left_to_right=True, path=str(path))
+    assert "->" in path.read_text()
