@@ -10,7 +10,7 @@
 > > 14. peirce/alpha.py:217: `Cut` accepts a `method` it does not serialise.
 > > 16. tensor.py:1429: `Elementwise.__repr__` emits raw arrays for `data`.
 
-- [WIP] @T-14209019-2026-11-25 16:36 1: Join with time_step (reproduce first)
+- [x] 1: Join with time_step (reproduce first)
 - [WIP] @T-14209019-2026-11-25 16:36 2, 8, 12: notebook Cuts rebuild and dagger
 - [WIP] @T-14209019-2026-11-25 16:36 3, 4: optyx Feedback round-trips its tree
 - [WIP] @T-14209019-2026-11-25 16:36 7, 11, 15: legacy Bubble trees load
