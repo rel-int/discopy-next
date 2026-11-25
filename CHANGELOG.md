@@ -539,6 +539,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `closed.Hypergraph` and `lambek.abstract.Hypergraph` declare
+  `dagger_involution`, `dagger_contravariance` and `dagger_monoidality`
+  failing, as their categories do: a curry has no dagger. The strategy draws
+  no curry, so `proptest/corpus/hypergraph.py` gives one to each
+  ([next#722]).
+
 - The README has a How section: DisCoPy began as an implementation of
   DisCoCat and QNLP models, and it links that application to
   `discopy.lambek`, where discopy.org links it to lambeq ([next#714]).
@@ -2631,6 +2637,7 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#722]: https://github.com/rel-int/discopy-next/issues/722
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705

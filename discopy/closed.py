@@ -781,6 +781,10 @@ CMap = cmap.CMap[Diagram]
 
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
+for law in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
+        messages.CURRY_HAS_NO_DAGGER))
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
