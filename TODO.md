@@ -8,5 +8,5 @@
 >
 > Follow the repo's AGENTS.md and changelog convention. Open a pull request. Reply to https://ampcode.com/threads/T-01a2123a-e6ca-715d-8fa5-ea931602b4f3 with its URL, or with what blocked you.
 
-- [ ] Draw bang branching off monoidal in docs/api/architecture.html
+- [WIP] @T-dc6d2cec-2026-11-25 17:03 Draw bang branching off monoidal in docs/api/architecture.html
 - [ ] Changelog entry
