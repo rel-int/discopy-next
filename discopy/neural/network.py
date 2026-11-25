@@ -273,8 +273,8 @@ class Network(markov.Diagram, comarkov.Diagram):
         return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
             else cls.merge_factory(typ, n_legs_in)
 
-    def to_function(self, tensor: type = object, rounds: int | None = None
-                    ) -> python.Function:
+    def to_function(self, tensor: type = object, rounds: int | None = None,
+                    sequence: bool = False) -> python.Function:
         """
         Compile a feedforward network to a function on tensors, one per leg:
         the functor sending every leg to ``tensor`` and every box to its
@@ -287,6 +287,8 @@ class Network(markov.Diagram, comarkov.Diagram):
                 or ``torch.Tensor``, checked on every wire.
             rounds : The number of rounds to :meth:`unroll` every trace
                 into, a network with a trace not compiling without.
+            sequence : Whether to unroll a trace as a stream of rounds,
+                one input and one output per round, see :meth:`unroll`.
 
         Example
         -------
@@ -303,13 +305,13 @@ class Network(markov.Diagram, comarkov.Diagram):
         NotImplementedError: Trace(add >> double) has a trace, only ...
         """
         if rounds is not None:
-            return self.unroll(rounds).to_function(tensor)
+            return self.unroll(rounds, sequence).to_function(tensor)
         self.assert_isfeedforward()
         return Functor(ob_map=lambda leg: (tensor, ),
                        ar_map=lambda box: box.assert_hasmodule().forward,
                        cod=python.Function)(self)
 
-    def unroll(self, rounds: int) -> Network:
+    def unroll(self, rounds: int, sequence: bool = False) -> Network:
         """
         The feedforward network running every trace for a number of
         ``rounds``: the traced legs start at :func:`zeros`, every round
@@ -324,8 +326,23 @@ class Network(markov.Diagram, comarkov.Diagram):
         a functor that preserves the rounds of a trace. A trace as a fixed
         point is not covered, its derivative being implicit.
 
+        With ``sequence=True`` the unrolled trace is the stream rather than
+        the observation of the last round: a network from ``dom ** rounds``
+        to ``cod ** rounds``, one input and one output per round, the state
+        threaded from round to round and the last one discarded. On a
+        constant input it is the default, up to the outputs but the last.
+        The stream is defined when the whole network is one trace, possibly
+        of a trace: a memory of several wires is nested traces, one per
+        wire, which are one trace over the whole memory by the vanishing law
+        ``Tr^X(Tr^Y(f)) = Tr^{X @ Y}(f)``. A trace with a neighbour, two
+        parallel traces or a trace inside the body raise
+        ``NotImplementedError``, their rounds having no common clock.
+        The state of round zero is zeros: it reads the shape of the first
+        input, copied once more for it, and not its values.
+
         Parameters:
             rounds : The number of rounds, at least one.
+            sequence : Whether to read the trace as a stream.
 
         Example
         -------
@@ -336,13 +353,16 @@ class Network(markov.Diagram, comarkov.Diagram):
         >>> assert counter.unroll(3).dom == x == counter.unroll(3).cod
         >>> counter.to_function(rounds=3)(np.array([1, 2]))
         array([3, 6])
+        >>> running = counter.to_function(rounds=3, sequence=True)
+        >>> running(*np.array([[1, 1], [2, 2], [3, 3]]))
+        (array([1, 1]), array([3, 3]), array([6, 6]))
         >>> counter.unroll(2).draw(
         ...     doctest="docs/_static/neural/unroll.svg", figsize=(5, 5))
 
         .. image:: /_static/neural/unroll.svg
             :align: center
         """
-        return Unroll(rounds)(self)
+        return Unroll(rounds, sequence)(self)
 
     def assert_isfeedforward(self) -> None:
         """ Raise ``NotImplementedError`` on a trace or a dagger: neither
@@ -354,8 +374,8 @@ class Network(markov.Diagram, comarkov.Diagram):
             if box.is_dagger:
                 raise NotImplementedError(f"{box} has no adjoint module.")
 
-    def to_lens(self, tensor: type = object, rounds: int | None = None
-                ) -> Lens:
+    def to_lens(self, tensor: type = object, rounds: int | None = None,
+                sequence: bool = False) -> Lens:
         """
         The reverse derivative of a feedforward network
         :cite:p:`CruttwellEtAl22`: the lens whose ``get`` is
@@ -372,6 +392,8 @@ class Network(markov.Diagram, comarkov.Diagram):
             tensor : The type of the tensors and of their gradients.
             rounds : The number of rounds to :meth:`unroll` every trace
                 into, a network with a trace having no lens without.
+            sequence : Whether to unroll a trace as a stream of rounds,
+                see :meth:`unroll`.
 
         Example
         -------
@@ -387,9 +409,20 @@ class Network(markov.Diagram, comarkov.Diagram):
         array([2, 6])
         >>> backprop.put(np.array([1, 2]), np.array([1, 1]))
         array([3, 5])
+
+        A counter as a stream, where the input of a round reaches the outputs
+        of that round and of the rounds after it, so that a gradient on the
+        first output only reaches the first input:
+
+        >>> x = Dims(1)
+        >>> add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m),
+        ...           vjp=lambda v, m, dy, dh: (dy + dh, dy + dh))
+        >>> stream = add.trace().to_lens(np.ndarray, rounds=2, sequence=True)
+        >>> stream.put(np.ones(1), np.ones(1), np.ones(1), np.zeros(1))
+        (array([1.]), array([0.]))
         """
         if rounds is not None:
-            return self.unroll(rounds).to_lens(tensor)
+            return self.unroll(rounds, sequence).to_lens(tensor)
         self.assert_isfeedforward()
         leg, pullback = Lens.ob((tensor, ), (tensor, )), python.Ty(Callable)
 
@@ -674,20 +707,130 @@ class Unroll(Functor):
 
     Parameters:
         rounds : The number of rounds, at least one.
+        sequence : Whether the unrolled trace takes one input and gives one
+            output per round, see :meth:`stream`.
     """
-    def __init__(self, rounds: int):
+    def __init__(self, rounds: int, sequence: bool = False):
         if rounds < 1:
             raise ValueError(f"Expected at least one round, got {rounds}.")
-        self.rounds = rounds
+        self.rounds, self.sequence = rounds, sequence
         super().__init__(ob_map=lambda leg: leg, ar_map=lambda box: box)
+
+    @staticmethod
+    def parts(other: Trace, body: Network) -> tuple[Network, Box]:
+        """
+        The ``body`` of a trace with its legs in the order ``dom @ mem`` to
+        ``cod @ mem`` (a left trace swaps them) and the :class:`Zeros` box
+        from ``dom`` to ``mem`` starting its state.
+
+        Parameters:
+            other : The trace.
+            body : Its body, possibly already unrolled.
+
+        Example
+        -------
+        >>> x = Dims(2)
+        >>> add = Box('add', x @ x, x @ x)
+        >>> body, start = Unroll.parts(add.trace(left=True), add)
+        >>> assert body.dom == x @ x and start.dom == x and start.cod == x
+        """
+        mem, x, y = other.mem, other.dom, other.cod
+        if other.left:
+            body = Network.swap(x, mem) >> body >> Network.swap(mem, y)
+        return body, Box('zeros', x, mem, module=Zeros(x, mem),
+                         vjp=Zeros(x, x))
+
+    @staticmethod
+    def merged(other: Trace) -> Trace:
+        """
+        The trace over one memory of several wires, given the trace of a
+        trace: by the vanishing law of traced categories,
+        ``Tr^X(Tr^Y(f)) = Tr^{X @ Y}(f)``, which is how :meth:`Network.trace`
+        builds a memory of several wires, one wire at a time. The memory is
+        ``X @ Y`` on the right and ``Y @ X`` on the left, the inner trace
+        being the one nearest the body. Traces on different sides raise
+        ``NotImplementedError``, their memories having no common order.
+
+        Parameters:
+            other : The trace, possibly of a trace.
+
+        Example
+        -------
+        >>> x = Dims(2)
+        >>> add = Box('add', x @ x @ x @ x, x @ x @ x @ x)
+        >>> nested = add.trace(2)
+        >>> assert isinstance(nested.arg, Trace) and len(nested.mem) == 1
+        >>> merged = Unroll.merged(nested)
+        >>> assert merged == Trace(add, mem=x @ x) and merged.dom == x @ x
+        """
+        boxes = other.arg.boxes
+        if not (len(boxes) == 1 and isinstance(boxes[0], Trace)
+                and boxes[0] == other.arg):
+            return other
+        inner = boxes[0]
+        if inner.left != other.left:
+            raise NotImplementedError(
+                f"{other} has a nested trace on the other side, "
+                "no stream of rounds.")
+        mem = inner.mem @ other.mem if other.left else other.mem @ inner.mem
+        return Unroll.merged(type(other)(
+            inner.arg, other.left, dom=other.dom, cod=other.cod, mem=mem))
+
+    def stream(self, other: Trace) -> Network:
+        """
+        The trace read as a stream of rounds, from ``dom ** rounds`` to
+        ``cod ** rounds``: the input of round ``t`` at position ``t``, its
+        output at position ``t`` and the state of every round the next one's.
+        The state of round zero is :class:`Zeros`, which reads the shape of
+        the first input and not its values, so that this input is copied
+        once, to the start and to round zero. A trace of a trace is one
+        trace over the memory of both, by the vanishing law
+        ``Tr^X(Tr^Y(f)) = Tr^{X @ Y}(f)`` (see :meth:`merged`), but a trace
+        elsewhere in the body raises ``NotImplementedError``, its inputs and
+        outputs having no round.
+
+        Parameters:
+            other : The trace to unroll.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> x = Dims(2)
+        >>> add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m))
+        >>> unrolled = Unroll(3, sequence=True).stream(add.trace())
+        >>> assert unrolled.dom == x ** 3 == unrolled.cod
+        >>> unrolled.to_function(np.ndarray)(
+        ...     *np.array([[1, 1], [2, 2], [3, 3]]))
+        (array([1, 1]), array([3, 3]), array([6, 6]))
+        """
+        other = self.merged(other)
+        if any(isinstance(box, Trace) for box in other.arg.boxes):
+            raise NotImplementedError(
+                f"{other} has a nested trace in its body, "
+                "no stream of rounds.")
+        mem, x, y = other.mem, other.dom, other.cod
+        body, start = self.parts(other, other.arg)
+        step = Network.swap(mem, x) >> body
+        network = Network.copy(x, 2) @ x ** (self.rounds - 1)\
+            >> start @ x ** self.rounds
+        for done in range(self.rounds):
+            network >>= y ** done @ step @ x ** (self.rounds - done - 1)
+        return network >> y ** self.rounds @ Network.discard(mem)
 
     def __call__(self, other):
         if not isinstance(other, Trace):
+            boxes = getattr(other, "boxes", [])
+            traces = [box for box in boxes if isinstance(box, Trace)]
+            if self.sequence and traces and (
+                    len(boxes) > 1 or other.dom != traces[0].dom):
+                raise NotImplementedError(
+                    f"{other} has a trace with a neighbour: a stream needs "
+                    "the trace to be the whole network.")
             return super().__call__(other)
-        mem, x, y, body = other.mem, other.dom, other.cod, self(other.arg)
-        if other.left:
-            body = Network.swap(x, mem) >> body >> Network.swap(mem, y)
-        start = Box('zeros', x, mem, module=Zeros(x, mem), vjp=Zeros(x, x))
+        if self.sequence:
+            return self.stream(other)
+        mem, x, y = other.mem, other.dom, other.cod
+        body, start = self.parts(other, self(other.arg))
         hidden = body >> Network.discard(y) @ mem
         network = Network.copy(x, self.rounds + 1) >> x ** self.rounds @ start
         for left in reversed(range(1, self.rounds)):
