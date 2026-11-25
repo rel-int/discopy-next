@@ -186,9 +186,12 @@ def closed(net: PeerNet | FactorNet) -> frobenius.CMap:
     """
     node = Signature((Orbit(MESSAGE, 1, Sym.PERM), Orbit(STATE, traced=True)))
     if isinstance(net, PeerNet):
-        return from_relation(net.peers.tolist(), node)
+        return from_relation(
+            net.peers.tolist(),  # ty: ignore[call-non-callable]
+            node)
     factor = Signature((Orbit(MESSAGE, 1, Sym.PERM), ))
-    table = net.to_units.view(net.n_units, net.arity).tolist()
+    table = net.to_units.view(  # ty: ignore[call-non-callable]
+        net.n_units, net.arity).tolist()
     return from_incidence(memberships(table, net.n_cells), node, factor,
                           factor_name=net.factor)
 
@@ -222,15 +225,16 @@ def legs(net: PeerNet | FactorNet, s) -> tuple[tuple, tuple]:
     given = tuple(leg for i in range(nodes)
                   for leg in (s.clue[:, i], s.answer[:, i]))
     if isinstance(net, PeerNet):
-        inputs = [[s.units[:, peer] for peer in row]
-                  for row in net.peers.tolist()]
+        rows = net.peers.tolist()  # ty: ignore[call-non-callable]
+        inputs = [[s.units[:, peer] for peer in row] for row in rows]
         members = ()
     else:
         units = s.units[:, net.to_units].view(
             len(s.units), net.n_units, net.arity, -1) \
             if s.units.dim() == 3 else s.units
         degrees = [net.degree] * nodes if net.real_degree is None \
-            else net.real_degree.long().tolist()
+            else net.real_degree.long(  # ty: ignore[call-non-callable]
+            ).tolist()
         inputs = [[s.cells[:, i, k] for k in range(degree)]
                   for i, degree in enumerate(degrees)]
         members = tuple(units[:, f, j] for f in range(net.n_units)
@@ -349,7 +353,7 @@ def boxes(cmap: frobenius.CMap, ar_map: dict, slots: list, dims: list,
 
 
 def interpret(cmap: frobenius.CMap, ob_map: dict, ar_map: dict,
-              inputs: dict | None = None) -> Trace:
+              inputs: dict | None = None) -> Network:
     """
     The network with a trace a closed map is sent to: one box per box of the
     map, with one leg in and one out per port wired to another box and per
@@ -395,7 +399,7 @@ from_incidence`.
     return Trace(body, mem=mem)
 
 
-def of(net: PeerNet | FactorNet) -> Trace:
+def of(net: PeerNet | FactorNet) -> Network:
     """
     The network with a trace of a recursive network: the closed map of its
     wiring, with the node module and the factor module of the network as the

@@ -74,7 +74,7 @@ message @ message @ message @ state @ state @ given @ given
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from numbers import Integral
@@ -458,7 +458,7 @@ def from_incidence(incidence: tuple, node: Signature,
     return frobenius.CMap.from_wiring(boxes, wires)
 
 
-def from_relation(relation: tuple, node: Signature, node_name: str = NODE
+def from_relation(relation: Sequence, node: Signature, node_name: str = NODE
                   ) -> frobenius.CMap:
     """
     The graph of a binary relation between nodes, as a closed map in
