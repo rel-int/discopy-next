@@ -22,7 +22,7 @@
 >
 > The issue still asks what a feedforward means in stream.Stream and whether rotate gets the same treatment. Those two questions are settled as above, so record that on the issue.
 
-- [ ] Feedforward in discopy.feedback: Feedback.dagger and Feedforward.dagger are each other's
+- [WIP] @T-51236a2e-2026-11-25 15:06 Feedforward in discopy.feedback: Feedback.dagger and Feedforward.dagger are each other's
 - [ ] Trace(Feedback, Feedforward), with Trace.rotate flipping the side of the loop
 - [ ] structural_boxes generates each level's Feedforward
 - [ ] drop the failing dagger declarations that now hold; keep pivotal's rotate ones
