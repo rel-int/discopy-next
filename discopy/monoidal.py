@@ -1428,6 +1428,12 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
 
+    Attributes:
+        draw_left_to_right : Whether the diagrams of the class are drawn left
+            to right rather than top to bottom, a property of the category
+            rather than of any diagram: see :class:`Bubble` for diagrams of
+            one direction drawn inside the boxes of another.
+
     .. admonition:: Summary
 
         .. autosummary::
@@ -1449,6 +1455,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     sum_factory: ClassVar[type[formal_sum.Sum]]
     bubble_factory: ClassVar[type["Bubble"]]
     functor_factory: ClassVar[type["Functor"]]
+    draw_left_to_right: ClassVar[bool] = False
     ob = Ty
     layer_factory = Layer
 
@@ -2535,10 +2542,6 @@ class Bubble(cat.Bubble, Box):
         draw_as_square (bool) : Whether to draw the bubble as a square.
         draw_as_frame (bool) : Whether to draw the bubble as a frame.
         draw_vertically (bool) : Whether to draw the frame slots vertically.
-        draw_left_to_right (bool) : Whether to draw the bubble as one box
-            with its args inside on a background of its ``frame_colour``,
-            flowing left to right across the drawing they are in, i.e.
-            top to bottom inside a bubble drawn left to right.
         kwargs : Passed to :class:`cat.Bubble`.
 
     Raises:
@@ -2581,14 +2584,22 @@ class Bubble(cat.Bubble, Box):
     .. image:: /_static/monoidal/coloured-frame.svg
         :align: center
 
-    A bubble drawn left to right is one box with its args flowing across it,
-    e.g. the meanings of "Very big car" in higher-order DisCoCat
-    :cite:p:`ToumiDeFelice25`, each word a lambda term whose body is a diagram:
+    The diagrams of a category with ``draw_left_to_right`` are drawn left to
+    right, and a bubble whose args are drawn in another direction than its
+    own category is drawn as one box with its args across it, on a
+    background of its ``frame_colour``. This is how to draw "Very big car" in
+    higher-order DisCoCat :cite:p:`ToumiDeFelice25`: each word is a lambda
+    term, drawn top to bottom, whose body is a diagram, drawn left to right:
 
+    >>> @factory
+    ... class Body(Diagram):
+    ...     draw_left_to_right = True
+    >>> class Primitive(Box, Body):
+    ...     pass
     >>> n, n_n = Ty('n'), Ty('n ← n')
-    >>> x, B, C = Box('x', Ty(), n), Box('B', n, n), Box('C', Ty(), n)
-    >>> style = dict(
-    ...     draw_left_to_right=True, color="green", frame_colour="red")
+    >>> x, B = Primitive('x', Ty(), n), Primitive('B', n, n)
+    >>> C = Primitive('C', Ty(), n)
+    >>> style = dict(color="green", frame_colour="red")
     >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
     ...            color="green", height=2)
     >>> big = Bubble(x >> B, dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
@@ -2605,15 +2616,14 @@ class Bubble(cat.Bubble, Box):
 
     """
     serialised_attrs = cat.Bubble.serialised_attrs + (
-        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically",
-        "draw_left_to_right")
+        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
 
     def __init__(
             self, *args: Diagram,
             drawing_name: str | None = None,
             draw_as_frame: bool | None = None,
             draw_as_square: bool | None = None,
-            draw_vertically=False, draw_left_to_right=False, **kwargs):
+            draw_vertically=False, **kwargs):
         params = {attr: kwargs.pop(attr)
                   for attr in BOX_DRAWING_ATTRIBUTES if attr in kwargs}
         cat.Bubble.__init__(self, *args, **kwargs)
@@ -2621,7 +2631,6 @@ class Bubble(cat.Bubble, Box):
                      data=self.data, is_dagger=self.is_dagger, **params)
         self.drawing_name = "" if drawing_name is None else drawing_name
         self.draw_vertically = draw_vertically
-        self.draw_left_to_right = draw_left_to_right
         self.frame_colour = params.get(
             'frame_colour', BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
         can_draw_as_square = len(args) == 1
@@ -2645,7 +2654,7 @@ class Bubble(cat.Bubble, Box):
 
     def to_drawing(self):
         args = [arg.to_drawing() for arg in self.args]
-        if self.draw_left_to_right:
+        if type(self.args[0]).draw_left_to_right != self.draw_left_to_right:
             nested = args[0].tensor(*args[1:])
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0

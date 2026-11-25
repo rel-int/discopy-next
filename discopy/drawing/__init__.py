@@ -88,7 +88,12 @@ def draw(diagram, **params):
         transpose and its conjugate are told apart, default is :code:`0.125`
         when some box is a conjugate, a transpose or a dagger not drawn as a
         braid, :code:`0` otherwise.
+    left_to_right : bool, optional
+        Whether to draw left to right, by default the
+        ``draw_left_to_right`` of the class of the diagram.
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().draw(**params)
 
 
