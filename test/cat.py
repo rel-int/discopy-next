@@ -760,8 +760,8 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "quantum.zx.Scalar": "c(v)",
     "rewrite.Layer": 'c(M.Box("f", x, y))',
     "rewrite.Step": 'c("s", M.Box("f", x, y), M.Box("g", x, y), data=v)',
-    "rewrite.Interchange": 'c(M.Box("f", x, y), M.Box("g", y, x), True)',
-    "rewrite.Slide": 'c(B.Box("f", B.Ty("x"), B.Ty("y")), B.Ty("z"))',
+    "monoidal.Interchange": 'c(M.Box("f", x, y), M.Box("g", y, x), True)',
+    "braided.Slide": 'c(B.Box("f", B.Ty("x"), B.Ty("y")), B.Ty("z"))',
 }
 
 
@@ -873,7 +873,7 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
-        "rewrite.{Layer,Interchange,Slide}":
+        "rewrite.Layer monoidal.Interchange braided.Slide":
         "a rewrite has no tree of its own yet, only that of a box",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",

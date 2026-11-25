@@ -15,6 +15,7 @@ Summary
     Diagram
     Box
     Braid
+    Slide
     Sum
     Bubble
     Functor
@@ -68,14 +69,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import ClassVar
 
-from discopy import monoidal, messages
+from discopy import monoidal, messages, rewrite
 from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
+from discopy.drawing import Drawing
 from discopy.monoidal import Ty
-from discopy.rewrite import Slide
 from discopy.utils import (
-    assert_isatomic, BinaryBoxConstructor, deprecated_alias,
+    assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
     factory_name, from_tree)
 
 
@@ -178,10 +179,9 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         >>> assert bot_left.naturality(1, left=False, down=False) == top_right
 
         This is the codomain of the rewrite
-        :meth:`discopy.rewrite.Slide.at`, which a gif draws as the box
+        :meth:`Slide.at`, which a gif draws as the box
         sliding through the braids:
 
-        >>> from discopy.rewrite import Slide
         >>> g, w = Box('g', x, y @ z, draw_as_spider=True), Ty('w')
         >>> slide = Slide.at(w @ g >> Diagram.braid(w, y @ z), 0)
         >>> _ = slide.to_gif(tween=12, timestep=80, loop=True,
@@ -344,6 +344,124 @@ Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
+Rewrite = rewrite.Rewrite[Diagram]
+
+
+class Slide[category](rewrite.Step):
+    """
+    A box slides through the braid with a wire next to it: the instance of
+    ``braid_naturality`` with an identity, see
+    :meth:`Diagram.naturality`, a step of the rewrites of the ``category``,
+    that of ``box`` when not given.
+
+    Parameters:
+        box : The box that slides.
+        wire : The type of one wire it slides through.
+        left : Whether the wire is on the left of the box, else right.
+        down : Whether the box slides down, else up.
+        braid : The braid, the :meth:`Diagram.braid` of the
+            box's diagram by default.
+
+    Example
+    -------
+    >>> x, y, z = map(Ty, "xyz")
+    >>> f = Box('f', x, y)
+    >>> step = Slide(f, z)
+    >>> assert type(step).ar is Rewrite
+    >>> print(step.dom, "|", step.cod)
+    z @ f >> Braid(z, y) | Braid(z, x) >> f @ z
+    >>> assert step.dagger() == Slide(f, z, left=False, down=False)
+    """
+    serialised_attrs = ("box", "wire", "*", "left", "down", "braid")
+
+    @classmethod
+    def subscript_bases(cls, category) -> tuple[type, ...]:
+        """ The steps of the category, of which a slide is one. """
+        return (rewrite.Step[category], )
+
+    @staticmethod
+    def category_of(*args, **kwargs) -> type:
+        """ The category of the box that slides, the first argument. """
+        return (args[0] if args else kwargs["box"]).factory
+
+    # pylint: disable-next=too-many-arguments  # naturality's arguments
+    def __init__(self, box: Box, wire: Ty, *, left=True,
+                 down=True, braid=None):
+        self.box, self.wire, self.left, self.down = box, wire, left, down
+        self.braid = braid
+        braid = braid or box.braid
+        if left and down:
+            dom = wire @ box >> braid(wire, box.cod)
+            cod = braid(wire, box.dom) >> box @ wire
+        elif left:
+            dom = braid(box.dom, wire) >> wire @ box
+            cod = box @ wire >> braid(box.cod, wire)
+        elif down:
+            dom = box @ wire >> braid(box.cod, wire)
+            cod = braid(box.dom, wire) >> wire @ box
+        else:
+            dom = braid(wire, box.dom) >> box @ wire
+            cod = wire @ box >> braid(wire, box.cod)
+        rewrite.Step.__init__(
+            self, f"Slide({box}, {wire}{self.flags})", dom, cod)
+
+    @property
+    def flags(self) -> str:
+        """ The arguments ``left`` and ``down`` that are not the default. """
+        return (", left=False" if not self.left else "")\
+            + (", down=False" if not self.down else "")
+
+    def __repr__(self):
+        return f"braided.Slide({self.box!r}, {self.wire!r}{self.flags})"
+
+    def dagger(self) -> Slide:
+        return type(self)(self.box, self.wire, left=not self.left,
+                          down=not self.down, braid=self.braid)
+
+    def frame(self, t: float) -> Drawing:
+        """
+        The crossings shrink into the box and grow out of its other side,
+        see :meth:`discopy.drawing.Drawing.slide`.
+
+        Parameters:
+            t : The fraction of the way, from ``0`` to ``1``.
+        """
+        return self.dom.to_drawing().slide(self.cod.to_drawing(), t)
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments  # naturality's arguments
+    def at(cls, diagram: Diagram, i: int, *, left=True, down=True,
+           braid=None) -> rewrite.Rewrite:
+        """
+        The slide of box ``i`` of a diagram with one box in each layer,
+        whiskered by the rest, see
+        :meth:`Diagram.naturality`, which is its codomain.
+
+        Parameters:
+            diagram : The diagram to rewrite.
+            i : The index of the box to slide.
+            left : Whether to slide left or right.
+            down : Whether to slide down or up.
+            braid : The braiding method to be used.
+
+        Raises:
+            AxiomError : When there is no braid to slide through.
+        """
+        box, offset = diagram.boxes[i], diagram.offsets[i]
+        dom = diagram.inside[i].dom
+        left_wires, right_wires = dom[:offset], dom[offset + len(box.dom):]
+        wire = left_wires[-1] if left else right_wires[0]
+        step = cls(box, wire, left=left, down=down, braid=braid)
+        start = i if down else i - len(step.dom) + 1
+        outside = (left_wires[:-1], right_wires) if left\
+            else (left_wires, right_wires[1:])
+        if start < 0 or diagram[start:start + len(step.dom)]\
+                != outside[0] @ step.dom @ outside[1]:
+            raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
+        return step.whisker(
+            diagram[:start], diagram[start + len(step.dom):], *outside)
+
+
 Id = Diagram.id
 
 

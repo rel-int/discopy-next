@@ -3,10 +3,16 @@
 """
 Rewrites, i.e. the 2-cells between diagrams, composed from steps.
 
+A :class:`Rewrite` is parametrised by the class of its diagrams, as
+:class:`discopy.cmap.CMap` is, and each level of the hierarchy has its own,
+e.g. ``monoidal.Rewrite = Rewrite[monoidal.Diagram]``, with the steps of its
+axioms defined in its module.
+
 The objects of the category :class:`Rewrite` are diagrams and its arrows are
 sequences of :class:`Layer`, each a diagram with holes, its ``context``,
 where every hole is filled by a :class:`Step`, a generating 2-cell, e.g. an
-:class:`Interchange` or a :class:`Slide` of a box through a braid. Each step
+:class:`discopy.monoidal.Interchange` or a :class:`discopy.braided.Slide` of
+a box through a braid. Each step
 of a layer happens at once, so that a rewrite can rewrite in parallel.
 
 Rewrites form a sesquicategory :cite:p:`Street96`: they compose vertically
@@ -37,8 +43,6 @@ Summary
     Rewrite
     Layer
     Step
-    Interchange
-    Slide
 
 Example
 -------
@@ -46,7 +50,7 @@ Two interchangers take one scalar round the other: the side each one goes
 is an argument of the step, since both interchangers of two scalars have the
 same domain and codomain.
 
->>> from discopy.monoidal import Box, Ty
+>>> from discopy.monoidal import Box, Interchange, Ty
 >>> s0, s1 = Box('s0', Ty(), Ty()), Box('s1', Ty(), Ty())
 >>> loop = Interchange(s0, s1, left=True) >> Interchange(s1, s0, left=True)
 >>> print(loop)
@@ -79,15 +83,22 @@ x @ g >> Interchange(f, h, left=True)
 
 from __future__ import annotations
 
-from discopy import cat, messages, monoidal
-from discopy.testable import Testable
+from typing import TYPE_CHECKING
+
+from discopy import cat, messages
 from discopy.drawing import Drawing, tweened, to_gif
-from discopy.utils import AxiomError, factory
+from discopy.testable import TestableGeneric
+from discopy.utils import (
+    AxiomError, assert_isinstance, classproperty, factory)
+
+if TYPE_CHECKING:
+    from discopy import monoidal
 
 
-class Layer(cat.Box):
+class Layer[category](cat.Box, TestableGeneric):
     """
-    A layer of a rewrite: a diagram, its ``context``, in which each box with
+    A layer of a rewrite of diagrams of the ``category``, taken from the
+    ``context`` when not given: a diagram in which each box with
     a :class:`Step` as ``data`` is a hole, the :attr:`Step.hole` of that
     step. Its domain is the context with each hole replaced by the domain of
     its step and its codomain the same with their codomains.
@@ -97,18 +108,29 @@ class Layer(cat.Box):
 
     Example
     -------
-    >>> from discopy.monoidal import Box, Ty
+    >>> from discopy.monoidal import Box, Diagram, Interchange, Ty
     >>> x = Ty('x')
     >>> f, g = Box('f', x, x), Box('g', x, x)
     >>> step = Interchange(f, g)
     >>> layer = Layer(f @ x >> step.hole)
+    >>> assert type(layer) is Layer[Diagram]
     >>> print(layer, "|", layer.dom, "|", layer.cod)
     f @ x >> Interchange(f, g) | f @ x >> x @ f >> g @ x \
 | f @ x >> g @ x >> x @ f
     >>> assert layer.steps == (step, )
     """
-    ob = monoidal.Diagram
+    ob = classproperty(lambda cls: cls.category)
     serialised_attrs = ("context", )
+
+    def __new__(cls, context: monoidal.Diagram):
+        return object.__new__(
+            cls if cls.category is not None else cls[context.factory])
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a layer is checked with its rewrites, see
+        :meth:`Rewrite.checked_params`. """
+        return ()
 
     def __init__(self, context: monoidal.Diagram):
         self.context = context
@@ -151,7 +173,7 @@ class Layer(cat.Box):
 
     def dagger(self) -> Layer:
         """ The layer in the same context, with each step reversed. """
-        return Layer(self.fill(lambda step: step.dagger().hole))
+        return type(self)(self.fill(lambda step: step.dagger().hole))
 
     def __eq__(self, other):
         return isinstance(other, Layer) and self.context == other.context
@@ -164,30 +186,55 @@ class Layer(cat.Box):
 
 
 @factory
-class Rewrite(cat.Arrow):
+class Rewrite[category](cat.Arrow, TestableGeneric):
     """
-    A rewrite is a sequence of composable :class:`Layer` from a diagram
-    ``dom`` to a diagram ``cod``.
+    A rewrite of diagrams of the ``category`` is a sequence of composable
+    :class:`Layer` from a diagram ``dom`` to a diagram ``cod``. Each level
+    of the hierarchy has its own, its :attr:`Diagram.rewrite_factory
+    <discopy.monoidal.Diagram.rewrite_factory>`, with the steps of its
+    axioms, e.g. :class:`discopy.monoidal.Interchange` from
+    :mod:`discopy.monoidal` up and :class:`discopy.braided.Slide` from
+    :mod:`discopy.braided` up.
 
     Parameters:
         inside : The layers of the rewrite.
         dom : The diagram it rewrites.
         cod : The diagram it rewrites into.
+
+    Example
+    -------
+    >>> from discopy import braided, monoidal
+    >>> x = monoidal.Ty('x')
+    >>> f = monoidal.Box('f', x, x)
+    >>> assert monoidal.Rewrite is Rewrite[monoidal.Diagram]
+    >>> assert type(monoidal.Interchange(f, f)).ar is monoidal.Rewrite
+    >>> braided.Rewrite.id(f)
+    Traceback (most recent call last):
+    ...
+    TypeError: Expected braided.Diagram, got monoidal.Box instead.
     """
-    ob = monoidal.Diagram
-    generator_factory = Layer
+    ob = classproperty(lambda cls: cls.category)
+    generator_factory = classproperty(lambda cls: Layer[cls.category])
+    box_factory = classproperty(lambda cls: Step[cls.category])
 
     @classmethod
-    def strategy(cls, **params):
-        """
-        Rewrites generate no terms yet, so the property matrix does not
-        check them: a step only goes between parallel diagrams, and the
-        matrix draws the objects of a law independently, each with its own
-        boundary, rather than from one hom.
+    def cast_ob(cls, x):
+        """ A diagram of the category, which is not cast but checked. """
+        assert_isinstance(x, cls.ob)
+        return x
 
-        >>> assert Rewrite not in Testable.enrolled()
+    @classmethod
+    def checked_params(cls) -> tuple:
         """
-        return Testable.strategy.__func__(cls, **params)
+        None: the property matrix does not check rewrites yet, since a step
+        goes between parallel diagrams only and the matrix draws each object
+        of a law with its own boundary, not from one hom.
+
+        >>> from discopy.testable import Testable
+        >>> from discopy.monoidal import Diagram
+        >>> assert Rewrite[Diagram] not in Testable.enrolled()
+        """
+        return ()
 
     def whisker(self, above=None, below=None, left=None, right=None
                 ) -> Rewrite:
@@ -202,7 +249,7 @@ class Rewrite(cat.Arrow):
 
         Example
         -------
-        >>> from discopy.monoidal import Box, Ty
+        >>> from discopy.monoidal import Box, Interchange, Ty
         >>> x = Ty('x')
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> step = Interchange(f, g).whisker(above=f @ x @ x, right=x)
@@ -217,7 +264,8 @@ class Rewrite(cat.Arrow):
             diagram = diagram if above is None else above >> diagram
             return diagram if below is None else diagram >> below
         return self.ar(
-            tuple(Layer(around(layer.context)) for layer in self.inside),
+            tuple(self.generator_factory(around(layer.context))
+                  for layer in self.inside),
             around(self.dom), around(self.cod))
 
     def tensor(self, other: Rewrite | monoidal.Diagram) -> Rewrite:
@@ -232,7 +280,7 @@ class Rewrite(cat.Arrow):
 
         Example
         -------
-        >>> from discopy.monoidal import Box, Ty
+        >>> from discopy.monoidal import Box, Interchange, Ty
         >>> x = Ty('x')
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> both = Interchange(f, g, left=True) @ Interchange(g, f, left=True)
@@ -246,10 +294,10 @@ class Rewrite(cat.Arrow):
         length = max(len(self.inside), len(other.inside))
 
         def padded(rewrite):
-            return rewrite.inside\
-                + (Layer(rewrite.cod), ) * (length - len(rewrite.inside))
+            return rewrite.inside + (self.generator_factory(rewrite.cod), )\
+                * (length - len(rewrite.inside))
         return self.ar(tuple(
-            Layer(this.context @ that.context)
+            self.generator_factory(this.context @ that.context)
             for this, that in zip(padded(self), padded(other))),
             self.dom @ other.dom, self.cod @ other.cod)
 
@@ -269,7 +317,7 @@ class Rewrite(cat.Arrow):
 
         Example
         -------
-        >>> from discopy.monoidal import Box, Ty
+        >>> from discopy.monoidal import Box, Interchange, Rewrite, Ty
         >>> x = Ty('x')
         >>> e, s = Box('e', x, Ty()), Box('s', Ty(), x @ x @ x)
         >>> m = Box('m', x @ x, x)
@@ -307,15 +355,18 @@ class Rewrite(cat.Arrow):
         return to_gif(*frames, **params)
 
 
-class Step(cat.Box, Rewrite):
+class Step[category](cat.Box, Rewrite):
     """
     A step is a generating rewrite from a diagram ``dom`` to a diagram
-    ``cod`` with the same domain and codomain. It is the rewrite of one layer
-    with one hole, its :attr:`hole`, a box named after the step with the step
-    as ``data``.
+    ``cod`` with the same domain and codomain, of the ``category`` of
+    ``dom`` when not given. It is the rewrite of one layer with one hole,
+    its :attr:`hole`, a box named after the step with the step as ``data``.
 
     A step is drawn by :meth:`frame`. Its subclasses are the steps the axioms
-    give, :class:`Interchange` and :class:`Slide`, each with its own frames.
+    give, each in the module of its axiom with its own frames, e.g.
+    :class:`discopy.monoidal.Interchange` and
+    :class:`discopy.braided.Slide`, and a user's own 2-cells. Such a subclass
+    takes the category from its arguments, see :meth:`category_of`.
 
     Parameters:
         name : The name of the step.
@@ -326,10 +377,11 @@ class Step(cat.Box, Rewrite):
 
     Example
     -------
-    >>> from discopy.monoidal import Box, Ty
+    >>> from discopy.monoidal import Box, Diagram, Rewrite, Ty
     >>> x = Ty('x')
     >>> f, g = Box('f', x, x), Box('g', x, x)
     >>> step = Step('commute', f >> g, g >> f)
+    >>> assert isinstance(step, Rewrite) and type(step) is Step[Diagram]
     >>> print(step.dagger(), "|", step.dagger().dom)
     commute[::-1] | g >> f
     >>> Step('wrong', f, Box('h', x, x @ x))
@@ -338,6 +390,20 @@ class Step(cat.Box, Rewrite):
     discopy.utils.AxiomError: Expected parallel arrows, got f: x -> x and \
 h: x -> x @ x instead.
     """
+    @classmethod
+    def subscript_bases(cls, category) -> tuple[type, ...]:
+        """ The rewrites of the category, of which a step is one. """
+        return (Rewrite[category], )
+
+    @staticmethod
+    def category_of(*args, **kwargs) -> type:
+        """ The category of the diagram ``dom``, the second argument. """
+        return (args[1] if len(args) > 1 else kwargs["dom"]).factory
+
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls if cls.category is not None
+                              else cls[cls.category_of(*args, **kwargs)])
+
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def __init__(self, name: str, dom: monoidal.Diagram,  # cat.Box's
                  cod: monoidal.Diagram, data=None, is_dagger=False):
@@ -347,8 +413,8 @@ h: x -> x @ x instead.
                 f"{d}: {d.dom} -> {d.cod}" for d in (self.dom, self.cod))))
         self.hole = self.dom.factory.box_factory(
             str(self), self.dom.dom, self.dom.cod, data=self)
-        Rewrite.__init__(
-            self, (Layer(self.hole), ), self.dom, self.cod, _scan=False)
+        Rewrite.__init__(self, (Layer[self.category](self.hole), ),
+                         self.dom, self.cod, _scan=False)
 
     def frame(self, t: float) -> Drawing:
         """
@@ -360,215 +426,3 @@ h: x -> x @ x instead.
             t : The fraction of the way, from ``0`` to ``1``.
         """
         return self.dom.to_drawing().interpolate(self.cod.to_drawing(), t)
-
-
-class Interchange(Step):
-    """
-    The interchanger of a box ``top`` with a box ``bottom`` under it, which
-    moves ``bottom`` above ``top``: the instance of ``bifunctoriality`` with
-    identities that :class:`discopy.monoidal.Diagram` breaks.
-
-    Parameters:
-        top : The box above, i.e. before.
-        bottom : The box below, i.e. after, with the wires between them.
-        left : Whether ``top`` is on the left of ``bottom``, else right.
-
-    When ``top`` has no output and ``bottom`` no input, e.g. two scalars,
-    both sides give the same domain and codomain and ``left`` is the side
-    ``top`` passes on: the two wind in opposite directions.
-
-    Example
-    -------
-    >>> from discopy.monoidal import Box, Ty
-    >>> x = Ty('x')
-    >>> f, g = Box('f', x, x), Box('g', x, x)
-    >>> step = Interchange(f, g, left=True)
-    >>> print(step.dom, "|", step.cod)
-    f @ x >> x @ g | x @ g >> f @ x
-    >>> assert step.dagger() == Interchange(g, f)
-    """
-    serialised_attrs = ("top", "bottom", "left")
-
-    def __init__(self, top: monoidal.Diagram, bottom: monoidal.Diagram,
-                 left=False):
-        self.top, self.bottom, self.left = top, bottom, left
-        if left:
-            dom = top @ bottom.dom >> top.cod @ bottom
-            cod = top.dom @ bottom >> top @ bottom.cod
-        else:
-            dom = bottom.dom @ top >> bottom @ top.cod
-            cod = bottom @ top.dom >> bottom.cod @ top
-        Step.__init__(self, f"Interchange({top}, {bottom}"
-                      + (", left=True)" if left else ")"), dom, cod)
-
-    def __repr__(self):
-        return f"rewrite.Interchange({self.top!r}, {self.bottom!r}"\
-            + (", left=True)" if self.left else ")")
-
-    def dagger(self) -> Interchange:
-        return Interchange(self.bottom, self.top, not self.left)
-
-    def frame(self, t: float) -> Drawing:
-        """
-        The two boxes move apart, swap their rows and move back, ``top`` on
-        its side, see :meth:`discopy.drawing.Drawing.interpolate`.
-
-        Parameters:
-            t : The fraction of the way, from ``0`` to ``1``.
-        """
-        return self.dom.to_drawing().interpolate(
-            self.cod.to_drawing(), t, left=self.left)
-
-    @classmethod
-    def at(cls, diagram: monoidal.Diagram, i: int, left=False) -> Rewrite:
-        """
-        The interchanger of layers ``i`` and ``i + 1`` of a diagram with one
-        box in each layer, whiskered by the rest: its codomain is
-        ``diagram.interchange(i, i + 1, left)``, see
-        :meth:`discopy.monoidal.Diagram.interchange`.
-
-        Parameters:
-            diagram : The diagram to rewrite.
-            i : The layer of the box above.
-            left : Whether the box above is on the left when it can be
-                either, as for two scalars.
-
-        Raises:
-            AxiomError : When the two boxes are connected.
-
-        Example
-        -------
-        >>> from discopy.monoidal import Box, Ty
-        >>> x = Ty('x')
-        >>> f, g = Box('f', x, x), Box('g', x, x)
-        >>> diagram = f @ x @ x >> x @ x @ g >> f @ x @ x
-        >>> step = Interchange.at(diagram, 0)
-        >>> print(step)
-        Interchange(f, x @ g, left=True) >> f @ x @ x
-        >>> assert step.cod == diagram.interchange(0, 1)
-        >>> Interchange.at(f >> g, 0)
-        Traceback (most recent call last):
-        ...
-        discopy.utils.AxiomError: Boxes f and g do not commute.
-        """
-        top, bottom = diagram.boxes[i], diagram.boxes[i + 1]
-        off0, off1 = diagram.offsets[i], diagram.offsets[i + 1]
-        wires = diagram.inside[i + 1].dom
-        is_left = off1 >= off0 + len(top.cod)
-        is_right = off0 >= off1 + len(bottom.dom)
-        if is_left and (left or not is_right):
-            start, end = off0, off1 + len(bottom.dom)
-            step = cls(top, wires[off0 + len(top.cod):off1] @ bottom, True)
-        elif is_right:
-            start, end = off1, off0 + len(top.cod)
-            step = cls(top, bottom @ wires[off1 + len(bottom.dom):off0])
-        else:
-            raise AxiomError(messages.INTERCHANGER_ERROR.format(top, bottom))
-        return step.whisker(
-            diagram[:i], diagram[i + 2:], wires[:start], wires[end:])
-
-
-class Slide(Step):
-    """
-    A box slides through the braid with a wire next to it: the instance of
-    ``braid_naturality`` with an identity, see
-    :meth:`discopy.braided.Diagram.naturality`.
-
-    Parameters:
-        box : The box that slides.
-        wire : The type of one wire it slides through.
-        left : Whether the wire is on the left of the box, else right.
-        down : Whether the box slides down, else up.
-        braid : The braid, the :meth:`discopy.braided.Diagram.braid` of the
-            box's diagram by default.
-
-    Example
-    -------
-    >>> from discopy.braided import Box, Ty
-    >>> x, y, z = map(Ty, "xyz")
-    >>> f = Box('f', x, y)
-    >>> step = Slide(f, z)
-    >>> print(step.dom, "|", step.cod)
-    z @ f >> Braid(z, y) | Braid(z, x) >> f @ z
-    >>> assert step.dagger() == Slide(f, z, left=False, down=False)
-    """
-    serialised_attrs = ("box", "wire", "*", "left", "down", "braid")
-
-    # pylint: disable-next=too-many-arguments  # naturality's arguments
-    def __init__(self, box: monoidal.Box, wire: monoidal.Ty, *, left=True,
-                 down=True, braid=None):
-        self.box, self.wire, self.left, self.down = box, wire, left, down
-        self.braid = braid
-        braid = braid or box.braid
-        if left and down:
-            dom = wire @ box >> braid(wire, box.cod)
-            cod = braid(wire, box.dom) >> box @ wire
-        elif left:
-            dom = braid(box.dom, wire) >> wire @ box
-            cod = box @ wire >> braid(box.cod, wire)
-        elif down:
-            dom = box @ wire >> braid(box.cod, wire)
-            cod = braid(box.dom, wire) >> wire @ box
-        else:
-            dom = braid(wire, box.dom) >> box @ wire
-            cod = wire @ box >> braid(wire, box.cod)
-        Step.__init__(self, f"Slide({box}, {wire}{self.flags})", dom, cod)
-
-    @property
-    def flags(self) -> str:
-        """ The arguments ``left`` and ``down`` that are not the default. """
-        return (", left=False" if not self.left else "")\
-            + (", down=False" if not self.down else "")
-
-    def __repr__(self):
-        return f"rewrite.Slide({self.box!r}, {self.wire!r}{self.flags})"
-
-    def dagger(self) -> Slide:
-        return Slide(self.box, self.wire, left=not self.left,
-                     down=not self.down, braid=self.braid)
-
-    def frame(self, t: float) -> Drawing:
-        """
-        The crossings shrink into the box and grow out of its other side,
-        see :meth:`discopy.drawing.Drawing.slide`.
-
-        Parameters:
-            t : The fraction of the way, from ``0`` to ``1``.
-        """
-        return self.dom.to_drawing().slide(self.cod.to_drawing(), t)
-
-    @classmethod
-    # pylint: disable-next=too-many-arguments  # naturality's arguments
-    def at(cls, diagram: monoidal.Diagram, i: int, *, left=True, down=True,
-           braid=None) -> Rewrite:
-        """
-        The slide of box ``i`` of a diagram with one box in each layer,
-        whiskered by the rest, see
-        :meth:`discopy.braided.Diagram.naturality`, which is its codomain.
-
-        Parameters:
-            diagram : The diagram to rewrite.
-            i : The index of the box to slide.
-            left : Whether to slide left or right.
-            down : Whether to slide down or up.
-            braid : The braiding method to be used.
-
-        Raises:
-            AxiomError : When there is no braid to slide through.
-        """
-        box, offset = diagram.boxes[i], diagram.offsets[i]
-        dom = diagram.inside[i].dom
-        left_wires, right_wires = dom[:offset], dom[offset + len(box.dom):]
-        wire = left_wires[-1] if left else right_wires[0]
-        step = cls(box, wire, left=left, down=down, braid=braid)
-        start = i if down else i - len(step.dom) + 1
-        outside = (left_wires[:-1], right_wires) if left\
-            else (left_wires, right_wires[1:])
-        if start < 0 or diagram[start:start + len(step.dom)]\
-                != outside[0] @ step.dom @ outside[1]:
-            raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
-        return step.whisker(
-            diagram[:start], diagram[start + len(step.dom):], *outside)
-
-
-Rewrite.box_factory = Step

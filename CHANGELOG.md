@@ -10,10 +10,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Added
 
 - `discopy.rewrite`, rewrites as explicit 2-cells between diagrams, a
-  sesquicategory (ADR 12): a `Rewrite` is a sequence of `Layer`s, each a
-  diagram with a hole for each `Step` that happens at once, with `Interchange`
-  (`bifunctoriality` with identities, the side it winds an argument) and
-  `Slide` (`braid_naturality`, a box through a braid) as steps, whiskering and
+  sesquicategory (ADR 12): a `Rewrite[category]` is a sequence of `Layer`s,
+  each a diagram of the `category` with a hole for each `Step` that happens at
+  once, each level having its own, e.g. `monoidal.Rewrite`, with
+  `monoidal.Interchange` (`bifunctoriality` with identities, the side it winds
+  an argument) and `braided.Slide` (`braid_naturality`, a box through a braid)
+  as steps, whiskering and
   tensor. `Diagram.normalization` is the rewrite to the normal form, and
   `braided.Diagram.naturality` is the codomain of `Slide.at`.
   `Rewrite.to_gif(tween=n)` animates a rewrite as an isotopy: an interchanger

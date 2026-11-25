@@ -15,11 +15,15 @@ design in thread
 
 ## Decision
 
-`discopy.rewrite` holds the 2-cells between diagrams. A `Rewrite` is a `cat.Arrow` whose objects
-are diagrams and whose generators are `Layer`s: a diagram, its context, with a hole for each
+`discopy.rewrite` holds the 2-cells between diagrams. A `Rewrite[category]` is a `cat.Arrow`
+whose objects are the diagrams of the `category`, a class of diagrams as for `CMap`, and whose
+generators are `Layer`s: a diagram, its context, with a hole for each
 `Step` that happens at once. A `Step` is a generating 2-cell; its subclasses are the instances of
 the axioms of `discopy.abc` that `monoidal.Diagram` breaks strictly: `Interchange` for
-`bifunctoriality` with identities, `Slide` for `braid_naturality` with an identity. What tells two
+`bifunctoriality` with identities, `Slide` for `braid_naturality` with an identity. Each level
+has its own rewrites, e.g. `monoidal.Rewrite = Rewrite[monoidal.Diagram]`, its
+`Diagram.rewrite_factory`, and the steps of its axioms live in its module: `monoidal.Interchange`,
+`braided.Slide`. What tells two
 steps with the same boundary apart, e.g. the side an interchanger winds, is an argument of the
 step. A user's own 2-cells are subclasses of `Step`.
 
