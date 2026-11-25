@@ -579,7 +579,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   traced bang and a reflexive object, with no free one. Feedback and linear
   do not import each other. `Hypergraph.glue` is the trace of a symmetric
   hypergraph with no condition on its category, which `plug` uses to rewrite
-  ([next#735]).
+  ([next#737]).
 
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
@@ -2738,7 +2738,7 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
-[next#735]: https://github.com/rel-int/discopy-next/pull/735
+[next#737]: https://github.com/rel-int/discopy-next/pull/737
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
