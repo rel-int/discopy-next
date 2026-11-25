@@ -3,9 +3,20 @@
 """
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
-:class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure,
-so it sits right above :mod:`discopy.monoidal`, the way :mod:`discopy.para`
-and :mod:`discopy.monad` sit beside the hierarchy.
+:class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure, so
+this package is the monoidal level, the exchange a box of its own, and its
+submodules the levels it makes sense to bang:
+
+.. autosummary::
+    :template: module.rst
+    :toctree: ../_api
+
+    symmetric
+
+The levels with copies, e.g. :mod:`discopy.markov` and :mod:`discopy.closed`,
+copy every wire already, and those with cups and caps make a bang trivial.
+Bang and :mod:`discopy.feedback` do not interact: no banged wire has a time
+step.
 
 Summary
 -------
@@ -963,3 +974,7 @@ TermBase.functor = Functor.id(Diagram)
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory = Ty.term_factory = TermBase
+
+# The levels with a bang subclass this one, so they are imported last.
+# pylint: disable-next=wrong-import-position
+from discopy.bang import symmetric  # noqa: E402,F401

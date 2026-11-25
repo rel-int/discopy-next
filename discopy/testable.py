@@ -927,8 +927,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``Diagram.yanking = BalancedCategory.yanking.modulo(
-        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
+        ``Diagram.yanking = BalancedTracedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`discopy.feedback.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):

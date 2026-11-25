@@ -72,7 +72,8 @@ from typing import ClassVar
 from discopy import (
     symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction)
 from discopy.abc import (
-    CompactCategory, DaggerMonoidalCategory, RigidCategory, SymmetricCategory)
+    BalancedTracedCategory, CompactCategory, DaggerMonoidalCategory,
+    RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -103,6 +104,12 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     currying_eta_right = CompactCategory.currying_eta_right
     currying_naturality_left = CompactCategory.currying_naturality_left
     currying_naturality_right = CompactCategory.currying_naturality_right
+    trace_naturality_left = TracedCategory.trace_naturality_left
+    trace_naturality_right = TracedCategory.trace_naturality_right
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right
+    trace_superposing_left = TracedCategory.trace_superposing_left
+    trace_superposing_right = TracedCategory.trace_superposing_right
 
     sum_factory: ClassVar[type["Sum"]]
     cup_factory: ClassVar[type["Cup"]]
@@ -237,6 +244,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
+Diagram.yanking = BalancedTracedCategory.yanking.modulo(Diagram.to_hypergraph)
 interaction.Diagram[Diagram].dagger_involution_rigid\
     = DaggerMonoidalCategory.dagger_involution.weaken(within=RigidCategory)
 interaction.Diagram[Diagram].dagger_contravariance_rigid\

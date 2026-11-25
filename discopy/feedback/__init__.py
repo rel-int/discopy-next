@@ -6,17 +6,30 @@ the free traced category as the case where the loop is not delayed.
 
 We follow the definition of :cite:t:`DiLavoreEtAl22` with some extra structure
 for the head and tail of streams with the :class:`FollowedBy` generator.
-A traced category is a feedback category whose delay is the identity, so
-every level of the hierarchy below this one, from :mod:`~discopy.balanced`
-and :mod:`~discopy.pivotal` down, is a feedback category: its wires carry a
-time step, a :class:`Trace` is a :class:`Feedback` whose memory is not
-delayed.
+A traced category is a feedback category whose delay is the identity: the
+wires of a feedback diagram carry a time step, and a :class:`Trace` is a
+:class:`Feedback` whose memory is not delayed.
 
-Note that these diagrams are planar, so that e.g. :mod:`~discopy.pivotal`
-diagrams are traced in this sense. See :mod:`~discopy.symmetric` for the usual
-notion of trace, :mod:`~discopy.markov` for the syntax of streams and
-:mod:`discopy.stream` for its interpretation, the main example of a feedback
-category.
+This package is the monoidal level, its submodules the levels of the
+hierarchy with feedback, each subclassing the ordinary module of the same
+name: :mod:`~discopy.feedback.balanced`, :mod:`~discopy.feedback.symmetric`
+for the usual notion of trace, :mod:`~discopy.feedback.markov` for the syntax
+of streams, :mod:`~discopy.feedback.comarkov` and
+:mod:`~discopy.feedback.closed`. The ordinary modules are not feedback
+categories, except :mod:`~discopy.pivotal` and the levels below it, whose
+wires still carry a time step. Note that these diagrams are planar, so that
+e.g. pivotal diagrams are traced in this sense. See :mod:`discopy.stream` for
+the interpretation of streams, the main example of a feedback category.
+
+.. autosummary::
+    :template: module.rst
+    :toctree: ../_api
+
+    balanced
+    symmetric
+    markov
+    comarkov
+    closed
 
 Summary
 -------
@@ -100,10 +113,11 @@ yanking from :class:`discopy.abc.TracedCategory`. Under each law, feedback
 comes first, checked on the nose where it can be and otherwise drawn and
 checked up to a functor into streams, then the trace on symmetric diagrams,
 checked on the nose for vanishing and joining and otherwise with
-:class:`discopy.symmetric.Equation`, i.e. up to hypergraph isomorphism:
-equality of planar traced diagrams is not implemented.
+:class:`discopy.feedback.symmetric.Equation`, i.e. up to hypergraph
+isomorphism: equality of planar traced diagrams is not implemented.
 
->>> from discopy import stream, symmetric
+>>> from discopy import stream
+>>> from discopy.feedback import symmetric
 >>> F0 = Functor(
 ...     lambda x: stream.Ty.sequence(x.generator.name), cod=stream.Stream)
 >>> F = Functor(
@@ -190,7 +204,7 @@ this can only be checked up to extensional equivalence of streams.
     :align: center
 
 >>> LHS, RHS = sliding.terms
->>> assert F(LHS).unroll(2).now.dom == symmetric.Ty("x0", "x1", "x2")
+>>> assert list(map(str, F(LHS).unroll(2).now.dom)) == ["x0", "x1", "x2"]
 >>> eq = Equation(*map(lambda f: F(f).unroll(2).now, sliding.terms),
 ...     symbol="$\\\\sim$").draw(
 ...         doctest='docs/_static/feedback/slide-unroll.svg')
@@ -203,7 +217,8 @@ this can only be checked up to extensional equivalence of streams.
     :align: center
 
 For a trace, the delay is the identity and the morphism slides without
-delay, up to the hypergraph isomorphism of :class:`discopy.symmetric.Equation`:
+delay, up to the hypergraph isomorphism of
+:class:`discopy.feedback.symmetric.Equation`:
 
 >>> sliding_left = symmetric.Equation(
 ...     (t >> k @ s).trace(left=True),
@@ -705,7 +720,7 @@ class Box(monoidal.Box, Diagram):
 
         Example
         -------
-        >>> from discopy.markov import Copy
+        >>> from discopy.feedback.markov import Copy
         >>> x = Ty('x')
         >>> assert Box('f', x, x).delay(42).time_step == 42
         >>> copy = Copy(x).delay(42)
@@ -763,7 +778,7 @@ class Box(monoidal.Box, Diagram):
 
         Example
         -------
-        >>> from discopy.markov import Copy
+        >>> from discopy.feedback.markov import Copy
         >>> x = Ty('x')
         >>> assert Box('f', x, x).delay(3).reset() == Box('f', x, x)
         >>> assert Copy(x).delay(3).reset() == Copy(x.delay(3))
@@ -1446,11 +1461,11 @@ def structural_boxes(
 
     Example
     -------
-    >>> from discopy import markov, symmetric
+    >>> from discopy.feedback import markov, symmetric
     >>> assert issubclass(markov.Head, symmetric.Head)
     >>> assert issubclass(markov.Head, markov.Box)
     >>> assert markov.Diagram.head_factory is markov.Head
-    >>> assert repr(markov.Trace).endswith("'discopy.markov.Trace'>")
+    >>> assert repr(markov.Trace).endswith("'discopy.feedback.markov.Trace'>")
     >>> assert issubclass(markov.Trace, markov.Feedforward)
     """
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
@@ -1459,8 +1474,11 @@ def structural_boxes(
     for name, (attr, doc) in STRUCTURAL_BOXES.items():
         own = [result["Feedback"], result["Feedforward"]]\
             if name == "Trace" else [box]
-        bases = [getattr(parent, attr) for parent in parents]
-        bases = [base for base in bases if isinstance(base, type)] + own
+        bases = [getattr(parent, attr, None) for parent in parents]
+        bases = [base for base in bases if isinstance(base, type)] or [next(
+            vars(base)[attr] for base in diagram.__mro__
+            if isinstance(vars(base).get(attr), type))]
+        bases += own
         result[name] = subclass(name, bases, module, doc.format(level))
     for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
@@ -1499,12 +1517,17 @@ def structural_wires(wire: type) -> tuple[type, type]:
 
 __getattr__ = deprecated_alias(__name__, {
     "Ob": "Wire",
-    "Swap": "discopy.markov.Swap",
-    "Permutation": "discopy.markov.Permutation",
-    "Copy": "discopy.markov.Copy",
-    "Discard": "discopy.markov.Discard",
+    "Swap": "discopy.feedback.markov.Swap",
+    "Permutation": "discopy.feedback.markov.Permutation",
+    "Copy": "discopy.feedback.markov.Copy",
+    "Discard": "discopy.feedback.markov.Discard",
 })
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+# The levels with feedback subclass this one, so they are imported last.
+# pylint: disable-next=wrong-import-position
+from discopy.feedback import (  # noqa: E402,F401
+    balanced, symmetric, markov, comarkov, closed)

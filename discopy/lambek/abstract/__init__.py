@@ -26,12 +26,6 @@ Summary
     Function
     Permutation
     Swap
-    Feedback
-    Feedforward
-    Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Bubble
     Functor
@@ -350,7 +344,7 @@ from collections import Counter
 from math import log
 from typing import ClassVar
 
-from discopy import closed, feedback, cmap, hypergraph
+from discopy import closed, cmap, hypergraph
 from discopy.cat import factory
 from discopy.lambek import categorial
 
@@ -405,7 +399,6 @@ class Diagram(closed.Diagram):
     curry_factory: ClassVar[type["Curry"]]
     eval_factory: ClassVar[type["Eval"]]
     coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
     discard_factory: ClassVar[type["Discard"]]
     sum_factory: ClassVar[type["Sum"]]
     ob = Ty
@@ -736,8 +729,6 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function

@@ -181,3 +181,13 @@ def test_functor_bangs_wires_through_banged():
     assert F(x.bang()) == Ty('b') @ x
     with raises(ValueError):
         Diagram.copy(x.bang(), -1)
+
+
+def test_symmetric_functor_sends_exchange_to_swap():
+    from discopy.bang import symmetric
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    f = symmetric.Box('f', x, y)
+    F = symmetric.Functor(ob_map={x: y, y: x}, ar_map={f: f[::-1]})
+    diagram = symmetric.Diagram.exchange(x, y) >> y @ f.bang()
+    assert F(diagram) == symmetric.Swap(y.bang(), x) >> x @ f[::-1].bang()
+    assert loads(dumps(diagram)) == diagram

@@ -220,6 +220,8 @@ class Symbolic:
     def __getattr__(self, name):
         if name.startswith("_"):
             raise AttributeError(name)
+        if not hasattr(self.cls, name):
+            raise Unsupported(f"{name} is not declared")
         returns = inspect.signature(
             getattr(self.cls, name)).return_annotation
         sort = {"C0": "Ob", "C1": "Hom"}.get(

@@ -4,7 +4,7 @@ import pickle
 
 from pytest import raises
 
-from discopy import feedback, symmetric
+from discopy import monoidal, symmetric
 from discopy.symmetric import *
 from discopy.utils import AxiomError, dumps, loads
 
@@ -12,7 +12,7 @@ from discopy.utils import AxiomError, dumps, loads
 def test_Swap():
     x, y = Ty('x'), Ty('y')
     assert repr(Swap(x, y)) == "symmetric.Swap("\
-        "feedback.Ty(feedback.Wire('x')), feedback.Ty(feedback.Wire('y')))"
+        "monoidal.Ty(monoidal.Wire('x')), monoidal.Ty(monoidal.Wire('y')))"
     assert Swap(x, y).dagger() == Swap(y, x)
     with raises(ValueError):
         Swap(x ** 2, Ty())
@@ -256,7 +256,7 @@ def test_Permutation_from_iterable():
             result = Permutation(dom, once)
             assert type(result) is type(listed) and result == listed
             assert hash(result) == hash(listed)
-            namespace = {"feedback": feedback, "symmetric": symmetric}
+            namespace = {"monoidal": monoidal, "symmetric": symmetric}
             assert eval(repr(result), namespace) == result
     assert Swap(x @ y, iter([1, 0])) == Swap(x, y)
 
@@ -485,6 +485,8 @@ def test_coloured_Layer_merge():
 
 
 def test_foliation_with_traces_and_permutations():
+    from discopy.feedback.symmetric import (
+        Box, Diagram, Equation, Permutation, Swap, Ty)
     from discopy import tensor
     x, y = Ty('x'), Ty('y')
     f, g, h = Box('f', x @ x, x @ x), Box('g', y @ x @ x, x), Box('h', x, x)
@@ -507,6 +509,8 @@ def test_foliation_with_traces_and_permutations():
 def test_foliation_idempotence():
     """ States keep their offsets and plumbing composes, whatever the
     number of boxes in a layer. """
+    from discopy.feedback.symmetric import (
+        Box, Diagram, Equation, Layer, Swap, Trace, Ty)
     x, y = Ty('x'), Ty('y')
     s, t, u = Box('s', Ty(), x), Box('t', Ty(), y), Box('u', Ty(), x)
     f, g = Box('f', Ty(), x @ x @ x), Box('g', x, x)

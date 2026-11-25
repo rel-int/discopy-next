@@ -61,6 +61,7 @@ Summary
     ComarkovCategory
     ClosedCategory
     BalancedCategory
+    BalancedTracedCategory
     RibbonCategory
     CompactCategory
     HypergraphCategory
@@ -909,11 +910,11 @@ class TracedCategory[
     the yanking axiom: its :meth:`feedback` is its :meth:`trace`, the partial
     trace of a morphism over some objects, and the trace of the swap of an
     object with itself is its identity, that of a braid its twist, see
-    :meth:`yanking`, :meth:`BalancedCategory.yanking` and
-    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`discopy.feedback` and the
-    levels below it, whose wires carry a time step, are traced on their
-    undelayed wires, the :class:`discopy.feedback.Trace` bubble being the
-    feedback over an undelayed memory.
+    :meth:`yanking`, :meth:`BalancedTracedCategory.yanking` and
+    :cite:t:`JoyalEtAl96`. The free diagrams of the :mod:`discopy.feedback`
+    package, whose wires carry a time step, are traced on their undelayed
+    wires, the :class:`discopy.feedback.Trace` bubble being the feedback over
+    an undelayed memory.
     """
     @abstractmethod
     def trace(self, n: int = 1, left: bool = False) -> C1:
@@ -956,7 +957,7 @@ class TracedCategory[
         either side, the yanking axiom of a symmetric traced category: on a
         compact category it is Reidemeister move 1 for either trace. A
         braided one states it with its twist, see
-        :meth:`BalancedCategory.yanking`, and a planar one, which has no
+        :meth:`BalancedTracedCategory.yanking`, and a planar one, which has no
         swap, declares it inapplicable.
         """
         # pylint: disable-next=no-member  # stated where there is a swap
@@ -2314,11 +2315,10 @@ class ClosedCategory[
 
 
 class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
-        BraidedCategory[C0, C1], TracedCategory[C0, C1]):
+        BraidedCategory[C0, C1]):
     """
-    A balanced category is a :class:`BraidedCategory` and a
-    :class:`TracedCategory` with a method :code:`twist` for the natural
-    automorphism :code:`x -> x`.
+    A balanced category is a :class:`BraidedCategory` with a method
+    :code:`twist` for the natural automorphism :code:`x -> x`.
     """
     @classmethod
     @abstractmethod
@@ -2353,6 +2353,26 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         unit = cls.ob()
         return cls.equation_factory(cls.twist(unit), cls.id(unit))
 
+    @rule
+    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The twist of an atom. """
+        return cls.twist(x)
+
+    @rule
+    def inverse_twisting[X: Atom[C0]](
+            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The inverse of the twist of an atom. """
+        return cls.twist(x).dagger()
+
+
+class BalancedTracedCategory[
+        C0: ColouredMonoid, C1: BalancedTracedCategory](
+            BalancedCategory[C0, C1], TracedCategory[C0, C1]):
+    """
+    A balanced traced category is a :class:`BalancedCategory` and a
+    :class:`TracedCategory` whose yanking gives the twist, see
+    :cite:t:`JoyalEtAl96`.
+    """
     @axiom
     def yanking[X: Atom[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
@@ -2368,27 +2388,16 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
             cls.twist(x),
             braid.trace(mem=x))  # ty: ignore[unknown-argument]
 
-    @rule
-    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The twist of an atom. """
-        return cls.twist(x)
-
-    @rule
-    def inverse_twisting[X: Atom[C0]](
-            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The inverse of the twist of an atom. """
-        return cls.twist(x).dagger()
-
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
-        PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
+        PivotalCategory[C0, C1], BalancedTracedCategory[C0, C1]):
     """
     A ribbon category is a :class:`PivotalCategory` which is also a
     :class:`BalancedCategory`, i.e. where diagrams can draw knots and links:
-    it yanks as a balanced category does, with the braid a planar pivotal
-    category lacks.
+    it yanks as a balanced traced category does, with the braid a planar
+    pivotal category lacks.
     """
-    yanking = BalancedCategory.yanking
+    yanking = BalancedTracedCategory.yanking
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](

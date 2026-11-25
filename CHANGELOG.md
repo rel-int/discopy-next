@@ -563,6 +563,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.feedback` and `discopy.bang` are packages, see
+  `docs/adr/0012-feedback-and-bang-are-packages.md`. The levels with feedback
+  are `feedback.balanced`, `feedback.symmetric`, `feedback.markov`,
+  `feedback.comarkov` and `feedback.closed`; `discopy.balanced`, `symmetric`,
+  `markov`, `comarkov` and `closed` are no longer feedback or traced, their
+  wires carry no time step and their `Trace`, `Feedback`, `FollowedBy`,
+  `Head`, `Tail`, `Diagram.wait` and `closed.Timed` moved with no alias.
+  `abc.BalancedCategory` is no longer traced, `abc.BalancedTracedCategory`
+  states its yanking. `pivotal`, `ribbon`, `compact` and `frobenius` keep
+  their trace of cups and caps. The levels with a bang are `bang` and
+  `bang.symmetric`, whose exchange is the swap; feedback and bang share no
+  class. `Hypergraph.glue` is the trace of a symmetric hypergraph with no
+  condition on its category, which `plug` uses to rewrite ([next#735]).
+
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
   category, e.g. `Matrix`, no longer has them, and the function
@@ -2699,6 +2713,7 @@ for the changelog of `1.2.1` and earlier.
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#735]: https://github.com/rel-int/discopy-next/pull/735
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

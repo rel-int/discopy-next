@@ -1,11 +1,11 @@
 """
-The corpus of :class:`discopy.symmetric.Diagram`, aimed at what its strategy
-draws rarely or never: boxes that share a name, carry ``data`` or
+The corpus of :class:`discopy.feedback.symmetric.Diagram`, aimed at what
+its strategy draws rarely or never: boxes that share a name, carry ``data`` or
 ``is_dagger``, names that are not identifiers, bubbles, long types, traces of
 several wires and feedback with a memory of several wires.
 """
 
-from discopy.symmetric import Box, Diagram, Swap, Ty
+from discopy.feedback.symmetric import Box, Diagram, Swap, Ty
 
 (x, y, z, m, n), e = map(Ty, "xyzmn"), Ty()
 f, g = Box("f", x, y), Box("f", y @ y, x)

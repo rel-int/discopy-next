@@ -3,6 +3,7 @@
 from pytest import raises
 
 from discopy import closed, comarkov, compact, frobenius, markov
+from discopy import feedback
 from discopy.para import (
     Closed, Comarkov, Compact, Feedback, Hypergraph, Markov, Symmetric,
     Traced)
@@ -49,6 +50,8 @@ def test_permutation():
 
 
 def test_trace():
+    x, y, z, p = map(feedback.symmetric.Ty, "xyzp")
+    Box, Diagram = feedback.symmetric.Box, feedback.symmetric.Diagram
     t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y), p)
     assert t.trace(0) == t
     inside = x @ Diagram.swap(p, y) >> t.inside
@@ -103,9 +106,9 @@ def test_closed_curry_stays_in_the_domain():
 
 
 def test_feedback():
-    x, y, z, P = map(markov.Ty, "xyzP")
+    x, y, z, P = map(feedback.markov.Ty, "xyzP")
     f = Feedback(x @ y.delay(), z @ y,
-                 markov.Box('f', x @ y.delay() @ P, z @ y), P)
+                 feedback.markov.Box('f', x @ y.delay() @ P, z @ y), P)
     fb = f.feedback()
     assert (fb.dom, fb.cod, fb.param) == (x, z, P)
     assert fb == f.feedback(1) == f.feedback(mem=y) == f.feedback(cod=z)
@@ -159,7 +162,8 @@ def test_copar():
 
 
 def test_copar_trace():
-    m = Ty('m')
+    x, y, z, p, m = map(feedback.symmetric.Ty, "xyzpm")
+    Box = feedback.symmetric.Box
     t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y @ m), p, m)
     trace = t.trace()
     assert (trace.dom, trace.cod, trace.param, trace.copar) == (x, z, p, m)
@@ -168,9 +172,9 @@ def test_copar_trace():
 
 
 def test_copar_feedback():
-    x, y, z, m, P = map(markov.Ty, "xyzmP")
+    x, y, z, m, P = map(feedback.markov.Ty, "xyzmP")
     f = Feedback(x @ y.delay(), z @ y,
-                 markov.Box('f', x @ y.delay() @ P, z @ y @ m), P, m)
+                 feedback.markov.Box('f', x @ y.delay() @ P, z @ y @ m), P, m)
     fb = f.feedback()
     assert (fb.dom, fb.cod, fb.param, fb.copar) == (x, z, P, m)
     assert f.delay().copar == m.delay()

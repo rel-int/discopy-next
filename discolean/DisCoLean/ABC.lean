@@ -17,8 +17,9 @@ does not compile yet:
 - `MarkovCategory`: it extends SymmetricCategory
 - `ComarkovCategory`: it extends SymmetricCategory
 - `ClosedCategory`: it extends BiclosedCategory, MarkovCategory
-- `BalancedCategory`: it extends TracedCategory
-- `RibbonCategory`: it extends PivotalCategory, BalancedCategory
+- `BalancedCategory`: ob is not declared
+- `BalancedTracedCategory`: it extends BalancedCategory, TracedCategory
+- `RibbonCategory`: it extends PivotalCategory, BalancedTracedCategory
 - `CompactCategory`: it extends RibbonCategory, SymmetricCategory
 - `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
 -/

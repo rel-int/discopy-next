@@ -47,8 +47,7 @@ def test_product_and_exponential_names_are_lazy():
     for typ in (X * Y, X >> Y):
         ob, = typ.inside
         assert "name" not in vars(ob)
-        delayed = ob.delay()
-        assert ob.name == str(ob) == delayed.name == ob.delay().name
+        assert ob.name == str(ob)
     nested = Variable("x", X)
     for _ in range(1000):
         nested = Tuple(nested, Variable("x", X))
@@ -346,7 +345,7 @@ def test_church_exponentiation():
 
 def test_untyped_terms_evaluate_draw_and_map():
     two, F = church(2, U), Functor.id(Diagram)
-    assert F(U) == U and F(U.delay()) == U.delay()
+    assert F(U) == U
     assert F(two.eval()) == two.eval()
     assert len(two.eval().to_drawing().cod) == 1
     assert two.to_map() == two.eval().to_map()
@@ -495,41 +494,6 @@ def test_substitution_under_binder():
         == Abstraction(y_, h(y)(z)(y_))
 
 
-def test_to_compact():
-    w, x, y, z = map(Ty, "wxyz")
-    f = Box("f", x @ y, z)
-
-    for left in (True, False):
-        source = f.curry(left=left)
-        target = source.to_compact()
-        expected = (f >> Coeval(source.cod, left=left)).trace(
-            left=not left)
-        assert target == expected
-        assert (target.dom, target.cod) == (source.dom, source.cod)
-
-    h = Box("h", w @ x @ y, z)
-    for left in (True, False):
-        source = h.curry(n=2, left=left)
-        assert source.to_compact() == (
-            h >> Coeval(source.cod, left=left)).trace(
-                n=2, left=not left)
-
-    g = Box("g", z << y, x)
-    assert (f.curry() >> g).to_compact() == f.curry().to_compact() >>\
-        g.to_compact()
-
-    nested = f.curry().curry().to_compact().to_map()
-    assert sum(isinstance(box, Coeval) for box in nested.boxes) == 2
-    assert not any(isinstance(box, Curry) for box in nested.boxes)
-
-    identity = x(lambda variable: variable)
-    application = identity(x("a"))
-    for term in (identity, application):
-        result = term.to_compact().to_map()
-        assert not any(isinstance(box, Curry) for box in result.boxes)
-        assert term.to_map().to_compact() == result
-
-
 def test_Application_without_freevars():
     """ A closed application of constants has an empty domain, see #542. """
     X, Y = Ty('X'), Ty('Y')
@@ -606,10 +570,8 @@ def test_is_linear():
     x, y = Ty("x"), Ty("y")
     f, nonlinear = Box("f", x, y), Copy(x) >> Box("g", x @ x, x)
     assert f.curry().is_linear and (f + f).is_linear
-    assert (Box("h", x @ y, x @ y) @ x).trace().is_linear
     assert not nonlinear.is_linear
     assert not nonlinear.curry().is_linear
-    assert not (nonlinear @ x).trace().is_linear
     assert not (nonlinear + nonlinear).is_linear
 
     g, a = (x >> (x >> y))("g"), x("a")
@@ -901,68 +863,6 @@ def test_Eval_defaults_left():
     assert Eval(X >> Y) == Diagram.ev(Y, X) == Eval(X >> Y, left=True)
     assert Coeval(X >> Y) == Eval(X >> Y).dagger()
     assert Eval(X >> Y).dom == (X >> Y) @ X
-
-
-def test_delay_types():
-    x, y = Ty('x'), Ty('y')
-    for typ in (x, x << y, y >> x, x ** y, x * y, x.product(y, x),
-                Ty(Product()), U):
-        delayed = typ.delay()
-        assert delayed != typ and delayed.delay(-1) == typ == delayed.tail
-        assert delayed.delay(2) == typ.delay(3) and delayed.head == Ty()
-        assert typ.head.delay().head == Ty() and typ.d.d == typ.delay(2)
-        assert eval(repr(delayed), Ty.environment()) == delayed
-        assert loads(dumps(delayed)) == delayed
-        assert hash(delayed) == hash(typ.delay().delay(-1).delay())
-    assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
-    assert (x << y).delay() != x.delay() << y.delay()
-    assert (y >> x).delay() != y.delay() >> x.delay()
-    assert (x ** y).delay() != x.delay() ** y.delay()
-    assert (x * y).delay() != x.delay() * y.delay()
-    assert (x << y).delay().inside[0].base == x
-    assert str((x << y).delay()) == "(y >> x).d"
-    assert str((x * y).delay(4)) == "(x * y).delay(4)"
-
-
-def test_delay_diagrams():
-    x, y, z = Ty('x'), Ty('y'), Ty('z')
-    f = Box('f', x @ y, z)
-    X, Y = Ty('X'), Ty('Y')
-    g, h = (X >> Y)('g'), (X >> (X >> Y))('h')
-    diagrams = [
-        f.curry(), f.curry(left=False), Diagram.ev(z, y),
-        Diagram.ev(z, y, left=False), Diagram.ev(z, y).dagger(),
-        Pack(x * y), Unpack(x * y), Copy(x) >> x @ Discard(x),
-        X(lambda v: g(v)).eval(), X(lambda v: h(v)(v)).eval(),
-        Tuple(X('a'), Y('b')).eval()]
-    for diagram in diagrams:
-        delayed = diagram.delay()
-        assert (delayed.dom, delayed.cod) == (
-            diagram.dom.delay(), diagram.cod.delay())
-        assert Diagram(delayed.inside, delayed.dom, delayed.cod) == delayed
-        assert delayed != diagram and delayed.delay(-1) == diagram
-        assert delayed.delay(2) == diagram.delay(3)
-        assert loads(dumps(delayed)) == delayed
-        assert Functor.id(Diagram)(delayed) == delayed
-        assert delayed.to_compact() == diagram.to_compact().delay()
-        assert delayed.to_drawing().dom == Drawing.id(delayed.dom).dom
-        for box in delayed.boxes:
-            assert eval(repr(box), Diagram.environment()) == box
-    assert Diagram.ev(z, y).delay().dagger()\
-        == Diagram.ev(z, y).dagger().delay()
-    assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
-    assert f.curry().delay().arg == f
-
-
-def test_Curry_of_no_wire_maps_as_its_argument():
-    x, y, z = Ty('x'), Ty('y'), Ty('z')
-    f = Box('f', x @ y, z)
-    for left in (True, False):
-        for curry, arg in [(Curry(f, 0, left), f),
-                           (Curry(f, 0, left).delay(), f.delay())]:
-            assert Functor.id(Diagram)(curry) == arg
-            assert curry.to_compact() == arg.to_compact()
-            assert curry.to_drawing() == arg.to_drawing()
 
 
 def test_Bubble_is_linear_and_has_no_term():
