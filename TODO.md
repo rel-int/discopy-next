@@ -7,5 +7,5 @@ make a new discopy-next branch (no PR) with all the upstream fixes we want to ma
 - [x] a strategy hook: `testable.PROVIDERS`, tried by `Declaration.sequents` before its own draw; `Declaration.provider` names it, noted in each matrix cell
 - [x] `comarkov.Diagram.hypergraph_section` on `Trace(Merge(x, 2), left=True)`: fixed, `spider_factory` builds a spider with no leg out as a traced merge, the mirror of `markov`
 - [ ] changelog entry, docs and tests for each change (the changelog bullets cite no pull request yet: add the `[next#N]` link once one is opened)
-- [ ] every check of CONTRIBUTING.md's "Run the unit tests"
-- [ ] report `comarkov.TermBase.str_transparency`, failing on `main` too: `str` of a comarkov term evaluates to a `monoidal.Kappa`
+- [x] every check of CONTRIBUTING.md's "Run the unit tests": flake8, pylint 9.3825, ruff, ty, the full suite (6243 passed, coverage 98.0%) and the whole property matrix at seed 0 (3037 passed; its 7 failures fail on `main` too, below)
+- [ ] report `TermBase.str_transparency` of balanced, braided, comarkov, feedback, markov, spacial and symmetric, failing on `main` too: `str` of a term evaluates to a `monoidal.Kappa`, not a term of its own module
