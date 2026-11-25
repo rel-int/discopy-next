@@ -87,8 +87,8 @@ an example `# doctest: +EXTRA`, usually its import line, e.g.
 docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 `test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
 
-CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`, not on a
-pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
+CI also runs every marimo notebook in `docs/notebooks/` but those of `UNEXECUTED` below on
+each commit of `main`, not on a pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
 instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
 (e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
