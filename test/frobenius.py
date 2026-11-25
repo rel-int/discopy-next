@@ -320,3 +320,28 @@ def test_tensor_drops_a_whiskered_identity_spider():
         assert diagram.foliation().foliation() == diagram.foliation()
         assert diagram.to_drawing().dagger().dagger() == diagram.to_drawing()
     assert spider @ f == x @ f and f @ spider == f @ x
+
+
+def test_relational_machine_calculus():
+    """ The examples of Barrett, Castle and Heijltjes (LICS 2024). """
+    x, y = Ty('x'), Ty('y')
+    E, F, R = Box('E', x, x), Box('F', x, x), Box('R', x, y)
+    meet = x(lambda a: x.exists(
+        lambda b: E(a) >> b.dagger() >> F(a) >> b.dagger() >> b))
+    assert Equation(meet.eval(), Spider(1, 2, x) >> E @ F >> Spider(2, 1, x))
+    M = x(lambda c: R(c))
+    converse = (y @ x).exists(
+        lambda a, b: a.dagger() >> b >> M >> a.dagger() >> b)
+    assert converse.dom == y and converse.cod == x
+    assert Equation(converse.eval(), M.dagger().eval(), R.converse())
+    gp, p = Box('gp', x @ x, y), Box('p', x @ x, y)
+    clause = (x @ x @ x).exists(
+        lambda u, v, w: gp(u, w).dagger() >> p(u, v) >> p(v, w))
+    assert Equation(clause.eval(), gp.converse()
+                    >> x @ Spider(0, 2, x) @ x >> p @ p)
+    cells = (x @ y).exists(lambda u, v: u.at('a').dagger()
+                           >> v.at('b').dagger() >> u.at('b') >> v.at('a'))
+    assert cells.dom == x @ y and cells.cod == y @ x
+    assert Equation(cells.eval(), Swap(x, y))
+    with raises(TypeError):
+        x(lambda a: R(a) >> a.dagger())
