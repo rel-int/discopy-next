@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `draw(left_to_right=True)` draws a diagram left to right, and
+  `Bubble(..., draw_left_to_right=True)` draws a bubble as one box with its
+  args flowing left to right inside it, e.g. the "Very big car" figure of
+  higher-order DisCoCat: `drawing.backend.Transposed` draws through the
+  reflection along the anti-diagonal, keeping the layout as it is
+  ([next#728]).
+
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -2662,6 +2669,7 @@ for the changelog of `1.2.1` and earlier.
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
+[next#728]: https://github.com/rel-int/discopy-next/pull/728
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
