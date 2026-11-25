@@ -12,5 +12,5 @@
 
 - [WIP] @T-1f2a1b14-2026-11-25 10:31 Architecture diagram shows the syntax box only, prose updated
 - [WIP] @T-1f2a1b14-2026-11-25 10:31 split_memory and memory_size move to FeedbackCategory
-- [ ] keyword_form becomes a FeedbackCategory method, Functions admonition dropped, callers and tests updated
+- [WIP] @T-1f2a1b14-2026-11-25 10:31 keyword_form becomes a FeedbackCategory method, Functions admonition dropped, callers and tests updated
 - [ ] CHANGELOG bullet and next-checks gates
