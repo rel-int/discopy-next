@@ -9,6 +9,39 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `neural.equivariant` computes the linear layers between permutation
+  representations of a finite group that commute with it, with one weight per
+  orbit of the group on pairs of points: `tying` is the orbit of each pair,
+  `Dense` the layer on tensors with channels, `layer` the layer as a
+  parametric map of `neural` networks and `equivariance` the distance of a
+  function to commuting with the group ([next#TBD]).
+
+- `neural.factorised` computes equivariant layers along the construction of
+  the group instead of on a dense matrix, checked equal to `Dense` in outputs
+  and gradients: `realise` picks `Pooling` for a side of one point, else
+  `Dense`, and `layer(..., fast=True)` uses it ([next#TBD]).
+
+- `neural.factorised.Kronecker` computes the equivariant layers of the natural
+  action of a product of chains, i.e. of symmetric groups, of the cyclic group
+  of order two and of their imprimitive wreath products and powers, along the
+  axes of the points, recognised by `structure` and picked by `realise`
+  ([next#TBD]).
+
+- `neural.factorised.Factor` has cyclic factors, so that `Kronecker` computes
+  the layers of the cyclic groups and of their products with chains as a
+  correlation along the cyclic axes, directly or by the fast Fourier transform
+  from `Kronecker.fft_from` points ([next#TBD]).
+
+- `neural.factorised.Partitions` computes the equivariant layers of a
+  symmetric group between its natural action and its tensor square, in either
+  direction or both, with one weight per set partition of the coordinates,
+  i.e. Möbius-inverted sums along the diagonals, and `realise` picks it for
+  those actions ([next#TBD]).
+
+- `group.Action.trivial` is the action of a group on a number of points that
+  fixes each of them, which tensors with any action of the group
+  ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2675,6 +2708,7 @@ for the changelog of `1.2.1` and earlier.
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
+[next#TBD]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#723]: https://github.com/rel-int/discopy-next/pull/723

@@ -5,6 +5,8 @@ The tables a recursive network gathers along: the primal graph and the
 routing of a factor table, and the factor table read back off a drawn map.
 """
 
+import itertools
+
 from pytest import importorskip, raises
 
 from discopy.frobenius import Box, CMap, Ty
@@ -147,6 +149,23 @@ def test_blocks_of_a_group():
         families(((0, ), ), layout)
     with raises(ValueError, match="does not start a family"):
         families(units[1:], layout)
+
+
+def test_orbitals():
+    """ The orbits of the action on pairs are the depths of the wiring. """
+    from discopy.group import Product, Symmetric, Wreath
+    from discopy.neural.wiring import chains, depths
+    lines = Wreath[Symmetric[2], Symmetric[2]]
+    group = Product[lines, lines]
+    pairs = group.action().tensor(group.action())
+    layout = chains(group)
+    assert layout == ((2, 2), (2, 2))
+    by_depth = {}
+    for v, w in itertools.product(range(16), repeat=2):
+        by_depth.setdefault(depths(v, w, layout), []).append(16 * v + w)
+    assert {tuple(block) for block in by_depth.values()}\
+        == set(pairs.orbits())
+    assert len(pairs.orbits()) == len(by_depth) == 9
 
 
 def test_blocks_errors():

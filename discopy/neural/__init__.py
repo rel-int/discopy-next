@@ -25,7 +25,12 @@ steps with a detached prefix; :mod:`discopy.neural.lattice` and
 computation time, each with its trainer; :mod:`discopy.neural.train` holds
 the optimiser, the schedule, the weight average and the per-sample clip;
 :mod:`discopy.neural.geometric` runs a network along the blocks of its
-symmetry group rather than along its tables.
+symmetry group rather than along its tables. :mod:`discopy.neural.equivariant`
+is the layers that commute with a finite group action, as weights tied along
+the orbits of the group on pairs of points, and
+:mod:`discopy.neural.factorised` computes them along the construction of the
+group, as sums over blocks, correlations and partitions rather than a dense
+matrix.
 
 .. autosummary::
     :template: module.rst
@@ -42,6 +47,8 @@ symmetry group rather than along its tables.
     act
     train
     geometric
+    equivariant
+    factorised
 
 Note
 ----

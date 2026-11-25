@@ -630,6 +630,29 @@ class Action:
         return f"Action({factory_name(self.group)}, {self.size}, "\
             f"{tuple(map(tuple, self.images))!r})"
 
+    @classmethod
+    def trivial(cls, group: type[FiniteGroup], size: int = 1) -> Action:
+        """
+        The action where every generator is the identity of ``range(size)``,
+        i.e. the functor to the permutations constant on the identity.
+
+        Parameters:
+            group : The group acting.
+            size : The number of points acted on.
+
+        Example
+        -------
+        >>> action = Action.trivial(Cyclic[4], 3)
+        >>> action
+        Action(group.Cyclic[4], 3, ((0, 1, 2),))
+        >>> action.orbits()
+        ((0,), (1,), (2,))
+        >>> action.tensor(Cyclic[4].action()).orbits()[0]
+        (0, 1, 2, 3)
+        """
+        return cls(group, size, tuple(
+            Permutation.id(size) for _ in group.generators()))
+
     def __call__(self, element: FiniteGroup) -> Permutation:
         assert_ismember(element, self.group)
         result = Permutation.id(self.size)
