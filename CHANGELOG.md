@@ -22,6 +22,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#TBD]).
 
+- `neural.datatype` has `Algebra.lift`, `Algebra.unitality` and
+  `Algebra.associativity`, the free monad on parametric maps and the cells of
+  the lax algebra of an algebra with a parameter, `Datatype.substitute` and
+  `plug`, the multiplication of the free monad, and `LaxHomomorphism`, the
+  folds of a datatype given by a map from the parameter to itself and the
+  parameter of the algebra, whose axioms are checked as equations: the
+  squares of Categorical Deep Learning, Appendix F and J, the copy being the
+  tied fold ([next#TBD]).
+
 - `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
   between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
   `then`, horizontal composition `>>` and `@`, and `is_invertible`;
