@@ -210,11 +210,12 @@ def indices(dom: tuple, cod: tuple, free: tuple | None = None) -> Iterator:
     Example
     -------
     >>> assert list(indices("aab", "aba")) == [(0, 2, 1), (1, 2, 0)]
-    >>> assert not list(indices("ab", "aa"))
+    >>> assert not list(indices("ab", "aa")) and not list(indices("ab", "a"))
     """
     free = tuple(range(len(dom))) if free is None else free
     if not cod:
-        yield ()
+        if not free:
+            yield ()
         return
     for i in free:
         rest = tuple(j for j in free if j != i)
