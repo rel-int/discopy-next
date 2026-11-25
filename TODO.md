@@ -15,5 +15,5 @@
 - [x] cat: `Box` takes `args` and `method`, `Arrow.bubble` builds a box with args, the functor sends one by `getattr(cod, method)`, `Bubble` an alias
 - [x] every module's `Bubble` fuses into its `Box` and `bubble_factory` goes; `isinstance(f, Bubble)` becomes `f.args`
 - [x] tensor: `Elementwise(Box)` carries `func`, a plain tensor `Box` none; the same in `quantum.circuit` and `quantum.zx`
-- [WIP] @T-14209019-2026-11-25 16:11 tests, notebooks and ADRs follow; CHANGELOG bullet
+- [x] tests, notebooks and ADRs follow; CHANGELOG bullet
 - [ ] run next-checks
