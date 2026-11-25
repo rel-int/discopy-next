@@ -473,8 +473,8 @@ def test_Bubble_flags_subs():
 def test_Box_signature():
     sig = signature(Box)
     assert list(sig.parameters) == [
-        "name", "dom", "cod", "data", "is_dagger", "time_step",
-        "is_deterministic", "is_affine"]
+        "name", "dom", "cod", "data", "is_dagger", "args", "method",
+        "time_step", "is_deterministic", "is_affine"]
     x = Ty('x')
     box = Box('f', x, x, **{
         name: param.default for name, param in sig.parameters.items()
@@ -485,3 +485,126 @@ def test_Box_signature():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_term_copies_a_variable_used_twice():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', y @ y, x)
+    diagram = Diagram.copy(x) >> f @ f >> g
+    term = diagram.to_term()
+    assert str(term) == (
+        "x(lambda x0: let(f(x0), lambda x1: "
+        "let(f(x0), lambda x2: g(x1, x2))))")
+    assert Equation(term.eval(), diagram)
+    assert str(term.normal_form()) == "x(lambda x0: g(f(x0), f(x0)))"
+    assert Equation(term.normal_form().eval(), diagram)
+    a = Variable('a', x)
+    twice = Constant(Box('m', x @ x, y))(a, a)
+    assert twice.freevars == [a] and twice.count(a) == 2
+    assert twice.eval() == Copy(x) >> Box('m', x @ x, y)
+    with raises(ValueError, match="disjoint free variables"):
+        symmetric.Constant(symmetric.Box('m', x @ x, y))(
+            symmetric.Variable('a', x), symmetric.Variable('a', x))
+
+
+def test_term_keeps_a_statement_copied_or_discarded():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', y @ y, x)
+    shared = f >> Diagram.copy(y) >> g
+    term = shared.to_term().normal_form()
+    assert str(term) == "x(lambda x0: let(f(x0), lambda x1: g(x1, x1)))"
+    assert Equation(term.eval(), shared)
+    assert not Equation(shared, Diagram.copy(x) >> f @ f >> g)
+    unused = f @ x >> Diagram.discard(y) @ x
+    term = unused.to_term().normal_form()
+    assert str(term) == (
+        "(x @ x)(lambda x0, x1: let(f(x0), lambda x2: x1, offset=0))")
+    assert Equation(term.eval(), unused)
+    assert not Equation(unused, Diagram.discard(x) @ x)
+    assert eval(str(term), TermBase.str_environment(term)) == term
+    a, b = Variable('a', x), Variable('b', x)
+    redex = let(Constant(f)(a), lambda v: b, offset=1)
+    assert redex.normal_form() == redex and redex.freevars == [b, a]
+    assert redex.eval() == x @ f >> x @ Discard(y)
+
+
+def test_term_kappa_discards_what_its_body_does_not_use():
+    x, y = Ty('x'), Ty('y')
+    f, a, b = Constant(Box('f', x, y)), Variable('a', x), Variable('b', y)
+    term = Kappa((b, a), f(a))
+    assert term == (y @ x)(lambda b, a: f(a)) and type(term) is Kappa
+    assert term.stack == y @ x and term.eval() == Discard(y) @ f.box
+    assert Kappa((b, ), f(a), 1).eval() == x @ Discard(y) >> f.box
+    assert Kappa((b, ), f(a), 0).eval() == Discard(y) @ x >> f.box
+    assert str(Kappa((b, ), f(a), 1)) == "y(lambda b: f(a), offset=1)"
+    with raises(ValueError, match="Expected an offset"):
+        Kappa((b, ), f(a))
+    with raises(ValueError, match="offset from 0 to 1"):
+        Kappa((b, ), f(a), 2)
+    with raises(ValueError, match="distinct variables to bind in f.a."):
+        Kappa((a, a), f(a))
+    low = symmetric.Constant(symmetric.Box('f', x, y))
+    with raises(ValueError, match="distinct free variables"):
+        (y @ x)(lambda b, a: low(a))
+    assert type((y @ x)(lambda b, a: a)) is Kappa
+    assert type(x(lambda a: a)) is monoidal.Kappa
+
+
+def test_term_substitute_under_a_kappa_of_no_variable():
+    x, y = Ty('x'), Ty('y')
+    e, k = Constant(Box('e', x, Ty())), Constant(Box('k', x @ x, y))
+    a, b = Variable('a', x), Variable('b', x)
+    term = (x @ x)(lambda a, b: let(e(a), lambda: k(b, a), offset=0))
+    assert term.freevars == [] and term.eval() == Function(
+        x @ x, [0, 1, 0]) >> e.box @ x @ x >> k.box
+    assert TermBase.reading(term) and TermBase.normal_form_soundness(term)
+    assert term.eval().to_term().alpha_eq(term)
+    body = let(e(a), lambda: k(b, a), offset=0)
+    assert body.context == ([a, b], Ty(), [])
+    assert body.func.context == ([], Ty(), [b, a])
+
+
+def test_term_functor_into_tensors():
+    import numpy as np
+    from discopy.tensor import Dim, Tensor
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', y @ y, x)
+    arrays = {f: np.array([[1, 2], [3, 4]]), g: np.arange(8).reshape(2, 2, 2)}
+    F = Functor({x: Dim(2), y: Dim(2)}, arrays, cod=Tensor[int])
+    shared = (f >> Diagram.copy(y) >> g).to_term()
+    copied = (Diagram.copy(x) >> f @ f >> g).to_term()
+    assert (shared.eval(F).array == np.einsum(
+        "ab,bbc->ac", arrays[f], arrays[g])).all()
+    assert (copied.eval(F).array == np.einsum(
+        "ab,ac,bcd->ad", arrays[f], arrays[f], arrays[g])).all()
+    assert (shared.eval(F).array != copied.eval(F).array).any()
+    unused = (f @ x >> Diagram.discard(y) @ x).to_term().normal_form()
+    assert (unused.eval(F).array == np.einsum(
+        "a,cd->acd", arrays[f].sum(axis=1), np.eye(2, dtype=int))).all()
+    dropped = (Diagram.discard(x) @ x).to_term()
+    assert (unused.eval(F).array != dropped.eval(F).array).any()
+
+
+def test_term_laws():
+    x, y = Ty('x'), Ty('y')
+    laws = (
+        TermBase.eta, TermBase.reading, TermBase.normal_form_soundness,
+        TermBase.normal_form_idempotence, TermBase.repr_transparency,
+        TermBase.str_transparency, TermBase.serialisation)
+    shapes = [
+        [1, 2, 1, 1, 0], [2, 1, 1, 2, 0, 1, 1, 0, 1], [0, 1, 2, 2, 1, 2, 1],
+        [1, 0, 1, 1, 2, 2, 0, 1, 2], [2, 0, 2, 1, 1, 3, 1, 2, 0, 1, 0, 1]]
+    wired = 0
+    for shape in shapes:
+        term = TermBase.generate(y, shape, [x, y], "ab")
+        assert all(law(term) for law in laws)
+        wired += any(isinstance(box, Function) for box in term.eval().boxes)
+        renamed = TermBase.generate(y, shape, [x, y], "c")
+        assert term.alpha_eq(renamed)
+        assert Equation(term.eval(), renamed.eval())
+    assert wired
+    v, w = Variable('v', x), Variable('w', x)
+    assert str(Sampler(TermBase, iter([0, 0, 1]), [x], "a").state(
+        y, (v, w))) == "c0(v, w, v)"
+    assert str(Sampler(TermBase, iter([0, 1, 2]), [x], "a").state(
+        y, (v, w))) == "c0(v)"

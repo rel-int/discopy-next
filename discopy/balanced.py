@@ -19,13 +19,18 @@ Summary
     DualRailBraid
     DualRailTwist
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     DualRail
     Equation
 
@@ -62,7 +67,7 @@ from dataclasses import dataclass
 from discopy import (
     config, monoidal, braided, feedback, cmap, hypergraph, messages)
 from discopy.abc import BalancedCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.feedback import Ty
 from discopy.monoidal import Colour
 from discopy.utils import factory_name, assert_isatomic, from_tree
@@ -411,12 +416,6 @@ class Sum(braided.Sum, feedback.Sum, Box):
     """
 
 
-class Bubble(braided.Bubble, feedback.Bubble, Box):
-    """
-    A balanced bubble is a braided and feedback bubble and a balanced box.
-    """
-
-
 class Functor(braided.Functor, feedback.Functor):
     """
     A balanced functor is a braided functor that twists.
@@ -497,8 +496,8 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
@@ -506,10 +505,17 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.braid_factory = Braid
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 Id = Diagram.id
 
 
 class Equation(braided.Equation):
     """ The :class:`braided.Equation` of balanced diagrams. """
+
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

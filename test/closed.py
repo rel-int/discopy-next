@@ -5,7 +5,7 @@ from pytest import raises
 from discopy import biclosed
 from discopy.closed import *
 from discopy.biclosed import Constraints, Sampler
-from discopy.utils import dumps, loads
+from discopy.utils import dumps, from_tree, loads
 
 
 U = Ty(Unitype())
@@ -97,6 +97,10 @@ def test_term_to_tree():
     assert loads(dumps(Projection(nested, 0))) == Projection(nested, 0)
     let_term = Let(Tuple(), (), Tuple())
     assert loads(dumps(let_term)) == let_term
+    legacy = f(v).to_tree()
+    legacy['func'] = legacy.pop('function')
+    legacy['args'] = legacy.pop('argument')
+    assert from_tree(legacy) == f(v)
 
 
 def test_strictification():
@@ -976,3 +980,23 @@ def test_Bubble_is_linear_and_has_no_term():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_beta_redex_into_tensor():
+    """ Regression for rel-int/discopy-next#676: β-equal terms, same tensor. """
+    import numpy as np
+    from discopy import tensor
+    N, S = Ty("N"), Ty("S")
+    f, g, x = Variable("f", S << N), Variable("g", (S << N) << (S << N)), \
+        Variable("x", N)
+    F = Functor(ob_map={N: tensor.Dim(2), S: tensor.Dim(3)}, ar_map={},
+                cod=tensor.Diagram)
+    rng = np.random.default_rng(0)
+    for redex, reduct in [((S << N)(lambda h: g(h)(x))(f), g(f)(x)),
+                          (N(lambda y: f(y))(x), f(x))]:
+        context = reduct.freevars
+        states = tensor.Diagram.id(tensor.Dim(1)).tensor(*(
+            tensor.Box(v.name, tensor.Dim(1), F(v.cod),
+                       rng.random(F(v.cod).inside)) for v in context))
+        assert np.allclose((states >> redex.eval(F, context)).eval().array,
+                           (states >> reduct.eval(F, context)).eval().array)

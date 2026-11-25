@@ -41,6 +41,7 @@ Summary
         :toctree:
 
         Maybe
+        List
         Powerset
         Subdistribution
         Seed
@@ -304,6 +305,42 @@ The maybe monad, sending a type ``X`` to ``X | None``.
 
 Its unit and multiplication are both the identity, since Python's native
 optional type does not distinguish ``None`` from a doubly-wrapped ``None``.
+"""
+
+
+def generate_list(outcomes: tuple):
+    """
+    The values of the :attr:`List` monad over some ``outcomes``: a list of at
+    most three of them.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    return st.lists(st.sampled_from(outcomes), max_size=3) if outcomes\
+        else st.just([])
+
+
+List = Monad(
+    "List",
+    ob_map=lambda X: list[X],
+    lift=lambda f: Function(
+        lambda xs: list(map(f, xs)),
+        list[f.dom.inside[0]], list[f.cod.inside[0]]),
+    unit_map=lambda X: Function(lambda x: [x], X, list[X]),
+    mult_map=lambda X: Function(
+        lambda xss: [x for xs in xss for x in xs], list[list[X]], list[X]),
+    generate=generate_list)
+"""
+The list monad, sending a type ``X`` to ``list[X]``, i.e. the free monoid
+monad: its unit takes a singleton and its multiplication concatenates.
+
+Its algebras are the monoids, the structure sending a list to its product,
+e.g. the sum of a list of arrows, see :meth:`discopy.cat.Arrow.algebra`. It
+is not commutative and comes with no :attr:`Monad.iterate`.
+
+>>> assert List.mult(int)([[1, 2], [], [3]]) == [1, 2, 3]
+>>> assert List(Function(lambda x: x + 1, int, int))([1, 2]) == [2, 3]
 """
 
 Powerset = Monad(

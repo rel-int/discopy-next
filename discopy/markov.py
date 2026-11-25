@@ -24,15 +24,35 @@ Summary
     Copy
     Discard
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
     Equation
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
+    Sampler
 
+
+Terms
+-----
+
+A diagram with copies and discards and exactly one output reads as a term
+of the kappa calculus where a variable occurs any number of times, see
+:class:`TermBase`: twice for a copy, not at all for a discard. Neither is
+assumed natural, so a box that is copied or discarded keeps its ``let``.
+
+>>> x, y = Ty('x'), Ty('y')
+>>> diagram = Copy(x) @ Discard(y) >> Box('f', x @ x, x)
+>>> print(diagram.to_term())
+(x @ y)(lambda x0, x1: f(x0, x0))
+>>> assert Equation(diagram.to_term().eval(), diagram)
 
 Axioms
 ------
@@ -74,14 +94,19 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sized
+from dataclasses import dataclass
 from inspect import Parameter, Signature, signature
 from operator import index
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
-from discopy.testable import FUEL
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
+from discopy.testable import FUEL, Equation as AbstractEquation, axiom
+# pylint: disable-next=unused-import  # the redex a term prints as
+from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -164,6 +189,13 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     discard_factory: ClassVar[type["Discard"]]
     function_factory: ClassVar[type["Function"]]
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
 
     @classmethod
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
@@ -814,54 +846,6 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
-class Bubble(symmetric.Bubble, Box):
-    """
-    A markov bubble is a symmetric bubble and a markov box: a total function
-    unless it says otherwise, whatever its args, and it keeps what it says
-    through dagger, substitution, rotation and markov functors.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        is_deterministic : Whether copying commutes with the bubble.
-        is_affine : Whether discarding commutes with the bubble.
-        kwargs : Passed to :class:`symmetric.Bubble`.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> sample = Box('sample', x, x, is_deterministic=False)
-    >>> noisy = sample.bubble(is_deterministic=False)
-    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
-    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
-    >>> assert Functor.id(Diagram)(noisy) == noisy
-    """
-    serialised_attrs = symmetric.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.deterministic, self.affine = is_deterministic, is_affine
-
-    def __repr__(self):
-        flags = "".join(f", {name}=False" for name in self.flags())
-        return super().__repr__()[:-1] + flags + ")" if flags\
-            else super().__repr__()
-
-    def setoid(self):
-        return super().setoid() + (self.deterministic, self.affine)
-
-    def to_tree(self) -> dict:
-        return {**super().to_tree(), **self.flags()}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        result = super().from_tree(tree)
-        result.deterministic = tree.get("is_deterministic", True)
-        result.affine = tree.get("is_affine", True)
-        return result
-
-
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -911,7 +895,8 @@ class Functor(symmetric.Functor):
             return function(  # ty: ignore[invalid-argument-type]
                 other.func, list(map(self, other.dom)))
         result = super().__call__(other)
-        if isinstance(other, Bubble) and isinstance(result, Bubble):
+        if isinstance(other, Box) and other.args\
+                and isinstance(result, Box) and result.args:
             return other.flagged(result)
         return result
 
@@ -925,8 +910,8 @@ Box.__init__.__signature__ = Signature([
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -936,7 +921,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -946,3 +930,201 @@ class Equation(symmetric.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Merge": "discopy.comarkov.Merge"})
+
+
+class TermBase(symmetric.TermBase):
+    """
+    A term of a category with copies and discards, i.e. of the kappa
+    calculus with contraction and weakening: a
+    :class:`discopy.symmetric.TermBase` where a variable occurs any number
+    of times. The context of a term is its distinct free variables in the
+    order of their first occurrence: an :class:`Application` copies the
+    ones its function and its argument share, a :class:`Kappa` discards
+    the ones its body does not use.
+
+    Nothing is assumed of a box: a discard need not be natural, so that a
+    statement whose variable is not used stays, as does one whose variable
+    is used twice, a copy of the output of a box being no two boxes. Beta
+    reduction only inlines a variable used exactly once, and a term
+    evaluates to a diagram up to the axioms of copy-discard categories,
+    see :class:`Equation`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g = Box('f', x, y), Box('g', y @ y, x)
+    >>> diagram = Diagram.copy(x) >> f @ f >> g
+    >>> print(diagram.to_term())
+    x(lambda x0: let(f(x0), lambda x1: let(f(x0), lambda x2: g(x1, x2))))
+    >>> print(diagram.to_term().normal_form())
+    x(lambda x0: g(f(x0), f(x0)))
+    >>> assert Equation(diagram.to_term().eval(), diagram)
+
+    >>> shared = f >> Diagram.copy(y) >> g
+    >>> print(shared.to_term().normal_form())
+    x(lambda x0: let(f(x0), lambda x1: g(x1, x1)))
+    >>> unused = f @ x >> Diagram.discard(y) @ x
+    >>> print(unused.to_term().normal_form())
+    (x @ x)(lambda x0, x1: let(f(x0), lambda x2: x1, offset=0))
+    >>> assert Equation(unused.to_term().eval(), unused)
+    >>> assert not Equation(unused, Diagram.discard(x) @ x)
+    """
+    strategy = classmethod(symmetric.TermBase.strategy.__func__)
+
+    @classmethod
+    def rewire(cls, box, arguments):
+        """ A function is read as its inputs, copied and discarded. """
+        return [arguments[i] for i in box.func.inside]\
+            if isinstance(box, Function) else super().rewire(box, arguments)
+
+    @staticmethod
+    def wire(functor, wiring, dom):
+        """
+        The image under a functor of the wiring from a type to its wires
+        at the given indices: that of their function in its domain, which
+        copies and discards them.
+        """
+        return functor(functor.dom.from_function(wiring, dom))
+
+    @axiom
+    def eta(cls, term: Self) -> AbstractEquation:
+        """
+        Eta expansion: a term and its expansion evaluate to diagrams equal
+        up to the axioms of copy-discard categories.
+        """
+        return Equation(term.expand().eval(), term.eval())
+
+
+class Variable(TermBase, symmetric.Variable):
+    """
+    A variable with a name and a type of one wire, an identity diagram.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+    """
+
+
+class Constant(TermBase, symmetric.Constant):
+    """
+    A box as a term, with its domain as stack.
+
+    Parameters:
+        box : The box.
+    """
+
+
+class Application(TermBase, symmetric.Application):
+    """
+    The application of a term to an argument with no stack: the variables
+    they share are copied, and their context is that of the function with
+    the variables of the argument where its stack was, each one where it
+    first occurs.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> g, a = Constant(Box('g', x @ x, y)), Variable('a', x)
+    >>> assert g(a, a).freevars == [a] and g(a, a).dom == x
+    >>> assert g(a, a).eval() == Copy(x) >> g.box
+    """
+    @staticmethod
+    def share(*contexts):
+        """ The distinct free variables of terms side by side. """
+        return list(dict.fromkeys(x for context in contexts for x in context))
+
+    @staticmethod
+    def contractible(func, arg):
+        """
+        Whether a function applied to an argument is a redex to contract:
+        one of a symmetric category that uses its variable exactly once,
+        neither copying nor discarding its argument.
+        """
+        return symmetric.Application.contractible(func, arg)\
+            and func.body.count(func.head) == 1
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        left, _, right = self.func.context
+        stack = list(range(len(self.stack)))
+        before, _, after = self.context
+        source = before + stack + after
+        wiring = [source.index(wire)
+                  for wire in left + self.arg.freevars + stack + right]
+        return self.wire(functor, wiring, self.dom) >> super().eval(functor)
+
+
+class Kappa(TermBase, symmetric.Kappa):
+    """
+    The abstraction of some ``variables`` in a ``body``, in any order and
+    whether it uses them or not: the ones it does not use are discarded.
+
+    Parameters:
+        variables : The variables to bind, in the order of the stack.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, needed
+            when nothing says where it is: no stack in the body, which
+            uses none of the variables.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, a, b = Constant(Box('f', x, y)), Variable('a', x), Variable('b', y)
+    >>> term = Kappa((b, a), f(a))
+    >>> assert term == (y @ x)(lambda b, a: f(a))
+    >>> assert term.eval() == Discard(y) @ f.box
+    >>> print(Kappa((b, ), f(a), 1))
+    y(lambda b: f(a), offset=1)
+    >>> assert Kappa((b, ), f(a), 1).eval() == x @ Discard(y) >> f.box
+    >>> Kappa((a, a), f(a))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected distinct variables to bind in f(a), got a, a.
+    """
+    unbound = messages.NOT_DISTINCT
+
+    @staticmethod
+    def binds(variables, body):
+        """ Whether the variables are distinct: a body need not use them. """
+        # pylint: disable=unused-argument  # a discarded variable is not used
+        return len(set(variables)) == len(variables)
+
+
+type Term = Variable | Constant | Application | Kappa
+
+
+@dataclass
+class Sampler(symmetric.Sampler):
+    """
+    Samples a term of a category with copies and discards as a
+    :class:`discopy.symmetric.Sampler` does, each subterm using its
+    variables in an order of its own, one of them twice or not at all.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> v, w = Variable('v', x), Variable('w', x)
+    >>> print(Sampler(TermBase, iter([0, 0, 1]), [x], "a").state(y, (v, w)))
+    c0(v, w, v)
+    >>> print(Sampler(TermBase, iter([0, 1, 2]), [x], "a").state(y, (v, w)))
+    c0(v)
+    """
+    def shuffle(self, bound):
+        """ A rotation of the variables with the first copied or dropped. """
+        bound = super().shuffle(bound)
+        kind = self.choose(range(4)) if bound else 0
+        return bound + bound[:1] if kind == 1\
+            else bound[1:] if kind == 2 else bound
+
+
+TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+
+
+Bubble = Box.from_args

@@ -23,7 +23,7 @@ Summary
     Cap
     Spider
     Sum
-    Bubble
+    Elementwise
     Diff
     Equation
 
@@ -53,12 +53,12 @@ from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, feedback, frobenius, cmap, config, hypergraph,
+    cat, monoidal, rigid, frobenius, cmap, config, hypergraph,
     messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
-    Matrix, backend, set_backend, get_backend,
+    Matrix, backend, set_backend, get_backend, repr_nonfinite,
     Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
@@ -615,7 +615,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         >>> graph = (g >> frobenius.Spider(1, 2, n)).to_hypergraph()
         >>> assert F(graph) == F(graph.to_diagram())
         """
-        if isinstance(other, Bubble):
+        if isinstance(other, Elementwise):
             return self(other.arg).map(other.func, self.dtype)
         if isinstance(other, (rigid.Cup, rigid.Cap))\
                 and other.left == other.right:
@@ -878,8 +878,14 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
     permutation_factory: ClassVar[type["Permutation"]]
     cup_factory: ClassVar[type["Cup"]]
     cap_factory: ClassVar[type["Cap"]]
-    bubble_factory: ClassVar[type["Bubble"]]
     ob = Dim
+
+    def bubble(self, *args, **params) -> Elementwise:
+        """
+        The :class:`Elementwise` box of a tensor diagram, the bubble of this
+        category: a tensor box with args applies a function elementwise.
+        """
+        return self.elementwise_factory(self, *args, **params)
 
     def __class_getitem__(cls, values):
         """ The dtype of a tensor, or the type parameter that declares a
@@ -942,7 +948,7 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         boxes = list(self.boxes) if dtype is None else []
         for box in boxes:
             inside = box.terms if isinstance(box, Sum)\
-                else (box.arg, ) if isinstance(box, Bubble) else ()
+                else box.args
             boxes += [b for diagram in inside for b in diagram.boxes]
         typed = [Matrix[box.dtype].zero(0, 0)
                  for box in boxes if box.dtype is not None]
@@ -1194,6 +1200,25 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
                 self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
 
+    def __repr__(self):
+        """
+        The representation of a tensor box, with its ``data`` as the nested
+        list of its entries through :func:`repr_nonfinite`, which the box
+        equals by :meth:`setoid` whatever array it holds.
+
+        >>> import numpy as np
+        >>> f = Box('f', Dim(1), Dim(2), np.array([np.nan, -np.inf]))
+        >>> print(repr(f).split('data=')[1])
+        [float('nan'), float('-inf')])
+        >>> from discopy import tensor
+        >>> assert eval(repr(f), {'tensor': tensor, 'Dim': Dim}) == f
+        """
+        if self.data is None:
+            return super().__repr__()
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        return super().__repr__().replace(
+            f", data={self.data!r}", f", data={repr_nonfinite(data)}", 1)
+
 
 class Cup(frobenius.Cup, Box):
     """
@@ -1306,15 +1331,17 @@ def func_repr(func: Callable) -> str:
         else f"{func.__module__}.{name}".removeprefix("builtins.")
 
 
-class Bubble(feedback.Bubble, Box):
+class Elementwise(Box):
     """
-    Bubble in a tensor diagram, applies a function elementwise. It is a
-    feedback bubble, so that a circuit bubble delays as one.
+    A tensor box with one arg that applies a function elementwise to the
+    tensor of its arg, which :meth:`Diagram.bubble` builds. It delays as a
+    feedback box with args does, so that a circuit one delays as one. A
+    plain tensor :class:`Box` carries no function.
 
     Parameters
     ----------
-    inside : tensor.Diagram
-        The diagram inside the bubble.
+    arg : tensor.Diagram
+        The diagram inside the box.
     func : callable
         The function to apply, default is :code:`lambda x: int(not x)`.
         A named function prints as its import path, e.g. :code:`abs` or
@@ -1352,21 +1379,37 @@ class Bubble(feedback.Bubble, Box):
     .. image:: /_static/tensor/product-rule.svg
         :align: center
     """
-    serialised_attrs = feedback.Bubble.serialised_attrs + ("func", )
+    serialised_attrs = (
+        "*args", "dom", "cod", "name", "is_dagger", "data", "drawing_name",
+        "draw_as_frame", "draw_as_square", "draw_vertically", "z",
+        "is_deterministic", "is_affine", "time_step", "func")
     func = staticmethod(lambda x: int(not x))
 
     def __new__(cls, *args, data=None, **kwargs):
         return super().__new__(cls, data=data)
 
-    def __init__(self, inside, func=None, **params):
+    def __init__(self, arg=None, dom=None, cod=None, name="", func=None,
+                 time_step=0, **params):
+        arg = params.pop("args", (arg, ))[0] if arg is None else arg
         if func is not None:
             self.func = func
-        super().__init__(inside, **params)
+        dom, cod = (
+            given if given is not None
+            else getattr(arg, attr).delay(time_step)
+            for attr, given in [("dom", dom), ("cod", cod)])
+        params.pop("method", None)
+        params.pop("args", None)
+        Box.__init__(self, name, dom, cod, args=(arg, ),
+                     time_step=time_step, **params)
+
+    @classmethod
+    def from_args(cls, *args, **params) -> Elementwise:
+        return cls(*args, **params)
 
     def setoid(self):
         """
-        Tensor bubbles are equal when their args, methods and funcs are, and
-        they are equal as tensor boxes: their daggers too, and their data by
+        Elementwise boxes are equal when their args and funcs are, and they
+        are equal as tensor boxes: their daggers too, and their data by
         its entries, so that a bubble holding a list hashes as a box does.
 
         >>> import numpy as np
@@ -1375,19 +1418,25 @@ class Bubble(feedback.Bubble, Box):
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
         """
         args = tuple(f.setoid() for f in self.args)
-        return (factory_key(type(self)), self.method, self.func)\
+        return (factory_key(type(self)), self.func)\
             + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
-        if self.func is type(self).func:
-            return super().__repr__()
-        return super().__repr__()[:-1] + f", func={func_repr(self.func)})"
+        kwargs = "" if self.is_id_on_objects else (
+            f", dom={self.dom!r}, cod={self.cod!r}")
+        kwargs += f", name={self.name!r}" if self.name else ""
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        kwargs += "" if data is None else f", data={repr_nonfinite(data)}"
+        kwargs += "" if self.func is type(self).func\
+            else f", func={func_repr(self.func)}"
+        kwargs += f", time_step={self.time_step}" if self.time_step else ""
+        return f"{factory_name(type(self))}({self.arg!r}{kwargs})"
 
     def grad(self, var, **params):
         """
-        The gradient of a bubble is given by the chain rule.
+        The gradient of an elementwise box is given by the chain rule.
 
         >>> from sympy.abc import x  # doctest: +EXTRA
         >>> g = Box('g', Dim(2), Dim(2), [2 * x, 0, 0, x + 1])
@@ -1415,7 +1464,7 @@ class Diff:
     tensor by the bubble of :meth:`Box.grad`, an entry with no ``diff``, e.g.
     a number, being a constant. Given a ``func``, it is the derivative of that
     function instead, bound by the variable, as the chain rule of
-    :meth:`Bubble.grad` applies it.
+    :meth:`Elementwise.grad` applies it.
 
     Parameters:
         var : The variable.
@@ -1462,9 +1511,12 @@ Diagram.sum_factory, Diagram.swap_factory = Sum, Swap
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
-Diagram.bubble_factory = Bubble
+Diagram.elementwise_factory = Elementwise
 Id = Diagram.id
 
 
 class Equation(frobenius.Equation):
     """ The :class:`frobenius.Equation` of tensor diagrams. """
+
+
+Bubble = Elementwise.from_args

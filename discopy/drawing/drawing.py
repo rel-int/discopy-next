@@ -539,11 +539,14 @@ which to_drawing recomputes.
         """
         The shift of one corner of each box drawn as a polygon when nothing
         else is asked for: :code:`0.125` when some box is a conjugate, a
-        transpose or a dagger not drawn as a braid, :code:`0` otherwise.
+        transpose or a dagger not drawn as a braid, :code:`0` otherwise,
+        counting the boxes of the drawings nested in its boxes.
         """
         return 0.125 * any(
             box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid)
+                box.is_dagger and not box.draw_as_braid) or (
+                any(nested.asymmetry()
+                    for nested in getattr(box, "nested", None) or ()))
             for box in self.boxes)
 
     def to_typst(self, **params):
@@ -1554,7 +1557,7 @@ which to_drawing recomputes.
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))
         right = Ty(Wire("", arg_dom.cod, dom.cod))
-        left[0].always_draw_label = True
+        left.inside[0].always_draw_label = True
         wires_can_go_straight = (
             len(dom), len(cod)) == (len(arg_dom), len(arg_cod))
         if frame_sides:

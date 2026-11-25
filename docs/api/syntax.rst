@@ -10,6 +10,7 @@ and the property tests that check their axioms.
 
     discopy.testable
     discopy.abc
+    discopy.lean
     discopy.cat
     discopy.monoidal
     discopy.spacial
@@ -21,13 +22,13 @@ and the property tests that check their axioms.
     discopy.comarkov
     discopy.closed
     discopy.biclosed
+    discopy.bang
     discopy.rigid
     discopy.pivotal
     discopy.ribbon
     discopy.compact
     discopy.frobenius
     discopy.hypergraph
-    discopy.egraph
     discopy.cmap
 
 Utilities shared by every module: serialisation, factories and configuration.

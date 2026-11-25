@@ -533,7 +533,7 @@ class Bang[Coarse, Object](Constructor):
     :class:`Delay` reads the delay, so that a category whose bang is the
     identity reads each object as its own bang.
 
-    >>> from discopy.biclosed import Ty, Diagram
+    >>> from discopy.bang import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
     """
     @staticmethod
@@ -1305,7 +1305,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
         >>> from discopy.biclosed import TermBase
         >>> assert Arrow in Testable.enrolled() and Ty in Testable.enrolled()
         >>> assert Box not in Testable.enrolled()
-        >>> from discopy.lambek.proofnet import ProofNet
+        >>> from discopy.lambek.abstract.proofnet import ProofNet
         >>> assert TermBase in Testable.enrolled()
         >>> assert ProofNet in Testable.enrolled()
         """

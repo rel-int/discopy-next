@@ -208,14 +208,14 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    monoidal, symmetric, frobenius, tensor, hypergraph
+    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
-from discopy.matrix import backend
+from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
-from discopy.utils import AxiomError, factory_name
+from discopy.utils import AxiomError, factory_name, from_tree
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
 from discopy.optyx.utils.misc import (
@@ -250,6 +250,9 @@ class PhotonNumberPreservation(Enum):
 
 class Ob(frobenius.Wire):
     """Basic object in an optyx Diagram: bit or mode"""
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
 
 
 @factory
@@ -302,6 +305,20 @@ class Diagram(frobenius.Diagram):
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
 
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of an optyx type is its spider with two legs in, as in any
+        frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
+        and :meth:`trace` bends its wires with both, so the cap comes out as
+        the spider with two legs out and `cap_factory` is never reached.
+
+        >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
+        >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
+
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
         return symmetric.Functor(
@@ -313,7 +330,8 @@ class Diagram(frobenius.Diagram):
 
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
-        of a :class:`Diagram`.
+        of a :class:`Diagram`, or a formal
+        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams.
 
@@ -803,7 +821,7 @@ class Box(frobenius.Box, Diagram):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         array = "" if self.array is None\
-            else f", array={self.array.tolist()!r}"
+            else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
 
@@ -1026,21 +1044,15 @@ class Sum(symmetric.Sum, Box):
             self.dom, self.cod)
 
     def to_path(self, dtype: type = complex):
-        return sum(term.to_path(dtype) for term in self.terms)
+        return Diagram.to_path(self, dtype)
 
     def inflate(self, d):
         return Diagram.inflate(self, d)
 
     def eval(self, n_photons=0, permanent=None, dtype=complex):
-        """Evaluate the sum of diagrams."""
-        # we need to implement the proper sums of qpath diagrams
-        # this is only a temporary solution, so that the grad tests pass
-        if permanent is None:
-            permanent = path.npperm
-        return sum(
-            term.to_path(dtype).eval(n_photons, permanent)
-            for term in self.terms
-        )
+        """Evaluate the sum of diagrams on the ``n_photons`` sector."""
+        permanent = path.npperm if permanent is None else permanent
+        return self.to_path(dtype).eval(n_photons, permanent)
 
     def to_tensor(self, input_dims=None):
         if not self.terms:
@@ -1463,15 +1475,23 @@ def truncation_tensor(
     return tensor
 
 
-class Feedback(monoidal.Bubble, Box):
+class Feedback(Box):
     """
     A feedback loop connecting the last `mem` outputs of `arg`
     back to its last `mem` inputs, one time step later.
 
-    The delay endofunctor is the identity, so `arg` goes from `dom @ mem`
+    The delay is real but left unwritten: the memory of `arg` is not typed
+    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
+
+    A loop is therefore a delay line rather than a trace, and yanking
+    fails: the feedback of a swap waits one time step instead of being the
+    identity.
+
+    >>> wait = Diagram.swap(mode, mode).feedback()
+    >>> assert wait.unroll(1) != Diagram.id(mode ** 3)
 
     Parameters:
         arg : The diagram from `dom @ mem` to `cod @ mem` to feed back.
@@ -1531,9 +1551,9 @@ class Feedback(monoidal.Bubble, Box):
         if self.effect.dom != mem:
             raise AxiomError(
                 f"{self.effect} is not an effect on the memory {mem}")
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, method="feedback_operator")
-        Box.__init__(self, str(self), dom, cod)
+        self.args = (arg, )
+        Box.__init__(self, str(self), dom, cod, args=(arg, ),
+                     method="feedback_operator")
 
     def __str__(self):
         args = "" if self.mem == self.arg.cod[-1:] else f"mem={self.mem}"
@@ -1551,6 +1571,19 @@ class Feedback(monoidal.Bubble, Box):
             if boundary != getattr(self, f"default_{attr}")(self.mem):
                 args += f", {attr}={repr(boundary)}"
         return f"{type(self).__name__}({args})"
+
+    def to_tree(self) -> dict:
+        """ The tree of a feedback: its arg, boundary, memory and ends. """
+        return {'factory': factory_name(type(self)), **{
+            attr: getattr(self, attr).to_tree() for attr in (
+                "arg", "dom", "cod", "mem", "state", "effect")}}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        arg, dom, cod, mem, state, effect = (
+            from_tree(tree[attr]) for attr in (
+                "arg", "dom", "cod", "mem", "state", "effect"))
+        return cls(arg, dom=dom, cod=cod, mem=mem, state=state, effect=effect)
 
     def to_path(self, dtype: type = complex):
         """A feedback loop has no path matrix until unrolled."""

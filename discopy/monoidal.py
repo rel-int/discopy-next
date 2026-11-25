@@ -20,11 +20,16 @@ Summary
     Layer
     Diagram
     Box
-    Sum
-    Bubble
     Functor
     Match
     Equation
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
+    InterchangeEquation
+    Sampler
 
 .. admonition:: Functions
 
@@ -34,6 +39,7 @@ Summary
         :toctree:
 
         uncolour_state
+        let
 
 Axioms
 ------
@@ -61,23 +67,115 @@ We can check the Eckmann-Hilton argument, up to interchanger.
 
 .. image:: /_static/monoidal/EckmannHilton.gif
     :align: center
+
+Terms
+-----
+
+A diagram also reads as a term of the planar linear kappa calculus, see
+:class:`TermBase`: the terms of :mod:`discopy.cat` with a list of variables
+as context, each used once and in order.
+
+A term has exactly one output, and the translation between diagrams and
+terms is faithful for the diagrams that have exactly one too:
+:meth:`Diagram.to_term` reads one variable for each wire
+and a ``let`` for each box but the last, which gives the output and needs
+none, and :meth:`TermBase.eval` gives the diagram back, box for box. A
+diagram with any other number of outputs is refused rather than read as the
+term of a different diagram.
+
+>>> x, y, z = map(Ty, "xyz")
+>>> f, g, h = Box('f', x, y), Box('g', x, z), Box('h', y @ z, x)
+>>> diagram = f @ x >> y @ g >> h
+>>> print(diagram.to_term())
+(x @ x)(lambda x0, x1: let(f(x0), lambda x2: \
+let(g(x1), lambda x3: h(x2, x3))))
+>>> assert diagram.to_term().eval() == diagram
+>>> (f @ g).to_term()
+Traceback (most recent call last):
+    ...
+ValueError: Expected exactly one output, got y @ z: a term has one.
+
+This loses no diagram where the category has products: a
+:class:`discopy.closed.Pack` box turns any closed diagram into one with
+exactly one output, of :class:`discopy.closed.Product` type. A closed diagram
+reads as a lambda term by default, see :meth:`discopy.closed.Diagram.to_term`,
+and as a kappa term with :meth:`TermBase.from_diagram`.
+
+>>> from discopy import closed
+>>> X, Y, Z = map(closed.Ty, "XYZ")
+>>> F, G = closed.Box('f', X, Y), closed.Box('g', X, Z)
+>>> packed = F @ G >> closed.Pack(Y * Z)
+>>> assert len(packed.cod) == 1
+>>> print(TermBase.from_diagram(packed).normal_form())
+(X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
+>>> assert TermBase.from_diagram(packed).eval() == packed
+
+Beta reduction :math:`(\\kappa x. e)(c) = e[c / x]` inlines the ``let`` of a
+box with one output, and :meth:`TermBase.normal_form` inlines them all. It is
+sound up to interchange: the two orders of ``f @ g`` have one normal form.
+
+>>> print(diagram.to_term().normal_form())
+(x @ x)(lambda x0, x1: h(f(x0), g(x1)))
+>>> other = x @ g >> f @ z >> h
+>>> assert other != diagram and InterchangeEquation(other, diagram)
+>>> assert other.to_term().normal_form() == diagram.to_term().normal_form()
+
+When every box has one output the normal form is a tree, and two diagrams
+with one output are equal up to interchange exactly when their normal forms
+are. A box with several outputs keeps its ``let``, which binds them all at
+once, and two such statements do not commute: there the normal form is
+sound, not complete.
+
+>>> copy = Box('copy', x, x @ x)
+>>> print((copy >> f @ g >> h).to_term().normal_form())
+x(lambda x0: let(copy(x0), lambda x1, x2: h(f(x1), g(x2))))
+>>> k = Box('k', x @ x @ x @ x, x)
+>>> first = copy @ x >> x @ x @ copy >> k
+>>> second = x @ copy >> copy @ x @ x >> k
+>>> assert first.to_hypergraph() == second.to_hypergraph()
+>>> assert first.to_term().normal_form() != second.to_term().normal_form()
+
+Eta expansion :math:`\\kappa x. e(x) = e` holds on the nose.
+
+>>> term = Constant(h)
+>>> assert (y @ z)(lambda a, b: term(a, b)).eval() == term.eval() == h
+
+A term is drawn as its diagram:
+
+>>> diagram.to_term().draw(doctest='docs/_static/monoidal/let.svg')
+
+.. image:: /_static/monoidal/let.svg
+    :align: center
+
+The modules above have terms of their own, down to :mod:`discopy.biclosed`
+where they are lambda terms: a :class:`discopy.symmetric.Kappa` binds its
+variables in any order, a :class:`discopy.markov.Kappa` need not use them
+and a :class:`discopy.markov.Application` may use one twice.
 """
 
 from __future__ import annotations
 
 import itertools
+from copy import copy
+from itertools import count
 from dataclasses import dataclass, field
 from functools import cached_property
 from operator import index
 from types import NoneType
 from typing import (
-    Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING, cast)
+    Iterable, Iterator, Callable, ClassVar, Mapping, Self, Sequence,
+    TYPE_CHECKING, cast)
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
+from discopy import sum as formal_sum
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
-from discopy.testable import Hom, Obj, TestableGeneric, Var, axiom
+# pylint: disable-next=unused-import  # the redex a term prints as
+from discopy.cat import let  # noqa: F401
+from discopy.testable import (
+    GENERATORS, Equation as AbstractEquation, Hom, Obj, TestableGeneric,
+    Var, axiom)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -94,11 +192,13 @@ from discopy.utils import (
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
+    text_width,
     unbiased,
 )
 
 if TYPE_CHECKING:
     import sympy
+    from hypothesis import strategies as st
 
 
 @dataclass(frozen=True)
@@ -236,7 +336,8 @@ class Wire(cat.Ob):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
 
-    __str__ = cat.Box.__str__
+    def __str__(self):
+        return str(self.name) + ("[::-1]" if self.is_dagger else '')
 
     def to_tree(self):
         tree = super().to_tree()
@@ -627,6 +728,25 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             parts.append(f'{name}("")' if s == '' else s)
         return ' @ '.join(parts)
 
+    def __call__(self, function: Callable, offset: int | None = None):
+        """
+        The kappa abstraction of a Python function from a variable for each
+        wire of the type to a term, see :class:`Kappa`, as a type of a
+        closed category applied to a function is a lambda abstraction.
+
+        Parameters:
+            function : The body, as a function of the variables.
+            offset : Passed to :class:`Kappa`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x @ y, x)
+        >>> term = (x @ y)(lambda a, b: Constant(f)(a, b))
+        >>> assert term.eval() == f
+        """
+        return Kappa.from_callable(self, offset)(function)
+
     def atoms(self) -> list[Ty]:
         """
         The atoms of a type: those of its objects, each one with no adjoint
@@ -703,7 +823,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
                  getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
-            for flag in ("frame_boundary", "draw_as_bracket"):
+            for flag in (
+                    "frame_boundary", "always_draw_label", "draw_as_bracket"):
                 if getattr(old, flag, False):
                     setattr(new, flag, True)
             for attr, default in (
@@ -1310,6 +1431,12 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
 
+    Attributes:
+        draw_left_to_right : Whether the diagrams of the class are drawn left
+            to right rather than top to bottom, a property of the category
+            rather than of any diagram: see :class:`Box` for diagrams of
+            one direction drawn as the args of a box of another.
+
     .. admonition:: Summary
 
         .. autosummary::
@@ -1328,9 +1455,9 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         messages.NO_PLANAR_NORMAL_FORM)
 
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
-    bubble_factory: ClassVar[type["Bubble"]]
+    sum_factory: ClassVar[type[formal_sum.Sum]]
     functor_factory: ClassVar[type["Functor"]]
+    draw_left_to_right: ClassVar[bool] = False
     ob = Ty
     layer_factory = Layer
 
@@ -1462,7 +1589,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         if not others:
             return self
         for other in others:
-            if isinstance(other, Sum):
+            if isinstance(other, formal_sum.Sum):
                 return self.sum_factory((self, )).tensor(*others)
             assert_isinstance(other, self.ar)
             assert_isinstance(self, other.ar)
@@ -1677,6 +1804,35 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         >>> assert c @ x != x @ c and (c @ x).to_map() == (x @ c).to_map()
         """
         return cmap.CMap[self.ar].from_diagram(self)
+
+    def to_term(self):
+        """
+        Read a diagram with exactly one output as a term of the planar
+        linear kappa calculus, see :class:`TermBase`: a variable for each
+        wire, ``x0, ..., x{n - 1}`` for the inputs, and a ``let`` for each
+        box in the order of the layers, but the last when it gives the
+        output, so that :meth:`TermBase.eval` gives the
+        diagram back, box for box.
+
+        A term has one output: a diagram with any other number of them is
+        refused. Every box is a constant, structural ones included, e.g. a
+        swap, and no wire is ever copied, discarded or crossed. Closed
+        Markov diagrams read as lambda terms instead, see
+        :meth:`discopy.closed.Diagram.to_term`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f, g = Box('f', x, y @ y), Box('g', y @ y, x)
+        >>> print((f >> g).to_term())
+        x(lambda x0: let(f(x0), lambda x1, x2: g(x1, x2)))
+        >>> e = Box('e', y, Ty())
+        >>> print((f >> y @ e >> Box('h', y, x)).to_term())
+        x(lambda x0: let(f(x0), lambda x1, x2: \
+let(e(x2), lambda: h(x1), offset=1)))
+        >>> assert (f >> g).to_term().eval() == f >> g
+        """
+        return self.term_factory.from_diagram(self)
 
     def to_staircases(self):
         """
@@ -2315,21 +2471,155 @@ class Box(cat.Box, Diagram):
 
     .. image:: /_static/monoidal/coloured-box.svg
         :align: center
+
+    A box with args, i.e. a bubble, is drawn around its arg, as a square
+    when their boundaries differ in length, or as a frame with a slot for
+    each of its args, side by side or vertically.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
+    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
+    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
+
+    .. image:: /_static/monoidal/bubble-example.svg
+        :align: center
+
+    >>> b = f.bubble(g, h >> h[::-1], dom=x, cod=y @ y)
+    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
+
+    .. image:: /_static/monoidal/bubble-multiple-args.svg
+        :align: center
+
+    >>> b = f.bubble(g, h, dom=x, cod=y @ y, draw_vertically=True)
+    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
+
+    .. image:: /_static/monoidal/frame-vertical-args.svg
+        :align: center
+
+    Coloured frames distinguish their outside, frame and slot regions.
+
+    >>> red, blue = map(Colour, ("red", "blue"))
+    >>> x = Ty(Wire("x", red, blue))
+    >>> f = Box("f", x, x)
+    >>> frame = f.bubble(
+    ...     dom=Ty(Wire("boundary", blue, red)),
+    ...     cod=Ty(Wire("boundary", blue, red)),
+    ...     draw_as_frame=True)
+    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
+
+    .. image:: /_static/monoidal/coloured-frame.svg
+        :align: center
+
+    The diagrams of a category with ``draw_left_to_right`` are drawn left to
+    right, and a box whose args are drawn in another direction than its
+    own category is drawn as one box with its args across it, on a
+    background of its ``frame_colour``. This is how to draw "Very big car" in
+    higher-order DisCoCat :cite:p:`ToumiDeFelice25`: each word is a lambda
+    term, drawn top to bottom, whose body is a diagram, drawn left to right:
+
+    >>> @factory
+    ... class Body(Diagram):
+    ...     draw_left_to_right = True
+    >>> class Primitive(Box, Body):
+    ...     pass
+    >>> n, n_n = Ty('n'), Ty('n ← n')
+    >>> x, B = Primitive('x', Ty(), n), Primitive('B', n, n)
+    >>> C = Primitive('C', Ty(), n)
+    >>> style = dict(color="green", frame_colour="red")
+    >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
+    ...            color="green", height=2)
+    >>> big = (x >> B).bubble(
+    ...     dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
+    >>> car = C.bubble(dom=Ty(), cod=n, **style)
+    >>> very_big = (x >> B >> B).bubble(
+    ...     dom=very.cod @ n_n, cod=n_n, drawing_name="λx ·", **style)
+    >>> very_big_car = (C >> B >> B).bubble(dom=n_n @ n, cod=n, **style)
+    >>> diagram = (very @ big @ car).foliation()\\
+    ...     >> very_big @ n >> very_big_car
+    >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
+
+    .. image:: /_static/monoidal/very-big-car.svg
+        :align: center
+
+    A box with args drawn in its own direction is a box with holes, e.g.
+    "with" as a frame with a hole on either side, named in its top left:
+
+    >>> A, y = Primitive('A', Ty(), n), Primitive('y', Ty(), n)
+    >>> W = lambda *args: Primitive(
+    ...     'W', Ty(), n, args=args, drawing_name="W",
+    ...     draw_as_frame=True, draw_vertically=True)
+    >>> with_ = W(y, x).bubble(
+    ...     dom=Ty(), cod=Ty('(n → n) ← n'), drawing_name="λxy ·", **style)
+    >>> with_attitude = W(y, A).bubble(
+    ...     dom=with_.cod @ n, cod=Ty('n → n'), drawing_name="λy ·", **style)
+    >>> diagram = (C.bubble(dom=Ty(), cod=n, **style) @ with_
+    ...            @ A.bubble(dom=Ty(), cod=n, **style)).foliation()\\
+    ...     >> n @ with_attitude\\
+    ...     >> W(C, A).bubble(dom=n @ with_attitude.cod, cod=n, **style)
+    >>> diagram.draw(
+    ...     doctest='docs/_static/monoidal/concepts-with-attitude.svg')
+
+    .. image:: /_static/monoidal/concepts-with-attitude.svg
+        :align: center
     """
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
+        draw_as_frame, draw_as_square, draw_vertically = (
+            params.pop("draw_as_frame", None),
+            params.pop("draw_as_square", None),
+            params.pop("draw_vertically", False))
         dom = dom if isinstance(dom, self.ob) else self.ob(dom)
         cod = cod if isinstance(cod, self.ob) else self.ob(cod)
         if (dom.dom, dom.cod) != (cod.dom, cod.cod):
             raise AxiomError(messages.NOT_GLOBULAR.format(
                 dom.dom, dom.cod, cod.dom, cod.cod))
+        if params.get("args") and params.get("drawing_name") is None\
+                and "drawing_name" not in vars(self):
+            params["drawing_name"] = ""
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in params:
                 setattr(self, attr, params.pop(attr))
         cat.Box.__init__(self, name, dom, cod, **params)
+        if self.args:
+            self.bubble_drawing(draw_as_frame, draw_as_square, draw_vertically)
         inside = () if self.is_identity\
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
+
+    def bubble_drawing(
+            self, draw_as_frame: bool | None, draw_as_square: bool | None,
+            draw_vertically: bool):
+        """
+        Set how a box with args is drawn: as a bubble around its one arg
+        when their boundaries have as many wires, else as a square, or as a
+        frame with a slot for each arg, side by side or vertically.
+
+        Parameters:
+            draw_as_frame : Whether to draw the box as a frame.
+            draw_as_square : Whether to draw the box as a square.
+            draw_vertically : Whether to draw the frame slots vertically.
+        """
+        self.draw_vertically = draw_vertically
+        if len(self.args) == 1:
+            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
+                len(self.arg.dom), len(self.arg.cod))
+            self.draw_as_square = draw_as_square or not can_draw_as_bubble
+            self.draw_as_frame = draw_as_frame or (
+                not can_draw_as_bubble and not self.draw_as_square)
+        else:
+            self.draw_as_frame = True
+            self.draw_as_square = False
+
+    @property
+    def frame_colour(self):
+        """ The colour of the frame, the default of
+        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        return vars(self).get(
+            "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
+
+    @frame_colour.setter
+    def frame_colour(self, colour):
+        vars(self)["frame_colour"] = colour
 
     def rebuild(self, **changes):
         """
@@ -2345,6 +2635,10 @@ class Box(cat.Box, Diagram):
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in vars(self) and attr not in vars(box):
                 setattr(box, attr, getattr(self, attr))
+        if self.args and box.args:
+            Box.bubble_drawing(
+                box, self.draw_as_frame, self.draw_as_square,
+                self.draw_vertically)
         return box
 
     is_identity = False
@@ -2371,147 +2665,43 @@ class Box(cat.Box, Diagram):
 
     @property
     def size(self):
-        return 1
-
-    def to_drawing(self):
-        return Drawing.from_box(self)
-
-
-class Sum(cat.Sum, Box):
-    """
-    A sum is a tuple of diagrams :code:`terms`
-    with the same domain and codomain.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-
-    Example
-    -------
-    >>> f = Box('f', 'x', 'x')
-    >>> print(f @ (f + f))
-    (f @ x >> x @ f) + (f @ x >> x @ f)
-    """
-    @property
-    def size(self):
-        return 1
-
-    def tensor(self, *others):
-        """
-        The tensor of sums distributes over the sum, i.e. its terms are the
-        ``n``-ary tensors of one term from each factor.
-
-        >>> f = Box('f', 'x', 'x')
-        >>> assert (f + f) @ (f + f) == sum(4 * [f @ f])
-        """
-        if not others:
-            return self
-        sums = [
-            other if isinstance(other, Sum) else self.sum_factory((other, ))
-            for other in others]
-        dom = self.dom.tensor(*(other.dom for other in sums))
-        cod = self.cod.tensor(*(other.cod for other in sums))
-        terms = tuple(
-            term.tensor(*rest) for term in self.terms
-            for rest in itertools.product(
-                *(other.terms for other in sums)))
-        return self.sum_factory(terms, dom, cod)
-
-    to_drawing = Diagram.to_drawing
-
-
-class Bubble(cat.Bubble, Box):
-    """
-    A bubble is a box with diagrams :code:`args` inside and an optional pair of
-    types :code:`dom` and :code:`cod`.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        drawing_name (str) : The label to use when drawing, empty by default.
-        draw_as_square (bool) : Whether to draw the bubble as a square.
-        draw_as_frame (bool) : Whether to draw the bubble as a frame.
-        draw_vertically (bool) : Whether to draw the frame slots vertically.
-        kwargs : Passed to :class:`cat.Bubble`.
-
-    Raises:
-        ValueError : When dom (resp. cod) is None and the args do not all
-            have the same dom (resp. cod).
-
-    Examples
-    --------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
-    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
-    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
-
-    .. image:: /_static/monoidal/bubble-example.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h >> h[::-1], dom=x, cod=y @ y)
-    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
-
-    .. image:: /_static/monoidal/bubble-multiple-args.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h, dom=x, cod=y @ y, draw_vertically=True)
-    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
-
-    .. image:: /_static/monoidal/frame-vertical-args.svg
-        :align: center
-
-    Coloured frames distinguish their outside, frame and slot regions.
-
-    >>> red, blue = map(Colour, ("red", "blue"))
-    >>> x = Ty(Wire("x", red, blue))
-    >>> f = Box("f", x, x)
-    >>> frame = f.bubble(
-    ...     dom=Ty(Wire("boundary", blue, red)),
-    ...     cod=Ty(Wire("boundary", blue, red)),
-    ...     draw_as_frame=True)
-    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
-
-    .. image:: /_static/monoidal/coloured-frame.svg
-        :align: center
-
-    """
-    serialised_attrs = cat.Bubble.serialised_attrs + (
-        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
-
-    def __init__(
-            self, *args: Diagram,
-            drawing_name: str | None = None,
-            draw_as_frame: bool | None = None,
-            draw_as_square: bool | None = None,
-            draw_vertically=False, **kwargs):
-        cat.Bubble.__init__(self, *args, **kwargs)
-        Box.__init__(self, self.name, self.dom, self.cod,
-                     data=self.data, is_dagger=self.is_dagger)
-        self.drawing_name = "" if drawing_name is None else drawing_name
-        self.draw_vertically = draw_vertically
-        self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
-        can_draw_as_square = len(args) == 1
-        can_draw_as_bubble = (can_draw_as_square
-                              and len(self.dom) == len(self.arg.dom)
-                              and len(self.cod) == len(self.arg.cod))
-        if len(args) == 1:
-            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
-                len(self.arg.dom), len(self.arg.cod))
-            self.draw_as_square = draw_as_square or not can_draw_as_bubble
-            self.draw_as_frame = draw_as_frame or (
-                not can_draw_as_bubble and not self.draw_as_square)
-        else:
-            self.draw_as_frame = True
-            self.draw_as_square = False
-
-    @property
-    def size(self):
-        """ The number of boxes in a bubble, counting its arguments. """
+        """ The number of boxes in a box, counting its arguments. """
         return 1 + sum(arg.size for arg in self.args)
 
     def to_drawing(self):
-        method = "frame" if self.draw_as_frame else "bubble"
+        if not self.args:
+            result = Drawing.from_box(self)
+            if not type(self).draw_left_to_right or "height" in vars(self)\
+                    or result.box.no_label:
+                return result
+            # The height of a box drawn left to right is its width on the page.
+            box = copy(self)
+            box.height = max(1, text_width(
+                getattr(self, "drawing_name", self.name)) + 1)
+            if "min_width" not in vars(self):
+                box.min_width = 0
+            return Drawing.from_box(box)
         args = [arg.to_drawing() for arg in self.args]
+        directions = {type(arg).draw_left_to_right for arg in self.args}
+        if len(directions) > 1:
+            raise ValueError(messages.MIXED_DIRECTIONS.format(self))
+        if directions != {self.draw_left_to_right}:
+            framed = [arg.framed() for arg in args]
+            height = max(arg.height for arg in framed)
+            nested = tuple(
+                arg.stretch(height - arg.height) for arg in framed)
+            width = sum(arg.width for arg in nested)
+            label = text_width(self.drawing_name) + .25\
+                if self.drawing_name else 0
+            return Box(
+                self.drawing_name, self.dom, self.cod, nested=nested,
+                color=getattr(self, "color", "white"),
+                frame_colour=self.frame_colour,
+                min_width=max(label + height + .5,
+                              getattr(self, "min_width", 0)),
+                height=max(width + 1,
+                           getattr(self, "height", 0))).to_drawing()
+        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
@@ -2674,17 +2864,22 @@ class Functor(cat.Functor):
             for box_or_typ in tail:
                 result = result @ self(box_or_typ)
             return result
-        if isinstance(other, Bubble) and self.cod is Drawing:
+        if isinstance(other, Box) and other.args and self.cod is Drawing:
             return other.to_drawing()
-        if isinstance(other, Bubble) and other.method == "bubble"\
-                and issubclass(self.cod, Diagram):
-            factory = self.cod.bubble_factory
+        if isinstance(other, Box) and other.args\
+                and other.method == "bubble" and issubclass(self.cod, Diagram):
             kept = {
                 attr: getattr(other, attr) for attr in other.serialised_attrs
-                if attr in factory.serialised_attrs
-                and attr not in ("*args", "dom", "cod", "method")}
-            return factory(*map(self, other.args), dom=self(other.dom),
-                           cod=self(other.cod), **kept)
+                if attr in getattr(
+                    self.cod, "elementwise_factory", self.cod.box_factory
+                ).serialised_attrs
+                and attr not in (
+                    "*", "*args", "args", "dom", "cod", "method")} | {
+                attr: getattr(other, attr) for attr in (
+                    "drawing_name", "draw_as_frame", "draw_as_square",
+                    "draw_vertically")}
+            return self.cod.bubble(*map(self, other.args), dom=self(other.dom),
+                                   cod=self(other.cod), **kept)
         return super().__call__(other)
 
 
@@ -2818,11 +3013,607 @@ Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
 Diagram.box_factory = Box
-Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
+Diagram.sum_factory = formal_sum.Sum[Diagram]
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
 Id = Diagram.id
 
-__getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
+
+class TermBase(cat.TermBase):
+    """
+    A term of a monoidal category, i.e. of the planar linear kappa calculus:
+    a :class:`discopy.cat.TermBase` with a list of variables as context,
+    each one wire, and a type as stack. A term in a context
+    :math:`\\Gamma` with a stack :math:`A` of inputs still to be applied
+    and one output :math:`b`
+
+    .. math::
+
+        \\Gamma_1, \\Gamma_2 \\vdash e : A \\to b
+        \\qquad \\text{denotes} \\qquad
+        \\Gamma_1 \\otimes A \\otimes \\Gamma_2 \\to b
+
+    - an :class:`Application` :math:`e(c)` feeds a term :math:`c` with no
+      stack to the first inputs of the stack of :math:`e`, putting the
+      context of :math:`c` where they were
+    - a :class:`Kappa` :math:`\\kappa x. e` moves a block of variables from
+      the context to the stack, where they stand
+
+    Terms are linear, each variable occurs once, and planar, the context is
+    in the order of the occurrences and nothing ever crosses, so that they
+    evaluate with composition and whiskering alone.
+
+    Attributes:
+        freevars (list[Variable]): The context, in the order of the domain.
+        stack (Ty): The inputs still to be applied.
+        offset (int | None): The number of free variables left of the stack,
+            ``None`` when the term has no place for one: a term with no
+            stack that is not a :class:`Kappa`.
+        cod (Ty): The codomain, one wire unless the term is the expression
+            of a :func:`let` binding several variables, or none.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, a, b = Constant(Box('f', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> term = f(a)
+    >>> assert term.freevars == [a] and term.offset == 1
+    >>> assert term.stack == y and term.dom == x @ y and term.cod == x
+    >>> assert term(b).dom == x @ y and term(b).offset is None
+    >>> g, h = Box('g', x, y), Box('h', x @ y @ x, y)
+    >>> term = (x @ x @ x)(
+    ...     lambda a, b, c: Constant(h)(a, Constant(g)(b), c))
+    >>> assert term.eval() == x @ g @ x >> h
+    """
+    stack: Ty
+    cod: Ty
+    sampler_factory: ClassVar[type[Sampler]]
+
+    strategy = classmethod(cat.TermBase.strategy.__func__)
+
+    @staticmethod
+    def wires(typ: Ty) -> list[Ty]:
+        """ The types of one wire a type is made of. """
+        return [typ[i:i + 1] for i in range(len(typ))]
+
+    def types(self, variables: Sequence[cat.Variable]) -> Ty:
+        """ The tensor of the types of some variables. """
+        return self.cod[:0].tensor(*(x.cod for x in variables))
+
+    @property
+    def dom(self) -> Ty:
+        """ The domain: the stack between the two halves of the context. """
+        offset = len(self.freevars) if self.offset is None else self.offset
+        return self.types(self.freevars[:offset]) @ self.stack\
+            @ self.types(self.freevars[offset:])
+
+    @classmethod
+    def from_diagram(cls, diagram: Diagram) -> cat.TermBase:
+        """
+        The term of a diagram with one output, see
+        :meth:`Diagram.to_term`.
+
+        Parameters:
+            diagram : The diagram to read.
+        """
+        if len(diagram.cod) != 1:
+            raise ValueError(messages.NOT_ONE_OUTPUT.format(diagram.cod))
+        fresh = count()
+
+        def name(typ):
+            return [cls.variable_factory(f"x{next(fresh)}", wire)
+                    for wire in cls.wires(typ)]
+
+        inputs = name(diagram.dom)
+        wires, steps = list(inputs), []
+        for layer in diagram.inside:
+            for box, offset in layer.boxes_and_offsets:
+                arguments = wires[offset:offset + len(box.dom)]
+                outputs = cls.rewire(box, arguments)
+                if outputs is None:
+                    outputs = name(box.cod)
+                    steps.append((cls.constant_factory(box)(
+                        *arguments), outputs, offset))
+                wires[offset:offset + len(box.dom)] = outputs
+        result, = wires
+        for expression, outputs, offset in reversed(steps):
+            result = expression if outputs == [result]\
+                else cls.bind(outputs, result, offset)(expression)
+        return cls.bind(inputs, result) if inputs else result
+
+    @classmethod
+    def rewire(cls, box: Box, arguments: list) -> list | None:
+        """
+        The variables on the outputs of a box that a term reads as wiring
+        rather than as a constant, given those on its inputs: ``None`` in a
+        monoidal category, where every box is a constant, a permutation of
+        them in a symmetric one.
+        """
+        # pylint: disable=unused-argument  # every box is a constant here
+        return None
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
+                 letters: Sequence[str | None]) -> cat.TermBase:
+        """
+        Build a term of codomain ``cod`` from a sequence of ``choices``, as
+        :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
+        bound by a kappa or left free, named ``v0, v1, ...``, and the
+        variable bound at each level is named by the letter at that level,
+        see :class:`Sampler`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(TermBase.generate(y, [1, 0, 0, 2, 2, 1, 2], [x], "ab"))
+        x(lambda a0: let(c0(a0), lambda b1, a2: c1(b1, a2)))
+        >>> print(TermBase.generate(y, [1, 2, 1, 2, 2, 0, 2], [x], "ab"))
+        let(c0, lambda a0, b1: c1(a0, b1, v0))
+        """
+        sampler = cls.sampler_factory(cls, iter(choices), types, letters)
+        dom = [sampler.choose(types) for _ in range(sampler.choose(range(3)))]
+        if sampler.choose((False, True)):
+            return sampler.state(cod, tuple(
+                cls.variable_factory(f"v{i}", typ)
+                for i, typ in enumerate(dom)))
+        variables = tuple(
+            sampler.bound(i, typ) for i, typ in enumerate(dom))
+        body = sampler.state(cod, variables, len(dom))
+        return cls.bind(variables, body) if variables else body
+
+    @classmethod
+    def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
+        """
+        Generate the arguments of :meth:`generate` but its letters, with
+        types of one wire each.
+        """
+        from hypothesis import strategies as st
+
+        types = st.sampled_from(GENERATORS).map(cls.functor.cod.ob)\
+            if types is None else types
+        return st.tuples(
+            types if cod is None else st.just(cod), cls.choices(),
+            st.lists(types, min_size=1, max_size=3))
+
+    @axiom
+    def normal_form_soundness(cls, term: Self) -> AbstractEquation:
+        """
+        Beta reduction is sound up to interchange, see
+        :class:`InterchangeEquation`: a term, its normal form and that of
+        the reading of its foliation evaluate to diagrams of one orbit. The
+        reading is there for beta reduction to change the order of its
+        boxes, those of a layer left to right: a generated term already
+        evaluates its arguments in the order its normal form does.
+        """
+        diagram = term.eval()
+        reading = diagram.foliation().to_term()
+        return InterchangeEquation(
+            diagram, term.normal_form().eval(), reading.normal_form().eval())
+
+    normal_form_completeness = cat.TermBase.normal_form_completeness\
+        .failing(messages.STATEMENTS_DO_NOT_COMMUTE)
+
+
+class Variable(TermBase, cat.Variable):
+    """
+    A variable with a name and a type of one wire, an identity diagram.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Variable('a', x).eval() == Diagram.id(x)
+    >>> Variable('a', x @ x)
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected exactly one output, got x @ x: a term has one.
+    """
+
+    def __init__(self, name: str, cod: Ty):
+        if len(cod) != 1:
+            raise ValueError(messages.NOT_ONE_OUTPUT.format(cod))
+        super().__init__(name, cod)
+        self.stack = cod[:0]
+
+
+class Constant(TermBase, cat.Constant):
+    """
+    A box as a term, with its domain as stack. It prints as the name of the
+    box, so that a term reads as a program calling its boxes.
+
+    Parameters:
+        box : The box.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> assert Constant(f).stack == x and Constant(f).eval() == f
+    >>> print(Constant(f)(Variable('a', x)))
+    f(a)
+    """
+
+
+class Application(TermBase, cat.Application):
+    """
+    The application of a term to an argument with no stack, which takes the
+    first inputs of the stack: the context of the argument goes where they
+    were, so that nothing crosses.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> g, a, b = Constant(Box('g', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> assert g(a, b) == Application(Application(g, a), b)
+    >>> assert g(a, b).freevars == [a, b]
+    >>> g(b)
+    Traceback (most recent call last):
+        ...
+    ValueError: g of stack x @ y does not apply to b of stack Ty() and \
+type y.
+    """
+
+    def __init__(self, func: TermBase, arg: TermBase):
+        # pylint: disable=super-init-not-called  # a context is a list here
+        assert_isinstance(func, TermBase)
+        assert_isinstance(arg, TermBase)
+        if arg.stack or func.offset is None\
+                or func.stack[:len(arg.cod)] != arg.cod:
+            raise ValueError(messages.NOT_APPLICABLE.format(
+                func, func.stack, arg, arg.stack, arg.cod))
+        self.func, self.arg = func, arg
+        before = self.share(func.freevars[:func.offset], arg.freevars)
+        self.freevars = self.share(before, func.freevars[func.offset:])
+        self.stack, self.cod = func.stack[len(arg.cod):], func.cod
+        self.offset = len(before) if self.stack else None
+
+    @staticmethod
+    def share(*contexts: list) -> list:
+        """
+        The context of terms side by side: their free variables in turn,
+        which have to be disjoint where nothing is copied.
+        """
+        result = [x for context in contexts for x in context]
+        if len(set(result)) < len(result):
+            raise ValueError("Expected disjoint free variables.")
+        return result
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        func, identity = self.func, functor.cod.id
+        left = identity(functor(self.types(func.freevars[:func.offset])))
+        right = identity(functor(
+            self.stack @ self.types(func.freevars[func.offset:])))
+        return left @ self.arg.eval(functor) @ right >> func.eval(functor)
+
+
+class Kappa(TermBase, cat.Kappa):
+    """
+    The abstraction of a block of ``variables`` of the ``body``, contiguous
+    in its context and next to its stack if it has one: they join the stack
+    where they stand, at its front if they are left of it and at its back
+    otherwise, so that the kappa of a term is the same diagram.
+
+    Parameters:
+        variables : The variables to bind, in the order of the context.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, needed
+            when nothing says where it is, no variable and no stack in the
+            body: the place for a box with no output.
+
+    Note
+    ----
+    Applying a type to a Python function names the variables after the
+    parameters, one for each wire, see :meth:`Ty.__call__`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, a, b = Constant(Box('f', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> term = Kappa((b, ), f(a, b))
+    >>> assert term.freevars == [a] and term.stack == y
+    >>> assert term == y(lambda b: f(a, b)) and term.eval() == f.box
+    >>> assert Kappa((a, ), term).stack == x @ y == Kappa((a, ), f(a)).stack
+    >>> Kappa((b, a), f(a, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected a block of variables next to the stack of f(a, b), \
+got b, a.
+
+    A box with no output is put between two wires by an ``offset``:
+
+    >>> e, c = Constant(Box('e', x, Ty())), Variable('c', x)
+    >>> term = let(e(a), lambda: f(c, b), offset=1)
+    >>> assert term.freevars == [c, a, b]
+    >>> assert term.eval() == x @ e.box @ y >> f.box
+    >>> let(e(a), lambda: f(c, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected an offset for the abstraction of no variable in \
+f(c, b), which has no stack to say where it stands.
+    >>> y(lambda b: f(c, b), offset=0)
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected offset 1 for the abstraction of b in f(c, b), got 0.
+    """
+    offset: int
+    unbound: ClassVar[str] = messages.NOT_A_BLOCK
+
+    @staticmethod
+    def place(variables, body):
+        """
+        The number of free variables left of the stack: where the first of
+        the variables stands in the context of the body, or else where its
+        stack does, ``None`` when it has none.
+        """
+        return body.freevars.index(variables[0]) if variables\
+            else body.offset
+
+    def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
+                 offset: int | None = None):
+        # pylint: disable=super-init-not-called  # a context is a list here
+        assert_isinstance(body, cat.TermBase)
+        variables = tuple(variables)
+        start = self.start(variables, body, offset)
+        stop = start + len(variables)
+        if tuple(body.freevars[start:stop]) != variables\
+                or body.offset not in (None, start, stop):
+            raise ValueError(self.unbound.format(
+                body, ", ".join(x.name for x in variables)))
+        self.variables, self.body, self.offset = variables, body, start
+        self.freevars = body.freevars[:start] + body.freevars[stop:]
+        self.cod, bound = body.cod, body.types(variables)
+        self.stack = bound @ body.stack if self.front else body.stack @ bound
+
+    @staticmethod
+    def binds(variables: tuple, body: cat.TermBase) -> bool:
+        """
+        Whether a body has the variables to bind: distinct ones, free in
+        it, each used exactly once where nothing is copied or discarded.
+        """
+        return len(set(variables)) == len(variables)\
+            and set(variables) <= set(body.freevars)
+
+    @classmethod
+    def start(cls, variables: tuple, body: cat.TermBase,
+              offset: int | None) -> int:
+        """
+        The number of free variables left of the stack: where the
+        variables or the stack of the body :meth:`place` it, or else the
+        ``offset``, which is refused when it says otherwise.
+        """
+        names = ", ".join(x.name for x in variables) or "no variable"
+        if not cls.binds(variables, body):
+            raise ValueError(cls.unbound.format(body, names))
+        expected = cls.place(variables, body)
+        start = expected if offset is None else offset
+        if start is None:
+            raise ValueError(messages.NO_OFFSET.format(body))
+        rest = len(set(body.freevars).difference(variables))
+        wanted = f"from 0 to {rest}" if expected is None else expected
+        valid = expected is not None or 0 <= start <= rest
+        if not valid or expected not in (None, start):
+            raise ValueError(
+                messages.WRONG_OFFSET.format(wanted, names, body, start))
+        return start
+
+
+type Term = Variable | Constant | Application | Kappa
+
+
+class InterchangeEquation(Equation):
+    """
+    An :class:`Equation` between diagrams which holds when
+    they are equal up to interchange, i.e. as morphisms of the free monoidal
+    category rather than of the premonoidal one: when the others are in the
+    :meth:`orbit` of the first under interchangers.
+
+    The hypergraphs of such diagrams are equal, and the converse fails: a
+    hypergraph forgets on which side of a wire a box with no wire sits. No
+    interchanger moves it across a wire that runs from the domain to the
+    codomain, only round the end of one: above a state or below an effect.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, s = Box('f', x, y), Box('s', Ty(), Ty())
+    >>> assert InterchangeEquation(s @ x >> f, f >> s @ y, s @ f)
+    >>> assert not InterchangeEquation(s @ x, x @ s)
+    >>> assert (s @ x).to_hypergraph() == (x @ s).to_hypergraph()
+    >>> cap, cup = Box('cap', Ty(), x), Box('cup', x @ x, Ty())
+    >>> assert InterchangeEquation(
+    ...     x @ s >> x @ cap >> cup, s @ x >> x @ cap >> cup)
+
+    Note
+    ----
+    The search is exhaustive and an orbit grows as the factorial of the
+    number of boxes that commute: this is for small diagrams, such as a law
+    draws. A boundary-connected diagram has a normal form instead, see
+    :cite:t:`DelpeuchVicary22` and :meth:`Diagram.normal_form`.
+    """
+    def __bool__(self):
+        first, *others = (term.to_staircases() for term in self.terms)
+        orbit = self.orbit(first, *others)
+        return all(other in orbit for other in others)
+
+    @staticmethod
+    def swaps(diagram: Diagram, i: int) -> list[Diagram]:
+        """
+        The interchanges of layer ``i`` with the one above it: none when
+        the two boxes do not commute, two when a box with no input goes
+        either side of a box with no output, one otherwise.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> e, s = Box('e', x, Ty()), Box('s', Ty(), x)
+        >>> for diagram in InterchangeEquation.swaps(e >> s, 1):
+        ...     print(diagram)
+        s @ x >> x @ e
+        x @ s >> e @ x
+        >>> assert not InterchangeEquation.swaps(s >> e, 1)
+        """
+        result = []
+        for left in (False, True):
+            try:
+                swapped = diagram.interchange(i, i - 1, left=left)
+            except AxiomError:
+                continue
+            result += [swapped] if swapped not in result else []
+        return result
+
+    @classmethod
+    def orbit(cls, diagram: Diagram, *until: Diagram) -> list[Diagram]:
+        """
+        The diagrams that a diagram with one box in each layer rewrites
+        into by interchangers, itself first, breadth first: all of them,
+        or as many as it takes to find every diagram of ``until``.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> for diagram in InterchangeEquation.orbit(f @ x >> x @ g):
+        ...     print(diagram)
+        f @ x >> x @ g
+        x @ g >> f @ x
+        >>> assert len(InterchangeEquation.orbit(f @ g @ f @ g)) == 24
+        >>> assert len(InterchangeEquation.orbit(f >> g)) == 1
+        """
+        result, seen, missing = [diagram], {diagram}, set(until) - {diagram}
+        position = 0
+        while position < len(result) and (missing or not until):
+            current, position = result[position], position + 1
+            found = dict.fromkeys(
+                swapped for i in range(1, len(current))
+                for swapped in cls.swaps(current, i) if swapped not in seen)
+            result += found
+            seen.update(found)
+            missing.difference_update(found)
+        return result
+
+
+@dataclass
+class Sampler:
+    """
+    Samples a term with no stack from a sequence of choices, one per node,
+    taking leaves once it runs out, see :meth:`TermBase.generate`.
+
+    The term is planar and linear: each subterm is given the variables it
+    uses, in order, and a node :meth:`split` them between its subterms. It
+    is a leaf, a fresh constant applied to subterms, or a statement binding
+    up to two outputs between the variables left for its body.
+
+    Parameters:
+        terms : The terms to sample, i.e. their factories.
+        choices : The choices left, consumed one per node.
+        types : The types of one wire the variables are drawn from.
+        letters : The letters naming the bound variables, one per level.
+        counter : The numbers of the constants built.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> sampler = Sampler(TermBase, iter([2, 0, 1, 1, 0, 0, 0]), [x], "a")
+    >>> print(sampler.state(y, (Variable('v', x), Variable('w', x))))
+    let(c0(v), lambda: c1(w), offset=0)
+    """
+    terms: type[TermBase]
+    choices: Iterator[int]
+    types: Sequence[Ty]
+    letters: Sequence[str | None]
+    counter: Iterator[int] = field(default_factory=count)
+
+    def choose(self, options: Sequence):
+        """ Pick an option by the next choice, the first when they ran out. """
+        return options[next(self.choices, 0) % len(options)]
+
+    def constant(
+            self, dom: Sequence[Ty], cod: Sequence[Ty]) -> cat.Constant:
+        """ A fresh constant between the tensors of two lists of types. """
+        category = self.terms.functor.cod
+        return self.terms.constant_factory(category.box_factory(
+            f"c{next(self.counter)}", category.ob().tensor(*dom),
+            category.ob().tensor(*cod)))
+
+    def bound(self, level: int, cod: Ty,
+              shadowed: cat.Variable | None = None) -> cat.Variable:
+        """
+        The variable bound at a given level, named by its letter or after
+        the variable it shadows, see :meth:`discopy.cat.TermBase.bound_name`.
+        """
+        return self.terms.variable_factory(
+            self.terms.bound_name(self.letters, level, shadowed), cod)
+
+    def shuffle(self, bound: tuple) -> tuple:
+        """
+        The bound variables in the order a term uses them: their own in a
+        monoidal category, picked by a choice where there is exchange.
+        """
+        return bound
+
+    def spine(
+            self, cod: Sequence[Ty], bound: tuple[cat.Variable, ...]
+            ) -> cat.TermBase:
+        """ A fresh constant applied to the bound variables in order. """
+        return self.constant([x.cod for x in bound], cod)(*bound)
+
+    def split(self, bound: tuple, n: int) -> list[tuple]:
+        """ The bound variables cut into ``n`` contiguous blocks. """
+        cuts = sorted(
+            self.choose(range(len(bound) + 1)) for _ in range(n - 1))
+        return [bound[i:j] for i, j in zip([0] + cuts, cuts + [len(bound)])]
+
+    def state(self, cod: Ty, bound: tuple[cat.Variable, ...] = (),
+              level: int = 0) -> cat.TermBase:
+        """
+        A term of a given type with no stack and the bound variables as
+        context: a leaf when the choices ran out, else what the next
+        choice picks.
+        """
+        kind, bound = next(self.choices, 0) % 3, self.shuffle(bound)
+        if kind == 0:
+            return bound[0] if [x.cod for x in bound] == [cod]\
+                else self.spine([cod], bound)
+        if kind == 1:
+            dom = [self.choose(self.types)
+                   for _ in range(1 + self.choose(range(2)))]
+            return self.constant(dom, [cod])(*(
+                self.state(typ, block, level)
+                for typ, block in zip(dom, self.split(bound, len(dom)))))
+        left, middle, right = self.split(bound, 3)
+        types = [
+            self.choose(self.types) for _ in range(self.choose((1, 0, 2)))]
+        used_up = [x for x in dict.fromkeys(middle) if x not in left + right]
+        variables = tuple(
+            self.bound(level + i, typ, next(iter(used_up[i:]), None))
+            for i, typ in enumerate(types))
+        inside = self.shuffle(left + variables + right)
+        expression = self.state(types[0], middle, level) if len(types) == 1\
+            else self.spine(types, middle)
+        body = self.state(cod, inside, level + len(types))
+        return self.terms.bind(variables, body, len(left))(expression)
+
+
+TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
+Diagram.term_factory = TermBase
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+
+__getattr__ = deprecated_alias(
+    __name__, {"PRO": "Nat", "Sum": Diagram.sum_factory})
+
+
+Bubble = Box.from_args

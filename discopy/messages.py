@@ -26,7 +26,8 @@ FREE_YANKING = (
 FREE_TWIST = (
     "A free twist is a box: the free balanced diagrams are not quotiented "
     "by the naturality of the twist.")
-NOT_FEEDBACK = "Cannot feed {} back into {}, expected {} as its input."
+NOT_FEEDBACK = (
+    "Cannot loop {} around {}, expected {} as its domain and codomain.")
 STREAM_SLIDING = (
     "A morphism slides along the feedback of streams only up to extensional "
     "equivalence, see discopy.feedback.")
@@ -39,6 +40,8 @@ NOT_MAPPING_OR_CALLABLE = "Expected a Mapping or a Callable, got {!r}."
 NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
                     " a pivotal type rather than a rigid one?"
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
+NO_ALGEBRA = "The homs of {} are not algebras of the monad {}."
+NOT_ONE_TYPE = "A channel goes from one type to one type, got {} -> {}."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
 MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
@@ -99,15 +102,17 @@ PARA_CURRY_COPAR = (
     "A closed category cannot curry a map with coparameters {}, as its "
     "exponential would swallow them.")
 LENS_NATURALITY = (
-    "A Markov lens is a unit and associative only up to the naturality of "
-    "copy and discard, which a hypergraph does not decide.")
+    "A Markov lens is a unit and associative, and its tensor the composite "
+    "of its whiskerings, only up to the naturality of copy and discard, "
+    "which a hypergraph does not decide.")
 LENS_BRAID_NATURALITY = (
     "A Markov braid copies its input for its put, so a Markov lens is "
     "natural in it only up to the naturality of copy, which a hypergraph "
     "does not decide.")
 PRISM_NATURALITY = (
-    "A prism is a unit and associative only up to the naturality of merge "
-    "and noise, which a hypergraph does not decide.")
+    "A prism is a unit and associative, and its tensor the composite of its "
+    "whiskerings, only up to the naturality of merge and noise, which a "
+    "hypergraph does not decide.")
 PRISM_BRAID_NATURALITY = (
     "A prism braid merges its build with its residual, so a prism is "
     "natural in it only up to the naturality of merge, which a hypergraph "
@@ -139,19 +144,20 @@ FREE_FEEDBACK = (
 RIGID_TYPE_HAS_NO_DAGGER = "Rigid types have no dagger, use pivotal instead."
 RIGID_HAS_NO_DAGGER = (
     "Rigid cups and caps have no dagger, use pivotal instead.")
-FEEDBACK_HAS_NO_DAGGER = (
-    "Feedback has no dagger and no rotation, "
-    "either would feed its memory back in time.")
+TRACE_HAS_NO_ROTATION = (
+    "A trace rotates only in a pivotal category, {} has no rotation.")
+FEEDBACK_HAS_NO_ROTATION = (
+    "Feedback and feedforward have no rotation, only a trace does: the "
+    "half-turn of a delayed feedback would feed its memory forward in time.")
+MARKOV_HAS_NO_DAGGER = (
+    "A copy or a discard has no dagger: a Markov category is not a dagger "
+    "category.")
+COMARKOV_HAS_NO_DAGGER = (
+    "A merge or a noise has no dagger: a comarkov category is not a dagger "
+    "category.")
 MAP_HAS_NO_ADJOINTS = (
     "A map is compact whatever category hosts it, but a host that is not "
     "rigid has no adjoints or curries for the laws to quantify over.")
-SECTION_NEEDS_SWAPS = (
-    "Decoding a hypergraph orders its boxes with swaps, which a category "
-    "with no symmetry does not have.")
-MAP_OF_A_CURRY = (
-    "The map of a curry rebuilds its inside from the map of it, which can "
-    "whisker a scalar on the other side, while a hypergraph compares the "
-    "inside of a bubble syntactically.")
 MAP_HAS_NO_SPIDERS = (
     "A map has no spiders: it keeps a copy or a merge as a box where a "
     "hypergraph merges its wires.")
@@ -190,8 +196,17 @@ OVERLAPPING_BOXES = (
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+STRUCTURAL_HAS_NO_DAGGER = (
+    "A structural box but the exchange has no dagger: !L* has no rule from "
+    "its codomain back to its domain.")
 LAXATOR_ARITY = (
     "A laxator takes two types, or none for the unit, got {}.")
+NOT_BANGED = (
+    "{} is not banged: only a type !x is copied by contraction and "
+    "discarded by weakening.")
+NEGATIVE_COPIES = "Expected a number of copies, got {}."
+WIRING_OUT_OF_RANGE = "Expected indices of the wires of {}, got {}."
+NOT_SHARED = "Expected banged variables to share, got {}."
 FREE_BANG = (
     "A free bang is a bubble and its structure boxes, which a hypergraph "
     "keeps as boxes: nothing cancels, merges or slides through them.")
@@ -250,3 +265,20 @@ LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")
+NOT_ONE_OUTPUT = "Expected exactly one output, got {}: a term has one."
+NOT_APPLICABLE = "{} of stack {} does not apply to {} of stack {} and type {}."
+NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."
+STATEMENTS_DO_NOT_COMMUTE = (
+    "A statement binding several outputs or none stays in a normal form, "
+    "and two of them do not commute.")
+NO_HIGHEST_LEVEL = "Expected terms of one level above the others, got {}."
+NOT_DISTINCT = "Expected distinct variables to bind in {}, got {}."
+NOT_FREE = "Expected distinct free variables of {}, got {}."
+NOT_THE_VARIABLE = "Expected the free variable of {}, with no stack, got {}."
+NO_OFFSET = (
+    "Expected an offset for the abstraction of no variable in {}, which "
+    "has no stack to say where it stands.")
+WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."
+MIXED_DIRECTIONS = (
+    "The args of {} are drawn in different directions, left to right and "
+    "top to bottom: a bubble draws them all in one.")

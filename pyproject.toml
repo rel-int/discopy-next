@@ -100,11 +100,10 @@ quantum = [
 ]
 lambek = [
     "nltk",
+    "spacy",
     "torch",
     "transformers",
 ]
-# the deprecated name of the lambek extra
-grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -136,7 +135,6 @@ notebooks = [
     "ipykernel == 6.23.*",
     "marimo",
     # imported by the notebooks in docs/notebooks/optyx
-    "pandas",
     "seaborn",
     "tqdm",
     # cotengra pools over joblib when it can: its concurrent.futures fallback
@@ -264,6 +262,7 @@ testpaths = [
     "discopy",
     "test/*.py",
     "test/*/*.py",
+    "test/lambek/*/*.py",
     "test/optyx/compiler/*.py",
 ]
 norecursedirs = [

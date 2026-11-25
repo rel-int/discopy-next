@@ -8,6 +8,7 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
+from discopy.sum import Sum
 from discopy.utils import AxiomError
 
 
@@ -432,11 +433,12 @@ def test_total_ordering():
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
     assert repr((f).bubble())\
-        == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
+        == "cat.Box('', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),))"
     assert str(f.bubble()) == "(f).bubble()"
     named = f.bubble(name="N", method="m")
-    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
-        " name='N', method='m')"
+    assert repr(named) == "cat.Box('N', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),), method='m')"
     assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
     assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
     image = Functor.id()(f.bubble(data=42, is_dagger=True))
@@ -576,10 +578,10 @@ def test_Sum():
         Sum((f, g))
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
-        == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+        == "sum.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
     lazy = Sum((f, f))
     assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
-        == f"cat.Sum(terms=({f!r}, {f!r}))"
+        == f"sum.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
@@ -673,12 +675,13 @@ def box_classes():
 
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
-    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
-    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
+    "{sum,markov}.Sum": "c((box(c, x, y, v), ))",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
-    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
-    "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
-    "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
+    "peirce.alpha.Box": 'c("f", data=v)',
+    "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
+    "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
+    'factory("x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '
+    'cod=k)), t, data=v), name="b")',  # not the unit, #636
     "monoidal.Layer":
     'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
     "braided.Braid {balanced,ribbon}.DualRailBraid ribbon.DualRailC{u,a}p":
@@ -688,10 +691,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
     "feedback.Box": 'c("f", x, y, data=v).delay()',
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
-    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
@@ -705,10 +708,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
-    "biclosed.Bang": "c(box(c, x, y, v))",
-    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
-    "biclosed.Exchange": "c(x, y, True)",
-    "biclosed.Laxator": "c(x, y)",
+    "bang.Bang": "c(box(c, x, y, v))",
+    "bang.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "bang.Exchange": "c(x, y, True)",
+    "bang.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
@@ -735,7 +738,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "lambek.cfg.Rule": 'c(x @ y, x, "r")',
     "lambek.cfg.Word": 'c("w", x, y)',
     "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
-    "tensor.Bubble":
+    "{tensor,quantum.circuit,quantum.zx}.Elementwise":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
     "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
@@ -840,7 +843,6 @@ BROKEN = {
         "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
@@ -850,10 +852,10 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "*.{Feedback,Feedforward,Trace}":
+        "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
     "subs": {
@@ -862,8 +864,9 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "a module has none",
+        "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",
     },
 }
@@ -973,3 +976,159 @@ def test_Equation_tree():
         Equation.from_tree(Equation(f, f).to_tree() | {'symbols': [[1]]})
     with raises(TypeError, match="Expected str"):
         dumps(Equation(f, f, symbols=[1]))
+
+
+def test_term_sequence():
+    x, y, z = Ob('x'), Ob('y'), Ob('z')
+    f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
+    term = (f >> g >> h).to_term()
+    assert str(term) == "x(lambda x0: h(g(f(x0))))"
+    assert term.eval() == f >> g >> h and term.dom == term.cod == x
+    assert term.constants == [Constant(h), Constant(g), Constant(f)]
+    assert Id(x).to_term() == x(lambda x0: x0)
+    assert Id(x).to_term().eval() == Id(x)
+    F = Functor({x: y, y: x, z: z}, {f: Box('g', y, x), g: Box('f', x, z)})
+    assert (f >> g).to_term().eval(F) == F(f >> g)
+    a = Variable('a', x)
+    assert a.dom == x and a.category is Arrow and not a.constants
+    assert Constant(f).dom == x and Constant(f)(a).dom == x
+
+
+def test_term_normal_form():
+    x, y, z = Ob('x'), Ob('y'), Ob('z')
+    f, g, h = (Constant(box) for box in (
+        Box('f', x, y), Box('g', y, z), Box('h', z, x)))
+    a = Variable('a', x)
+    statement = let(f(a), lambda b: let(g(b), lambda c: h(c)))
+    assert str(statement) == "let(f(a), lambda b: let(g(b), lambda c: h(c)))"
+    assert statement.normal_form() == h(g(f(a)))
+    assert statement.eval() == f.box >> g.box >> h.box
+    closed = y(lambda b: g(b))
+    assert closed.normal_form() == closed and closed.eval() == g.box
+    assert x(lambda a: closed(f(a))).normal_form()\
+        == x(lambda a: g(f(a)))
+    assert g.expand() == y(lambda x: g(x)) and a.expand() == a
+    k = Constant(Box('k', x, x))
+    shadowed = x(lambda a: let(k(a), lambda a: k(a)))
+    assert shadowed.normal_form() == x(lambda a: k(k(a)))
+    for term in (statement, closed, g, a, h(g(f(a))), shadowed):
+        assert TermBase.normal_form_completeness(term)
+        assert TermBase.eta(term) and TermBase.reading(term)
+        assert loads(dumps(term)) == term
+        assert eval(repr(term), TermBase.environment()) == term
+
+
+def test_term_alpha_and_substitute():
+    x, y = Ob('x'), Ob('y')
+    f, a, b = Constant(Box('f', x, y)), Variable('a', x), Variable('b', x)
+    first, second = x(lambda a: f(a)), x(lambda b: f(b))
+    assert first != second and first.alpha_eq(second)
+    assert AlphaEquation(first, second) and not AlphaEquation(f(a), f(b))
+    assert not first.alpha_eq(f) and not f(a).alpha_eq(a)
+    assert not a.alpha_eq(f(a))
+    assert not let(a, lambda c: f(c)).alpha_eq(f(a))
+    assert f(a).substitute({a: b}) == f(b) and f.substitute({a: b}) == f
+    assert first.substitute({a: b}) == first
+    assert Variable.fresh("a", x, f(a)) == Variable("a_", x)
+
+
+def test_term_errors():
+    x, y = Ob('x'), Ob('y')
+    f, a = Constant(Box('f', x, y)), Variable('a', x)
+    with raises(ValueError, match="does not apply"):
+        f(f(a))
+    with raises(ValueError, match="does not apply"):
+        a(a)
+    with raises(ValueError, match="does not apply"):
+        f(f)
+    with raises(ValueError, match="free variable of f.a."):
+        Kappa((Variable('b', x), ), f(a))
+    with raises(ValueError, match="free variable of f"):
+        Kappa((), f)
+    with raises(ValueError):
+        Kappa((a, ), f(a), 1)
+    with raises(TypeError, match="one level above the others"):
+        TermBase.highest(Kappa, Application)
+    with raises(ValueError, match="Expected 1 variables, got 2"):
+        x(lambda a, b: a)
+    assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
+
+
+@pytest.mark.parametrize("level, structure", [
+    ("spacial", lambda module, x, y: module.Id(x @ y)),
+    ("feedback", lambda module, x, y: module.Id(x @ y)),
+    ("braided", lambda module, x, y: module.Braid(y, x)),
+    ("balanced", lambda module, x, y: module.Twist(x) @ y),
+    ("comarkov", lambda module, x, y: module.Merge(x) @ y)])
+def test_terms_of_a_level(level, structure):
+    import importlib
+    import pickle
+    from discopy import monoidal
+    module = importlib.import_module(f"discopy.{level}")
+    x, y = module.Ty('x'), module.Ty('y')
+    wiring = structure(module, x, y)
+    diagram = wiring >> module.Box('f', x @ y, x)
+    term = diagram.to_term()
+    assert type(term) is module.Kappa and term.category is module.Diagram
+    assert module.Diagram.term_factory is module.TermBase
+    assert issubclass(module.Kappa, monoidal.Kappa)
+    assert term.eval() == diagram
+    assert len(term.constants) == len(diagram.boxes)
+    assert all(type(c) is module.Constant for c in term.constants)
+    for copy in (pickle.loads(pickle.dumps(term)), loads(dumps(term))):
+        assert type(copy) is module.Kappa and copy == term
+    assert type(x(lambda a: a)) is monoidal.Kappa
+
+
+def test_terms_from_biclosed_up():
+    from discopy import biclosed, compact, symmetric
+    x = compact.Ty('x')
+    diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
+    term = diagram.to_term()
+    assert type(term) is symmetric.Kappa and term.eval() == diagram
+    assert type(x(lambda a: a)) is biclosed.Abstraction
+
+
+def test_term_laws():
+    from hypothesis import find
+    x, y = Ob('x'), Ob('y')
+    laws = (
+        TermBase.eta, TermBase.reading, TermBase.normal_form_soundness,
+        TermBase.normal_form_idempotence, TermBase.normal_form_completeness,
+        TermBase.repr_transparency, TermBase.str_transparency,
+        TermBase.serialisation)
+    shapes = [
+        [0, 0, 2, 1, 1, 1, 0, 1, 0], [0, 1, 1], [1, 0, 2, 0, 2, 1],
+        [0, 0, 1, 1, 2, 1], [1, 1, 2, 2, 0, 1, 1]]
+    for shape in shapes:
+        term = TermBase.generate(y, shape, [x, y], "ab")
+        assert all(law(term) for law in laws)
+        renamed = TermBase.generate(y, shape, [x, y], "c")
+        assert TermBase.alpha_renaming((term, renamed))
+        assert TermBase.alpha_soundness((term, renamed))
+    with raises(NotImplementedError):
+        AlphaEquivalence.shapes()
+    with raises(NotImplementedError):
+        AlphaEquivalence.generate(y, [], [x], "a")
+    first, second, _ = find(TermBase.related(), lambda terms: True)
+    assert first.alpha_eq(second)
+    assert Renamed[TermBase].checked_params() == ()
+    assert Canonical[TermBase].checked_params() == ()
+
+
+def test_legacy_Bubble_tree():
+    """ A tree dumped before #560 fused bubbles into boxes still loads. """
+    from discopy import monoidal, rigid
+    from discopy.utils import from_tree
+    ob = {'factory': 'cat.Ob', 'name': 'x'}
+    f = {'factory': 'cat.Box', 'name': 'f', 'dom': ob, 'cod': ob}
+    tree = {'factory': 'cat.Bubble', 'arg': f, 'dom': ob, 'cod': ob}
+    assert from_tree(tree) == Box('f', Ob('x'), Ob('x')).bubble()
+    x = rigid.Ty('x')
+    g = rigid.Box('g', x, x).bubble(name="b").r
+    tree = g.to_tree() | {'factory': 'rigid.Bubble'}
+    assert from_tree(tree) == g
+    h = monoidal.Box('h', monoidal.Ty('x'), monoidal.Ty('y'))
+    tree = h.bubble().to_tree() | {'factory': 'monoidal.Bubble'}
+    del tree['name']
+    assert from_tree(tree) == h.bubble()

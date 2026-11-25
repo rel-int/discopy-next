@@ -36,6 +36,7 @@ from math import sqrt
 import os
 import pathlib
 import re
+from types import SimpleNamespace
 from xml.etree import ElementTree
 
 from typing import TYPE_CHECKING
@@ -54,9 +55,10 @@ from PIL import Image, ImageSequence
 
 from discopy import config
 from discopy.drawing import Node, Point
+from discopy.utils import text_width
 from discopy.drawing.typst_ast import (
     Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
-    Import, RawText, Str, TypstNode)
+    Import, RawText, Str, TypstNode, latex_math)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -101,10 +103,16 @@ def matplotlib_context():
 def draw(graph: Drawing, **params):
     """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     if params.get("format") == "typst":
-        path, show = params.pop("path", None), params.pop("show", True)
+        path, compare = doctest_or_path(
+            params.pop("path", None), params.pop("doctest", None))
+        show = params.pop("show", True)
+        compare = params.pop("compare", False) or compare
         return Typst(**params).draw(graph, **params).output(
-            path=path, show=show, **params)
+            path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
+    left_to_right = params.get('left_to_right', False)
+    width, height = (graph.height, graph.width) if left_to_right\
+        else (graph.width, graph.height)
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
         if colours:
@@ -115,14 +123,18 @@ def draw(graph: Drawing, **params):
             margin_inches = DEFAULT['legend_margin']
             extra = legend_inches + margin_inches
             fig_width = params['figsize'][0] if 'figsize' in params\
-                else (graph.width or 1)
+                else (width or 1)
             if 'figsize' in params:
                 params['figsize'] = (fig_width + extra, params['figsize'][1])
-            space = params.get('legend_space', extra * graph.width / fig_width)
-            graph = graph.make_space(
-                space, graph.width, exclusive=True, copy=True)
+            space = params.get('legend_space', extra * width / fig_width)
+            if left_to_right:  # The physical right of a transposed drawing.
+                width += space
+            else:
+                graph = graph.make_space(
+                    space, graph.width, exclusive=True, copy=True)
+                width = graph.width
     figsize = params.get('figsize', None if aspect == 'auto' else (
-        graph.width or 1, graph.height or 1))
+        width or 1, height or 1))
     backend = params.get('backend', None) or (
         TikZ(use_tikzstyles=params.get('use_tikzstyles', None))
         if params.get('to_tikz', False)
@@ -133,11 +145,14 @@ def draw(graph: Drawing, **params):
     max_v = max(graph.height, graph.width, 0.01)
     params['nodesize'] = round(params.get('nodesize', 1.) / sqrt(max_v), 3)
 
-    backend.draw_boundary(graph, **params)
-    backend.draw_regions(graph, **params)
-    backend.draw_wires(graph, **params)
-    backend.draw_boxes(graph, **params)
-    backend.draw_spiders(graph, **params)
+    if left_to_right:
+        backend.draw_boundary(
+            SimpleNamespace(width=width, height=height), **params)
+        canvas = Transposed(backend, Point(0, 0), graph)
+    else:
+        canvas = backend
+        canvas.draw_boundary(graph, **params)
+    canvas.draw_drawing(graph, **params)
     if params.get('legend', False):
         backend.draw_legend(graph, **params)
 
@@ -145,7 +160,7 @@ def draw(graph: Drawing, **params):
         params.get('path', None), params.get('doctest', None))
     return backend.output(
         path=path,
-        baseline=graph.height / 2 or .5,
+        baseline=height / 2 or .5,
         tikz_options=params.get('tikz_options', None),
         show=params.get('show', True), aspect=aspect,
         margins=params.get('margins', DEFAULT['margins']),
@@ -656,6 +671,13 @@ class Backend(ABC):
             (0, 0), (x, 0), (x, y), (0, y),
             facecolor=boundary_color, edgecolor=boundary_color)
 
+    def draw_drawing(self, graph, **params):
+        """ Draw the regions, wires, boxes and spiders of a drawing. """
+        self.draw_regions(graph, **params)
+        self.draw_wires(graph, **params)
+        self.draw_boxes(graph, **params)
+        self.draw_spiders(graph, **params)
+
     def draw_regions(self, graph, **params):
         """
         Draw coloured 0-cell regions, e.g. the background of a
@@ -683,6 +705,9 @@ class Backend(ABC):
         types = [graph.dom, graph.cod]
         for box in graph.boxes:
             types += [box.dom, box.cod]
+            for nested in getattr(box, "nested", None) or ():
+                for name, colour in Backend.region_colours(nested).items():
+                    colours.setdefault(name, colour)
         for typ in types:
             candidates = [getattr(typ, "dom", None), getattr(typ, "cod", None)]
             for obj in getattr(typ, "inside", ()):
@@ -916,7 +941,7 @@ class Backend(ABC):
         when it is dark, see :meth:`Matplotlib.dark_gid`.
         """
         draw_label_anyway = params.get('draw_box_labels', True) and getattr(
-            x, "always_draw_label", False)
+            x.inside[0], "always_draw_label", False) and str(x.inside[0])
         if not params.get('wire_labels', True) and not draw_label_anyway:
             return
         if getattr(x.inside[0], "skip_label", False):
@@ -928,13 +953,18 @@ class Backend(ABC):
         i += pad_i
         j -= pad_j
         fontsize = params.get('fontsize_types', params.get('fontsize', None))
-        background = getattr(x, "cod", None)
+        background = self.label_background(x)
         adaptive = background is None
         color = self.readable_foreground(
             "white" if adaptive else background.name)
         self.draw_text(
             label, i, j, verticalalignment='top', fontsize=fontsize,
             color=color, adaptive=adaptive)
+
+    @staticmethod
+    def label_background(typ):
+        """ The region a wire label is drawn on, the one to its right. """
+        return getattr(typ, "cod", None)
 
     @staticmethod
     def has_boundary_sides(typ):
@@ -1187,14 +1217,49 @@ class Backend(ABC):
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
+        label = positions[node]
+        if box.nested is not None:
+            label = self.draw_nested(box, points, label, **params)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
-            self.draw_text(box.drawing_name, *positions[node],
+            self.draw_text(box.drawing_name, *label,
                            ha='center', va='center',
                            color=self.readable_foreground(
                                "white" if adaptive else box.color),
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
+
+    def draw_nested(self, box, corners, centre, **params):
+        """
+        Draw the drawings nested in a box left to right, one under the other,
+        on a background of the box's ``frame_colour``, see
+        :class:`Transposed`, centred in the space right of the box's label,
+        and return the centre of that label, on the left of the box. Their
+        wires plug into the edges of the background, a line separates each
+        from the next, so that no two regions meet without one, and a
+        daggered box reflects them, the last on top.
+        """
+        nested = box.nested
+        width = sum(drawing.width for drawing in nested)
+        height = max(drawing.height for drawing in nested)
+        left, right = min(x for x, _ in corners), max(x for x, _ in corners)
+        start = left + (
+            text_width(box.drawing_name) + .25 if box.drawing_name else 0)
+        x, y = (start + right - height) / 2, centre[1] - width / 2
+        self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
+                          (x, y + width), facecolor=box.frame_colour)
+        offset = 0
+        for drawing in nested:
+            offset += drawing.width
+            origin = Point(x, y + offset - drawing.width if box.is_dagger
+                           else y + width - offset)
+            Transposed(self, origin, drawing, flip=box.is_dagger)\
+                .draw_drawing(drawing, **params)
+            if offset < width:
+                edge = y + offset if box.is_dagger else y + width - offset
+                self.draw_bezier([Point(x + t * height / 3, edge)
+                                  for t in range(4)], adaptive=False)
+        return Point((left + start) / 2, centre[1])
 
     @staticmethod
     def triangle_corners(positions, node):
@@ -1476,6 +1541,148 @@ class Backend(ABC):
             nodesize=params.get("nodesize", 1), adaptive=True)
 
 
+class Transposed(Backend):
+    """
+    A backend that draws left to right on another one, through the
+    reflection along the anti-diagonal of a drawing :math:`w \\times h`
+
+    .. math::
+
+        (x, y) \\mapsto (h - y, w - x)
+
+    which takes its domain to the left, its codomain to the right and its
+    first wire to the top, then moves it to ``origin``. Wires, regions and
+    boxes are Beziers and polygons, whose image under an affine map is the
+    curve of the images of their control points, so the layout of the
+    drawing is kept as it is and only its picture is transposed. Labels stay
+    upright, and drawing on a transposed backend transposes back.
+
+    Parameters:
+        parent : The backend to draw on.
+        origin : The bottom left corner of the transposed drawing.
+        graph : The drawing, for its width and height.
+        flip : Whether to reflect the transposed drawing along the
+            horizontal axis too, e.g. inside a daggered box.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> (Box('f', Ty(), x) >> Box('g', x, x @ x)).draw(
+    ...     left_to_right=True,
+    ...     doctest="docs/_static/drawing/left-to-right.svg")
+
+    .. image:: /_static/drawing/left-to-right.svg
+        :align: center
+    """
+    def __init__(self, parent: Backend, origin: Point, graph: Drawing,
+                 flip=False):
+        self.parent, self.origin, self.flip = parent, origin, flip
+        self.textpad, self.lift = DEFAULT["textpad"][0], False
+        self.width, self.height = graph.width, graph.height
+        super().__init__()
+
+    def map(self, point) -> Point:
+        """ The image of a point of the drawing on the parent backend. """
+        x, y = point
+        return Point(self.origin.x + self.height - y,
+                     self.origin.y + (x if self.flip else self.width - x))
+
+    def draw_boundary(self, graph, *args, **params):
+        self.parent.draw_boundary(
+            SimpleNamespace(width=self.height, height=self.width),
+            *args, **params)
+
+    @property
+    def turns(self) -> int:
+        """ The number of transpositions this backend draws through, two of
+        which cancel out, e.g. top-to-bottom args in a left-to-right box. """
+        return 1 + getattr(self.parent, "turns", 0)
+
+    def compose(self, point) -> tuple[Point, Backend]:
+        """ The image of a point through every transposition drawn through,
+        and the backend they draw on. """
+        point, canvas = self.map(point), self.parent
+        while isinstance(canvas, Transposed):
+            point, canvas = canvas.map(point), canvas.parent
+        return point, canvas
+
+    def cod_is_after(self) -> bool:
+        """ Whether the region right of a wire, its ``cod``, ends up above
+        it on the page, or right of it when the turns cancel out. """
+        (x0, y0), _ = self.compose((0, 0))
+        (x1, y1), _ = self.compose((1, 0))
+        return (y1 > y0) if self.turns % 2 else (x1 > x0)
+
+    def label_background(self, typ):
+        """ The region a wire label lies on: the side of its wire it is
+        lifted to, else its ``cod`` as when no turn is drawn through. """
+        return getattr(typ, "cod" if self.cod_is_after() or not self.lift
+                       else "dom", None)
+
+    def draw_wire_label(self, x, i, j, **params):
+        self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
+        # The name of a bubble labels its left side, which turns into its
+        # top or, reflected, its bottom: it stays inside, the side of its cod.
+        is_name = getattr(x.inside[0], "always_draw_label", False)
+        self.lift = self.turns % 2 and (
+            not is_name or self.cod_is_after())
+        super().draw_wire_label(x, i, j, **params)
+
+    def draw_text(self, text, i, j, **params):
+        point, canvas = self.compose((i, j))
+        if params.get("verticalalignment") == "top" and self.lift:
+            # A wire label hangs below its point, a textpad off its wire:
+            # stand it on a point the textpad above the wire instead, so
+            # that each backend lifts it by its own font size.
+            if not self.cod_is_after():
+                point = point.shift(y=2 * self.textpad)
+            params = dict(params, verticalalignment="bottom")
+        canvas.draw_text(text, *point, **params)
+
+    def draw_node(self, i, j, **params):
+        self.parent.draw_node(*self.map((i, j)), **params)
+
+    def draw_polygon(self, *points, **params):
+        self.parent.draw_polygon(*map(self.map, points), **params)
+
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def draw_wire(self, source, target, bend_out=False, bend_in=False,
+                  style=None, linewidth=None, adaptive=True):
+        """ Draw the curve :class:`Matplotlib` draws, as a cubic Bezier,
+        since other backends bend wires vertically. """
+        if linewidth == 0:
+            return
+        if style is not None:  # e.g. the arrow of a measure, straight
+            self.parent.draw_wire(
+                self.map(source), self.map(target), style=style,
+                linewidth=linewidth, adaptive=adaptive)
+            return
+        source, target = Point(*source), Point(*target)
+        middle = Point(target.x, source.y) if bend_out\
+            else Point(source.x, target.y)
+        self.draw_bezier(self.cubic([source, middle, target]), adaptive)
+
+    def draw_bezier(self, points, adaptive=True):
+        self.parent.draw_bezier(list(map(self.map, points)), adaptive)
+
+    def draw_filled_shape(self, start, steps, color):
+        self.parent.draw_filled_shape(self.map(start), [
+            (kind, *map(self.map, points)) for kind, *points in steps], color)
+
+    def draw_region_cell(self, left, right, facecolor):
+        self.parent.draw_region_cell(
+            list(map(self.map, left)), list(map(self.map, right)), facecolor)
+
+    def draw_spiders(self, graph, draw_box_labels=True, **params):
+        self.parent.draw_spiders(graph.relabel_nodes(positions={
+            node: self.map(point) for node, point in graph.positions.items()
+        }), draw_box_labels, **params)
+
+    def output(self, path=None, show=True, **params):
+        return self.parent.output(path, show, **params)
+
+
 class TikZ(Backend):
     """ Tikz drawing backend. """
     #: The size in points of the label of a box, and of a wire one size down.
@@ -1626,13 +1833,15 @@ class TikZ(Backend):
         fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         """
-        is_wire_label = params.get("verticalalignment", "center") == "top"
+        alignment = params.get("verticalalignment", "center")
+        is_wire_label = alignment in ("top", "bottom")
         options = "style=none" + (
             ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west"
+            options += ", anchor=north west" if alignment == "top"\
+                else ", anchor=south west"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -1870,6 +2079,7 @@ class Typst(Backend):
 
     def __init__(self, **params):
         self.body: list = []
+        self.labels: list = []
         self.nodesize = params.get("nodesize", 1)
         self.fontsize = params.get("fontsize", DEFAULT["fontsize"])
         # Match Matplotlib's default stroke weight so wires/boxes read at
@@ -1885,11 +2095,10 @@ class Typst(Backend):
         """
         max_v = max(graph.height, graph.width, 0.01)
         self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
-        self.draw_boundary(graph, **params)
-        self.draw_regions(graph, **params)
-        self.draw_wires(graph, **params)
-        self.draw_boxes(graph, **params)
-        self.draw_spiders(graph, **params)
+        canvas = Transposed(self, Point(0, 0), graph)\
+            if params.get("left_to_right", False) else self
+        canvas.draw_boundary(graph, **params)
+        canvas.draw_drawing(graph, **params)
         return self
 
     @staticmethod
@@ -1912,13 +2121,19 @@ class Typst(Backend):
         """
         Return ``(inner, math)`` for a diagram label.
 
-        Only explicit ``$...$`` wrappers enter Typst math mode. Bare words
-        like ``Alice`` stay as plain text — Typst would otherwise treat them
-        as undefined variables (``unknown variable: Alice``).
+        A label between dollars, with no other dollar but escaped ones, is
+        LaTeX mathematics, as matplotlib and TikZ read it, written in Typst
+        mathematics by :func:`~discopy.drawing.typst_ast.latex_math`. Any
+        other label is plain text, e.g. ``Alice``, which Typst would read as
+        a variable, or ``$a$ and $b$``.
+
+        >>> Typst.math_label("$\\\\mapsto$"), Typst.math_label("Alice")
+        (('arrow.r.bar', True), ('Alice', False))
         """
         text = str(text)
-        if text.startswith("$") and text.endswith("$") and len(text) >= 2:
-            return text[1:-1], True
+        if len(text) >= 2 and text[0] == text[-1] == "$"\
+                and not re.search(r"(?<!\\)\$", text[1:-1]):
+            return latex_math(text[1:-1]), True
         return text, False
 
     def coord(self, x, y):
@@ -1941,6 +2156,8 @@ class Typst(Backend):
         # not strike through the glyph.
         if params.get("verticalalignment", "center") == "top":
             extra["anchor"] = Str("west")
+        elif params.get("verticalalignment", "center") == "bottom":
+            extra["anchor"] = Str("south-west")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)
@@ -1950,7 +2167,7 @@ class Typst(Backend):
                 Ident("text"), [content], {"size": Ident(f"{scale}em")})
         else:
             text_call = content
-        self.body.append(Call(
+        self.labels.append(Call(
             Ident("content"), [self.coord(i, j), text_call], extra))
         super().draw_text(text, i, j, **params)
 
@@ -2036,21 +2253,89 @@ class Typst(Backend):
         )
         super().draw_bezier(points)
 
+    def draw_filled_shape(self, start, steps, color, stroke=False):
+        """
+        The shape of :meth:`Backend.draw_filled_shape` as one CeTZ
+        ``merge-path`` of its lines and curves, with a hairline in its own
+        colour if ``stroke``, else none, as :meth:`TikZ.draw_filled_shape`.
+
+        >>> typst = Typst()
+        >>> typst.draw_filled_shape((0, 0), [
+        ...     ("line", (1, 0)), ("curve", (1, 1), (0, 1), (0, 0))], "red")
+        >>> print(typst.body[0].render())  # doctest: +NORMALIZE_WHITESPACE
+        merge-path({line((0, 0), (1, 0));
+            bezier((1, 0), (0, 0), (1, 1), (0, 1))},
+            close: true, fill: rgb("#e8a5a5"), stroke: none)
+        """
+        segments, point = [], start
+        for step in steps:
+            if step[0] == "line":
+                segments.append(Call(Ident("line"), [
+                    self.coord(*point), self.coord(*step[1])]))
+            else:
+                segments.append(Call(Ident("bezier"), [
+                    self.coord(*point), self.coord(*step[3]),
+                    self.coord(*step[1]), self.coord(*step[2])]))
+            point = step[-1]
+        self.body.append(Call(Ident("merge-path"), [RawText(
+            "{" + "; ".join(segment.render() for segment in segments) + "}")
+        ], {"close": Bool(True),
+            "fill": Ident(self.color_expr(self.format_color(color))),
+            "stroke": self.stroke(color, linewidth=0.25) if stroke
+            else Ident("none")}))
+        super().draw_filled_shape(start, steps, color)
+
+    def draw_region_cell(self, left, right, facecolor):
+        """
+        Fill the cell between two Beziers as one closed path, see
+        :meth:`Backend.region_cell_steps`, stroked in its own colour so that
+        two cells meeting edge to edge leave no seam, as
+        :meth:`TikZ.draw_region_cell` does.
+        """
+        self.draw_filled_shape(
+            left[0], self.region_cell_steps(left, right), facecolor,
+            stroke=True)
+        super().draw_region_cell(left, right, facecolor)
+
     def spider_shape(self, box, i, j) -> list[Call]:
         """
-        The disc or the square of a spider at ``(i, j)``, and nothing when
-        its colour is transparent: such a spider is just its label, e.g. the
-        symbol of an :class:`discopy.monoidal.Equation`.
+        The shape of a spider at ``(i, j)``, one of :data:`SHAPES` as
+        matplotlib draws it: a square, a triangle pointing up or down, a
+        plus sign in its colour or else a disc. Nothing when its colour is
+        transparent: such a spider is just its label, e.g. the symbol of an
+        :class:`discopy.monoidal.Equation`.
+
+        >>> from discopy.frobenius import Ty, Spider
+        >>> spider = Spider(1, 1, Ty('x'))
+        >>> for shape in SHAPES:
+        ...     spider.shape = shape
+        ...     call, *_ = Typst().spider_shape(spider, 0, 0)
+        ...     print(shape, call.func.render(), len(call.args))
+        rectangle rect 2
+        triangle_up line 3
+        triangle_down line 3
+        circle circle 1
+        plus line 2
         """
         if self.is_transparent(box.color):
             return []
         colour = self.color_expr(self.format_color(box.color))
         options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        size = self.nodesize * 0.15
         if box.shape == "rectangle":
-            size = self.nodesize * 0.15
             return [Call(Ident("rect"), [
                 self.coord(i - size, j - size),
                 self.coord(i + size, j + size)], options)]
+        if box.shape in ("triangle_up", "triangle_down"):
+            apex = size if box.shape == "triangle_up" else -size
+            return [Call(Ident("line"), [
+                self.coord(i - size, j - apex), self.coord(i + size, j - apex),
+                self.coord(i, j + apex)], {"close": Bool(True), **options})]
+        if box.shape == "plus":
+            return [Call(Ident("line"), [
+                self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                {"stroke": self.stroke(box.color)})
+                for x, y in ((size, 0), (0, size))]
         return [Call(Ident("circle"), [self.coord(i, j)], {
             "radius": Float(self.nodesize * 0.12), **options})]
 
@@ -2076,14 +2361,17 @@ class Typst(Backend):
                 lbl = Call(
                     Ident("text"), [ContentExpr(inner, math=math)],
                     {"fill": Ident(fc), "size": Ident(f"{scale}em")})
-                self.body.append(Call(
+                self.labels.append(Call(
                     Ident("content"), [self.coord(i, j), lbl]))
         super().draw_spiders(graph, draw_box_labels)
 
     def to_document(self, **params):
         """
         The document of what was drawn: a CeTZ canvas on a page cropped to
-        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        it, with ``page_margin`` around and ``unit_length`` to a unit. Its
+        :attr:`labels` come after the rest of its :attr:`body`, so that no
+        box or wire drawn after a label hides it, as TikZ puts its labels on
+        a layer of their own.
         """
         margin = params.get("page_margin", "0.2cm")
         doc = Document(
@@ -2098,26 +2386,56 @@ class Typst(Backend):
         unit_len = params.get("unit_length", "1in")
         canvas = Canvas(
             canvas_kwargs={"length": Ident(unit_len)},
-            body=[RawText("import draw: *")] + self.body,
+            body=[RawText("import draw: *")] + self.body + self.labels,
         )
         doc.content = canvas
         return doc
 
-    def output(self, path=None, show=True, **params):
-        doc = self.to_document(**params)
-        source = doc.render()
-        if isinstance(path, (str, os.PathLike))\
-                and str(path).endswith(".typ"):
-            pathlib.Path(path).write_text(source, encoding="utf-8")
-            return source
+    @staticmethod
+    def compile(source: str) -> bytes:
+        """ The SVG of a Typst ``source``, with the optional ``typst``. """
         try:
             import typst
-
-            svg = typst.compile(source.encode(), format="svg", pretty=True)
         except ImportError as error:  # pragma: no cover
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "
                 "Install it with: pip install typst") from error
+        return typst.compile(source.encode(), format="svg", pretty=True)
+
+    @classmethod
+    def save(cls, source: str, path) -> str | bytes:
+        """ Write a Typst ``source`` to a path ending in ``.typ``, its
+        SVG to any other path, and return what was written. """
+        if str(path).endswith(".typ"):
+            pathlib.Path(path).write_bytes(source.encode("utf-8"))
+            return source
+        svg = cls.compile(source)
+        pathlib.Path(path).write_bytes(svg)
+        return svg
+
+    def output(self, path=None, show=True, **params):
+        """
+        The Typst source of the drawing when ``path`` ends in ``.typ``,
+        written there, else its SVG, written to ``path`` when there is one.
+        With ``compare``, i.e. ``draw(doctest=path)``, the file at ``path``
+        is a baseline, its source or its SVG, so ``path`` ends in ``.typ``
+        or ``.svg``: written when missing, compared with otherwise, as
+        :func:`save_and_compare` does for any other backend.
+        """
+        source = self.to_document(**params).render()
+        is_source = isinstance(path, (str, os.PathLike))\
+            and str(path).endswith(".typ")
+        if params.get("compare", False):
+            if not str(path).endswith((".typ", ".svg")):
+                raise ValueError(
+                    f"A Typst baseline ends in .typ or .svg, got {path!r}.")
+            written = []
+            save_and_compare(path, lambda file: written.append(
+                self.save(source, file)))
+            return written[0]
+        if is_source:
+            return self.save(source, path)
+        svg = self.compile(source)
         if hasattr(path, "write"):
             path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
             return svg

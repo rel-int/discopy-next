@@ -26,6 +26,26 @@ def test_feedback_types():
     assert fb.dom == fb.cod == qmode ** 2 and fb.mem == qmode ** 2
 
 
+def test_double_and_single_keep_delays():
+    for ty in (qubit, qmode, bit, qubit @ qmode.delay(2)):
+        for n in (1, 3):
+            assert ty.delay(n).double() == ty.double().delay(n)
+            assert ty.delay(n).single() == ty.single().delay(n)
+    assert qmode.delay().double() != qmode.double()
+
+
+def test_head_and_delay_of_types():
+    for ty in (qubit, qmode, core.mode, core.bit, core.Mode(2)):
+        assert ty.delay() != ty and ty.delay().delay(-1) == ty
+        assert len(ty.head) == len(ty) and ty.head.delay() != ty.head
+    init = Diagram.followed_by(qmode)
+    assert (init.dom, init.cod) == (qmode.head @ qmode.delay(), qmode)
+    for ty in (qubit, qmode, bit):
+        assert ty.head.single() == ty.single().head
+        assert ty.head.double() == ty.double().head
+    assert qubit.head.inside[0].is_classical is False
+
+
 def test_feedback_axioms():
     with pytest.raises(AxiomError):
         photonic.BS.feedback(dom=qmode ** 2, cod=qmode, mem=qmode)
@@ -327,3 +347,11 @@ def test_feedback_subs():
         return (cnot >> swap).feedback(state=qubits.Ket("+"))
     assert loop(phi).subs((phi, 0.5)) == loop(0.5)
     assert loop(phi).lambdify(phi)(0.5) == loop(0.5)
+
+
+def test_feedback_tree():
+    from discopy.utils import dumps, loads
+    swaps = Diagram.swap(qmode ** 2, qmode ** 2)
+    for fb in (open_delay(), open_delay().double(), swaps.feedback(
+            mem=qmode ** 2, effect=Diagram.id(qmode ** 2))):
+        assert loads(dumps(fb)) == fb

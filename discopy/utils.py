@@ -319,6 +319,13 @@ class NamedGeneric:
     >>> from discopy import frobenius
     >>> frobenius.Hypergraph.__name__
     'Hypergraph[frobenius.Diagram]'
+
+    A class with a ``subscript_bases`` classmethod also subclasses the
+    bases it returns for the values, e.g. a :class:`Sum <discopy.sum.Sum>`
+    of diagrams is a box of them:
+
+    >>> from discopy.sum import Sum
+    >>> assert issubclass(Sum[frobenius.Diagram], frobenius.Box)
     """
     if TYPE_CHECKING:
         #: The names of the type parameters in DisCoPy, declared so that
@@ -351,18 +358,19 @@ class NamedGeneric:
                 values[0] if len(values) == 1 else values)
         if hasattr(cls, "__is_named_generic__"):
             cls = cls.__bases__[0]
-        attributes = next((
-            [param.__name__ for param in c.__type_params__]
-            for c in cls.__mro__ if c.__type_params__), None)
-        if attributes is None:
+        owner = next((c for c in cls.__mro__ if c.__type_params__), None)
+        if owner is None:
             raise TypeError(messages.NO_TYPE_PARAMETER.format(cls))
+        attributes = [param.__name__ for param in owner.__type_params__]
         cls_values = tuple(getattr(cls, attr, None) for attr in attributes)
         if cls not in NamedGeneric._cache:
             NamedGeneric._cache[cls] = {cls_values: cls}
         if values not in NamedGeneric._cache[cls]:
             origin = get_origin(cls)
+            bases = origin.subscript_bases(*values)\
+                if "subscript_bases" in vars(owner) else ()
 
-            class C(origin):
+            class C(origin, *bases):
                 __is_named_generic__ = True
 
                 def __reduce__(self):
@@ -428,7 +436,7 @@ def product(xs: Sequence, unit=1):
     return unit if not xs else product(xs[1:], unit * xs[0])
 
 
-def deprecated_alias(module_name: str, aliases: dict[str, str]):
+def deprecated_alias(module_name: str, aliases: dict[str, str | type]):
     """
     The module-level ``__getattr__`` of a module with one or more classes
     that were renamed, returning each new class with a
@@ -437,7 +445,8 @@ def deprecated_alias(module_name: str, aliases: dict[str, str]):
     Parameters:
         module_name : The ``__name__`` of the module deprecating names.
         aliases : A mapping from each deprecated name to its new name, in
-            the same module, or to its new dotted path when it moved.
+            the same module, or to its new dotted path when it moved, or to
+            the new class itself when it has no name, e.g. a subscript.
 
     Example
     -------
@@ -451,20 +460,31 @@ def deprecated_alias(module_name: str, aliases: dict[str, str]):
     discopy.rigid.PRO is deprecated, use discopy.rigid.Nat instead.
     >>> print(w[1].message)
     discopy.markov.Merge is deprecated, use discopy.comarkov.Merge instead.
+    >>> from discopy import monoidal
+    >>> with warnings.catch_warnings(record=True) as w:
+    ...     warnings.simplefilter("always")
+    ...     assert monoidal.Sum is monoidal.Diagram.sum_factory
+    >>> print(w[0].message)
+    discopy.monoidal.Sum is deprecated, use sum.Sum[monoidal.Diagram] instead.
     """
     def __getattr__(name):
-        if name in aliases:
-            import warnings
-            from importlib import import_module
-            new_module, _, new_name = aliases[name].rpartition('.')
+        if name not in aliases:
+            raise AttributeError(
+                f"module {module_name!r} has no attribute {name!r}")
+        import warnings
+        from importlib import import_module
+        alias = aliases[name]
+        if isinstance(alias, str):
+            new_module, _, new_name = alias.rpartition('.')
             new_module = new_module or module_name
-            warnings.warn(
-                f"{module_name}.{name} is deprecated, "
-                f"use {new_module}.{new_name} instead.",
-                DeprecationWarning, stacklevel=2)
-            return getattr(import_module(new_module), new_name)
-        raise AttributeError(
-            f"module {module_name!r} has no attribute {name!r}")
+            new_path = f"{new_module}.{new_name}"
+            alias = getattr(import_module(new_module), new_name)
+        else:
+            new_path = factory_name(alias)
+        warnings.warn(
+            f"{module_name}.{name} is deprecated, use {new_path} instead.",
+            DeprecationWarning, stacklevel=2)
+        return alias
     return __getattr__
 
 
@@ -577,12 +597,6 @@ def resolve_factory(name: str) -> type:
     >>> assert resolve_factory("tensor.Diagram[complex]") is Diagram[complex]
     >>> assert resolve_factory("tensor.Diagram[float64]") is Diagram[float64]
 
-    A module that was renamed is found under its old name, see
-    :data:`RENAMED`, so that a tree written before the rename still loads.
-
-    >>> from discopy.lambek import pregroup
-    >>> assert resolve_factory("grammar.pregroup.Ty") is pregroup.Ty
-
     Any other name raises, e.g. that of an object a module of DisCoPy
     imports, so that a file names no function for :func:`loads` to reach.
 
@@ -596,7 +610,6 @@ def resolve_factory(name: str) -> type:
         return resolve_factory(origin)[
             resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
-    modules[:1] = [RENAMED.get(module, module) for module in modules[:1]]
     import discopy  # pylint: disable=import-outside-toplevel
     if not modules and factory not in vars(discopy):
         import numpy
@@ -606,13 +619,11 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_TYPE.format(factory))
     module = sys.modules.get(".".join(["discopy", *modules]))
     cls = getattr(module, factory, None)
+    cls = getattr(cls, "__self__", cls)  # an alias, e.g. Box.from_args
     if not is_discopy_class(cls):
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls
 
-
-RENAMED = {"grammar": "lambek"}
-""" The modules of DisCoPy that were renamed, from old name to new. """
 
 SYMPY_CONSTANTS = (
     "Zero", "One", "NegativeOne", "Half", "Pi", "Exp1", "ImaginaryUnit",
@@ -1565,6 +1576,8 @@ class RichDisplay:
         """ Draw as a standalone SVG string. """
         from io import StringIO
         buffer = StringIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="svg", show=False, **params)
         return buffer.getvalue()
@@ -1573,6 +1586,8 @@ class RichDisplay:
         """ Draw as PNG bytes. """
         from io import BytesIO
         buffer = BytesIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="png", show=False, **params)
         return buffer.getvalue()
@@ -1596,3 +1611,16 @@ class RichDisplay:
         return {mimetype: draw() for mimetype, draw in data.items()
                 if (include is None or mimetype in include)
                 and (exclude is None or mimetype not in exclude)}
+
+
+def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
+    """
+    The class ``name`` of ``module`` with the given bases, less those another
+    base subclasses, so that it prints, pickles and reads back from its tree
+    as a class written in that module would.
+    """
+    bases = tuple(dict.fromkeys(  # ty: ignore[invalid-assignment]
+        base for base in bases if not any(
+            other is not base and issubclass(other, base) for other in bases)))
+    return type(name, bases, {  # ty: ignore[invalid-argument-type]
+        "__module__": module, "__qualname__": name, "__doc__": doc})

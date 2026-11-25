@@ -3,10 +3,11 @@
 """
 DisCoPy's grammar modules.
 
-:mod:`discopy.lambek.neural` needs PyTorch, which the ``lambek`` extra
-installs, so it is not imported here: import it on its own.
+:mod:`discopy.lambek.abstract.neural` and
+:mod:`discopy.lambek.categorial.bobcat` need PyTorch, which the ``lambek``
+extra installs, so they are not imported here: import them on their own.
 """
 
 from discopy.lambek import (
-    thue, cfg, categorial, pregroup, dependency, abstract, proofnet)
+    thue, cfg, categorial, pregroup, dependency, abstract)
 from discopy.lambek.thue import Word, Rule

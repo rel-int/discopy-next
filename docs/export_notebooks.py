@@ -26,7 +26,8 @@ It can also be run as a script::
     python docs/export_notebooks.py --check --jobs 4  # four at a time
 
 ``--check`` fails when a notebook does not execute, unless it is one of
-:data:`KNOWN_BROKEN`, which fail on a bug that an issue tracks.
+:data:`KNOWN_BROKEN`, which fail on a bug that an issue tracks. The notebooks
+of :data:`UNEXECUTED` never run unless named.
 """
 from __future__ import annotations
 
@@ -36,6 +37,7 @@ import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -58,9 +60,12 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # ``--check`` does not block on them; ``generate`` already falls back to a link
 # page for any notebook that fails to execute. An entry whose issue is closed
 # has stopped being evidence: re-run the notebook before trusting it.
-KNOWN_BROKEN = {
-    "optyx/readme_example": ISSUES + "251",
-}
+KNOWN_BROKEN: dict[str, str] = {}
+
+# Notebooks that neither the docs build nor ``--check`` runs, unless named on
+# the command line: their page links to the source. The old optyx README takes
+# some four minutes and what it shows the other optyx notebooks show too.
+UNEXECUTED = {"optyx/readme_example"}
 
 IFRAME = """\
 .. raw:: html
@@ -133,20 +138,29 @@ def title_of(notebook: Path) -> str:
 
 
 def export(notebook: Path, *, check: bool) -> None:
-    """Run ``notebook`` and export the computed HTML (unless ``check``)."""
+    """Run ``notebook`` and export the computed HTML (unless ``check``).
+
+    The notebook runs as its Python form, written by ``marimo convert``, since
+    marimo makes the file it runs the ``__main__`` module, which a process
+    spawned by :mod:`multiprocessing`, e.g. by cotengra's optimizer, imports
+    again: as Markdown it is a syntax error (#251).
+    """
     with TemporaryDirectory() as scratch:
         if check:
             output = Path(scratch) / f"{notebook.stem}.html"
         else:
             output = HTML_DIR / f"{name_of(notebook)}.html"
             output.parent.mkdir(parents=True, exist_ok=True)
+        script = Path(scratch) / f"{notebook.stem}.py"
         path = os.pathsep.join(filter(None, (
             str(DOCS.parent), os.environ.get("PYTHONPATH"))))
-        subprocess.run(
-            [sys.executable, "-m", "marimo", "export", "html", notebook.name,
-             "-o", str(output), "-f"],
-            cwd=notebook.parent, env=os.environ | {"PYTHONPATH": path},
-            check=True)
+        marimo = partial(
+            subprocess.run, cwd=notebook.parent,
+            env=os.environ | {"PYTHONPATH": path}, check=True)
+        marimo([sys.executable, "-m", "marimo", "convert", notebook.name,
+                "-o", str(script)], stdout=subprocess.DEVNULL)
+        marimo([sys.executable, "-m", "marimo", "export", "html", str(script),
+                "-o", str(output), "-f"])
         add_theme_style(output, title_of(notebook))
 
 
@@ -177,10 +191,11 @@ def generate(*, strict: bool = False) -> None:
     When ``strict`` is false a notebook that fails to execute falls back to a
     link page instead of aborting the build. When the environment sets
     :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs and
-    every page is a link page.
+    every page is a link page, as is that of every notebook of
+    :data:`UNEXECUTED`.
     """
     for notebook in notebooks():
-        if os.environ.get(SKIP) == "1":
+        if os.environ.get(SKIP) == "1" or name_of(notebook) in UNEXECUTED:
             write_page(notebook, rendered=False, skipped=True)
             continue
         try:
@@ -217,8 +232,8 @@ def main() -> int:
         parser.error("--jobs must be at least 1")
 
     names = set(args.notebooks)
-    selected = [nb for nb in notebooks()
-                if not names or {nb.stem, name_of(nb)} & names]
+    selected = [nb for nb in notebooks() if {nb.stem, name_of(nb)} & names
+                or not names and name_of(nb) not in UNEXECUTED]
     unmatched = names.difference(
         *({nb.stem, name_of(nb)} for nb in selected))
     if not selected or unmatched:

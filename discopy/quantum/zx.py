@@ -17,7 +17,7 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
+    Elementwise
     Permutation
     Swap
     Spider
@@ -357,7 +357,28 @@ class Box(tensor.Box[complex], Diagram):
         name (str) : The name of the box.
         dom (rigid.Nat) : The domain of the box, i.e. its input.
         cod (rigid.Nat) : The codomain of the box, i.e. its output.
+        is_dagger (bool | None) : Whether the box is a dagger, ``None`` when
+            it is self-adjoint, as :data:`H` is.
+
+    Example
+    -------
+    >>> import pickle
+    >>> from discopy.utils import dumps, loads
+    >>> assert H.dagger() is H and eval(repr(H)) == H
+    >>> assert pickle.loads(pickle.dumps(H)) == loads(dumps(H)) == H
     """
+    def dagger(self):
+        return self if self.is_dagger is None else super().dagger()
+
+    def __repr__(self):
+        if self.is_dagger is None:
+            return super().__repr__()[:-1] + ", is_dagger=None)"
+        return super().__repr__()
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        return tree if self.is_dagger is not None else tree | {
+            "is_dagger": None}
 
 
 class Sum(tensor.Sum[complex], Box):
@@ -371,10 +392,10 @@ class Sum(tensor.Sum[complex], Box):
     """
 
 
-class Bubble(tensor.Bubble[complex], Box):
+class Elementwise(tensor.Elementwise[complex], Box):
     """
-    A ZX bubble is a tensor bubble in a ZX diagram, which differentiates as
-    a ZX box does.
+    A ZX elementwise box is a tensor one in a ZX diagram, which
+    differentiates as a ZX box does.
 
     >>> bubble = Z(1, 1).bubble()
     >>> assert (bubble >> Z(1, 1)).eval() == bubble.eval()
@@ -645,8 +666,7 @@ circuit2zx = quantum.circuit.Functor(
     dom=Circuit, cod=Diagram)
 
 H = Box('H', Nat(1), Nat(1), data=[x / 2 ** .5 for x in (1, 1, 1, -1)],
-        is_deterministic=False, is_affine=False)
-H.dagger = lambda: H  # ty: ignore[invalid-assignment]
+        is_deterministic=False, is_affine=False, is_dagger=None)
 H.draw_as_spider = True
 H.drawing_name, H.tikzstyle_name, = '', 'H'
 H.color, H.shape = "yellow", "rectangle"
@@ -654,7 +674,7 @@ H.color, H.shape = "yellow", "rectangle"
 SWAP = Swap(Nat(1), Nat(1))
 Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
-Diagram.bubble_factory = Bubble
+Diagram.elementwise_factory = Elementwise
 Diagram.permutation_factory = Permutation
 Id = Diagram.id
 
@@ -1988,3 +2008,6 @@ class Agenda:
 
 
 Diagram.hypergraph_factory = Hypergraph
+
+
+Bubble = Elementwise.from_args

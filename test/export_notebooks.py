@@ -3,6 +3,8 @@ on the discopy of its own tree."""
 
 from pathlib import Path
 
+import pytest
+
 from docs import export_notebooks
 from fixtures.pyproject import EXTRAS, installs
 
@@ -24,6 +26,31 @@ def test_notebook_imports_the_discopy_of_its_tree(tmp_path, monkeypatch):
     export_notebooks.export(notebook, check=True)
 
 
+SPAWN = """\
+# A process pool — as cotengra's optimizer starts
+
+```python {.marimo}
+import marimo as mo
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
+
+with ProcessPoolExecutor(
+        1, mp_context=multiprocessing.get_context("spawn")) as pool:
+    assert list(pool.map(abs, [-1])) == [1]
+```
+"""
+
+
+@pytest.mark.slow
+def test_a_spawned_worker_can_import_the_notebook(tmp_path):
+    """A spawned worker re-imports the notebook as its main module, which
+    must be Python and not Markdown (#251)."""
+    notebook = tmp_path / "spawn.md"
+    notebook.write_text(SPAWN)
+
+    export_notebooks.export(notebook, check=True)
+
+
 def test_every_name_must_match_a_notebook(monkeypatch, capsys):
     monkeypatch.setattr(export_notebooks, "render", lambda *_, **__: True)
     monkeypatch.setattr("sys.argv", [
@@ -31,6 +58,33 @@ def test_every_name_must_match_a_notebook(monkeypatch, capsys):
 
     assert export_notebooks.main() == 1
     assert "fixpoint" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("names, runs", [
+    ([], False), (["readme_example"], True)])
+def test_an_unexecuted_notebook_runs_only_when_named(
+        monkeypatch, names, runs):
+    rendered = []
+    monkeypatch.setattr(export_notebooks, "render", lambda notebook, **_: (
+        rendered.append(export_notebooks.name_of(notebook)) or True))
+    monkeypatch.setattr("sys.argv", ["export_notebooks.py", "--check", *names])
+
+    assert export_notebooks.main() == 0
+    assert ("optyx/readme_example" in rendered) is runs
+
+
+def test_the_docs_build_links_to_an_unexecuted_notebook(monkeypatch):
+    pages = {}
+    monkeypatch.delenv(export_notebooks.SKIP, raising=False)
+    monkeypatch.setattr(export_notebooks, "export", lambda *_, **__: None)
+    monkeypatch.setattr(export_notebooks, "write_page", lambda nb, **kw: (
+        pages.setdefault(export_notebooks.name_of(nb), kw)))
+
+    export_notebooks.generate()
+
+    assert pages["optyx/readme_example"] == {
+        "rendered": False, "skipped": True}
+    assert pages["optyx/fixpoints"] == {"rendered": True}
 
 
 def test_the_docs_extra_installs_what_the_optyx_notebooks_need():
