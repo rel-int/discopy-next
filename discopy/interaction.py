@@ -134,6 +134,16 @@ class Ty[natural](Pregroup, TestableGeneric):
     form_under = Pregroup.form_under.inapplicable(messages.PAIR_TYPES)
     form_l = Pregroup.form_l.inapplicable(messages.PAIR_TYPES)
     form_r = Pregroup.form_r.inapplicable(messages.PAIR_TYPES)
+    adjoint_involution = Pregroup.adjoint_involution.inapplicable(
+        messages.PAIR_TYPES)
+    adjoint_contravariance_left = Pregroup.adjoint_contravariance_left\
+        .inapplicable(messages.PAIR_TYPES)
+    adjoint_contravariance_right = Pregroup.adjoint_contravariance_right\
+        .inapplicable(messages.PAIR_TYPES)
+    residuation_over = Pregroup.residuation_over.inapplicable(
+        messages.PAIR_TYPES)
+    residuation_under = Pregroup.residuation_under.inapplicable(
+        messages.PAIR_TYPES)
 
     @classmethod
     def strategy(cls):

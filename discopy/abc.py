@@ -379,6 +379,19 @@ class DelayMonoid[C0, C1: DelayMonoid](ColouredMonoid[C0, C1]):
         one time step. """
         return x.delay()
 
+    @axiom
+    def delay_monoidality[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, A, C]]:
+        """ The delay is a monoid endomorphism: it preserves the tensor. """
+        return cls.equation_factory((x @ y).delay(), x.delay() @ y.delay())
+
+    @axiom
+    def delay_unit[X: Obj[C0]](
+            cls: type[C1], x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """ The delay is a monoid endomorphism: it preserves the unit. """
+        return cls.equation_factory(cls.id(x).delay(), cls.id(x))
+
 
 class BangMonoid[C0, C1: BangMonoid](ColouredMonoid[C0, C1]):
     """
@@ -1680,6 +1693,45 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
             cls, x: Hom[C1, A, B]) -> Hom[C1, B, A]:
         """ The formation rule of :class:`R`: the right adjoint. """
         return x.r
+
+    @axiom
+    def adjoint_involution[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ The left adjoint of the right adjoint is the identity, and vice
+        versa. """
+        return cls.equation_factory(x.r.l, x, x.l.r)
+
+    @axiom
+    def adjoint_contravariance_left[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, C, A]]:
+        """ The left adjoint reverses the tensor, ``(x @ y).l == y.l @ x.l``.
+        """
+        return cls.equation_factory((x @ y).l, y.l @ x.l)
+
+    @axiom
+    def adjoint_contravariance_right[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, C, A]]:
+        """ The right adjoint reverses the tensor, ``(x @ y).r == y.r @ x.r``.
+        """
+        return cls.equation_factory((x @ y).r, y.r @ x.r)
+
+    @axiom
+    def residuation_over[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, C, B]
+    ) -> Equation[Hom[C1, A, C]]:
+        """ The exponential over is the tensor with the left adjoint,
+        ``x << y == x @ y.l``. """
+        return cls.equation_factory(x << y, x @ y.l)
+
+    @axiom
+    def residuation_under[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, y: Hom[C1, A, C], x: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, C, B]]:
+        """ The exponential under is the tensor with the right adjoint,
+        ``y >> x == y.r @ x``. """
+        return cls.equation_factory(y >> x, y.r @ x)
 
     def is_adjoint(self: C1, other: C1) -> bool:
         """

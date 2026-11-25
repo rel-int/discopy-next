@@ -28,6 +28,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `markov` and `comarkov` fail on their copies, discards, merges and noises
   ([next#730]).
 
+- The equations of the objects are axioms of their classes: `abc.Pregroup` states
+  `adjoint_involution`, `adjoint_contravariance_left` and `_right`, `residuation_over` and
+  `residuation_under`, and `abc.DelayMonoid` `delay_monoidality` and `delay_unit`, so that the
+  property matrix checks them on every class of types.
+
 - `testable.PROVIDERS` holds `Provider`s, partial maps from a declaration to a strategy of its
   sequents, which `Declaration.sequents` tries in order before drawing them itself, so that a
   plugin, e.g. a Boltzmann sampler, supplies the arguments of the laws it covers without patching
@@ -964,6 +969,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   off `discopy.monoidal`, inside the syntax, and the docstring of
   `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
   ([next#732]).
+
+- `feedback.Ty.delay` keeps the colour of a unit: a type with no wire is its own delay, as
+  `abc.DelayMonoid.delay_unit` states.
 
 - `comarkov.Diagram.spider_factory` builds a spider with no leg out as the trace of a merge,
   the mirror of `markov`'s traced copy, so that a traced merge reads back from its hypergraph
