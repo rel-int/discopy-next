@@ -3,5 +3,5 @@
 - [x] Backend: draw a nested drawing through the transpose map
 - [x] Bubble: opt-in direction, drawn as one box with its args left to right inside
 - [x] Top level: draw(direction=...)
-- [ ] Reproduce the Very big car figure as a doctest
+- [x] Reproduce the Very big car figure as a doctest
 - [ ] Changelog, checks
