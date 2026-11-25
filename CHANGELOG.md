@@ -897,7 +897,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - A frame drawn left to right keeps its name inside it, in its top left
   corner, rather than lifted above its top side like a wire label, and a
-  frame keeps its name under `wire_labels=False`; `Box`'s docstring draws
+  bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
+  gradients in `tensor`'s product and chain rules; `Box`'s docstring draws
   "concepts with attitude" from higher-order DisCoCat ([next#735]).
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
