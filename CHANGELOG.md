@@ -9,6 +9,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `neural.equivariant` computes the linear layers between permutation
+  representations of a finite group that commute with it, with one weight per
+  orbit of the group on pairs of points: `tying` is the orbit of each pair,
+  `Dense` the layer on tensors with channels, `layer` the layer as a
+  parametric map of `neural` networks and `equivariance` the distance of a
+  function to commuting with the group ([next#TBD]).
+
+- `group.Action.trivial` is the action of a group on a number of points that
+  fixes each of them, which tensors with any action of the group
+  ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2675,6 +2686,7 @@ for the changelog of `1.2.1` and earlier.
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
+[next#TBD]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#723]: https://github.com/rel-int/discopy-next/pull/723

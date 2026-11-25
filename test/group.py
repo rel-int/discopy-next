@@ -115,6 +115,15 @@ def test_action():
         Wreath[Cyclic[3], Cyclic[2]].action(Cyclic[2].action())
 
 
+def test_trivial():
+    for G in GROUPS:
+        action = Action.trivial(G, 3)
+        assert action.images == len(G.generators()) * (Permutation.id(3), )
+        assert action(G.sample(random.Random(0))) == Permutation.id(3)
+        assert action.orbits() == ((0, ), (1, ), (2, ))
+    assert Action.trivial(Cyclic[4]) == Action(Cyclic[4], 1, ((0, ), ))
+
+
 def test_iterated_wreath():
     """
     A wreath whose top is a wreath is as cheap as its factors: each group
