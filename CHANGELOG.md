@@ -547,7 +547,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
-  `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)`,
+  `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)` (an
+  `Elementwise` in `tensor` and `quantum`),
   a box with `args=(f, )`, `isinstance(f, Bubble)` becomes `f.args`, and
   `Bubble` stays an alias of `Box.from_args`, or of `Elementwise.from_args` in
   `tensor`, `quantum.circuit` and `quantum.zx`, and a tree dumped with a

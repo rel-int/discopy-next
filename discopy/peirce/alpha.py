@@ -248,7 +248,8 @@ got white inside white.
         kwargs = {
             k: tree[k] for k in ("name", "data", "is_dagger") if k in tree}
         arg, dom, cod = map(
-            from_tree, (tree['args'][0], tree['dom'], tree['cod']))
+            from_tree, (tree.get('args', [tree.get('arg')])[0], tree['dom'],
+                        tree['cod']))
         return cls(arg, dom=dom, cod=cod, **kwargs)
 
 
