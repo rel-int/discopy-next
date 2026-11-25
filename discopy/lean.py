@@ -621,12 +621,15 @@ def functor(cls: type, own: dict[str, str], declared: dict) -> str:
     class, extending those of its bases: its action ``ob`` on objects and
     ``map`` on morphisms preserve each operation of the class, under the
     premises of the rule that concludes it, if any, e.g. ``comp`` on
-    composable morphisms only, as ``cut`` concludes it.
+    composable morphisms only, as ``cut`` concludes it. A rule that fixes a
+    number, e.g. ``delaying`` the one time step of ``delay f 1``, does not:
+    the operation is preserved on every number.
     """
     name, parents = cls.__name__, bases(cls)
     fields = {}
     for decl, compiled in declared.values():
-        if isinstance(decl, Rule) and compiled.output.name in own:
+        if isinstance(decl, Rule) and compiled.output.name in own and all(
+                isinstance(arg, Term) for arg in compiled.output.args):
             sort = "ob" if compiled.output.sort == "Ob" else "map"
             source = Compiled(
                 compiled.binders, compiled.premises,

@@ -266,8 +266,8 @@ structure FeedbackCategory.Laws (cat : FeedbackCategory Ob Hom) : Prop extends t
 
 /-- A functor of `FeedbackCategory`: it preserves each of its operations. -/
 structure FeedbackCategory.Functor (cat : FeedbackCategory Ob Hom) (cat' : FeedbackCategory Ob' Hom') extends toMonoidalCategory : MonoidalCategory.Functor cat.toMonoidalCategory cat'.toMonoidalCategory where
-  map_delay : ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → map (cat.delay f 1) = cat'.delay (map f) 1
   map_feedbackMem : ∀ (Γ Δ M : Ob) (f : Hom), cat.dom f = cat.tensorOb Γ (cat.dom (cat.delay (cat.id M) 1)) → cat.cod f = cat.tensorOb Δ M → map (cat.feedbackMem f M) = cat'.feedbackMem (map f) (ob M)
+  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
   map_feedback : ∀ (f : Hom) (n : Nat), map (cat.feedback f n) = cat'.feedback (map f) n
   map_feedbackDomCodMem : ∀ (f : Hom) (X Y Z : Ob), map (cat.feedbackDomCodMem f X Y Z) = cat'.feedbackDomCodMem (map f) (ob X) (ob Y) (ob Z)
 
