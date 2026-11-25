@@ -219,7 +219,7 @@ def ast_size(_box) -> int:
     return 1
 
 
-class Join(markov.Bubble):
+class Join(markov.Box):
     """
     The join of parallel diagrams, an e-box of the string diagrams of a
     semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
@@ -228,7 +228,8 @@ class Join(markov.Bubble):
 
     Parameters:
         terms : The diagrams joined, with the same domain and codomain.
-        params : Passed to :class:`markov.Bubble`, e.g. by :meth:`dagger`.
+        params : Passed to :meth:`markov.Box.from_args`, e.g. by
+            :meth:`dagger`.
 
     Example
     -------
@@ -243,10 +244,17 @@ class Join(markov.Bubble):
     (x @ f >> h) + (x @ g >> h)
     """
     is_id_on_objects = True
+    serialised_attrs = (
+        "*args", "dom", "cod", "name", "is_dagger", "data")
 
-    def __init__(self, *terms, **params):
+    def __init__(self, *terms, dom=None, cod=None, name="", **params):
+        terms = tuple(params.pop("args", ())) or terms
+        dom, cod = (
+            given if given is not None else self.common(terms, attr)
+            for attr, given in [("dom", dom), ("cod", cod)])
         params.pop("method", None)
-        super().__init__(*terms, method="join", **params)
+        markov.Box.__init__(self, name, dom, cod, args=terms, method="join",
+                            **params)
         for term in terms:
             assert_isparallel(self, term)
         self.deterministic = len(terms) == 1 and terms[0].is_deterministic

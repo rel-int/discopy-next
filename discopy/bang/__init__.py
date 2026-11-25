@@ -31,7 +31,6 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
     Bang
     Structural
     Dereliction
@@ -408,13 +407,7 @@ class Sum(monoidal.Sum, Box):
     """
 
 
-class Bubble(monoidal.Bubble, Box):
-    """
-    A bubble in the free linear category, i.e. a monoidal bubble and its box.
-    """
-
-
-class Bang(monoidal.Bubble, Box):
+class Bang(Box):
     """
     The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
     a :class:`Curry` is.
@@ -443,9 +436,8 @@ class Bang(monoidal.Bubble, Box):
 
     def __init__(self, arg: Diagram):
         dom, cod = arg.dom.bang(), arg.cod.bang()
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, drawing_name="!")
-        Box.__init__(self, f"({arg}).bang()", dom, cod)
+        Box.__init__(self, f"({arg}).bang()", dom, cod, args=(arg, ),
+                     drawing_name="!")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r})"
@@ -703,7 +695,6 @@ class Laxator(Structural):
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.bang_factory = Bang
 Diagram.dereliction_factory = Dereliction
 Diagram.digging_factory = Digging
@@ -974,6 +965,10 @@ TermBase.functor = Functor.id(Diagram)
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory = Ty.term_factory = TermBase
+
+
+Bubble = Box.from_args
+
 
 # The levels with a bang subclass this one, so they are imported last.
 # pylint: disable-next=wrong-import-position

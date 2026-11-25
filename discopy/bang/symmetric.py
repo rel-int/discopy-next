@@ -19,7 +19,6 @@ Summary
     Permutation
     Swap
     Sum
-    Bubble
     Bang
     Dereliction
     Digging
@@ -92,10 +91,6 @@ class Sum(symmetric.Sum, bang.Sum, Box):
     """ A sum in a symmetric linear diagram. """
 
 
-class Bubble(symmetric.Bubble, bang.Bubble, Box):
-    """ A bubble in a symmetric linear diagram. """
-
-
 class Bang(bang.Bang, Box):
     """ The bang of a symmetric linear diagram. """
 
@@ -139,7 +134,6 @@ Diagram.functor_factory = Functor
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.bang_factory = Bang
 Diagram.dereliction_factory = Dereliction
 Diagram.digging_factory = Digging
@@ -148,3 +142,6 @@ Diagram.weakening_factory = Weakening
 Diagram.laxator_factory = Laxator
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
+
+
+Bubble = Box.from_args

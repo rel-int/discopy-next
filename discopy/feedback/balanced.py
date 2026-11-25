@@ -25,7 +25,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     DualRail
 
@@ -103,10 +102,6 @@ class Sum(balanced.Sum, feedback.Sum, Box):
     """ A balanced feedback sum is a balanced and a feedback sum. """
 
 
-class Bubble(balanced.Bubble, feedback.Bubble, Box):
-    """ A balanced feedback bubble is a balanced and a feedback bubble. """
-
-
 class Functor(balanced.Functor, feedback.Functor):
     """
     A balanced feedback functor is a balanced functor and a feedback functor.
@@ -142,7 +137,6 @@ Diagram.functor_factory = Functor
 Diagram.braid_factory = Braid
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -150,3 +144,6 @@ Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

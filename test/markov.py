@@ -482,7 +482,7 @@ def test_Bubble_flags_subs():
 def test_Box_signature():
     sig = signature(Box)
     assert list(sig.parameters) == [
-        "name", "dom", "cod", "data", "is_dagger",
+        "name", "dom", "cod", "data", "is_dagger", "args", "method",
         "is_deterministic", "is_affine"]
     x = Ty('x')
     box = Box('f', x, x, **{

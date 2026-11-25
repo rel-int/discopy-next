@@ -46,7 +46,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
 """
 
@@ -261,7 +260,8 @@ class Timed(Box):
         if time_step:
             self._time_step = time_step
             monoidal.Box.__init__(self, self.name, self.dom.delay(time_step),
-                                  self.cod.delay(time_step))
+                                  self.cod.delay(time_step), args=self.args,
+                                  method=self.method)
 
     time_step = property(lambda self: self._time_step)
 
@@ -400,11 +400,6 @@ class Sum(closed.Sum, markov.Sum, Box):
     """ A closed feedback sum is a closed and a feedback sum. """
 
 
-class Bubble(closed.Bubble, markov.Bubble, Box):
-    """ A closed feedback bubble is a closed and a feedback bubble. """
-    serialised_attrs = markov.Bubble.serialised_attrs
-
-
 class Functor(closed.Functor, markov.Functor):
     """
     A closed feedback functor is a closed and a feedback functor: a delayed
@@ -448,8 +443,10 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Ty.product_factory = Product
 
 Id = Diagram.id
+
+
+Bubble = Box.from_args

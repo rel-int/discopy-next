@@ -26,7 +26,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     DualRail
 
@@ -115,10 +114,6 @@ class Sum(symmetric.Sum, balanced.Sum, Box):
     """ A symmetric feedback sum is a symmetric and a feedback sum. """
 
 
-class Bubble(symmetric.Bubble, balanced.Bubble, Box):
-    """ A symmetric feedback bubble is a symmetric and a feedback bubble. """
-
-
 class Functor(symmetric.Functor, balanced.Functor):
     """
     A symmetric feedback functor is a symmetric and a feedback functor.
@@ -144,7 +139,6 @@ Diagram.functor_factory = Functor
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -152,3 +146,6 @@ Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

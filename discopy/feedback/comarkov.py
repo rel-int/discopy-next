@@ -27,7 +27,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
 
 Example
@@ -109,10 +108,6 @@ class Sum(comarkov.Sum, symmetric.Sum, Box):
     """ A comarkov feedback sum is a comarkov and a feedback sum. """
 
 
-class Bubble(comarkov.Bubble, symmetric.Bubble, Box):
-    """ A comarkov feedback bubble is a comarkov and a feedback bubble. """
-
-
 class Functor(comarkov.Functor, symmetric.Functor):
     """
     A comarkov feedback functor is a comarkov and a feedback functor.
@@ -136,10 +131,12 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.noise_factory = Noise
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

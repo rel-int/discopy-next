@@ -19,7 +19,6 @@ Summary
     DualRailBraid
     DualRailTwist
     Sum
-    Bubble
     Functor
     TermBase
     Variable
@@ -398,12 +397,6 @@ class Sum(braided.Sum, Box):
     """
 
 
-class Bubble(braided.Bubble, Box):
-    """
-    A balanced bubble is a braided bubble and a balanced box.
-    """
-
-
 class Functor(braided.Functor):
     """
     A balanced functor is a braided functor that twists.
@@ -490,7 +483,6 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.braid_factory = Braid
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 Id = Diagram.id
 
@@ -502,3 +494,6 @@ class Equation(braided.Equation):
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

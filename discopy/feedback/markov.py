@@ -27,7 +27,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
 
 Example
@@ -133,11 +132,6 @@ class Sum(markov.Sum, symmetric.Sum, Box):
     """ A Markov feedback sum is a Markov and a feedback sum. """
 
 
-class Bubble(markov.Bubble, symmetric.Bubble, Box):
-    """ A Markov feedback bubble is a Markov and a feedback bubble. """
-    serialised_attrs = markov.Bubble.serialised_attrs + ("time_step", )
-
-
 class Functor(markov.Functor, symmetric.Functor):
     """
     A Markov feedback functor is a Markov and a feedback functor.
@@ -161,10 +155,12 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

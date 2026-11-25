@@ -949,10 +949,10 @@ def test_Bubble_data():
 
 
 def test_Bubble_time_step():
-    from discopy.quantum.circuit import Bubble, qubit
+    from discopy.quantum.circuit import Elementwise, qubit
     from discopy.quantum.gates import X
     delayed = X.bubble().delay()
-    undelayed = Bubble(X, dom=qubit.d, cod=qubit.d)
+    undelayed = Elementwise(X, dom=qubit.d, cod=qubit.d)
     assert delayed.reset() == X.bubble() != undelayed.reset()
     assert delayed != undelayed and len({delayed, undelayed}) == 2
 
@@ -1009,7 +1009,7 @@ def test_grad_of_named_bubble_reads_back():
     for diff in (tensor.Diff(x), tensor.Diff(tmp, abs)):
         assert eval(repr(diff)) == diff
     chain = next(box for box in bubble.grad(x).boxes
-                 if isinstance(box, Bubble) and box.func != Bubble.func)
+                 if isinstance(box, Elementwise) and box.func != Elementwise.func)
     assert repr(chain.func) == "tensor.Diff(tmp, abs)"
 
 
