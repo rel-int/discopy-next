@@ -1432,8 +1432,8 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     Attributes:
         draw_left_to_right : Whether the diagrams of the class are drawn left
             to right rather than top to bottom, a property of the category
-            rather than of any diagram: see :class:`Bubble` for diagrams of
-            one direction drawn inside the boxes of another.
+            rather than of any diagram: see :class:`Box` for diagrams of
+            one direction drawn as the args of a box of another.
 
     .. admonition:: Summary
 

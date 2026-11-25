@@ -10,7 +10,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Added
 
 - A category draws left to right when its `Diagram` class sets
-  `draw_left_to_right = True`, and a `Bubble` whose args are drawn in
+  `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
   across it, e.g. the "Very big car" figure of higher-order DisCoCat: the
   terms top to bottom, their bodies left to right.
