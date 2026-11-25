@@ -875,8 +875,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `discopy.sum` goes, and `Sum` lives in each module again: `cat.Sum` is a box
   of formal sums with their composition, `monoidal.Sum` adds the tensor and
-  each level's `Sum` subclasses its parent's. `Sum[C]` and the
-  `subscript_bases` hook of `NamedGeneric` go with it ([next#736]).
+  each level's `Sum` subclasses its parent's: import `Sum` from the module of
+  its category, e.g. `monoidal.Sum` for `sum.Sum[monoidal.Diagram]`.
+  `Sum[C]` and the `subscript_bases` hook of `NamedGeneric` go with it
+  ([next#736]).
 - The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
   does not apply, now that a class with no tensor does not state it
   ([next#485]).
