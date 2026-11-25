@@ -26,6 +26,9 @@ computation time, each with its trainer; :mod:`discopy.neural.train` holds
 the optimiser, the schedule, the weight average and the per-sample clip;
 :mod:`discopy.neural.geometric` runs a network along the blocks of its
 symmetry group rather than along its tables.
+:mod:`discopy.neural.datatype` is the syntax of recursive networks: the
+terms of an inductive datatype such as lists or trees, and the algebras that
+fold them, with one tied parameter in a category of parametric maps.
 
 .. autosummary::
     :template: module.rst
@@ -42,6 +45,7 @@ symmetry group rather than along its tables.
     act
     train
     geometric
+    datatype
 
 Note
 ----

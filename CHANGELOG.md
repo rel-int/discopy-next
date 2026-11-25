@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `neural.datatype` has `Datatype`, the constructors of a polynomial
+  endofunctor, with the diagrams of its terms (lists, trees), and `Algebra`,
+  one image for each constructor whose fold of a term is a functor, tied by
+  one copy of the parameter per constructor in parametric categories: the
+  recursive networks of Categorical Deep Learning, Appendix J
+  ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2421,6 +2428,7 @@ for the changelog of `1.2.1` and earlier.
 [#825]: https://github.com/discopy/discopy/pull/825
 [#829]: https://github.com/discopy/discopy/pull/829
 [#830]: https://github.com/discopy/discopy/pull/830
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [next#1]: https://github.com/rel-int/discopy-next/pull/1
 [next#9]: https://github.com/rel-int/discopy-next/issues/9
 [next#10]: https://github.com/rel-int/discopy-next/issues/10
