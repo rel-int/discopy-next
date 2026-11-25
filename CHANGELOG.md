@@ -869,7 +869,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Fixed
 
 - The architecture diagram of `discopy.abc` draws `discopy.bang` branching
-  off `discopy.monoidal` ([next#732]).
+  off `discopy.monoidal`, inside the syntax, and the docstring of
+  `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
+  ([next#732]).
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
