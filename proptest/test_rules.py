@@ -54,6 +54,6 @@ def test_rule(rule, drawn):
         drawn.add(repr(premises))
         conclusion = rule(**premises)
         note(conclusion)
-        assert inhabits(conclusion, rule.output(scope))
+        assert inhabits(conclusion, rule.output(scope), rule.category)
 
     check()

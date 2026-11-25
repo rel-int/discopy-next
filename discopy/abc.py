@@ -506,6 +506,9 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
     :class:`discopy.matrix.Matrix` and :class:`discopy.hypergraph.Hypergraph`
     do: the hook is here so that it fires for those too.
     """
+    ob_tensor = Tensor.formation(C0)
+    ob_unit = Unit.formation(C0)
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if "trace" in vars(cls):
@@ -672,6 +675,8 @@ class FeedbackCategory[
     tightening and sliding. A :class:`TracedCategory` is a feedback category
     whose delay is the identity.
     """
+    ob_delay = Delay.formation(C1, ob=C0)
+
     def delay(self, n_steps: int = 1) -> C1:
         """
         The delay endofunctor applied to a morphism, the identity by default.
@@ -1097,6 +1102,9 @@ class BiclosedCategory[
     We also assume the type for objects comes with methods for left and right
     exponentials :code`x << y` and :code`x >> y`.
     """
+    ob_over = Over.formation(C0)
+    ob_under = Under.formation(C0)
+
     @classmethod
     @abstractmethod
     def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
@@ -1263,6 +1271,8 @@ class LinearCategory[
     The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
     digging, then the bang of the arrow.
     """
+    ob_bang = Bang.formation(C1, ob=C0)
+
     @abstractmethod
     def bang(self: C1) -> C1:
         """ The bang of a morphism, to be instantiated. """
@@ -1641,6 +1651,9 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
     A rigid category is a :class:`BiclosedCategory` with a :class:`Pregroup` as
     object type and methods for :code:`cups` and :code:`caps`.
     """
+    ob_l = L.formation(C0)
+    ob_r = R.formation(C0)
+
     @classmethod
     @abstractmethod
     def cups(cls, left: C0, right: C0) -> C1:
@@ -2073,6 +2086,8 @@ class MarkovCategory[
     of the supply with the tensor are stated here, see
     :class:`ComarkovCategory` for the dual.
     """
+    ob_repeat = Repeat.formation(C0, nat=Nat)
+
     @classmethod
     @abstractmethod
     def copy(cls, x: C0, n: int = 2) -> C1:
@@ -2188,6 +2203,8 @@ class ComarkovCategory[
     comarkov when its opposite is Markov. The laws of a commutative monoid
     and the coherence of the supply with the tensor are stated here.
     """
+    ob_repeat = Repeat.formation(C0, nat=Nat)
+
     @classmethod
     @abstractmethod
     def merge(cls, x: C0, n: int = 2) -> C1:
@@ -2424,6 +2441,8 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
     a :class:`ComarkovCategory`, the Frobenius law and speciality
     identifying the comonoids with the monoids.
     """
+    ob_repeat = Repeat.formation(C0, nat=Nat)
+
     @classmethod
     @abstractmethod
     def spiders(cls, n_legs_in: int, n_legs_out: int, typ: C0) -> C1:

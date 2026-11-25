@@ -443,137 +443,6 @@ def substitute(annotation, scope: dict):
     return origin[args if len(args) > 1 else args[0]]
 
 
-class Constructor:
-    """
-    A constructor of object expressions in a signature, e.g.
-    ``Tensor[A, B]``: a type for a typechecker, an expression while a
-    variable is left in it, see :func:`is_open`, and the object
-    :meth:`form` builds once there is none. Subscripting a constructor is
-    therefore not always a type: once every variable is substituted, see
-    :func:`substitute`, ``Tensor[x, y]`` *is* the object ``x @ y``, which is
-    how an annotation becomes the boundary a premise is drawn with.
-
-    >>> from discopy.monoidal import Ty
-    >>> A = TypeVar("A")
-    >>> assert isinstance(Tensor[A, Ty('y')], GenericAlias)
-    >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
-    """
-    def __class_getitem__(cls, args):
-        args = args if isinstance(args, tuple) else (args, )
-        if any(map(is_open, args)):
-            return GenericAlias(cls, args)
-        return cls.form(*args)
-
-    @staticmethod
-    def form(*args):
-        """ The object the constructor builds from objects. """
-        raise NotImplementedError
-
-
-class Tensor[*Objects](Constructor):
-    """
-    The tensor of objects in a signature: ``Tensor[A, B]`` is a type for a
-    typechecker and the object ``A @ B`` once the variables are sampled.
-
-    >>> from discopy.monoidal import Ty
-    >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
-    """
-    @staticmethod
-    def form(*objects):
-        return reduce(matmul, objects)
-
-
-class Unit[Coarse](Constructor):
-    """
-    The unit of a monoid of objects in a signature: ``Unit[C0]`` is the
-    object ``C0()``.
-
-    >>> from discopy.monoidal import Ty
-    >>> assert Unit[Ty] == Ty()
-    """
-    @staticmethod
-    def form(*args):
-        ob, = args
-        return ob()
-
-
-class L[Object](Constructor):
-    """ The left adjoint of an object in a signature, ``x.l``. """
-    @staticmethod
-    def form(*args):
-        obj, = args
-        return obj.l
-
-
-class R[Object](Constructor):
-    """ The right adjoint of an object in a signature, ``x.r``. """
-    @staticmethod
-    def form(*args):
-        obj, = args
-        return obj.r
-
-
-class Delay[Coarse, Object](Constructor):
-    """
-    The delay of an object by one time step in a signature, read off the
-    delay of its identity in a category ``Coarse``, i.e.
-    ``Coarse.id(M).delay().dom``, so that an object with no time step of
-    its own, e.g. a natural number, is its own delay.
-
-    >>> from discopy.feedback import Ty, Diagram
-    >>> assert Delay[Diagram, Ty('x')] == Ty('x').delay()
-    """
-    @staticmethod
-    def form(*args):
-        category, obj = args
-        return category.id(obj).delay().dom
-
-
-class Bang[Coarse, Object](Constructor):
-    """
-    The bang of an object in a signature, read off the bang of its identity
-    in a category ``Coarse``, i.e. ``Coarse.id(M).bang().dom``, as
-    :class:`Delay` reads the delay, so that a category whose bang is the
-    identity reads each object as its own bang.
-
-    >>> from discopy.bang import Ty, Diagram
-    >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
-    """
-    @staticmethod
-    def form(*args):
-        category, obj = args
-        return category.id(obj).bang().dom
-
-
-class Over[Base, Exponent](Constructor):
-    """ The exponential on the left in a signature, ``base << exponent``. """
-    @staticmethod
-    def form(*args):
-        base, exponent = args
-        return base << exponent
-
-
-class Under[Exponent, Base](Constructor):
-    """ The exponential on the right in a signature, ``exponent >> base``. """
-    @staticmethod
-    def form(*args):
-        exponent, base = args
-        return exponent >> base
-
-
-class Repeat[Object, N](Constructor):
-    """
-    An object repeated a number of times in a signature, ``x ** n``.
-
-    >>> from discopy.monoidal import Ty
-    >>> assert Repeat[Ty('x'), 2] == Ty('x', 'x')
-    """
-    @staticmethod
-    def form(*args):
-        obj, n = args
-        return obj ** n
-
-
 def position(variable: TypeVar, category: type) -> int | None:
     """
     Which parameter of :meth:`discopy.abc.Category.typeparams` a type
@@ -605,12 +474,13 @@ def position(variable: TypeVar, category: type) -> int | None:
     return None if owner is None else owner.__type_params__.index(variable)
 
 
-def inhabits(value, kind) -> bool:
+def inhabits(value, kind, category=None) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
     ``Hom[C, dom, cod]`` has that boundary, compared by the
     :meth:`discopy.abc.Category.ob_equation` of ``C``, the value of
-    ``Var[T, x]`` is ``x``, an equation of ``Equation[T]`` has terms of
+    ``Var[T, x]`` is ``x``, compared by that of ``category`` when given,
+    e.g. the one a formation rule is bound to, an equation of ``Equation[T]`` has terms of
     type ``T``, as an inequation of ``Inequation[T]`` does, a tuple of
     ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
     subclass of ``T``.
@@ -623,6 +493,7 @@ def inhabits(value, kind) -> bool:
     >>> assert inhabits(Equation(f, f), Equation[Hom[Diagram, x, y]])
     >>> assert inhabits(Inequation(1, 2), Inequation[int])
     >>> assert not inhabits(Equation(1, 2), Inequation[int])
+    >>> assert inhabits(x @ y, Var[Ty, Tensor[x, y]], Diagram)
     """
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
@@ -630,7 +501,8 @@ def inhabits(value, kind) -> bool:
             and bool(args[0].ob_equation(value.dom, args[1]))\
             and bool(args[0].ob_equation(value.cod, args[2]))
     if origin is Var:
-        return value == args[1]
+        return value == args[1] if category is None\
+            else bool(category.ob_equation(value, args[1]))
     if isinstance(origin, type) and issubclass(origin, Equation):
         return isinstance(value, origin) and all(
             inhabits(term, args[0]) for term in value.terms)
@@ -1120,6 +992,19 @@ class Rule[**P, T](Declaration[P, T], classmethod):
         return calls[0].func.attr if calls else None
 
     @cached_property
+    def forms_object(self) -> bool:
+        """
+        Whether the rule concludes an object, ``Var[C0, ...]``, as the
+        formation rule of a :class:`Constructor` does, rather than a
+        morphism.
+
+        >>> from discopy.monoidal import Diagram
+        >>> assert Diagram.ob_unit.forms_object
+        >>> assert not Diagram.mix.forms_object
+        """
+        return get_origin(self.annotations()["return"]) is Var
+
+    @cached_property
     def is_recursive(self) -> bool:
         """
         Whether the rule has a morphism among its premises, i.e. a parameter
@@ -1386,6 +1271,207 @@ def slots(category: type) -> dict[str, Slot]:
         for name, value in vars(base).items() if isinstance(value, Slot)}
 
 
+class Constructor(Rule):
+    """
+    A constructor of object expressions in a signature, e.g.
+    ``Tensor[A, B]``: a type for a typechecker, an expression while a
+    variable is left in it, see :func:`is_open`, and the object
+    :meth:`form` builds once there is none. Subscripting a constructor is
+    therefore not always a type: once every variable is substituted, see
+    :func:`substitute`, ``Tensor[x, y]`` *is* the object ``x @ y``, which is
+    how an annotation becomes the boundary a premise is drawn with.
+
+    A constructor is also the formation rule of the objects it builds, i.e.
+    the introduction rule of the sort of objects in the sequent calculus of
+    a category: an instance, e.g. ``ob_tensor = Tensor.formation(C0)`` on
+    :class:`discopy.abc.MonoidalCategory`, is a :class:`Rule` whose premises
+    are the objects it takes, ``a: Var[C0, A]`` and ``b: Var[C0, B]``, and
+    whose conclusion is the object it builds, ``Var[C0, Tensor[A, B]]``, so
+    that the objects of a category are derived from its rules as its
+    morphisms are, see :attr:`Testable.constructors`.
+
+    >>> from discopy.monoidal import Ty, Diagram
+    >>> A = TypeVar("A")
+    >>> assert isinstance(Tensor[A, Ty('y')], GenericAlias)
+    >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
+    >>> assert Diagram.ob_tensor(a=Ty('x'), b=Ty('y')) == Ty('x', 'y')
+    >>> assert Diagram.ob_tensor.forms_object
+    """
+    __hash__ = Rule.__hash__
+
+    def __class_getitem__(cls, args):
+        args = args if isinstance(args, tuple) else (args, )
+        if any(map(is_open, args)):
+            return GenericAlias(cls, args)
+        return cls.form(*args)
+
+    @staticmethod
+    def form(*args):
+        """ The object the constructor builds from objects. """
+        raise NotImplementedError
+
+    @classmethod
+    def formation(cls, *coarse, ob=None, nat=None) -> Self:
+        """
+        The formation rule of the constructor in a category whose objects are
+        ``ob``, a type parameter of the class stating it: one premise
+        ``Var[ob, X]`` for each object the constructor takes, two for the
+        objects of a :class:`Tensor`, ``Var[nat, N]`` for a number ``N:
+        nat``, and the parameters named ``Coarse`` taken from ``coarse`` in
+        order, read off the category the rule is bound to, see
+        :func:`position`.
+
+        Parameters:
+            coarse : The type parameters of the class stating the rule that
+                the parameters named ``Coarse`` stand for, e.g. ``C1`` for
+                the category a :class:`Delay` is read off.
+            ob : The type parameter of the objects, ``coarse[0]`` if
+                :obj:`None`.
+            nat : The sort of numbers, for :class:`Repeat`.
+        """
+        ob = coarse[0] if ob is None else ob
+        coarse_values, arguments, variables = iter(coarse), [], []
+        for parameter in cls.__type_params__:
+            if parameter.__name__ == "Coarse":
+                arguments.append(next(coarse_values))
+                continue
+            names = ("A", "B") if isinstance(parameter, TypeVarTuple)\
+                else (parameter.__name__, )
+            for name in names:
+                bound = nat if name == "N" else Obj[ob]
+                variable = TypeVar(name, bound=bound)
+                variables.append((name.lower(), variable,
+                                  Var[nat if name == "N" else ob, variable]))
+                arguments.append(variable)
+        constructor = cls
+
+        def function(category, **values):
+            built = [
+                category.typeparams()[position(argument, category)]
+                if not any(argument is v for _, v, _ in variables)
+                else values[next(n for n, v, _ in variables if v is argument)]
+                for argument in arguments]
+            return constructor.form(*built)
+
+        function.__name__ = function.__qualname__ = f"ob_{cls.__name__.lower()}"
+        function.__doc__ = f"The formation rule of :class:`{cls.__name__}`."
+        function.__type_params__ = tuple(v for _, v, _ in variables)
+        function.__annotations__ = {
+            name: kind for name, _, kind in variables}
+        function.__annotations__["return"] = Var[
+            ob, GenericAlias(cls, tuple(arguments))]
+        function.__signature__ = inspect.Signature([
+            inspect.Parameter(
+                "category", inspect.Parameter.POSITIONAL_OR_KEYWORD)] + [
+            inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY)
+            for name, _, _ in variables])
+        return cls(function)
+
+
+class Tensor[*Objects](Constructor):
+    """
+    The tensor of objects in a signature: ``Tensor[A, B]`` is a type for a
+    typechecker and the object ``A @ B`` once the variables are sampled.
+
+    >>> from discopy.monoidal import Ty
+    >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
+    """
+    @staticmethod
+    def form(*objects):
+        return reduce(matmul, objects)
+
+
+class Unit[Coarse](Constructor):
+    """
+    The unit of a monoid of objects in a signature: ``Unit[C0]`` is the
+    object ``C0()``.
+
+    >>> from discopy.monoidal import Ty
+    >>> assert Unit[Ty] == Ty()
+    """
+    @staticmethod
+    def form(*args):
+        ob, = args
+        return ob()
+
+
+class L[Object](Constructor):
+    """ The left adjoint of an object in a signature, ``x.l``. """
+    @staticmethod
+    def form(*args):
+        obj, = args
+        return obj.l
+
+
+class R[Object](Constructor):
+    """ The right adjoint of an object in a signature, ``x.r``. """
+    @staticmethod
+    def form(*args):
+        obj, = args
+        return obj.r
+
+
+class Delay[Coarse, Object](Constructor):
+    """
+    The delay of an object by one time step in a signature, read off the
+    delay of its identity in a category ``Coarse``, i.e.
+    ``Coarse.id(M).delay().dom``, so that an object with no time step of
+    its own, e.g. a natural number, is its own delay.
+
+    >>> from discopy.feedback import Ty, Diagram
+    >>> assert Delay[Diagram, Ty('x')] == Ty('x').delay()
+    """
+    @staticmethod
+    def form(*args):
+        category, obj = args
+        return category.id(obj).delay().dom
+
+
+class Bang[Coarse, Object](Constructor):
+    """
+    The bang of an object in a signature, read off the bang of its identity
+    in a category ``Coarse``, i.e. ``Coarse.id(M).bang().dom``, as
+    :class:`Delay` reads the delay, so that a category whose bang is the
+    identity reads each object as its own bang.
+
+    >>> from discopy.bang import Ty, Diagram
+    >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
+    """
+    @staticmethod
+    def form(*args):
+        category, obj = args
+        return category.id(obj).bang().dom
+
+
+class Over[Base, Exponent](Constructor):
+    """ The exponential on the left in a signature, ``base << exponent``. """
+    @staticmethod
+    def form(*args):
+        base, exponent = args
+        return base << exponent
+
+
+class Under[Exponent, Base](Constructor):
+    """ The exponential on the right in a signature, ``exponent >> base``. """
+    @staticmethod
+    def form(*args):
+        exponent, base = args
+        return exponent >> base
+
+
+class Repeat[Object, N](Constructor):
+    """
+    An object repeated a number of times in a signature, ``x ** n``.
+
+    >>> from discopy.monoidal import Ty
+    >>> assert Repeat[Ty('x'), 2] == Ty('x', 'x')
+    """
+    @staticmethod
+    def form(*args):
+        obj, n = args
+        return obj ** n
+
+
 def axiom[**P, T](
         equation: Callable[Concatenate[Any, P], Equation[T]]
 ) -> Axiom[P, Equation[T]]:
@@ -1522,7 +1608,12 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
     """ The axioms inherited by ``cls``, see :meth:`declared`. """
 
     rules = classproperty(lambda cls: cls.declared(Rule))
-    """ The rules inherited by ``cls``, see :meth:`declared`. """
+    """ The rules inherited by ``cls``, see :meth:`declared`: those that
+    conclude a morphism and the formation rules of its objects. """
+
+    constructors = classproperty(lambda cls: cls.declared(Constructor))
+    """ The formation rules of the objects of ``cls``, see
+    :class:`Constructor`. """
 
     @classmethod
     def subclasses(cls) -> tuple[type[Self], ...]:

@@ -2,7 +2,7 @@
 
 import pickle
 import sys
-from typing import Self, TypeVar
+from typing import Self, TypeVar, get_origin
 
 from hypothesis import Phase, find, settings
 from hypothesis import strategies as st
@@ -469,3 +469,24 @@ def test_legacy_factory():
     with warns(DeprecationWarning, match="assign .*Recipe.Box instead"):
         assert Recipe.Box is Step
     assert issubclass(Recipe.Swap, Step)
+
+
+def test_constructors():
+    from discopy import compact, feedback
+    from discopy.testable import Constructor, Var
+    assert sorted(monoidal.Diagram.constructors) == ["ob_tensor", "ob_unit"]
+    assert {"ob_l", "ob_r", "ob_over", "ob_delay"} <= set(
+        compact.Diagram.constructors)
+    rule = compact.Diagram.ob_delay
+    assert isinstance(rule, Constructor) and rule.forms_object
+    assert not rule.is_recursive and rule.given(Ty('x'), Ty('y')) == {}
+    assert get_origin(rule.annotations()["return"]) is Var
+    x = feedback.Ty('x')
+    assert feedback.Diagram.ob_delay(object=x) == x.delay()
+    assert feedback.Diagram.ob_unit() == feedback.Ty()
+    assert "ob_tensor" in monoidal.Diagram.rules
+
+
+def test_formation_rules_derive_no_morphism():
+    term = find(monoidal.Diagram.search(fuel=2), lambda f: len(f) > 0)
+    assert isinstance(term, monoidal.Diagram)
