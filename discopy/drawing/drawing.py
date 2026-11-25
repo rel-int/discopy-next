@@ -536,8 +536,8 @@ which to_drawing recomputes.
         return 0.125 * any(
             box.is_conjugate or box.is_transpose or (
                 box.is_dagger and not box.draw_as_braid) or (
-                getattr(box, "nested", None) is not None
-                and box.nested.asymmetry())
+                any(nested.asymmetry()
+                    for nested in getattr(box, "nested", None) or ()))
             for box in self.boxes)
 
     def to_typst(self, **params):

@@ -726,7 +726,7 @@ def test_bubble_of_coloured_args_drawn_in_another_direction():
 
     x = Ty(Wire('x', Colour('red'), Colour('blue')))
     bubble = Bubble(Primitive('f', x, x), Primitive('g', x, x))
-    assert bubble.to_drawing().boxes[0].nested is not None
+    assert len(bubble.to_drawing().boxes[0].nested) == 2
 
 
 def test_left_to_right_labels_legend_and_dagger():

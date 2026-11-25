@@ -705,9 +705,8 @@ class Backend(ABC):
         types = [graph.dom, graph.cod]
         for box in graph.boxes:
             types += [box.dom, box.cod]
-            if getattr(box, "nested", None) is not None:
-                for name, colour in Backend.region_colours(
-                        box.nested).items():
+            for nested in getattr(box, "nested", None) or ():
+                for name, colour in Backend.region_colours(nested).items():
                     colours.setdefault(name, colour)
         for typ in types:
             candidates = [getattr(typ, "dom", None), getattr(typ, "cod", None)]
@@ -1198,22 +1197,29 @@ class Backend(ABC):
 
     def draw_nested(self, box, corners, centre, **params):
         """
-        Draw the drawing nested in a box left to right on a background of
-        the box's ``frame_colour``, see :class:`Transposed`, centred in the
-        space right of the box's label, and return the centre of that label,
-        on the left of the box.
+        Draw the drawings nested in a box left to right, one under the other,
+        on a background of the box's ``frame_colour``, see
+        :class:`Transposed`, centred in the space right of the box's label,
+        and return the centre of that label, on the left of the box. Their
+        wires plug into the edges of the background, and a daggered box
+        reflects them, the last on top.
         """
-        nested = box.nested.framed()
+        nested = [drawing.framed() for drawing in box.nested]
+        width = sum(drawing.width for drawing in nested)
+        height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
         start = left + (
             text_width(box.drawing_name) + .25 if box.drawing_name else 0)
-        origin = Point((start + right - nested.height) / 2,
-                       centre[1] - nested.width / 2)
-        canvas = Transposed(self, origin, nested, flip=box.is_dagger)
-        canvas.draw_polygon(
-            (0, 0), (nested.width, 0), (nested.width, nested.height),
-            (0, nested.height), facecolor=box.frame_colour)
-        canvas.draw_drawing(nested, **params)
+        x, y = (start + right - height) / 2, centre[1] - width / 2
+        self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
+                          (x, y + width), facecolor=box.frame_colour)
+        offset = 0
+        for drawing in nested:
+            offset += drawing.width
+            origin = Point(x, y + offset - drawing.width if box.is_dagger
+                           else y + width - offset)
+            Transposed(self, origin, drawing, flip=box.is_dagger)\
+                .draw_drawing(drawing, **params)
         return Point((left + start) / 2, centre[1])
 
     @staticmethod
@@ -1548,7 +1554,12 @@ class Transposed(Backend):
             *args, **params)
 
     def draw_text(self, text, i, j, **params):
-        self.parent.draw_text(text, *self.map((i, j)), **params)
+        point = self.map((i, j))
+        if self.flip and params.get("verticalalignment") == "top":
+            # A wire label hangs below its point, lift it above its wire.
+            point = point.shift(
+                y=(params.get("fontsize") or DEFAULT["fontsize"]) / 72)
+        self.parent.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
         self.parent.draw_node(*self.map((i, j)), **params)
