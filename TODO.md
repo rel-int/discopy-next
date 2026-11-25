@@ -6,6 +6,6 @@
 >
 > *Bugs in a next repo*: the fix takes the convention `circuit.Box.dagger` and optyx's `Box.dagger` already state, *a box declares itself self-adjoint with `is_dagger=None`*, so no public name and no pick between readings. Points 1, 2 and 4 of #718 are choices and stay with the issue.
 
-- [ ] zx.H is self-adjoint by `is_dagger=None`, which `zx.Box` reads in `dagger`, `__repr__` and `to_tree`, so it pickles and its repr and tree stay transparent
+- [WIP] @T-50c03de7-2026-11-25 01:30 zx.H is self-adjoint by `is_dagger=None`, which `zx.Box` reads in `dagger`, `__repr__` and `to_tree`, so it pickles and its repr and tree stay transparent
 - [ ] a corpus entry for the `pickling` cells of `zx.Diagram` and `zx.Hypergraph`, a Hadamard and a red spider
 - [ ] CHANGELOG bullet with the PR number, and the gates of next-checks
