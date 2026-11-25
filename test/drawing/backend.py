@@ -1009,3 +1009,98 @@ def test_label_contrast_through_two_turns_reflected():
     assert inside.turns == 2 and not inside.cod_is_after()
     typ = SimpleNamespace(dom="white", cod="black")
     assert inside.label_background(typ) == "black"
+
+
+def test_left_to_right_frame_keeps_its_name_inside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.alignments = {}
+
+        def draw_text(self, text, i, j, **params):
+            self.alignments[text] = params.get("verticalalignment")
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    y, x = Primitive('y', Ty(), n), Primitive('x', Ty(), n)
+    with_ = Primitive('W', Ty(), n, args=(y, x), drawing_name="W",
+                      draw_as_frame=True, draw_vertically=True)
+    recorder = Recorder()
+    with_.bubble(dom=Ty(), cod=n).draw(backend=recorder)
+    assert recorder.alignments["W"] == "top"
+    assert recorder.alignments["n"] == "bottom"
+
+
+def test_frame_name_drawn_without_wire_labels():
+    from discopy.drawing.backend import Backend
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts = []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.append(text)
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    recorder = Recorder()
+    Box('f', x, x).bubble(
+        dom=x, cod=x, drawing_name="g", draw_as_frame=True
+    ).draw(backend=recorder, wire_labels=False)
+    assert "g" in recorder.texts and "x" not in recorder.texts
+
+
+def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts, self.frames = {}, []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = (j, params.get("verticalalignment"))
+
+        def draw_polygon(self, *points, **params):
+            self.frames.append([y for _, y in points])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    frame = Primitive('W', Ty(), n, args=(
+        Primitive('y', Ty(), n), Primitive('x', Ty(), n)), drawing_name="W",
+        draw_as_frame=True, draw_vertically=True)
+    for dagger in (False, True):
+        recorder = Recorder()
+        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        (drawing.dagger() if dagger else drawing).draw(backend=recorder)
+        j, alignment = recorder.texts["W"]
+        bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
+        assert alignment == ("bottom" if dagger else "top")
+        assert bottom < j < top

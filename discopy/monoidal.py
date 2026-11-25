@@ -823,8 +823,9 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
                  getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
-            if getattr(old, "frame_boundary", False):
-                new.frame_boundary = True
+            for flag in ("frame_boundary", "always_draw_label"):
+                if getattr(old, flag, False):
+                    setattr(new, flag, True)
             for attr, default in (
                     WIRE_DRAWING_ATTRIBUTES | COLOUR_DRAWING_ATTRIBUTES
             ).items():
@@ -2537,6 +2538,27 @@ class Box(cat.Box, Diagram):
     >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
 
     .. image:: /_static/monoidal/very-big-car.svg
+        :align: center
+
+    A box with args drawn in its own direction is a box with holes, e.g.
+    "with" as a frame with a hole on either side, named in its top left:
+
+    >>> A, y = Primitive('A', Ty(), n), Primitive('y', Ty(), n)
+    >>> W = lambda *args: Primitive(
+    ...     'W', Ty(), n, args=args, drawing_name="W",
+    ...     draw_as_frame=True, draw_vertically=True)
+    >>> with_ = W(y, x).bubble(
+    ...     dom=Ty(), cod=Ty('(n → n) ← n'), drawing_name="λxy ·", **style)
+    >>> with_attitude = W(y, A).bubble(
+    ...     dom=with_.cod @ n, cod=Ty('n → n'), drawing_name="λy ·", **style)
+    >>> diagram = (C.bubble(dom=Ty(), cod=n, **style) @ with_
+    ...            @ A.bubble(dom=Ty(), cod=n, **style)).foliation()\\
+    ...     >> n @ with_attitude\\
+    ...     >> W(C, A).bubble(dom=n @ with_attitude.cod, cod=n, **style)
+    >>> diagram.draw(
+    ...     doctest='docs/_static/monoidal/concepts-with-attitude.svg')
+
+    .. image:: /_static/monoidal/concepts-with-attitude.svg
         :align: center
     """
 

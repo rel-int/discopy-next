@@ -1542,7 +1542,7 @@ which to_drawing recomputes.
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))
         right = Ty(Wire("", arg_dom.cod, dom.cod))
-        left[0].always_draw_label = True
+        left.inside[0].always_draw_label = True
         wires_can_go_straight = (
             len(dom), len(cod)) == (len(arg_dom), len(arg_cod))
         if frame_sides:
