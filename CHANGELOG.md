@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
+  between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
+  `then`, horizontal composition `>>` and `@`, and `is_invertible`;
+  `para.UpToPermutation` compares maps up to the permutations of their
+  parameters, searched by `para.permutations` over at most `para.BOUND = 6`
+  wires ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -554,6 +561,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- The seven laws of `para` that were declared failing, `bifunctoriality`,
+  `scalar_sliding`, `braid_naturality`, `trace_dinaturality_left`,
+  `trace_dinaturality_right`, `sliding` and `transpose_contravariance`, now
+  hold modulo invertible 2-cells, i.e. permutations of the parameters, and
+  `messages.PARA_REPARAM` is removed ([next#TBD]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
