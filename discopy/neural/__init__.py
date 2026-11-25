@@ -27,7 +27,10 @@ the optimiser, the schedule, the weight average and the per-sample clip;
 :mod:`discopy.neural.geometric` runs a network along the blocks of its
 symmetry group rather than along its tables. :mod:`discopy.neural.equivariant`
 is the layers that commute with a finite group action, as weights tied along
-the orbits of the group on pairs of points.
+the orbits of the group on pairs of points. :mod:`discopy.neural.augment`
+uses the same group on the data instead: random augmentation as a seeded
+Kleisli arrow, the Reynolds average of a function and the homomorphisms of
+:math:`G`-sets.
 
 .. autosummary::
     :template: module.rst
@@ -45,6 +48,7 @@ the orbits of the group on pairs of points.
     train
     geometric
     equivariant
+    augment
 
 Note
 ----

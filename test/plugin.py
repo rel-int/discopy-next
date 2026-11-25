@@ -31,7 +31,7 @@ UNIMPORTABLE = (
     "discopy/lambek/abstract/neural.py",
     "discopy/lambek/categorial/bobcat.py", "discopy/neural/torch.py",
     "discopy/neural/geometric.py", "discopy/neural/equivariant.py",
-    "discopy/neural/kernels.py",
+    "discopy/neural/augment.py", "discopy/neural/kernels.py",
     "discopy/neural/cell.py", "discopy/neural/recursion.py",
     "discopy/neural/lattice.py", "discopy/neural/act.py",
     "discopy/neural/train.py",
