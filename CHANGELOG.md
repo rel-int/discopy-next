@@ -555,6 +555,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The architecture diagram of the syntax moves from the docstring of
+  `discopy.abc` to the syntax page of the docs, with the sentence that
+  describes it ([next#732]).
+
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
   category, e.g. `Matrix`, no longer has them, and the function
