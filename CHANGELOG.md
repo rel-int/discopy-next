@@ -16,6 +16,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   recursive networks of Categorical Deep Learning, Appendix J
   ([next#TBD]).
 
+- `neural.datatype` has `Machine`, a Mealy, Moore or unfolding cell with its
+  feedback and its unrolling through `discopy.stream`, and `Coalgebra`, one
+  image for each box of the cell whose unrolled image is tied by one copy of
+  the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
+  ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
