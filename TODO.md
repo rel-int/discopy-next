@@ -26,5 +26,5 @@
 - [x] Trace(Feedback, Feedforward), with Trace.rotate flipping the side of the loop
 - [x] structural_boxes generates each level's Feedforward
 - [x] drop the failing dagger declarations that now hold; keep pivotal's rotate ones
-- [WIP] @T-51236a2e-2026-11-25 15:53 record the stream and rotate rulings on #710
+- [x] record the stream and rotate rulings on #710
 - [ ] CHANGELOG bullet and next-checks
