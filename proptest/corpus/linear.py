@@ -1,10 +1,10 @@
 """
-The corpus of :class:`discopy.bang.Diagram`, aimed at what its strategy does
+The corpus of :class:`discopy.linear.monoidal.Diagram`, aimed at what its strategy does
 not draw: the structural boxes of a linear category, i.e. dereliction,
 digging, contraction, weakening, exchange and laxator.
 """
 
-from discopy.bang import (
+from discopy.linear.monoidal import (
     Box, Contraction, Dereliction, Diagram, Digging, Exchange, Laxator, Ty,
     Weakening)
 

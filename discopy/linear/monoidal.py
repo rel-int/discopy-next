@@ -3,20 +3,12 @@
 """
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
-:class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure, so
-this package is the monoidal level, the exchange a box of its own, and its
-submodules the levels it makes sense to bang:
-
-.. autosummary::
-    :template: module.rst
-    :toctree: ../_api
-
-    symmetric
-
-The levels with copies, e.g. :mod:`discopy.markov` and :mod:`discopy.closed`,
-copy every wire already, and those with cups and caps make a bang trivial.
-Bang and :mod:`discopy.feedback` do not interact: no banged wire has a time
-step.
+:class:`discopy.abc.LinearCategory`. The comonad, its :class:`Bang`,
+:class:`Dereliction` and :class:`Digging`, are those of
+:mod:`discopy.linear.cat`; this module adds what uses the tensor, the
+:class:`Contraction` and :class:`Weakening` of the comonoid on a banged
+object, the :class:`Laxator` and the :class:`Exchange`, which makes a banged
+object central and needs no symmetry.
 
 Summary
 -------
@@ -56,9 +48,9 @@ dereliction, after the bang of ``f``.
 >>> f = Box('f', x, y)
 >>> twice = f.bang() >> Contraction(y) >> Dereliction(y) @ Dereliction(y)
 >>> assert twice.dom == x.bang() and twice.cod == y @ y
->>> twice.draw(doctest='docs/_static/bang/twice.svg')
+>>> twice.draw(doctest='docs/_static/linear/twice.svg')
 
-.. image:: /_static/bang/twice.svg
+.. image:: /_static/linear/twice.svg
     :align: center
 
 A :class:`Functor` into a category without a bang, e.g.
@@ -70,15 +62,15 @@ the second quantisation of ``f``, see the notebook
 
 from __future__ import annotations
 
-from functools import cached_property
 from typing import Callable, ClassVar, Self
 
 from discopy import monoidal, messages
 from discopy.abc import DaggerCategory, LinearCategory, MonoidalCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
+from discopy.linear import cat
 from discopy.utils import (
-    AxiomError, assert_isinstance, factory_name, from_tree, get_origin)
+    AxiomError, assert_isinstance, get_origin)
 
 
 @factory
@@ -128,7 +120,7 @@ class Ty(monoidal.Ty):
         return type(self)(self.bang_factory(self))
 
 
-class BangOb(monoidal.Wire):
+class BangOb(cat.BangOb, monoidal.Wire):
     """
     The bang ``!x`` of a type ``x``, a wire of its own holding it, the way an
     :class:`Exp` holds its base and exponent.
@@ -138,30 +130,13 @@ class BangOb(monoidal.Wire):
 
     Example
     -------
-    >>> from discopy import bang
+    >>> from discopy import linear
     >>> x, y = Ty('x'), Ty('y')
     >>> assert Ty(BangOb(x @ y)) == (x @ y).bang()
     >>> assert eval(repr(BangOb(x))) == BangOb(x)
     >>> assert BangOb(x @ y).drawing_name == "!(x @ y)"
     """
     ob = Ty
-
-    def __init__(self, arg: Ty):
-        assert_isinstance(arg, self.ob)
-        self.arg = arg
-        super().__init__("")
-        del self.name
-
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        "The name of a bang is its print, computed when first read."
-        return str(self)
-
-    def __eq__(self, other):
-        return isinstance(other, type(self)) and self.arg == other.arg
-
-    def __hash__(self):
-        return hash(repr(self))
 
     def __str__(self):
         arg = str(self.arg) if len(self.arg) == 1 else f"({self.arg})"
@@ -177,17 +152,6 @@ class BangOb(monoidal.Wire):
         """ The atoms of a bang: those of the type it holds. """
         return self.arg.atoms()
 
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg!r})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']))
-
     def dagger(self) -> BangOb:
         """ A banged wire is its own dagger, as it has no colour. """
         return self
@@ -197,7 +161,7 @@ Ty.bang_factory = BangOb
 
 
 @factory
-class Diagram(monoidal.Diagram, LinearCategory):
+class Diagram(monoidal.Diagram, cat.Arrow, LinearCategory):
     """
     A diagram in the free linear category: a monoidal diagram with
     :class:`Bang` bubbles and the :class:`Dereliction`, :class:`Digging`,
@@ -225,31 +189,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
         messages.STRUCTURAL_HAS_NO_DAGGER)
     dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
         messages.STRUCTURAL_HAS_NO_DAGGER)
-
-    def bang(self) -> Diagram:
-        """
-        Wrapper around :class:`Bang` called by :class:`Functor`: the bang of
-        a free diagram is a bubble, so it is a functor only up to the laws
-        the free category declares failing.
-
-        Example
-        -------
-        >>> x, y = Ty('x'), Ty('y')
-        >>> f = Box('f', x, y)
-        >>> assert f.bang() == Bang(f) and f.bang().dom == x.bang()
-        >>> assert Diagram.id(x).bang() != Diagram.id(x.bang())
-        """
-        return self.bang_factory(self)
-
-    @classmethod
-    def dereliction(cls, x: Ty) -> Dereliction:
-        """ Wrapper around :class:`Dereliction`. """
-        return cls.dereliction_factory(x)
-
-    @classmethod
-    def digging(cls, x: Ty) -> Digging:
-        """ Wrapper around :class:`Digging`. """
-        return cls.digging_factory(x)
 
     @classmethod
     def contraction(cls, x: Ty) -> Contraction:
@@ -395,7 +334,7 @@ class Diagram(monoidal.Diagram, LinearCategory):
         return self.term_factory.constant_factory(self)(*arguments)
 
 
-class Box(monoidal.Box, Diagram):
+class Box(monoidal.Box, cat.Box, Diagram):
     """
     A box in the free linear category, i.e. a monoidal box of its diagrams.
     """
@@ -407,23 +346,21 @@ class Sum(monoidal.Sum, Box):
     """
 
 
-class Bang(Box):
+class Bang(cat.Bang, Box):
     """
-    The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
-    a :class:`Curry` is.
+    The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a box with ``f``
+    as its arg, drawn with an exclamation mark.
 
     Parameters:
         arg : The diagram to bang.
 
     Example
     -------
-    >>> from discopy import bang
+    >>> from discopy import linear
     >>> x, y = Ty('x'), Ty('y')
     >>> f = Box('f', x, y)
     >>> assert Bang(f).dom == x.bang() and Bang(f).cod == y.bang()
     >>> assert eval(repr(Bang(f))) == Bang(f) and eval(str(Bang(f))) == Bang(f)
-    >>> print(Bang(f >> f[::-1]))
-    (f >> f[::-1]).bang()
 
     The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is the digging
     followed by the bang:
@@ -432,76 +369,24 @@ class Bang(Box):
     >>> promotion = Digging(x) >> g.bang()
     >>> assert promotion.dom == x.bang() and promotion.cod == y.bang()
     """
-    serialised_attrs = ("*args", )
-
+    # pylint: disable-next=super-init-not-called  # a monoidal box is drawn
     def __init__(self, arg: Diagram):
         dom, cod = arg.dom.bang(), arg.cod.bang()
         Box.__init__(self, f"({arg}).bang()", dom, cod, args=(arg, ),
                      drawing_name="!")
 
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.arg!r})"
 
-    def __str__(self):
-        return self.name
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']))
-
-    def dagger(self) -> Bang:
-        """ The dagger of a bang is the bang of the dagger. """
-        return type(self)(self.arg.dagger())
-
-
-class Structural(Box):
+class Structural(cat.Structural, Box):
     """
-    A structural box of a linear category, built from the types of its
-    :attr:`serialised_attrs` rather than a name and a boundary: its name is
-    the call on them, which is its string.
+    A structural box of a linear category, a structural box of its comonad
+    and a box of its diagrams.
     """
-    def __getnewargs__(self):
-        """ The arguments of the constructor. """
-        return tuple(getattr(self, attr) for attr in self.serialised_attrs)
-
-    def __repr__(self):
-        arguments = (
-            repr(value) for value in self.__getnewargs__()
-            if value is not None)
-        return f"{factory_name(type(self))}({', '.join(arguments)})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self))} | {
-            attr: value.to_tree() if isinstance(value, Ty) else value
-            for attr, value in zip(
-                self.serialised_attrs, self.__getnewargs__())}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(**{
-            attr: from_tree(value) if isinstance(value, dict) else value
-            for attr, value in tree.items() if attr != "factory"})
-
-    def dagger(self):
-        """
-        A structural box has no dagger but for the exchange.
-
-        >>> Dereliction(Ty('x')).dagger()
-        Traceback (most recent call last):
-        ...
-        discopy.utils.AxiomError: Dereliction(x) has no dagger: ...
-        """
-        raise AxiomError(messages.BANG_HAS_NO_DAGGER.format(self))
 
 
-class Dereliction(Structural):
+class Dereliction(cat.Dereliction, Structural):
     """
-    The dereliction ``!x -> x``, the counit of the bang and the rule of !L*
-    deriving ``Γ, !x, Δ ⊢ y`` from ``Γ, x, Δ ⊢ y``.
+    The dereliction ``!x -> x`` of a type, see
+    :class:`discopy.linear.cat.Dereliction`.
 
     Parameters:
         x : The type to derelict.
@@ -511,13 +396,6 @@ class Dereliction(Structural):
     >>> x = Ty('x')
     >>> assert Dereliction(x).dom == x.bang() and Dereliction(x).cod == x
     """
-    serialised_attrs = ("x", )
-    drawing_name = "ε"
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Dereliction({x})", x.bang(), x)
-
     @classmethod
     # pylint: disable-next=arguments-differ  # drawn with no boundary
     def strategy(cls, *, types=None):
@@ -531,9 +409,10 @@ class Dereliction(Structural):
         return cls.atomic_strategy(types).map(cls)
 
 
-class Digging(Structural):
+class Digging(cat.Digging, Structural):
     """
-    The digging ``!x -> !!x``, the comultiplication of the bang.
+    The digging ``!x -> !!x`` of a type, see
+    :class:`discopy.linear.cat.Digging`.
 
     Parameters:
         x : The type to dig.
@@ -543,13 +422,7 @@ class Digging(Structural):
     >>> x = Ty('x')
     >>> assert Digging(x).cod == x.bang().bang()
     """
-    serialised_attrs = ("x", )
-    drawing_name = "δ"
     strategy = classmethod(Dereliction.strategy.__func__)
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Digging({x})", x.bang(), x.bang().bang())
 
 
 class Contraction(Structural):
@@ -654,7 +527,7 @@ class Laxator(Structural):
 
     Example
     -------
-    >>> from discopy import bang
+    >>> from discopy import linear
     >>> x, y = Ty('x'), Ty('y')
     >>> assert Laxator(x, y).dom == x.bang() @ y.bang()
     >>> assert Laxator(x, y).cod == (x @ y).bang()
@@ -968,8 +841,3 @@ Diagram.term_factory = Ty.term_factory = TermBase
 
 
 Bubble = Box.from_args
-
-
-# The levels with a bang subclass this one, so they are imported last.
-# pylint: disable-next=wrong-import-position
-from discopy.bang import symmetric  # noqa: E402,F401

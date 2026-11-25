@@ -1,7 +1,7 @@
 from pytest import raises
 
-from discopy import bang
-from discopy.bang import *
+from discopy.linear import monoidal as bang
+from discopy.linear.monoidal import *
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -64,7 +64,8 @@ def test_structural_primitives_of_a_linear_category():
 def test_bang_reads_back():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
-    namespace = vars(bang) | dict(x=x, y=y, f=f, bang=bang)
+    from discopy import linear
+    namespace = vars(bang) | dict(x=x, y=y, f=f, linear=linear)
     for thing in (
             x.bang(), (x @ y).bang().bang(), Ty().bang(), f.bang(), (f >> f[::-1]).bang(), Bang(f).bang(),
             Dereliction(x @ y), Digging(x.bang()), Contraction(x),
@@ -183,11 +184,14 @@ def test_functor_bangs_wires_through_banged():
         Diagram.copy(x.bang(), -1)
 
 
-def test_symmetric_functor_sends_exchange_to_swap():
-    from discopy.bang import symmetric
-    x, y = symmetric.Ty('x'), symmetric.Ty('y')
-    f = symmetric.Box('f', x, y)
-    F = symmetric.Functor(ob_map={x: y, y: x}, ar_map={f: f[::-1]})
-    diagram = symmetric.Diagram.exchange(x, y) >> y @ f.bang()
-    assert F(diagram) == symmetric.Swap(y.bang(), x) >> x @ f[::-1].bang()
-    assert loads(dumps(diagram)) == diagram
+def test_cat_needs_no_tensor():
+    from discopy.linear import cat
+    x, y = cat.Ob('x'), cat.Ob('y')
+    f = cat.Box('f', x, y)
+    assert not hasattr(cat.Arrow, "tensor")
+    promotion = cat.Digging(x) >> f.bang().bang()
+    F = cat.Functor({x: y, y: x}, {f: f[::-1]})
+    assert F(promotion) == cat.Digging(y) >> f[::-1].bang().bang()
+    assert loads(dumps(promotion)) == promotion
+    with raises(AxiomError):
+        cat.Dereliction(x).dagger()

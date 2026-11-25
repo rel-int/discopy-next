@@ -563,8 +563,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- `discopy.feedback` and `discopy.bang` are packages, see
-  `docs/adr/0012-feedback-and-bang-are-packages.md`. The levels with feedback
+- `discopy.feedback` and `discopy.linear` are packages, see
+  `docs/adr/0012-feedback-and-linear-are-packages.md`. The levels with feedback
   are `feedback.balanced`, `feedback.symmetric`, `feedback.markov`,
   `feedback.comarkov` and `feedback.closed`; `discopy.balanced`, `symmetric`,
   `markov`, `comarkov` and `closed` are no longer feedback or traced, their
@@ -572,10 +572,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Head`, `Tail`, `Diagram.wait` and `closed.Timed` moved with no alias.
   `abc.BalancedCategory` is no longer traced, `abc.BalancedTracedCategory`
   states its yanking. `pivotal`, `ribbon`, `compact` and `frobenius` keep
-  their trace of cups and caps. The levels with a bang are `bang` and
-  `bang.symmetric`, whose exchange is the swap; feedback and bang share no
-  class. `Hypergraph.glue` is the trace of a symmetric hypergraph with no
-  condition on its category, which `plug` uses to rewrite ([next#735]).
+  their trace of cups and caps. `discopy.bang` is `discopy.linear.monoidal`,
+  with no alias, over `discopy.linear.cat`, the free `abc.ComonadCategory`,
+  i.e. bang, dereliction and digging with no tensor; contraction, weakening,
+  laxator and exchange stay in `linear.monoidal`. `abc.GoISituation` states a
+  traced bang and a reflexive object, with no free one. Feedback and linear
+  do not import each other. `Hypergraph.glue` is the trace of a symmetric
+  hypergraph with no condition on its category, which `plug` uses to rewrite
+  ([next#735]).
 
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
