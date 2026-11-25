@@ -560,7 +560,7 @@ class Diagram(monoidal.Diagram, TracedCategory):
         back is the memory itself and :attr:`feedback_factory` when it is its
         delay. The keyword form ``dom``, ``cod``, ``mem`` is primary, the
         positional ``n`` its fallback, see
-        :meth:`discopy.abc.MonoidalCategory.split_memory`.
+        :meth:`discopy.abc.FeedbackCategory.split_memory`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> f = Box('f', x @ (x @ y).delay(), x @ x @ y)

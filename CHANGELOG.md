@@ -544,6 +544,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
+  `abc.FeedbackCategory`, so a monoidal category that is not a feedback
+  category, e.g. `Matrix`, no longer has them, and the function
+  `abc.keyword_form` is removed for the static method
+  `abc.FeedbackCategory.keyword_form`; a class that traces without being a
+  feedback category, e.g. `Matrix`, still takes the keyword form of `trace`. The architecture diagram of
+  `discopy.abc` shows the syntax alone, and the docs list `discopy.egraph`
+  under semantics ([next#726]).
+
 - `closed.Hypergraph` and `lambek.abstract.Hypergraph` declare
   `dagger_involution`, `dagger_contravariance` and `dagger_monoidality`
   failing, as their categories do: a curry has no dagger. The strategy draws
@@ -2667,6 +2676,7 @@ for the changelog of `1.2.1` and earlier.
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
+[next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
