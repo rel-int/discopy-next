@@ -544,10 +544,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- `abc.FeedbackCategory` owns `split_memory`, `memory_size` and
-  `keyword_form`, a static method now rather than a function of `discopy.abc`;
-  a class that traces without being a feedback category, e.g. `Matrix`,
-  still takes the keyword form of `trace`. The architecture diagram of
+- `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
+  `abc.FeedbackCategory`, so a monoidal category that is not a feedback
+  category, e.g. `Matrix`, no longer has them, and the function
+  `abc.keyword_form` is removed for the static method
+  `abc.FeedbackCategory.keyword_form`; a class that traces without being a
+  feedback category, e.g. `Matrix`, still takes the keyword form of `trace`. The architecture diagram of
   `discopy.abc` shows the syntax alone, and the docs list `discopy.egraph`
   under semantics ([next#726]).
 
