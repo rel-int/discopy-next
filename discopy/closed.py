@@ -1137,19 +1137,19 @@ class Variable(TermBase, biclosed.Variable):
 
 class Application(TermBase, biclosed.Application):
     """
-    The application ``func(args)`` of a term to another.
+    The application ``function(argument)`` of a term to another.
 
     Attributes:
-        overlap : The variables free in both ``func`` and ``args``, which
-            :meth:`eval` copies.
+        overlap : The variables free in both ``function`` and ``argument``,
+            which :meth:`eval` copies.
     """
     serialised_attrs = biclosed.Application.serialised_attrs
-    func: Term
+    function: Term
     argument: Term
 
-    def __init__(self, func: Term, args: Term, left: bool = False):
+    def __init__(self, function: Term, argument: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
-        biclosed.Application.__init__(self, func, args)
+        biclosed.Application.__init__(self, function, argument)
 
     def __check_dom__(self, func, args, left):
         self.overlap = [x for x in func.freevars if x in args.freevars]
@@ -1159,11 +1159,11 @@ class Application(TermBase, biclosed.Application):
     @property
     def is_linear(self):
         return not self.overlap\
-            and self.func.is_linear and self.argument.is_linear
+            and self.function.is_linear and self.argument.is_linear
 
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
-        func, args = self.func, self.argument
+        func, args = self.function, self.argument
         evaluate = functor.cod.ev(
             functor(func.cod.base), functor(func.cod.exponent))
         return self.weaken(functor, context)\
@@ -1171,12 +1171,12 @@ class Application(TermBase, biclosed.Application):
             >> func.eval(functor) @ args.eval(functor) >> evaluate
 
     def occurrences(self, variable):
-        return self.func.occurrences(variable)\
+        return self.function.occurrences(variable)\
             + self.argument.occurrences(variable)
 
     def substitute(self, substitution):
         return type(self)(
-            self.func.substitute(substitution),
+            self.function.substitute(substitution),
             self.argument.substitute(substitution))
 
 
@@ -1822,7 +1822,7 @@ class Strategy:
         while isinstance(term, (Application, Abstraction)):
             if isinstance(term, Application):
                 spine.append(term.argument)
-                term = term.func
+                term = term.function
             elif spine:
                 if not self.spend():
                     return None

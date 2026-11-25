@@ -574,7 +574,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Bubble` factory still loads. The function a tensor bubble applies
   elementwise moves to `tensor.Elementwise`, the box `tensor.Diagram.bubble`
   builds, and a plain tensor box carries none;
-  `biclosed.Application.args` is renamed `argument` ([next#729]).
+  `biclosed.Application.func` and `args` are spelled out as `function` and
+  `argument`, in its trees too, and a tree with the old keys still loads
+  ([next#729]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback

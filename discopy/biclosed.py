@@ -1118,29 +1118,32 @@ class Variable(TermBase):
 
 class Application(TermBase):
     """
-    The application either ``func(args)`` of a term ``func`` of type ``Y << X``
-    to a term ``args`` of type ``X`` or ``args(func, left=True)`` of a term
-    ``args`` of type ``X`` fed as input to a term ``func`` of type ``X >> Y``.
+    The application either ``function(argument)`` of a term ``function`` of
+    type ``Y << X`` to a term ``argument`` of type ``X`` or
+    ``argument(function, left=True)`` of a term ``argument`` of type ``X`` fed
+    as input to a term ``function`` of type ``X >> Y``.
 
     Attributes:
-        func (Term): The function being applied.
+        function (Term): The function being applied.
         argument (Term): The argument to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
-    serialised_attrs = ("func", "argument", "left")
+    serialised_attrs = ("function", "argument", "left")
 
-    def __init__(self, func: TermBase, args: TermBase, left: bool = False):
-        assert_isinstance(func, TermBase)
-        assert_isinstance(args, TermBase)
-        if not func.cod.is_exp:
-            raise TypeError(messages.NOT_EXPONENTIAL.format(func, func.cod))
-        self.func, self.argument, self.left = func, args, left
-        if self.func.cod.exponent != self.argument.cod:
+    def __init__(
+            self, function: TermBase, argument: TermBase, left: bool = False):
+        assert_isinstance(function, TermBase)
+        assert_isinstance(argument, TermBase)
+        if not function.cod.is_exp:
+            raise TypeError(
+                messages.NOT_EXPONENTIAL.format(function, function.cod))
+        self.function, self.argument, self.left = function, argument, left
+        if function.cod.exponent != argument.cod:
             raise ValueError(
-                f"Expected {self.func.cod.exponent}, got {self.argument.cod}")
-        cod, fname, xname = func.cod.base, str(func), str(args)
+                f"Expected {function.cod.exponent}, got {argument.cod}")
+        cod, fname, xname = function.cod.base, str(function), str(argument)
         name = f"{xname}({fname}, left=True)" if left else f"{fname}({xname})"
-        dom = self.__check_dom__(func, args, left)
+        dom = self.__check_dom__(function, argument, left)
         super().__init__(name, dom, cod)
 
     def __check_dom__(self, func, args, left):
@@ -1153,31 +1156,42 @@ class Application(TermBase):
 
     def eval(self, functor=None):
         functor = functor or self.functor
-        func = self.func.eval(functor=functor)
+        func = self.function.eval(functor=functor)
         args = self.argument.eval(functor=functor)
-        base, exponent = self.func.cod.base, self.func.cod.exponent
+        base, exponent = self.function.cod.base, self.function.cod.exponent
         ev = functor.cod.ev(
             functor(base), functor(exponent), left=not self.left)
         return args @ func >> ev if self.left else func @ args >> ev
 
     def map(self, functor, context):
         return functor.cod.ob.application_factory(
-            functor.map_term(self.func, context),
+            functor.map_term(self.function, context),
             functor.map_term(self.argument, context), self.left)
 
     def __repr__(self):
-        func, args = repr(self.func), repr(self.argument)
+        func, arg = repr(self.function), repr(self.argument)
         left = ", left=True" if self.left else ""
-        return factory_name(type(self)) + f"({func}, {args}{left})"
+        return factory_name(type(self)) + f"({func}, {arg}{left})"
 
     def to_tree(self):
-        return dict(factory=factory_name(type(self)), func=self.func.to_tree(),
-                    args=self.argument.to_tree(), left=self.left)
+        return dict(factory=factory_name(type(self)),
+                    function=self.function.to_tree(),
+                    argument=self.argument.to_tree(), left=self.left)
+
+    @staticmethod
+    def subtrees(tree):
+        """
+        The trees of the function and the argument of an application, read
+        from the keys ``func`` and ``args`` of a tree from before they were
+        spelled out.
+        """
+        return tuple(map(from_tree, (
+            tree.get('function', tree.get('func')),
+            tree.get('argument', tree.get('args')))))
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])),
-                   left=tree['left'])
+        return cls(*cls.subtrees(tree), left=tree['left'])
 
     def setoid(self):
         """
@@ -1185,24 +1199,24 @@ class Application(TermBase):
         are, rather than when they print the same between the same types:
         a closed constant prints as its bare name, whatever its type.
         """
-        return factory_key(type(self)), self.func, self.argument, self.left
+        return factory_key(type(self)), self.function, self.argument, self.left
 
     @property
     def constants(self):
-        return self.argument.constants + self.func.constants if self.left\
-            else self.func.constants + self.argument.constants
+        return self.argument.constants + self.function.constants if self.left\
+            else self.function.constants + self.argument.constants
 
     def atoms(self) -> list:
         """ The atoms of an application: those of its function and args. """
-        return self.func.atoms() + self.argument.atoms()
+        return self.function.atoms() + self.argument.atoms()
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications on one side, functions and arguments alike. """
         if any(type(other) is not type(self) or other.left != self.left
                for other in others):
             return False
-        return self.func.alpha_eq_under(
-            scopes, [other.func for other in others], depth)\
+        return self.function.alpha_eq_under(
+            scopes, [other.function for other in others], depth)\
             and self.argument.alpha_eq_under(
                 scopes, [other.argument for other in others], depth)
 

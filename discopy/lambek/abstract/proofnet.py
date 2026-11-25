@@ -567,7 +567,7 @@ class ProofNet(Testable):
                 bound = [("wire", next(wires)) for _ in ports(term.var.cod)]
                 return bound + visit(term.body, scope | {term.var: bound})
             if isinstance(term, Application):
-                func = visit(term.func, scope)
+                func = visit(term.function, scope)
                 args = visit(term.argument, scope)
                 edges.extend(zip(func, args))
                 return func[len(args):]

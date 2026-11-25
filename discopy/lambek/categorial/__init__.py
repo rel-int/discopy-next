@@ -313,37 +313,38 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
 class FA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
-    serialised_attrs = ("func", "argument")
+    serialised_attrs = ("function", "argument")
 
-    def __init__(self, func, args):
-        biclosed.Application.__init__(self, func, args, left=False)
+    def __init__(self, function, argument):
+        biclosed.Application.__init__(self, function, argument, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])))
+        return cls(*cls.subtrees(tree))
 
     def simplify(self):
-        return self.func.simplify()(self.argument.simplify())
+        return self.function.simplify()(self.argument.simplify())
 
 
 class BA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
-    serialised_attrs = ("argument", "func")
+    serialised_attrs = ("argument", "function")
 
-    def __init__(self, args, func):
-        biclosed.Application.__init__(self, func, args, left=True)
+    def __init__(self, argument, function):
+        biclosed.Application.__init__(self, function, argument, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['args'], tree['func'])))
+        return cls(*cls.subtrees(tree)[::-1])
 
     def simplify(self):
-        return self.argument.simplify()(self.func.simplify(), left=True)
+        return self.argument.simplify()(self.function.simplify(), left=True)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.argument!r}, {self.func!r})"
+        return factory_name(type(self))\
+            + f"({self.argument!r}, {self.function!r})"
 
 
 class TypeRaising(TermBase):

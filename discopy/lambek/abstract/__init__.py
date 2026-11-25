@@ -653,7 +653,7 @@ class Lexicon(Functor):
         """
         args = []
         while isinstance(term, Application):
-            term, args = term.func, [term.argument] + args
+            term, args = term.function, [term.argument] + args
         yield parent, position, term
         for i, arg in enumerate(args):
             yield from Lexicon.productions(arg, term, i)
