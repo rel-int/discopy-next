@@ -6,8 +6,8 @@
 the factor graph read as a closed map in the Int construction, one trace whose unrolled rounds are those of
 `Recursion.round`, as in *Categorical Deep Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332.)
 
-- [ ] `neural.diagram`: `interpret` a closed map as one round, `of` a PeerNet or FactorNet, `closed`, `legs`
-- [ ] `wiring.ports` and `wiring.where` factored out of `from_map`, behaviour unchanged
-- [ ] tests: the round is `Recursion.round`, the trace unrolls to a cycle, same parameters, equal gradients through the unrolled trace, float64
-- [ ] refusals: a node among its own peers, an asymmetric peers table, a factor named like the nodes
-- [ ] CHANGELOG bullet
+- [x] `neural.diagram`: `interpret` a closed map as one round, `of` a PeerNet or FactorNet, `closed`, `legs`
+- [x] `wiring.ports` and `wiring.where` factored out of `from_map`, behaviour unchanged
+- [x] tests: the round is `Recursion.round`, the trace unrolls to a cycle, same parameters, equal gradients through the unrolled trace, float64
+- [x] refusals: a node among its own peers, an asymmetric peers table, a factor named like the nodes
+- [x] CHANGELOG bullet
