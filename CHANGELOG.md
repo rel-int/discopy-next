@@ -72,6 +72,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   laws of every para category that failed for want of a reparametrisation
   now hold modulo it ([next#TBD]).
 
+- `neural.network.Unroll(rounds, sequence=True)`, and the `sequence` option of
+  `Network.unroll`, `to_function` and `to_lens`, read a trace as a stream: the
+  network from one input per round to one output per round, the state threaded
+  from zeros ([next#TBD]). The default is unchanged.
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2743,6 +2747,7 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
 [next#TBD]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
@@ -2760,7 +2765,6 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
-[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

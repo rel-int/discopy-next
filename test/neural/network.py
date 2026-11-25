@@ -467,14 +467,52 @@ def test_unroll():
         Box('f', x, x, module=lambda v: v).trace().to_function(rounds=1)()
 
 
-def recurrent(torch, width=3, state=4):
-    """ A recurrent cell and a readout of its state, with a trace. """
+def recurrence(torch, width=3, state=4, left=False):
+    """ A recurrent network with its cell and readout boxes, traced on the
+    left or on the right. """
     x, m, y = Dims(width), Dims(state), Dims(2)
     linear = torch.nn.Linear(width + state, state).double()
     cell = Box('cell', x @ m, m, module=lambda v, h: torch.tanh(
         linear(torch.cat([v, h], -1))))
     readout = Box('readout', m, y, module=torch.nn.Linear(state, 2).double())
-    return (cell >> Network.copy(m) >> readout @ m).trace()
+    body = cell >> Network.copy(m) >> readout @ m
+    if left:
+        body = Network.swap(m, x) >> body >> Network.swap(y, m)
+    return body.trace(left=left), cell, readout
+
+
+def recurrent(torch, width=3, state=4):
+    """ A recurrent cell and a readout of its state, with a trace. """
+    return recurrence(torch, width, state)[0]
+
+
+def as_tuple(legs):
+    """ The tensors a function returns, one or several, as a tuple. """
+    return legs if isinstance(legs, tuple) else (legs, )
+
+
+def asymmetric(x, left):
+    """ The trace of ``out = 2 * v + m, state = v - m`` on every leg of
+    ``x``, with the memory on the left of the input when ``left``. """
+    half = len(x)
+
+    def module(*legs):
+        mem, new = (legs[:half], legs[half:]) if left\
+            else (legs[half:], legs[:half])
+        out = tuple(2 * v + m for v, m in zip(new, mem))
+        state = tuple(v - m for v, m in zip(new, mem))
+        return state + out if left else out + state
+    return Box('cell', x @ x, x @ x, module=module).trace(
+        left=left, dom=x, cod=x, mem=x)
+
+
+def mealy_loop(steps):
+    """ The outputs of ``asymmetric`` from zeros, written as a loop. """
+    state, outputs = [0 * leg for leg in steps[0]], []
+    for step in steps:
+        outputs += [2 * v + m for v, m in zip(step, state)]
+        state = [v - m for v, m in zip(step, state)]
+    return outputs
 
 
 def test_backprop_through_time():
@@ -534,6 +572,152 @@ def test_unroll_jax():
     expected = jax.vjp(function, inputs)[1](gradient)[0]
     put = jax.jit(network.to_lens(jax.Array, rounds=3).put)
     assert jnp.allclose(put(inputs, gradient), expected)
+
+
+def test_sequence_counter_and_delay():
+    import numpy as np
+    x = Dims(2)
+    add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m))
+    ones = np.ones(2, dtype=int)
+    running = add.trace().to_function(rounds=3, sequence=True)
+    assert [list(out) for out in running(ones, 2 * ones, 3 * ones)] == [
+        [1, 1], [3, 3], [6, 6]]
+    lag = Box('lag', x @ x, x @ x, module=lambda v, m: (m, v))
+    function = lag.trace().to_function(rounds=3, sequence=True)
+    assert [list(out) for out in function(ones, 2 * ones, 3 * ones)] == [
+        [0, 0], [1, 1], [2, 2]]
+    assert Unroll(2).sequence is False
+    stream = add.trace().unroll(4, sequence=True)
+    assert stream.dom == stream.cod == x ** 4
+    assert not any(isinstance(box, Trace) for box in stream.boxes)
+    assert add.unroll(3, sequence=True) == add
+    with raises(ValueError, match="at least one round"):
+        add.trace().unroll(0, sequence=True)
+
+
+def test_sequence_needs_the_trace_to_be_the_whole_network():
+    x = Dims(2)
+    add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m))
+    g, trace = Box('g', x, x), add.trace()
+    for network in (g >> trace, trace >> g, x @ trace, trace @ x,
+                    trace @ trace):
+        with raises(NotImplementedError, match="whole network"):
+            network.unroll(2, sequence=True)
+        assert network.unroll(2).dom == network.dom
+    with raises(NotImplementedError, match="nested trace"):
+        (trace @ x >> add).trace().unroll(2, sequence=True)
+    two = Box('two', x @ x @ x, x @ x @ x)
+    with raises(NotImplementedError, match="other side"):
+        two.trace(left=False).trace(left=True).unroll(2, sequence=True)
+
+
+def test_sequence_of_a_memory_of_two_wires_is_nested_traces():
+    import numpy as np
+    x = Dims(2)
+
+    def module(v, m, n):
+        return v + m * n, 2 * m + v, n - m
+
+    cell = Box('cell', x @ x @ x, x @ x @ x, module=module)
+    nested = cell.trace(2)
+    assert isinstance(nested.arg, Trace) and len(nested.mem) == 1
+    for rounds in range(1, 6):
+        gen = np.random.default_rng(rounds)
+        steps = [gen.normal(size=(5, 2)) for _ in range(rounds)]
+        m, n, expected = np.zeros((5, 2)), np.zeros((5, 2)), []
+        for step in steps:
+            out, m, n = module(step, m, n)
+            expected.append(out)
+        function = nested.to_function(np.ndarray, rounds, True)
+        got = as_tuple(function(*steps))
+        assert len(got) == rounds and all(map(np.allclose, got, expected))
+
+
+def test_sequence_on_a_constant_input_is_the_last_round():
+    import numpy as np
+    x, y = Dims(2), Dims(3)
+    add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m))
+    cell = Box('cell', x @ x, y @ x, module=lambda v, m: (
+        np.concatenate([v + m, v[..., :1] * m[..., 1:]], -1), v - m + 1))
+    x2 = Dims(2) @ Dims(3)
+    networks = [add.trace(), add.trace(left=True), cell.trace(),
+                asymmetric(Dims(2), False), asymmetric(Dims(2), True),
+                asymmetric(x2, False), asymmetric(x2, True)]
+    for network in networks:
+        for rounds in range(1, 6):
+            drop = Network.discard(network.cod ** (rounds - 1)) @ network.cod
+            copied = Network.copy(network.dom, rounds)\
+                >> network.unroll(rounds, sequence=True)
+            law = copied >> drop if rounds > 1 else copied
+            gen = np.random.default_rng(rounds)
+            inputs = [gen.normal(size=(5, 2)), gen.normal(size=(5, 3))]
+            inputs = inputs[:len(network.dom)]
+            expected = as_tuple(network.to_function(np.ndarray, rounds)(
+                *inputs))
+            got = as_tuple(law.to_function(np.ndarray)(*inputs))
+            assert len(got) == len(expected)
+            assert all(map(np.allclose, got, expected))
+
+
+def test_sequence_is_a_loop_of_the_cell():
+    torch = importorskip("torch")
+    torch.manual_seed(0)
+    for left in (False, True):
+        network, cell, readout = recurrence(torch, left=left)
+        for rounds in (1, 2, 5):
+            inputs = [torch.randn(6, 3, dtype=torch.float64)
+                      for _ in range(rounds)]
+            state, expected = torch.zeros(6, 4, dtype=torch.float64), []
+            for step in inputs:
+                state = cell.module(step, state)
+                expected.append(readout.module(state))
+            function = network.to_function(torch.Tensor, rounds, True)
+            outputs = as_tuple(function(*inputs))
+            assert len(outputs) == rounds
+            assert all(torch.allclose(a, b, atol=1e-10)
+                       for a, b in zip(outputs, expected))
+
+
+def test_sequence_is_a_loop_of_the_asymmetric_cell():
+    import numpy as np
+    for x in (Dims(2), Dims(2) @ Dims(3)):
+        for left in (False, True):
+            network = asymmetric(x, left)
+            for rounds in range(1, 6):
+                gen = np.random.default_rng(rounds)
+                steps = [[gen.normal(size=(5, 2)), gen.normal(size=(5, 3))]
+                         [:len(x)] for _ in range(rounds)]
+                function = network.to_function(np.ndarray, rounds, True)
+                got = as_tuple(function(*(leg for s in steps for leg in s)))
+                expected = mealy_loop(steps)
+                assert len(got) == len(expected) == rounds * len(x)
+                assert all(map(np.allclose, got, expected))
+
+
+def test_sequence_backprop_through_time():
+    torch = importorskip("torch")
+    torch.manual_seed(1)
+    for left in (False, True):
+        network, cell, readout = recurrence(torch, left=left)
+        for rounds in (1, 2, 3, 5):
+            inputs = [torch.randn(6, 3, dtype=torch.float64,
+                                  requires_grad=True) for _ in range(rounds)]
+            gradients = [torch.randn(6, 2, dtype=torch.float64)
+                         for _ in range(rounds)]
+            state, outputs = torch.zeros(6, 4, dtype=torch.float64), []
+            for step in inputs:
+                state = cell.module(step, state)
+                outputs.append(readout.module(state))
+            expected = torch.autograd.grad(outputs, inputs, gradients)
+            backprop = network.to_lens(torch.Tensor, rounds, sequence=True)
+            detached = [step.detach() for step in inputs]
+            got = as_tuple(backprop.get(*detached))
+            puts = as_tuple(backprop.put(*detached, *gradients))
+            assert len(got) == len(puts) == rounds
+            assert all(torch.allclose(a, b, atol=1e-10)
+                       for a, b in zip(got, outputs))
+            assert all(torch.allclose(a, b, atol=1e-10)
+                       for a, b in zip(puts, expected))
 
 
 def test_delay_is_the_identity():
