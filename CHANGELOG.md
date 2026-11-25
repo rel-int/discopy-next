@@ -2045,6 +2045,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
+  run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
+  `--check` and the docs build, which give it a page linking to its source,
+  still listed under "Optyx notebooks", and naming it runs it ([next#727]).
+
 - `proptest/test_corpus.py` replays a committed corpus of terms written by hand
   or by a language model, `proptest/corpus/`, against the laws of the property
   matrix, deterministically and offline, with a first corpus for
@@ -2672,6 +2677,7 @@ for the changelog of `1.2.1` and earlier.
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
+[next#727]: https://github.com/rel-int/discopy-next/pull/727
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
