@@ -23,7 +23,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     DualRail
     Equation
@@ -884,12 +883,6 @@ class Sum(balanced.Sum, Box):
     """
 
 
-class Bubble(balanced.Bubble, Box):
-    """
-    A symmetric bubble is a balanced bubble and a symmetric box.
-    """
-
-
 class Functor(balanced.Functor):
     """
     A symmetric functor is a monoidal functor that preserves swaps.
@@ -978,7 +971,6 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -1202,3 +1194,6 @@ TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory, monoidal.Kappa.above = TermBase, Kappa
+
+
+Bubble = Box.from_args
