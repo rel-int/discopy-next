@@ -13,6 +13,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   for any map, `of` for a `PeerNet` or `FactorNet` whose round it reproduces,
   `legs` for its state, and `wiring.ports` numbers the ports ([next#TBD]).
 
+- `neural.diagram.stack` sends the layer of boxes that share a module to one
+  box on a leading node axis, and the wiring between layers to an index
+  gather, one box per degree: the stacked image of a `FactorNet` is its
+  round, with a number of boxes that does not grow with the graph
+  ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
