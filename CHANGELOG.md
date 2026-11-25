@@ -15,6 +15,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
 
+- `discopy.lean` compiles `abc.FeedbackCategory`: a call with keywords is an
+  operation of its own, named after the method and its keywords, e.g.
+  `feedbackDomCodMem`, and a call leaving a numeric default out passes it,
+  so that `f.delay()` is `delay f 1` ([next#723]).
+
 - `discolean/` models the terms of `cat` and `monoidal`: the five laws of
   `cat.TermBase` are proved on nameless terms, and a planar linear term of
   `monoidal` evaluates to a diagram of its context, which a diagram with one
@@ -2633,6 +2638,7 @@ for the changelog of `1.2.1` and earlier.
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#723]: https://github.com/rel-int/discopy-next/pull/723
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
