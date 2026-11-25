@@ -2,6 +2,6 @@
 >
 > not sure what's the difference between reflected or not? I don't have a strong opinion on above or below, I guess above is better
 
-- [ ] A line between consecutive args nested in a box
+- [x] A line between consecutive args nested in a box
 - [ ] Wire labels above their wires in every left-to-right drawing
 - [ ] Changelog, checks
