@@ -15,6 +15,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
 
+- `discopy.lean` compiles `abc.FeedbackCategory`: a call with keywords is an
+  operation of its own, named after the method and its keywords, e.g.
+  `feedbackDomCodMem`, and a call leaving a numeric default out passes it,
+  so that `f.delay()` is `delay f 1` ([next#723]).
+
 - `discolean/` models the terms of `cat` and `monoidal`: the five laws of
   `cat.TermBase` are proved on nameless terms, and a planar linear term of
   `monoidal` evaluates to a diagram of its context, which a diagram with one
@@ -548,6 +553,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   checks `scalar_sliding` and `braid_naturality` on streams, up to the order
   of their memory as `bifunctoriality` is ([next#514]).
 
+- `closed.Hypergraph` and `lambek.abstract.Hypergraph` declare
+  `dagger_involution`, `dagger_contravariance` and `dagger_monoidality`
+  failing, as their categories do: a curry has no dagger. The strategy draws
+  no curry, so `proptest/corpus/hypergraph.py` gives one to each
+  ([next#722]).
+
 - The README has a How section: DisCoPy began as an implementation of
   DisCoCat and QNLP models, and it links that application to
   `discopy.lambek`, where discopy.org links it to lambeq ([next#714]).
@@ -838,9 +849,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modules removed from optyx: it was the prototype of the light-cone bound
   that `optyx.utils.misc.get_max_dim_for_box` computes for
   `Diagram.to_tensor`, now unit-tested ([next#249]).
+- Four optyx notebooks: `compile_to_semm` and `Compiler`, which repeated each
+  other and the doctest of `optyx.compiler.semm.compile_to_semm`, and
+  `optyx-vqe-experiment` and `bosonic-vqe-2`, whose gradient descent
+  `bose_hubbard` keeps. `pandas`, which only `optyx-vqe-experiment` imported,
+  leaves the `notebooks` extra ([next#715]).
 
 ### Fixed
 
+- `bang.Diagram` declares `dagger_involution` and `dagger_contravariance`
+  failing, since every structural box but the exchange has no dagger, and
+  `proptest/corpus/bang.py` replays them on the structural boxes its strategy
+  does not draw ([next#721]).
+
+- `docs/notebooks/optyx/readme_example.md`, the old optyx README, executes
+  and is listed under "Optyx notebooks": its sweep of the contraction's `chi`
+  starts at 2, since at `chi=1` quimb's QR divides by zero ([next#442]), and
+  takes the median of three contractions per `chi` instead of ten. It leaves
+  `KNOWN_BROKEN`, which is now empty ([next#715]).
 - `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
   a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
   property matrix draws such terms: a naming of the kappa terms may reuse a
@@ -2626,14 +2652,18 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#722]: https://github.com/rel-int/discopy-next/issues/722
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#723]: https://github.com/rel-int/discopy-next/pull/723
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
+[next#715]: https://github.com/rel-int/discopy-next/pull/715
+[next#721]: https://github.com/rel-int/discopy-next/pull/721
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

@@ -7,8 +7,7 @@ rules, axioms and abstract methods, untyped as in the Python, each rule its
 typing law and each axiom a `def`, all of them in its `Laws`. The classes it
 does not compile yet:
 
-- `FeedbackCategory`: it calls feedback with keywords ['mem']
-- `TracedCategory`: it extends FeedbackCategory
+- `TracedCategory`: it takes the length of a symbol
 - `BiclosedCategory`: it takes the length of a symbol
 - `LinearCategory`: it slices a symbol
 - `RigidCategory`: it extends BiclosedCategory
@@ -215,6 +214,62 @@ structure PRO.Laws (cat : PRO Hom) : Prop extends toMonoidalCategory : MonoidalC
 
 /-- A functor of `PRO`: it preserves each of its operations. -/
 structure PRO.Functor (cat : PRO Hom) (cat' : PRO Hom') extends toMonoidalCategory : MonoidalCategory.Functor cat.toMonoidalCategory cat'.toMonoidalCategory where
+
+/-- `discopy.abc.FeedbackCategory`: A feedback category is a `MonoidalCategory` with a monoidal endofunctor `delay` and an operator `feedback` from morphisms `x @ m.delay() -> y @ m` to morphisms `x -> y`, see `KatisEtAl02` and `DiLavoreEtAl22`. -/
+structure FeedbackCategory (Ob : Type u) (Hom : Type v) extends MonoidalCategory Ob Hom where
+  delay : Hom → Nat → Hom
+  feedbackMem : Hom → Ob → Hom
+  feedback : Hom → Nat → Hom
+  feedbackDomCodMem : Hom → Ob → Ob → Ob → Hom
+  /-- `delaying`: The delay of a morphism by one time step. -/
+  delaying : ∀ (A B : Ob) (f : Hom), dom f = A → cod f = B → dom (delay f 1) = dom (delay (id A) 1) ∧ cod (delay f 1) = dom (delay (id B) 1)
+  /-- `feedback_right`: The feedback of a memory on the right. -/
+  feedback_right : ∀ (Γ Δ M : Ob) (f : Hom), dom f = tensorOb Γ (dom (delay (id M) 1)) → cod f = tensorOb Δ M → dom (feedbackMem f M) = Γ ∧ cod (feedbackMem f M) = Δ
+
+/-- Delaying by no time step is the identity. -/
+def FeedbackCategory.delay_unit (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.delay f 0 = f
+
+/-- Delaying twice is delaying by two time steps. -/
+def FeedbackCategory.delay_composition (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.delay (cat.delay f 1) 1 = cat.delay f 2
+
+/-- Feeding back the unit does nothing. -/
+def FeedbackCategory.vanishing (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.feedback f 0 = f
+
+/-- Feeding back a tensor is feeding back its factors in turn. -/
+def FeedbackCategory.joining (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (X Y M N : Ob) (f : Hom), cat.dom f = cat.tensorOb X (cat.dom (cat.delay (cat.id (cat.tensorOb M N)) 1)) → cat.cod f = cat.tensorOb (cat.tensorOb Y M) N → cat.feedbackDomCodMem f X Y (cat.tensorOb M N) = cat.feedbackDomCodMem (cat.feedbackDomCodMem f (cat.tensorOb X (cat.dom (cat.delay (cat.id M) 1))) (cat.tensorOb Y M) N) X Y M
+
+/-- Feedback commutes with tensoring a morphism on the left. -/
+def FeedbackCategory.strength (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (U V X Y M : Ob) (e f : Hom), cat.dom e = U → cat.cod e = V → cat.dom f = cat.tensorOb X (cat.dom (cat.delay (cat.id M) 1)) → cat.cod f = cat.tensorOb Y M → cat.tensor e (cat.feedbackDomCodMem f X Y M) = cat.feedbackDomCodMem (cat.tensor e f) (cat.tensorOb (cat.dom e) X) (cat.tensorOb (cat.cod e) Y) M
+
+/-- Feedback is natural in its domain and its codomain. -/
+def FeedbackCategory.tightening (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (W X Y Z M : Ob) (f g h : Hom), cat.dom f = cat.tensorOb X (cat.dom (cat.delay (cat.id M) 1)) → cat.cod f = cat.tensorOb Y M → cat.dom g = W → cat.cod g = X → cat.dom h = Y → cat.cod h = Z → cat.feedbackDomCodMem (cat.comp (cat.comp (cat.tensor g (cat.delay (cat.id M) 1)) f) (cat.tensor h (cat.id M))) (cat.dom g) (cat.cod h) M = cat.comp (cat.comp g (cat.feedbackDomCodMem f X Y M)) h
+
+/-- A morphism slides around the feedback, delayed on its way back in: the memory is its codomain on one side and its domain on the other. -/
+def FeedbackCategory.sliding (cat : FeedbackCategory Ob Hom) : Prop :=
+  ∀ (X Y M N : Ob) (f k : Hom), cat.dom f = cat.tensorOb X (cat.dom (cat.delay (cat.id M) 1)) → cat.cod f = cat.tensorOb Y N → cat.dom k = N → cat.cod k = M → cat.feedbackDomCodMem (cat.comp f (cat.tensor (cat.id Y) k)) X Y (cat.cod k) = cat.feedbackDomCodMem (cat.comp (cat.tensor (cat.id X) (cat.delay k 1)) f) X Y (cat.dom k)
+
+/-- The laws of `FeedbackCategory`. -/
+structure FeedbackCategory.Laws (cat : FeedbackCategory Ob Hom) : Prop extends toMonoidalCategory : MonoidalCategory.Laws cat.toMonoidalCategory where
+  delay_unit : cat.delay_unit
+  delay_composition : cat.delay_composition
+  vanishing : cat.vanishing
+  joining : cat.joining
+  strength : cat.strength
+  tightening : cat.tightening
+  sliding : cat.sliding
+
+/-- A functor of `FeedbackCategory`: it preserves each of its operations. -/
+structure FeedbackCategory.Functor (cat : FeedbackCategory Ob Hom) (cat' : FeedbackCategory Ob' Hom') extends toMonoidalCategory : MonoidalCategory.Functor cat.toMonoidalCategory cat'.toMonoidalCategory where
+  map_feedbackMem : ∀ (Γ Δ M : Ob) (f : Hom), cat.dom f = cat.tensorOb Γ (cat.dom (cat.delay (cat.id M) 1)) → cat.cod f = cat.tensorOb Δ M → map (cat.feedbackMem f M) = cat'.feedbackMem (map f) (ob M)
+  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
+  map_feedback : ∀ (f : Hom) (n : Nat), map (cat.feedback f n) = cat'.feedback (map f) n
+  map_feedbackDomCodMem : ∀ (f : Hom) (X Y Z : Ob), map (cat.feedbackDomCodMem f X Y Z) = cat'.feedbackDomCodMem (map f) (ob X) (ob Y) (ob Z)
 
 /-- `discopy.abc.ResiduatedMonoid`: A monoid is residuated when it comes with methods `over` and `under` with syntactic sugar `<<` and `>>`. -/
 structure ResiduatedMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
