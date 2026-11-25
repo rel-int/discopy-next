@@ -129,6 +129,11 @@ class Ty[natural](Pregroup, TestableGeneric):
     associativity = Pregroup.associativity.inapplicable(messages.PAIR_TYPES)
     ax = Pregroup.ax.inapplicable(messages.PAIR_TYPES)
     cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
+    form_repeat = Pregroup.form_repeat.inapplicable(messages.PAIR_TYPES)
+    form_over = Pregroup.form_over.inapplicable(messages.PAIR_TYPES)
+    form_under = Pregroup.form_under.inapplicable(messages.PAIR_TYPES)
+    form_l = Pregroup.form_l.inapplicable(messages.PAIR_TYPES)
+    form_r = Pregroup.form_r.inapplicable(messages.PAIR_TYPES)
 
     @classmethod
     def strategy(cls):

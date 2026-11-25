@@ -29,13 +29,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#730]).
 
 - The constructors of object expressions in `discopy.testable` are rules: `Constructor`
-  subclasses `Rule`, and `Tensor.formation(C0)` is the formation rule of the tensor of objects,
-  from objects `a: Var[C0, A]` and `b: Var[C0, B]` to the object `Var[C0, Tensor[A, B]]`.
-  `abc` declares them where their structure appears (`ob_tensor`, `ob_unit`, `ob_l`, `ob_r`,
-  `ob_delay`, `ob_bang`, `ob_over`, `ob_under`, `ob_repeat`) and `Testable.constructors` lists
-  them, so a category's objects are derived from its rules as its morphisms are. The property
-  matrix checks them with the other rules, comparing objects by the `ob_equation` of the
-  category, which `inhabits` now takes.
+  subclasses `Rule`, and each constructor is the formation rule of the class of objects whose
+  structure it is. The objects of a category are the morphisms of a coloured monoid, whose `cut`
+  is the `Tensor` and whose `ax` the `Unit`; `abc.ColouredMonoid` adds `form_repeat`,
+  `ResiduatedMonoid` `form_over` and `form_under`, `Pregroup` `form_l` and `form_r`, and the new
+  `abc.DelayMonoid` and `abc.BangMonoid`, the objects of feedback and linear categories,
+  `form_delay` and `form_bang`. `Testable.constructors` lists them, so that objects are derived
+  from rules as morphisms are. `feedback.Ty` is a `DelayMonoid`, `bang.Ty` a `BangMonoid` and
+  `biclosed.Ty` a `ResiduatedMonoid`.
 
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
@@ -957,6 +958,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   off `discopy.monoidal`, inside the syntax, and the docstring of
   `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
   ([next#732]).
+
+- `comarkov.Diagram.spider_factory` builds a spider with no leg out as the trace of a merge,
+  the mirror of `markov`'s traced copy, so that a traced merge reads back from its hypergraph
+  and `hypergraph_section` holds on it.
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a

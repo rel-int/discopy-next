@@ -342,6 +342,59 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     def __rmatmul__(self: C1, other):
         return self.whisker(other).tensor(self)
 
+    @Unit
+    def ax[X: Obj[C0]](cls: type[C1], x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The formation rule of :class:`Unit`: the unit at a colour. """
+        return cls.id(x)
+
+    @Tensor
+    def cut[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, B, C]) -> Hom[C1, A, C]:
+        """ The formation rule of :class:`Tensor`: the tensor of two
+        elements, which is their composition. """
+        return f.tensor(g)
+
+    @Repeat
+    def form_repeat[A: Obj[C0], N: Nat](
+            cls: type[C1], x: Hom[C1, A, A], n: Var[Nat, N]
+    ) -> Hom[C1, A, A]:
+        """ The formation rule of :class:`Repeat`: an element repeated
+        ``n`` times. """
+        return x.tensor(*(index(n) - 1) * [x]) if index(n) else cls.id(x.dom)
+
+
+class DelayMonoid[C0, C1: DelayMonoid](ColouredMonoid[C0, C1]):
+    """
+    A delay monoid is a :class:`ColouredMonoid` with a monoid endomorphism
+    ``delay``, the objects of a :class:`FeedbackCategory`.
+    """
+    @abstractmethod
+    def delay(self: C1, n: int = 1) -> C1:
+        """ The delay of an element by ``n`` time steps. """
+
+    @Delay
+    def form_delay[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, A, B]:
+        """ The formation rule of :class:`Delay`: the delay of an element by
+        one time step. """
+        return x.delay()
+
+
+class BangMonoid[C0, C1: BangMonoid](ColouredMonoid[C0, C1]):
+    """
+    A bang monoid is a :class:`ColouredMonoid` with an operation ``bang``,
+    the objects of a :class:`LinearCategory`.
+    """
+    @abstractmethod
+    def bang(self: C1) -> C1:
+        """ The bang of an element. """
+
+    @Bang
+    def form_bang[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, A, B]:
+        """ The formation rule of :class:`Bang`: the bang of an element. """
+        return x.bang()
+
 
 class Monoid[C1: Monoid](ColouredMonoid[NoneType, C1]):
     """ A monoid is a coloured monoid with a single, trivial colour. """
@@ -506,9 +559,6 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
     :class:`discopy.matrix.Matrix` and :class:`discopy.hypergraph.Hypergraph`
     do: the hook is here so that it fires for those too.
     """
-    ob_tensor = Tensor.formation(C0)
-    ob_unit = Unit.formation(C0)
-
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if "trace" in vars(cls):
@@ -675,8 +725,6 @@ class FeedbackCategory[
     tightening and sliding. A :class:`TracedCategory` is a feedback category
     whose delay is the identity.
     """
-    ob_delay = Delay.formation(C1, ob=C0)
-
     def delay(self, n_steps: int = 1) -> C1:
         """
         The delay endofunctor applied to a morphism, the identity by default.
@@ -1092,6 +1140,20 @@ class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
     def __rshift__(self, other):
         return other.under(self)
 
+    @Over
+    def form_over[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, base: Hom[C1, A, B], exponent: Hom[C1, C, B]
+    ) -> Hom[C1, A, C]:
+        """ The formation rule of :class:`Over`: ``base << exponent``. """
+        return base << exponent
+
+    @Under
+    def form_under[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, exponent: Hom[C1, A, C], base: Hom[C1, A, B]
+    ) -> Hom[C1, C, B]:
+        """ The formation rule of :class:`Under`: ``exponent >> base``. """
+        return exponent >> base
+
 
 class BiclosedCategory[
         C0: ResiduatedMonoid, C1: BiclosedCategory](MonoidalCategory[C0, C1]):
@@ -1102,9 +1164,6 @@ class BiclosedCategory[
     We also assume the type for objects comes with methods for left and right
     exponentials :code`x << y` and :code`x >> y`.
     """
-    ob_over = Over.formation(C0)
-    ob_under = Under.formation(C0)
-
     @classmethod
     @abstractmethod
     def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
@@ -1271,8 +1330,6 @@ class LinearCategory[
     The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
     digging, then the bang of the arrow.
     """
-    ob_bang = Bang.formation(C1, ob=C0)
-
     @abstractmethod
     def bang(self: C1) -> C1:
         """ The bang of a morphism, to be instantiated. """
@@ -1612,6 +1669,18 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
     l: C1
     r: C1
 
+    @L
+    def form_l[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, B, A]:
+        """ The formation rule of :class:`L`: the left adjoint. """
+        return x.l
+
+    @R
+    def form_r[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, B, A]:
+        """ The formation rule of :class:`R`: the right adjoint. """
+        return x.r
+
     def is_adjoint(self: C1, other: C1) -> bool:
         """
         Whether ``other`` is an adjoint of ``self``, on either side.
@@ -1651,9 +1720,6 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
     A rigid category is a :class:`BiclosedCategory` with a :class:`Pregroup` as
     object type and methods for :code:`cups` and :code:`caps`.
     """
-    ob_l = L.formation(C0)
-    ob_r = R.formation(C0)
-
     @classmethod
     @abstractmethod
     def cups(cls, left: C0, right: C0) -> C1:
@@ -2086,8 +2152,6 @@ class MarkovCategory[
     of the supply with the tensor are stated here, see
     :class:`ComarkovCategory` for the dual.
     """
-    ob_repeat = Repeat.formation(C0, nat=Nat)
-
     @classmethod
     @abstractmethod
     def copy(cls, x: C0, n: int = 2) -> C1:
@@ -2203,8 +2267,6 @@ class ComarkovCategory[
     comarkov when its opposite is Markov. The laws of a commutative monoid
     and the coherence of the supply with the tensor are stated here.
     """
-    ob_repeat = Repeat.formation(C0, nat=Nat)
-
     @classmethod
     @abstractmethod
     def merge(cls, x: C0, n: int = 2) -> C1:
@@ -2441,8 +2503,6 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
     a :class:`ComarkovCategory`, the Frobenius law and speciality
     identifying the comonoids with the monoids.
     """
-    ob_repeat = Repeat.formation(C0, nat=Nat)
-
     @classmethod
     @abstractmethod
     def spiders(cls, n_legs_in: int, n_legs_out: int, typ: C0) -> C1:

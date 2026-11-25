@@ -2,7 +2,7 @@
 
 import pickle
 import sys
-from typing import Self, TypeVar, get_origin
+from typing import Self, TypeVar
 
 from hypothesis import Phase, find, settings
 from hypothesis import strategies as st
@@ -472,21 +472,20 @@ def test_legacy_factory():
 
 
 def test_constructors():
-    from discopy import compact, feedback
-    from discopy.testable import Constructor, Var
-    assert sorted(monoidal.Diagram.constructors) == ["ob_tensor", "ob_unit"]
-    assert {"ob_l", "ob_r", "ob_over", "ob_delay"} <= set(
-        compact.Diagram.constructors)
-    rule = compact.Diagram.ob_delay
-    assert isinstance(rule, Constructor) and rule.forms_object
-    assert not rule.is_recursive and rule.given(Ty('x'), Ty('y')) == {}
-    assert get_origin(rule.annotations()["return"]) is Var
-    x = feedback.Ty('x')
-    assert feedback.Diagram.ob_delay(object=x) == x.delay()
-    assert feedback.Diagram.ob_unit() == feedback.Ty()
-    assert "ob_tensor" in monoidal.Diagram.rules
-
-
-def test_formation_rules_derive_no_morphism():
-    term = find(monoidal.Diagram.search(fuel=2), lambda f: len(f) > 0)
-    assert isinstance(term, monoidal.Diagram)
+    from discopy import bang, compact, feedback
+    from discopy.testable import Delay, L, Repeat, Tensor, Unit
+    assert sorted(monoidal.Ty.constructors) == ["ax", "cut", "form_repeat"]
+    assert {"form_l", "form_r", "form_over", "form_under", "form_delay"} <= set(
+        compact.Ty.constructors)
+    assert isinstance(compact.Ty.cut, Tensor)
+    assert isinstance(compact.Ty.ax, Unit)
+    assert isinstance(compact.Ty.form_l, L)
+    assert isinstance(feedback.Ty.form_delay, Delay)
+    assert isinstance(monoidal.Ty.form_repeat, Repeat)
+    x, y = compact.Ty('x'), compact.Ty('y')
+    assert compact.Ty.form_l(x @ y) == (x @ y).l
+    assert compact.Ty.form_repeat(x, 0) == compact.Ty()
+    assert compact.Ty.form_repeat(x, 2) == x @ x
+    assert feedback.Ty.form_delay(feedback.Ty('x')) == feedback.Ty('x').delay()
+    assert bang.Ty.form_bang(bang.Ty('x')) == bang.Ty('x').bang()
+    assert "form_l" not in compact.Diagram.rules

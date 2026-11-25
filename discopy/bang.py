@@ -62,7 +62,8 @@ from functools import cached_property
 from typing import Callable, ClassVar, Self
 
 from discopy import monoidal, messages
-from discopy.abc import DaggerCategory, LinearCategory, MonoidalCategory
+from discopy.abc import (
+    BangMonoid, DaggerCategory, LinearCategory, MonoidalCategory)
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -71,7 +72,7 @@ from discopy.utils import (
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(BangMonoid, monoidal.Ty):
     """
     A type with a bang, a monoidal type whose wires may be
     :class:`BangOb`.

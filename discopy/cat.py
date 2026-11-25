@@ -350,7 +350,6 @@ class FreeCategory(Category):
         rules = [
             rule for name, rule in cls.rules.items()
             if rule.applicable and name in (within or cls).rules
-            and not rule.forms_object
             and (fuel > 0 or not rule.is_recursive)]
 
         @st.composite

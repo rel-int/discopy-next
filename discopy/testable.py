@@ -474,13 +474,12 @@ def position(variable: TypeVar, category: type) -> int | None:
     return None if owner is None else owner.__type_params__.index(variable)
 
 
-def inhabits(value, kind, category=None) -> bool:
+def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
     ``Hom[C, dom, cod]`` has that boundary, compared by the
     :meth:`discopy.abc.Category.ob_equation` of ``C``, the value of
-    ``Var[T, x]`` is ``x``, compared by that of ``category`` when given,
-    e.g. the one a formation rule is bound to, an equation of ``Equation[T]`` has terms of
+    ``Var[T, x]`` is ``x``, an equation of ``Equation[T]`` has terms of
     type ``T``, as an inequation of ``Inequation[T]`` does, a tuple of
     ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
     subclass of ``T``.
@@ -493,7 +492,6 @@ def inhabits(value, kind, category=None) -> bool:
     >>> assert inhabits(Equation(f, f), Equation[Hom[Diagram, x, y]])
     >>> assert inhabits(Inequation(1, 2), Inequation[int])
     >>> assert not inhabits(Equation(1, 2), Inequation[int])
-    >>> assert inhabits(x @ y, Var[Ty, Tensor[x, y]], Diagram)
     """
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
@@ -501,8 +499,7 @@ def inhabits(value, kind, category=None) -> bool:
             and bool(args[0].ob_equation(value.dom, args[1]))\
             and bool(args[0].ob_equation(value.cod, args[2]))
     if origin is Var:
-        return value == args[1] if category is None\
-            else bool(category.ob_equation(value, args[1]))
+        return value == args[1]
     if isinstance(origin, type) and issubclass(origin, Equation):
         return isinstance(value, origin) and all(
             inhabits(term, args[0]) for term in value.terms)
@@ -992,19 +989,6 @@ class Rule[**P, T](Declaration[P, T], classmethod):
         return calls[0].func.attr if calls else None
 
     @cached_property
-    def forms_object(self) -> bool:
-        """
-        Whether the rule concludes an object, ``Var[C0, ...]``, as the
-        formation rule of a :class:`Constructor` does, rather than a
-        morphism.
-
-        >>> from discopy.monoidal import Diagram
-        >>> assert Diagram.ob_unit.forms_object
-        >>> assert not Diagram.mix.forms_object
-        """
-        return get_origin(self.annotations()["return"]) is Var
-
-    @cached_property
     def is_recursive(self) -> bool:
         """
         Whether the rule has a morphism among its premises, i.e. a parameter
@@ -1281,26 +1265,28 @@ class Constructor(Rule):
     :func:`substitute`, ``Tensor[x, y]`` *is* the object ``x @ y``, which is
     how an annotation becomes the boundary a premise is drawn with.
 
-    A constructor is also the formation rule of the objects it builds, i.e.
-    the introduction rule of the sort of objects in the sequent calculus of
-    a category: an instance, e.g. ``ob_tensor = Tensor.formation(C0)`` on
-    :class:`discopy.abc.MonoidalCategory`, is a :class:`Rule` whose premises
-    are the objects it takes, ``a: Var[C0, A]`` and ``b: Var[C0, B]``, and
-    whose conclusion is the object it builds, ``Var[C0, Tensor[A, B]]``, so
-    that the objects of a category are derived from its rules as its
-    morphisms are, see :attr:`Testable.constructors`.
+    A constructor is also the formation rule of the objects it builds. The
+    objects of a category are the morphisms of a category of their own, a
+    :class:`discopy.abc.ColouredMonoid` between colours, whose ``cut`` is
+    the :class:`Tensor` and whose ``ax`` the :class:`Unit`, and each other
+    constructor is a rule of the class of objects whose structure it is,
+    e.g. :class:`L` the rule ``form_l`` of a :class:`discopy.abc.Pregroup`:
+    an
+    instance of a constructor is that :class:`Rule`, see :meth:`formation`
+    and :attr:`Testable.constructors`, so that objects are derived from
+    rules as morphisms are.
 
-    >>> from discopy.monoidal import Ty, Diagram
+    >>> from discopy.rigid import Ty
     >>> A = TypeVar("A")
     >>> assert isinstance(Tensor[A, Ty('y')], GenericAlias)
     >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
-    >>> assert Diagram.ob_tensor(a=Ty('x'), b=Ty('y')) == Ty('x', 'y')
-    >>> assert Diagram.ob_tensor.forms_object
+    >>> assert Ty.form_l(Ty('x', 'y')) == Ty('x', 'y').l
+    >>> assert isinstance(Ty.cut, Tensor) and isinstance(Ty.form_l, L)
     """
     __hash__ = Rule.__hash__
 
-    def __class_getitem__(cls, args):
-        args = args if isinstance(args, tuple) else (args, )
+    def __class_getitem__(cls, item):
+        args = item if isinstance(item, tuple) else (item, )
         if any(map(is_open, args)):
             return GenericAlias(cls, args)
         return cls.form(*args)
@@ -1309,63 +1295,6 @@ class Constructor(Rule):
     def form(*args):
         """ The object the constructor builds from objects. """
         raise NotImplementedError
-
-    @classmethod
-    def formation(cls, *coarse, ob=None, nat=None) -> Self:
-        """
-        The formation rule of the constructor in a category whose objects are
-        ``ob``, a type parameter of the class stating it: one premise
-        ``Var[ob, X]`` for each object the constructor takes, two for the
-        objects of a :class:`Tensor`, ``Var[nat, N]`` for a number ``N:
-        nat``, and the parameters named ``Coarse`` taken from ``coarse`` in
-        order, read off the category the rule is bound to, see
-        :func:`position`.
-
-        Parameters:
-            coarse : The type parameters of the class stating the rule that
-                the parameters named ``Coarse`` stand for, e.g. ``C1`` for
-                the category a :class:`Delay` is read off.
-            ob : The type parameter of the objects, ``coarse[0]`` if
-                :obj:`None`.
-            nat : The sort of numbers, for :class:`Repeat`.
-        """
-        ob = coarse[0] if ob is None else ob
-        coarse_values, arguments, variables = iter(coarse), [], []
-        for parameter in cls.__type_params__:
-            if parameter.__name__ == "Coarse":
-                arguments.append(next(coarse_values))
-                continue
-            names = ("A", "B") if isinstance(parameter, TypeVarTuple)\
-                else (parameter.__name__, )
-            for name in names:
-                bound = nat if name == "N" else Obj[ob]
-                variable = TypeVar(name, bound=bound)
-                variables.append((name.lower(), variable,
-                                  Var[nat if name == "N" else ob, variable]))
-                arguments.append(variable)
-        constructor = cls
-
-        def function(category, **values):
-            built = [
-                category.typeparams()[position(argument, category)]
-                if not any(argument is v for _, v, _ in variables)
-                else values[next(n for n, v, _ in variables if v is argument)]
-                for argument in arguments]
-            return constructor.form(*built)
-
-        function.__name__ = function.__qualname__ = f"ob_{cls.__name__.lower()}"
-        function.__doc__ = f"The formation rule of :class:`{cls.__name__}`."
-        function.__type_params__ = tuple(v for _, v, _ in variables)
-        function.__annotations__ = {
-            name: kind for name, _, kind in variables}
-        function.__annotations__["return"] = Var[
-            ob, GenericAlias(cls, tuple(arguments))]
-        function.__signature__ = inspect.Signature([
-            inspect.Parameter(
-                "category", inspect.Parameter.POSITIONAL_OR_KEYWORD)] + [
-            inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY)
-            for name, _, _ in variables])
-        return cls(function)
 
 
 class Tensor[*Objects](Constructor):
@@ -1608,12 +1537,11 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
     """ The axioms inherited by ``cls``, see :meth:`declared`. """
 
     rules = classproperty(lambda cls: cls.declared(Rule))
-    """ The rules inherited by ``cls``, see :meth:`declared`: those that
-    conclude a morphism and the formation rules of its objects. """
+    """ The rules inherited by ``cls``, see :meth:`declared`. """
 
     constructors = classproperty(lambda cls: cls.declared(Constructor))
-    """ The formation rules of the objects of ``cls``, see
-    :class:`Constructor`. """
+    """ The rules of ``cls`` that are constructors: the formation rules of
+    a class of objects, see :class:`Constructor`. """
 
     @classmethod
     def subclasses(cls) -> tuple[type[Self], ...]:

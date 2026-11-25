@@ -94,6 +94,28 @@ structure ColouredMonoid.Laws (cat : ColouredMonoid Ob Hom) : Prop extends toCat
 structure ColouredMonoid.Functor (cat : ColouredMonoid Ob Hom) (cat' : ColouredMonoid Ob' Hom') extends toCategory : Category.Functor cat.toCategory cat'.toCategory where
   map_tensor : ∀ (f g : Hom), map (cat.tensor f g) = cat'.tensor (map f) (map g)
 
+/-- `discopy.abc.DelayMonoid`: A delay monoid is a `ColouredMonoid` with a monoid endomorphism `delay`, the objects of a `FeedbackCategory`. -/
+structure DelayMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
+  delay : Hom → Nat → Hom
+
+/-- The laws of `DelayMonoid`. -/
+structure DelayMonoid.Laws (cat : DelayMonoid Ob Hom) : Prop extends toColouredMonoid : ColouredMonoid.Laws cat.toColouredMonoid
+
+/-- A functor of `DelayMonoid`: it preserves each of its operations. -/
+structure DelayMonoid.Functor (cat : DelayMonoid Ob Hom) (cat' : DelayMonoid Ob' Hom') extends toColouredMonoid : ColouredMonoid.Functor cat.toColouredMonoid cat'.toColouredMonoid where
+  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
+
+/-- `discopy.abc.BangMonoid`: A bang monoid is a `ColouredMonoid` with an operation `bang`, the objects of a `LinearCategory`. -/
+structure BangMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
+  bang : Hom → Hom
+
+/-- The laws of `BangMonoid`. -/
+structure BangMonoid.Laws (cat : BangMonoid Ob Hom) : Prop extends toColouredMonoid : ColouredMonoid.Laws cat.toColouredMonoid
+
+/-- A functor of `BangMonoid`: it preserves each of its operations. -/
+structure BangMonoid.Functor (cat : BangMonoid Ob Hom) (cat' : BangMonoid Ob' Hom') extends toColouredMonoid : ColouredMonoid.Functor cat.toColouredMonoid cat'.toColouredMonoid where
+  map_bang : ∀ (f : Hom), map (cat.bang f) = cat'.bang (map f)
+
 /-- `discopy.abc.Monoid`: A monoid is a coloured monoid with a single, trivial colour. -/
 structure Monoid (Hom : Type v) extends ColouredMonoid Unit Hom where
 

@@ -382,8 +382,9 @@ def declarations(cls: type) -> dict[str, tuple[Declaration, Compiled]]:
     """
     The rules then the axioms a class states itself, evaluated on symbols,
     leaving out the axioms it declares inapplicable and the formation rules
-    of its objects, see :class:`discopy.testable.Constructor`: those are the
-    operations on ``Ob`` the structure already has.
+    of a class of objects, see :class:`discopy.testable.Constructor`: each
+    one is an operation its structure has already, e.g. ``l`` of a
+    ``Pregroup`` or ``comp`` of a ``ColouredMonoid``.
     """
     result = {}
     for kind in (Rule, Axiom):
