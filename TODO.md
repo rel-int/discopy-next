@@ -6,9 +6,9 @@
 [#121](https://github.com/rel-int/discopy-next/issues/121), the homomorphisms of algebras of the monad G × − of
 *Categorical Deep Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332.)
 
-- [ ] `group.Action.trivial`: the action of a group fixing every point
-- [ ] `neural.equivariant.tying`: the orbit of each entry of a matrix from the orbits of `cod.tensor(dom)`
-- [ ] `Dense`: the reference layer with one weight per orbit, channels and an equivariant bias
-- [ ] `layer`: the parametric box of `para.Markov[Network]`, `equivariance`: the check on generators
-- [ ] tests against an independent orbit labelling, the Bell numbers, MLP / CNN / Deep Sets weight counts, negative controls
-- [ ] CHANGELOG bullet
+- [x] `group.Action.trivial`: the action of a group fixing every point
+- [x] `neural.equivariant.tying`: the orbit of each entry of a matrix from the orbits of `cod.tensor(dom)`
+- [x] `Dense`: the reference layer with one weight per orbit, channels and an equivariant bias
+- [x] `layer`: the parametric box of `para.Markov[Network]`, `equivariance`: the check on generators
+- [x] tests against an independent orbit labelling, the Bell numbers, MLP / CNN / Deep Sets weight counts, negative controls
+- [x] CHANGELOG bullet
