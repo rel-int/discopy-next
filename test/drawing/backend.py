@@ -818,7 +818,7 @@ def test_left_to_right_separates_args_and_lifts_labels():
             self.beziers.append(([tuple(p) for p in points], adaptive))
 
         def draw_text(self, text, i, j, **params):
-            if params.get("verticalalignment") == "top":
+            if params.get("verticalalignment") in ("top", "bottom"):
                 self.labels.append(j)
             else:
                 self.boxes[text] = j
@@ -862,7 +862,7 @@ def test_left_to_right_label_padding_and_contrast():
             self.wire_y = points[0][1]
 
         def draw_text(self, text, i, j, **params):
-            if params.get("verticalalignment") == "top":
+            if params.get("verticalalignment") in ("top", "bottom"):
                 self.labels.append((j, params["color"]))
 
         def output(self, path=None, show=True, **params):
@@ -873,7 +873,7 @@ def test_left_to_right_label_padding_and_contrast():
     Primitive('f', x, x).draw(backend=recorder, textpad=(.5, .0625))
     assert recorder.labels
     for j, color in recorder.labels:
-        assert j - 10 / 72 >= recorder.wire_y + .5 - 1e-9
+        assert j >= recorder.wire_y + .5 - 1e-9
         assert color == "black"
 
 
@@ -899,7 +899,7 @@ def test_left_to_right_labels_above_wires_in_a_daggered_box():
                 self.wires.append(points[0][1])
 
         def draw_text(self, text, i, j, **params):
-            if params.get("verticalalignment") == "top":
+            if params.get("verticalalignment") in ("top", "bottom"):
                 self.labels.append((j, params["color"]))
 
         def output(self, path=None, show=True, **params):
@@ -911,8 +911,7 @@ def test_left_to_right_labels_above_wires_in_a_daggered_box():
     bubble.to_drawing().dagger().draw(backend=recorder)
     assert recorder.labels
     for j, color in recorder.labels:
-        bottom = j - 10 / 72
-        assert any(bottom - .125 <= y <= bottom for y in recorder.wires)
+        assert any(j - .125 <= y < j for y in recorder.wires)
         assert color == "white"
 
 
@@ -933,7 +932,7 @@ def test_labels_of_args_turned_back_top_to_bottom():
                 self.wires.append(points[0][0])
 
         def draw_text(self, text, i, j, **params):
-            if params.get("verticalalignment") == "top":
+            if params.get("verticalalignment") in ("top", "bottom"):
                 self.labels.append((i, params["color"]))
 
         def output(self, path=None, show=True, **params):
@@ -969,7 +968,7 @@ def test_label_contrast_through_three_turns_reflected_outside():
             self.colours = []
 
         def draw_text(self, text, i, j, **params):
-            if params.get("verticalalignment") == "top":
+            if params.get("verticalalignment") in ("top", "bottom"):
                 self.colours.append(params["color"])
 
         def output(self, path=None, show=True, **params):
@@ -980,3 +979,21 @@ def test_label_contrast_through_three_turns_reflected_outside():
     Bubble(Across(Bubble(Primitive('f', x, x)))).to_drawing().dagger().draw(
         backend=recorder)
     assert recorder.colours and set(recorder.colours) == {"white"}
+
+
+def test_left_to_right_labels_stand_on_their_point_in_tikz(tmp_path):
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    path = tmp_path / "ltr.tikz"
+    Primitive('f', Ty('x'), Ty('x')).draw(
+        to_tikz=True, fontsize_types=2, path=str(path))
+    tikz = path.read_text()
+    assert "anchor=south west" in tikz and "anchor=north west" not in tikz

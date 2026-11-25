@@ -1598,10 +1598,11 @@ class Transposed(Backend):
         point, canvas = self.compose((i, j))
         if params.get("verticalalignment") == "top" and self.turns % 2:
             # A wire label hangs below its point, a textpad off its wire:
-            # lift it above the wire, the textpad off it the other way.
-            point = point.shift(y=(
-                params.get("fontsize") or DEFAULT["fontsize"]) / 72 + (
-                    0 if self.cod_is_after() else 2 * self.textpad))
+            # stand it on a point the textpad above the wire instead, so
+            # that each backend lifts it by its own font size.
+            if not self.cod_is_after():
+                point = point.shift(y=2 * self.textpad)
+            params = dict(params, verticalalignment="bottom")
         canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
@@ -1797,13 +1798,15 @@ class TikZ(Backend):
         fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         """
-        is_wire_label = params.get("verticalalignment", "center") == "top"
+        alignment = params.get("verticalalignment", "center")
+        is_wire_label = alignment in ("top", "bottom")
         options = "style=none" + (
             ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west"
+            options += ", anchor=north west" if alignment == "top"\
+                else ", anchor=south west"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -2118,6 +2121,8 @@ class Typst(Backend):
         # not strike through the glyph.
         if params.get("verticalalignment", "center") == "top":
             extra["anchor"] = Str("west")
+        elif params.get("verticalalignment", "center") == "bottom":
+            extra["anchor"] = Str("south-west")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)
