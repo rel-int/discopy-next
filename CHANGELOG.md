@@ -2701,8 +2701,8 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
-[next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#733]: https://github.com/rel-int/discopy-next/pull/733
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
