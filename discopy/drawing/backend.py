@@ -1527,9 +1527,10 @@ class Transposed(Backend):
         return Point(
             self.origin.x + self.height - y, self.origin.y + self.width - x)
 
-    def draw_boundary(self, graph, **params):
+    def draw_boundary(self, graph, *args, **params):
         self.parent.draw_boundary(
-            SimpleNamespace(width=self.height, height=self.width), **params)
+            SimpleNamespace(width=self.height, height=self.width),
+            *args, **params)
 
     def draw_text(self, text, i, j, **params):
         self.parent.draw_text(text, *self.map((i, j)), **params)
@@ -1540,8 +1541,11 @@ class Transposed(Backend):
     def draw_polygon(self, *points, **params):
         self.parent.draw_polygon(*map(self.map, points), **params)
 
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
                   style=None, linewidth=None, adaptive=True):
+        """ Draw the curve :class:`Matplotlib` draws, as a cubic Bezier,
+        since other backends bend wires vertically. """
         if linewidth == 0:
             return
         source, target = Point(*source), Point(*target)
