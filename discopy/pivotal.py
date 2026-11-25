@@ -29,7 +29,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Equation
     Functor
 
@@ -151,6 +150,7 @@ class Layer(rigid.Layer, feedback.Layer):
 
 
 @factory
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
 class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
     """
     A pivotal diagram is a rigid diagram and a feedback diagram
@@ -254,6 +254,7 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
     dagger_monoidality_monoidal = None
 
 
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
 class Box(rigid.Box, feedback.Box, Diagram):
     """
     A pivotal box is a rigid box in a pivotal diagram.
@@ -277,6 +278,8 @@ class Box(rigid.Box, feedback.Box, Diagram):
         return rigid.Box.__repr__(self)[:-1] + time_step + ")"
 
     def __str__(self):
+        if self.args and not self.z:
+            return feedback.Box.__str__(self)
         return rigid.Box.__str__(self) + feedback.str_delayed(self.time_step)
 
     def rotate(self, left=False):
@@ -291,10 +294,12 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def to_drawing(self):
         result = super().to_drawing()
-        result.is_conjugate = self.is_conjugate
+        if not self.args:
+            result.is_conjugate = self.is_conjugate
         return result
 
 
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
 class Cup(rigid.Cup, Box):
     """
     A pivotal cup is a rigid cup of pivotal types.
@@ -309,6 +314,7 @@ class Cup(rigid.Cup, Box):
         return self.cap_factory(self.left, self.right)
 
 
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
 class Cap(rigid.Cap, Box):
     """
     A pivotal cap is a rigid cap of pivotal types.
@@ -323,6 +329,7 @@ class Cap(rigid.Cap, Box):
         return self.cup_factory(self.left, self.right)
 
 
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
 class Sum(rigid.Sum, feedback.Sum, Box):
     """
     A pivotal sum is a sum of pivotal diagrams.
@@ -332,25 +339,6 @@ class Sum(rigid.Sum, feedback.Sum, Box):
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
     """
-
-
-class Bubble(rigid.Bubble, feedback.Bubble, Box):
-    """
-    A pivotal bubble is a rigid and feedback bubble and a pivotal box, whose
-    winding number is that of a pivotal box, i.e. a half-turn mod 2.
-
-    Example
-    -------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> bubble = Box('f', x, y).bubble()
-    >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
-    """
-    serialised_attrs = rigid.Bubble.serialised_attrs + ("time_step", )
-
-    def rotate(self, left=False) -> Bubble:
-        result = super().rotate(left)
-        result.z %= 2
-        return result
 
 
 class Functor(rigid.Functor, feedback.Functor):
@@ -372,7 +360,6 @@ Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 CMap = cmap.CMap[Diagram]
 Id = Diagram.id
 
@@ -382,3 +369,6 @@ class Equation(rigid.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args

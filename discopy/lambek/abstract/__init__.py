@@ -33,7 +33,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     Lexicon
     TermBase
@@ -528,15 +527,6 @@ class Sum(closed.Sum, Box):
     "A formal sum of abstract diagrams."
 
 
-class Bubble(closed.Bubble, Box):
-    """
-    An abstract bubble is a closed bubble and an abstract box.
-
-    >>> A = Ty('A')
-    >>> assert (Box('f', A, A).bubble() >> Box('g', A, A)).cod == A
-    """
-
-
 class Functor(closed.Functor):
     """
     An abstract functor is a closed functor with abstract diagrams as domain.
@@ -663,7 +653,7 @@ class Lexicon(Functor):
         """
         args = []
         while isinstance(term, Application):
-            term, args = term.func, [term.args] + args
+            term, args = term.function, [term.argument] + args
         yield parent, position, term
         for i, arg in enumerate(args):
             yield from Lexicon.productions(arg, term, i)
@@ -748,7 +738,6 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
@@ -772,3 +761,6 @@ of type ``String``, ``Position(lambda x: x)`` is the empty string and
 
 # pylint: disable-next=wrong-import-position  # proofnet imports this module
 from discopy.lambek.abstract import proofnet  # noqa: E402
+
+
+Bubble = Box.from_args

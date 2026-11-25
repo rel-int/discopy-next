@@ -10,7 +10,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Added
 
 - A category draws left to right when its `Diagram` class sets
-  `draw_left_to_right = True`, and a `Bubble` whose args are drawn in
+  `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
   across it, e.g. the "Very big car" figure of higher-order DisCoCat: the
   terms top to bottom, their bodies left to right.
@@ -562,6 +562,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
+  inside it, and the `method` a functor calls on their images, a generator
+  being a box with no args. The `Bubble` class of every module fuses into its
+  `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)` (an
+  `Elementwise` in `tensor` and `quantum`),
+  a box with `args=(f, )`, `isinstance(f, Bubble)` becomes `f.args`, and
+  `Bubble` stays an alias of `Box.from_args`, or of `Elementwise.from_args` in
+  `tensor`, `quantum.circuit` and `quantum.zx`, and a tree dumped with a
+  `Bubble` factory still loads. The function a tensor bubble applies
+  elementwise moves to `tensor.Elementwise`, the box `tensor.Diagram.bubble`
+  builds, and a plain tensor box carries none;
+  `biclosed.Application.func` and `args` are spelled out as `function` and
+  `argument`, in its trees too, and a tree with the old keys still loads
+  ([next#729]).
 
 - In a left-to-right drawing, wire labels sit above their wires, and a line
   separates each of the args nested in a box from the next, so that no two
@@ -2702,6 +2717,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
+[next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

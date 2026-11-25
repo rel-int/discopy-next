@@ -619,6 +619,7 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_TYPE.format(factory))
     module = sys.modules.get(".".join(["discopy", *modules]))
     cls = getattr(module, factory, None)
+    cls = getattr(cls, "__self__", cls)  # an alias, e.g. Box.from_args
     if not is_discopy_class(cls):
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls

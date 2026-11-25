@@ -520,7 +520,7 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
         assert delayed.args == (f, ) and (delayed.dom, delayed.cod) == (
             x.d, y.d)
         assert delayed.reset() == bubble and delayed != f.delay().bubble()
-        assert delayed == module.Bubble(f, time_step=1)
+        assert delayed == module.Bubble(f, time_step=1) == f.bubble(time_step=1)
         assert bubble.delay(2) == delayed.delay()
         assert delayed.dagger() == bubble.dagger().delay()
         assert (bubble >> h).delay() == delayed >> h.delay()

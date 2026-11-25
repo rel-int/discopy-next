@@ -781,15 +781,14 @@ def test_left_to_right_labels_legend_and_dagger():
 
 
 def test_bubble_drawn_in_another_direction_fits_its_framed_args():
-    from discopy.monoidal import Bubble
     from discopy.ribbon import DualRailCup, Ty as RTy
 
-    class Across(Bubble):
+    class Across(Box):
         draw_left_to_right = True
 
     x = RTy('x')
     arg = DualRailCup(x @ x, x.r @ x.r)
-    drawing = Across(arg, dom=Ty(), cod=Ty()).to_drawing()
+    drawing = Across.from_args(arg, dom=Ty(), cod=Ty()).to_drawing()
     nested, = drawing.boxes[0].nested
     framed = arg.to_drawing().framed()
     assert framed.width != arg.to_drawing().width
@@ -917,9 +916,9 @@ def test_left_to_right_labels_above_wires_in_a_daggered_box():
 
 def test_labels_of_args_turned_back_top_to_bottom():
     from discopy.drawing.backend import Backend
-    from discopy.monoidal import Bubble, Colour, Wire
+    from discopy.monoidal import Colour, Wire
 
-    class Across(Bubble):
+    class Across(Box):
         draw_left_to_right = True
 
     class Recorder(Backend):
@@ -940,7 +939,8 @@ def test_labels_of_args_turned_back_top_to_bottom():
 
     x = Ty(Wire('x', Colour('white'), Colour('black')))
     recorder = Recorder()
-    Across(Box('f', x, x), dom=Ty(), cod=Ty()).draw(backend=recorder)
+    Across.from_args(Box('f', x, x), dom=Ty(), cod=Ty()).draw(
+        backend=recorder)
     assert recorder.labels and recorder.wires
     for i, color in recorder.labels:
         assert any(0 < i - wire <= .125 for wire in recorder.wires)
@@ -959,7 +959,7 @@ def test_label_contrast_through_three_turns_reflected_outside():
     class Primitive(Box, Body):
         pass
 
-    class Across(Bubble):
+    class Across(Box):
         draw_left_to_right = True
 
     class Recorder(Backend):
@@ -976,8 +976,8 @@ def test_label_contrast_through_three_turns_reflected_outside():
 
     x = Ty(Wire('x', Colour('white'), Colour('black')))
     recorder = Recorder()
-    Bubble(Across(Bubble(Primitive('f', x, x)))).to_drawing().dagger().draw(
-        backend=recorder)
+    inside = Across.from_args(Bubble(Primitive('f', x, x)))
+    Bubble(inside).to_drawing().dagger().draw(backend=recorder)
     assert recorder.colours and set(recorder.colours) == {"white"}
 
 
