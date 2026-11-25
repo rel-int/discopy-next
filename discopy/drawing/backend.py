@@ -705,6 +705,10 @@ class Backend(ABC):
         types = [graph.dom, graph.cod]
         for box in graph.boxes:
             types += [box.dom, box.cod]
+            if getattr(box, "nested", None) is not None:
+                for name, colour in Backend.region_colours(
+                        box.nested).items():
+                    colours.setdefault(name, colour)
         for typ in types:
             candidates = [getattr(typ, "dom", None), getattr(typ, "cod", None)]
             for obj in getattr(typ, "inside", ()):
@@ -1205,7 +1209,7 @@ class Backend(ABC):
             text_width(box.drawing_name) + .25 if box.drawing_name else 0)
         origin = Point((start + right - nested.height) / 2,
                        centre[1] - nested.width / 2)
-        canvas = Transposed(self, origin, nested)
+        canvas = Transposed(self, origin, nested, flip=box.is_dagger)
         canvas.draw_polygon(
             (0, 0), (nested.width, 0), (nested.width, nested.height),
             (0, nested.height), facecolor=box.frame_colour)
@@ -1512,6 +1516,8 @@ class Transposed(Backend):
         parent : The backend to draw on.
         origin : The bottom left corner of the transposed drawing.
         graph : The drawing, for its width and height.
+        flip : Whether to reflect the transposed drawing along the
+            horizontal axis too, e.g. inside a daggered box.
 
     Example
     -------
@@ -1524,16 +1530,17 @@ class Transposed(Backend):
     .. image:: /_static/drawing/left-to-right.svg
         :align: center
     """
-    def __init__(self, parent: Backend, origin: Point, graph: Drawing):
-        self.parent, self.origin = parent, origin
+    def __init__(self, parent: Backend, origin: Point, graph: Drawing,
+                 flip=False):
+        self.parent, self.origin, self.flip = parent, origin, flip
         self.width, self.height = graph.width, graph.height
         super().__init__()
 
     def map(self, point) -> Point:
         """ The image of a point of the drawing on the parent backend. """
         x, y = point
-        return Point(
-            self.origin.x + self.height - y, self.origin.y + self.width - x)
+        return Point(self.origin.x + self.height - y,
+                     self.origin.y + (x if self.flip else self.width - x))
 
     def draw_boundary(self, graph, *args, **params):
         self.parent.draw_boundary(

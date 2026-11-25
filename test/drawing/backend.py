@@ -727,3 +727,29 @@ def test_bubble_of_coloured_args_drawn_in_another_direction():
     x = Ty(Wire('x', Colour('red'), Colour('blue')))
     bubble = Bubble(Primitive('f', x, x), Primitive('g', x, x))
     assert bubble.to_drawing().boxes[0].nested is not None
+
+
+def test_left_to_right_labels_legend_and_dagger():
+    from discopy.drawing.backend import Backend, Transposed
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.drawing import Point
+    from discopy.utils import factory, text_width
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    name = 'a very long function name'
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    long = Primitive(name, x, x).to_drawing()
+    assert long.height >= text_width(name) + 1 > 1 == long.width
+    assert sorted(Backend.region_colours(
+        Bubble(Primitive('f', x, x), dom=Ty(), cod=Ty()).to_drawing())
+    ) == ['blue', 'red']
+    drawing = Primitive('f', x, x).to_drawing()
+    up, down = (Transposed(None, Point(0, 0), drawing, flip=flip)
+                for flip in (False, True))
+    assert up.map((0, 0)).y == drawing.width and down.map((0, 0)).y == 0

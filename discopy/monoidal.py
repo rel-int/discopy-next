@@ -157,6 +157,7 @@ and a :class:`discopy.markov.Application` may use one twice.
 from __future__ import annotations
 
 import itertools
+from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -2528,6 +2529,14 @@ class Box(cat.Box, Diagram):
         return 1
 
     def to_drawing(self):
+        if type(self).draw_left_to_right and "height" not in vars(self):
+            # The height of a box drawn left to right is its width on the page.
+            box = copy(self)
+            box.height = max(1, text_width(
+                getattr(self, "drawing_name", self.name)) + 1)
+            if "min_width" not in vars(self):
+                box.min_width = 0
+            return Drawing.from_box(box)
         return Drawing.from_box(self)
 
 
