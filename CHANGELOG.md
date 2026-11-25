@@ -16,6 +16,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   terms top to bottom, their bodies left to right.
   `drawing.backend.Transposed` draws through the reflection along the
   anti-diagonal, keeping the layout as it is ([next#728]).
+- In a left-to-right drawing, wire labels sit above their wires, and a line
+  separates each of the args nested in a box from the next, so that no two
+  regions meet without one ([next#733]).
 
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
@@ -2698,6 +2701,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
+[next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
