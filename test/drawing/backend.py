@@ -671,3 +671,126 @@ def test_typst_draws_the_symbol_of_an_equation_as_its_label_alone():
     assert 'text("=", fill: rgb("#000000")' in source
     assert "circle(" not in source
     assert compiled(source, format="svg")
+
+
+def test_left_to_right_follows_the_category_and_keeps_arrows(tmp_path):
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.quantum.circuit import Measure
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    f = Primitive('f', x, x)
+    body = f >> Primitive('g', x, x @ x)
+    assert body.to_svg() == body.to_svg(left_to_right=True)\
+        != body.to_svg(left_to_right=False)
+    assert Bubble(f[::-1], dom=x, cod=x).to_drawing().asymmetry() == 0.125
+
+    path = tmp_path / "measure.tikz"
+    Measure().draw(to_tikz=True, left_to_right=True, path=str(path))
+    assert "->" in path.read_text()
+
+
+def test_bubble_of_args_drawn_in_different_directions():
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    with raises(ValueError):
+        Bubble(Box('f', x, x), Primitive('g', x, x)).to_drawing()
+
+
+def test_bubble_of_coloured_args_drawn_in_another_direction():
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    bubble = Bubble(Primitive('f', x, x), Primitive('g', x, x))
+    assert len(bubble.to_drawing().boxes[0].nested) == 2
+
+
+def test_left_to_right_labels_legend_and_dagger():
+    from discopy.config import BOX_DRAWING_ATTRIBUTES
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory, text_width
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    name = 'a very long function name'
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    long = Primitive(name, x, x).to_drawing()
+    assert long.height >= text_width(name) + 1 > 1 == long.width
+    assert sorted(Backend.region_colours(
+        Bubble(Primitive('f', x, x), dom=Ty(), cod=Ty()).to_drawing())
+    ) == ['blue', 'red']
+    spider = Primitive(name, x, x, draw_as_spider=True).to_drawing()
+    assert spider.height == 1
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.heights = {}
+
+        def draw_text(self, text, i, j, **params):
+            self.heights[text] = j
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    y = Ty('y')
+    bubble = Bubble(
+        Primitive('f', y, y), Primitive('g', y, y), frame_colour="red")
+    assert bubble.dagger().frame_colour == "red"
+    default = BOX_DRAWING_ATTRIBUTES['frame_colour']
+    BOX_DRAWING_ATTRIBUTES['frame_colour'] = lambda _: "blue"
+    try:
+        assert Bubble(Primitive('f', y, y)).frame_colour == "blue"
+    finally:
+        BOX_DRAWING_ATTRIBUTES['frame_colour'] = default
+    up, down = Recorder(), Recorder()
+    bubble.to_drawing().draw(backend=up)
+    bubble.to_drawing().dagger().draw(backend=down)
+    assert up.heights['f'] > up.heights['g']
+    assert down.heights['f'] < down.heights['g']
+
+
+def test_bubble_drawn_in_another_direction_fits_its_framed_args():
+    from discopy.ribbon import DualRailCup, Ty as RTy
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    x = RTy('x')
+    arg = DualRailCup(x @ x, x.r @ x.r)
+    drawing = Across.from_args(arg, dom=Ty(), cod=Ty()).to_drawing()
+    nested, = drawing.boxes[0].nested
+    framed = arg.to_drawing().framed()
+    assert framed.width != arg.to_drawing().width
+    assert nested.width == framed.width
+    assert drawing.height >= nested.width + 1

@@ -1576,6 +1576,8 @@ class RichDisplay:
         """ Draw as a standalone SVG string. """
         from io import StringIO
         buffer = StringIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="svg", show=False, **params)
         return buffer.getvalue()
@@ -1584,6 +1586,8 @@ class RichDisplay:
         """ Draw as PNG bytes. """
         from io import BytesIO
         buffer = BytesIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="png", show=False, **params)
         return buffer.getvalue()
