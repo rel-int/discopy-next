@@ -7,6 +7,6 @@
 
 - [x] cat: `cat.Sum(Box)` holds the terms, `+`, `then`, `dagger`, `subs`/`lambdify`, the tree and the drawing
 - [x] monoidal: `monoidal.Sum(cat.Sum, Box)` adds `tensor`; every module's `Sum` subclasses its parent module's, none `formal_sum`
-- [WIP] @T-14209019-2026-11-25 20:22 delete `discopy/sum.py`, `Sum[...]`, the `formal_sum` alias and the `subscript_bases` hook if nothing else uses it
+- [x] delete `discopy/sum.py`, `Sum[...]`, the `formal_sum` alias and the `subscript_bases` hook if nothing else uses it
 - [ ] tests, docs, notebooks and CHANGELOG follow; close #10 as superseded
 - [ ] run next-checks
