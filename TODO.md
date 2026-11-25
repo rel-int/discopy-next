@@ -5,7 +5,7 @@
 > "same for bang, it shouldn't be a branch separate from the rest of the package, it should be its own package with modules for everything that makes sense to bang. feedback and bang shouldn't have to interact until we've figured out a meaningful way to do so"
 
 - [x] `discopy.feedback` a package: the monoidal level in `__init__`, then `balanced`, `symmetric`, `markov`, `comarkov`, `closed` and the levels below that carry a delay
-- [WIP] @amp-T-f829d881-2026-11-25 18:56 the ordinary modules neither feedback nor traced: no time step, no `Trace` bubble; pivotal and below keep the trace their cups and caps give
+- [x] the ordinary modules neither feedback nor traced: no time step, no `Trace` bubble; pivotal and below keep the trace their cups and caps give
 - [WIP] @amp-T-f829d881-2026-11-25 18:56 `discopy.bang` a package: one module per level that bangs
 - [WIP] @amp-T-f829d881-2026-11-25 18:56 no feedback-of-bang, no bang-of-feedback
 - [WIP] @amp-T-f829d881-2026-11-25 18:57 tests, proptest matrix, docs and changelog follow
