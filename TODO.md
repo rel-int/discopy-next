@@ -8,4 +8,4 @@
 - [x] the ordinary modules neither feedback nor traced: no time step, no `Trace` bubble; pivotal and below keep the trace their cups and caps give
 - [x] `discopy.bang` a package: one module per level that bangs
 - [x] no feedback-of-bang, no bang-of-feedback
-- [WIP] @amp-T-f829d881-2026-11-25 18:57 tests, proptest matrix, docs and changelog follow
+- [x] tests, proptest matrix, docs and changelog follow
