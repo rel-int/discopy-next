@@ -834,3 +834,39 @@ def test_left_to_right_separates_args_and_lifts_labels():
     (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)
     wire_y = recorder.beziers[0][0][0][1]
     assert recorder.labels and all(j > wire_y for j in recorder.labels)
+
+
+def test_left_to_right_label_padding_and_contrast():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wire_y = [], None
+
+        def draw_bezier(self, points, adaptive=True):
+            self.wire_y = points[0][1]
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") == "top":
+                self.labels.append((j, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Primitive('f', x, x).draw(backend=recorder, textpad=(.5, .0625))
+    assert recorder.labels
+    for j, color in recorder.labels:
+        assert j - 10 / 72 >= recorder.wire_y + .5 - 1e-9
+        assert color == "black"

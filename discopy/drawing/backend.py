@@ -953,13 +953,18 @@ class Backend(ABC):
         i += pad_i
         j -= pad_j
         fontsize = params.get('fontsize_types', params.get('fontsize', None))
-        background = getattr(x, "cod", None)
+        background = self.label_background(x)
         adaptive = background is None
         color = self.readable_foreground(
             "white" if adaptive else background.name)
         self.draw_text(
             label, i, j, verticalalignment='top', fontsize=fontsize,
             color=color, adaptive=adaptive)
+
+    @staticmethod
+    def label_background(typ):
+        """ The region a wire label is drawn on, the one to its right. """
+        return getattr(typ, "cod", None)
 
     @staticmethod
     def has_boundary_sides(typ):
@@ -1544,6 +1549,7 @@ class Transposed(Backend):
     def __init__(self, parent: Backend, origin: Point, graph: Drawing,
                  flip=False):
         self.parent, self.origin, self.flip = parent, origin, flip
+        self.textpad = DEFAULT["textpad"][0]
         self.width, self.height = graph.width, graph.height
         super().__init__()
 
@@ -1558,6 +1564,15 @@ class Transposed(Backend):
             SimpleNamespace(width=self.height, height=self.width),
             *args, **params)
 
+    def label_background(self, typ):
+        """ A label above its wire lies on the region right of the wire
+        when the drawing is reflected, on the one left of it otherwise. """
+        return getattr(typ, "cod" if self.flip else "dom", None)
+
+    def draw_wire_label(self, x, i, j, **params):
+        self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
+        super().draw_wire_label(x, i, j, **params)
+
     def draw_text(self, text, i, j, **params):
         point = self.map((i, j))
         if params.get("verticalalignment") == "top":
@@ -1565,7 +1580,7 @@ class Transposed(Backend):
             # lift it above the wire, the textpad off it the other way.
             point = point.shift(y=(
                 params.get("fontsize") or DEFAULT["fontsize"]) / 72 + (
-                    0 if self.flip else 2 * DEFAULT["textpad"][0]))
+                    0 if self.flip else 2 * self.textpad))
         self.parent.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
