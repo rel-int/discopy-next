@@ -93,7 +93,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from operator import matmul
-from typing import Self
+from typing import Any, Self
 
 from discopy import messages
 from discopy.kleisli.multiplicative import pack, pack_value
@@ -280,8 +280,8 @@ class Para:
     """
     dom: object
     cod: object
-    inside: object
-    param: object
+    inside: Any
+    param: Any
     action: Action
 
     def __post_init__(self):
