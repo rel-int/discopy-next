@@ -3,5 +3,5 @@
 > > [P2] `glue` skips the boundary checks that `trace` performs, so invalid counts can silently glue fewer wires and mismatched types can be merged. Call `assert_istraceable(self, n, left)` before the zero-count case.
 > > [P3] The `GoISituation` entry omits the symmetric requirement. `abc.GoISituation` is linear, traced and symmetric, so name it as a symmetric traced bang.
 
-- [ ] discopy/hypergraph.py glue checks its boundary as trace does
+- [WIP] @amp-T-f829d881-2026-11-25 21:22 discopy/hypergraph.py glue checks its boundary as trace does
 - [ ] CHANGELOG.md GoISituation is a symmetric traced bang
