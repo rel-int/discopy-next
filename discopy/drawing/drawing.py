@@ -719,15 +719,23 @@ which to_drawing recomputes.
             raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
         return result
 
-    def interpolate(self, other: Drawing, t: float) -> Drawing:
+    def interpolate(self, other: Drawing, t: float,
+                    left: bool | None = None) -> Drawing:
         """
         The drawing a fraction ``t`` of the way from ``self`` to ``other``,
         when the drawings are of diagrams one interchanger apart: their plane
         graphs are equal once the indices of two consecutive boxes are
         swapped.
 
+        When the plane graphs are equal, e.g. two drawings of one diagram,
+        this is a laxator of :meth:`discopy.rewrite.Rewrite.to_gif`: every
+        node moves vertically, then horizontally. Along each half which side
+        of a straight wire a node is on is linear in ``t``, so a box that is
+        on the same side at both ends never crosses it, which moving both
+        ways at once does not ensure.
+
         This is a planar isotopy, see
-        :meth:`discopy.monoidal.Equation.path`: the two boxes move apart
+        :class:`discopy.rewrite.Interchange`: the two boxes move apart
         (:meth:`apart`), swap their rows and move back, so they never
         overlap. The box moved to the right is the one for which both ends
         pushed apart are still feasible drawings of their diagrams, see
@@ -738,6 +746,8 @@ which to_drawing recomputes.
         Parameters:
             other : The drawing to move to.
             t : The fraction of the way, from ``0`` to ``1``.
+            left : Whether the upper of the two boxes is the one on the left,
+                guessed if ``None``, see :class:`discopy.rewrite.Interchange`.
 
         Raises:
             ValueError : When the drawings are not one move apart.
@@ -748,7 +758,7 @@ which to_drawing recomputes.
         >>> x = Ty('x')
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> a, b = (f @ x >> x @ g).to_drawing(), (x @ g >> f @ x).to_drawing()
-        >>> assert a.interpolate(b, 0) == a
+        >>> assert a.interpolate(b, 0) == a and a.interpolate(b, 1) == b
         >>> box = Node("box", box=f, j=0)
         >>> a.interpolate(b, .5).positions[box]
         Point(x=0.5, y=1.0)
@@ -772,15 +782,23 @@ which to_drawing recomputes.
                 break
         else:
             return self.slide(other, t)
+        if t == 1:
+            return other
         start = dict(self.positions)
         end = {mapping[node]: p for node, p in other.positions.items()}
         stops = [start, end]
+        if not swap:
+            stops[1:1] = [{node: Point(p.x, end[node].y)
+                           for node, p in start.items()}]
+            stops = [stop for i, stop in enumerate(stops)
+                     if i in (0, 2) or stop not in (start, end)]
         if swap:
-            orders = sorted(
-                [sorted(swap), sorted(swap)[::-1]], key=lambda order: (
-                    self.centre(order[1]).x - self.centre(order[0]).x
-                    + other.centre(swap[order[1]]).x
-                    - other.centre(swap[order[0]]).x) < 0)
+            orders = [sorted(swap)[::1 if left else -1]] if left is not None\
+                else sorted(
+                    [sorted(swap), sorted(swap)[::-1]], key=lambda order: (
+                        self.centre(order[1]).x - self.centre(order[0]).x
+                        + other.centre(swap[order[1]]).x
+                        - other.centre(swap[order[0]]).x) < 0)
             left, right = next((
                 (j, k) for j, k in orders
                 if self.apart(j, k).is_feasible(self) and other.apart(

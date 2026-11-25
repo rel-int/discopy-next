@@ -72,9 +72,10 @@ from discopy import monoidal, messages
 from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
-from discopy.monoidal import Ty, Match
+from discopy.monoidal import Ty
+from discopy.rewrite import Slide
 from discopy.utils import (
-    assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
+    assert_isatomic, BinaryBoxConstructor, deprecated_alias,
     factory_name, from_tree)
 
 
@@ -176,13 +177,14 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         >>> assert bot_right.naturality(1, down=False) == top_left
         >>> assert bot_left.naturality(1, left=False, down=False) == top_right
 
-        Drawn with ``tween`` frames, a box slides through the braids, see
-        :meth:`discopy.drawing.Drawing.slide`:
+        This is the codomain of the rewrite
+        :meth:`discopy.rewrite.Slide.at`, which a gif draws as the box
+        sliding through the braids:
 
+        >>> from discopy.rewrite import Slide
         >>> g, w = Box('g', x, y @ z, draw_as_spider=True), Ty('w')
-        >>> source = w @ g >> Diagram.braid(w, y @ z)
-        >>> _ = source.to_gif(
-        ...     source.naturality(0), tween=12, timestep=80, loop=True,
+        >>> slide = Slide.at(w @ g >> Diagram.braid(w, y @ z), 0)
+        >>> _ = slide.to_gif(tween=12, timestep=80, loop=True,
         ...     doctest="docs/_static/braided/naturality.gif")
 
         .. image:: /_static/braided/naturality.gif
@@ -190,29 +192,7 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         """
         if any(len(layer.boxes) > 1 for layer in self.inside):
             return self.to_staircases().naturality(i, left, down, braid)
-        braid = braid or self.braid
-        box, offset, dom = self.boxes[i], self.offsets[i], self.inside[i].dom
-        left_wires, right_wires = dom[:offset], dom[offset + len(box.dom):]
-        if left and down:
-            source = left_wires[-1] @ box >> braid(left_wires[-1], box.cod)
-            target = braid(left_wires[-1], box.dom) >> box @ left_wires[-1]
-        elif left:
-            source = braid(box.dom, left_wires[-1]) >> left_wires[-1] @ box
-            target = box @ left_wires[-1] >> braid(box.cod, left_wires[-1])
-        elif down:
-            source = box @ right_wires[0] >> braid(box.cod, right_wires[0])
-            target = braid(box.dom, right_wires[0]) >> right_wires[0] @ box
-        else:
-            source = braid(right_wires[0], box.dom) >> box @ right_wires[0]
-            target = right_wires[0] @ box >> braid(right_wires[0], box.cod)
-        start = i if down else i - len(source) + 1
-        match = Match(above=self[:start], below=self[start + len(source):],
-                      left=left_wires[:-1] if left else left_wires,
-                      right=right_wires if left else right_wires[1:])
-        if start < 0 or self[start:start + len(source)]\
-                != match.left @ source @ match.right:
-            raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
-        return match.substitute(target)  # ty: ignore[invalid-return-type]
+        return Slide.at(self, i, left=left, down=down, braid=braid).cod
 
 
 class Box(monoidal.Box, Diagram):

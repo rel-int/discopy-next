@@ -149,18 +149,19 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     Parameters
     ----------
     diagrams : :class:`Diagram`, optional
-        Sequence of diagrams to draw.
+        Sequence of diagrams to draw, or of drawings.
     path : str
         Where to save the image, if :code:`None` the gif is only embedded.
     timestep : int, optional
         Time step in milliseconds, default is :code:`500`.
     tween : int, optional
         Frames per step, default is :code:`1`: from each diagram to the next
-        the drawing moves by :meth:`Drawing.interpolate`, so that the gif is
-        an isotopy, e.g. along :meth:`discopy.monoidal.Equation.path`, and
-        raises :code:`ValueError` when two consecutive diagrams are not one
-        move apart. The wires between two ports are then drawn vertical at
-        both ends, i.e. with :code:`smooth_wires=True`.
+        the drawing moves by :meth:`Drawing.interpolate`, guessing the move,
+        and raises :code:`ValueError` when two consecutive diagrams are not
+        one move apart. A rewrite says its moves instead, see
+        :meth:`discopy.rewrite.Rewrite.to_gif`. The wires between two ports
+        are then drawn vertical at both ends, i.e. with
+        :code:`smooth_wires=True`.
     loop : bool, optional
         Whether to loop, default is :code:`False`, going back to the first
         diagram by playing the gif backwards unless it ends where it starts,

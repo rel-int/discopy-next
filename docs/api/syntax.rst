@@ -31,6 +31,7 @@ and the property tests that check their axioms.
     discopy.hypergraph
     discopy.egraph
     discopy.cmap
+    discopy.rewrite
 
 Utilities shared by every module: serialisation, factories and configuration.
 

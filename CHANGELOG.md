@@ -9,23 +9,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- Planar isotopy as a gif: `monoidal.Equation.path` is the rewrite steps from
-  one term to the next through their normal form, `Equation.to_gif` animates
-  it, and `to_gif(..., tween=n)` moves each drawing to the next in `n` frames
-  by `Drawing.interpolate`, which raises unless the two are one move apart:
-  an interchanger, or a box sliding through the braids or swaps next to it
-  by `naturality` (`Drawing.slide`), where the crossings pass behind the box
-  halfway, or through the dot of a box drawn as a spider, which slides
-  rigidly while the braid stays behind and passes under its legs. Tweened,
-  its port-to-port wires are vertical at both ends and the strands over a
-  braid are drawn over a halo (`draw(smooth_wires=True)`), and every frame
-  keeps the same axes, which `draw` now passes on as `xlim` and `ylim`.
-  `Diagram.to_gif` draws the Eckmann-Hilton loop of two scalars. Across an
-  interchanger the two boxes move apart (`Drawing.apart`, with every wire
-  beside the one that moves), swap rows and move back, so that no box overlaps
-  another and no wire crosses one. A gif
-  tweened so is an isotopy between the drawings. `Diagram.normalization`
-  lists the steps `normal_form` takes ([next#706]).
+- `discopy.rewrite`, rewrites as explicit 2-cells between diagrams, a
+  sesquicategory (ADR 12): a `Rewrite` is a sequence of `Layer`s, each a
+  diagram with a hole for each `Step` that happens at once, with `Interchange`
+  (`bifunctoriality` with identities, the side it winds an argument) and
+  `Slide` (`braid_naturality`, a box through a braid) as steps, whiskering and
+  tensor. `Diagram.normalization` is the rewrite to the normal form, and
+  `braided.Diagram.naturality` is the codomain of `Slide.at`.
+  `Rewrite.to_gif(tween=n)` animates a rewrite as an isotopy: an interchanger
+  moves the two boxes apart, swaps their rows and moves them back
+  (`Drawing.interpolate`, `Drawing.apart`), a box slides through the braids or
+  swaps next to it (`Drawing.slide`), and between two drawings of one diagram
+  the laxator moves every node vertically then horizontally. Tweened, wires
+  between two ports are vertical at both ends (`draw(smooth_wires=True)`) and
+  every frame keeps the same axes, which `draw` now passes on as `xlim` and
+  `ylim` ([next#706]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
