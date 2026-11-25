@@ -33,6 +33,7 @@ Summary
     Bubble
     Sum
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -90,7 +91,8 @@ from typing import ClassVar, Self
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
     hypergraph, symmetric)
-from discopy.abc import HypergraphCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, HypergraphCategory)
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
@@ -246,6 +248,10 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -1014,8 +1020,8 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

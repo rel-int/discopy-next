@@ -24,6 +24,7 @@ Summary
     Copy
     Discard
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -101,7 +102,9 @@ from typing import ClassVar, Self
 
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
 from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
@@ -187,6 +190,13 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     discard_factory: ClassVar[type["Discard"]]
     function_factory: ClassVar[type["Function"]]
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
 
     @classmethod
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
@@ -948,8 +958,8 @@ Box.__init__.__signature__ = Signature([
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

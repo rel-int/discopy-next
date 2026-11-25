@@ -40,6 +40,7 @@ Summary
     Discard
     Noise
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -1024,8 +1025,8 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Network, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor
 Network.copy_factory, Network.merge_factory = Copy, Merge

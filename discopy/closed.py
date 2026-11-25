@@ -51,6 +51,7 @@ Summary
     Copy
     Discard
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -789,8 +790,8 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
     lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
