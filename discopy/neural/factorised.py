@@ -3,9 +3,9 @@
 """
 Equivariant layers factorised along the construction of the group: the
 realisations of :mod:`discopy.neural.equivariant` that compute the linear maps
-from the sums over the blocks of a product, a wreath product or a power and
-the correlations of a cyclic group, instead of from a dense matrix with one
-entry for each pair of points.
+from the sums over the blocks of a product, a wreath product or a power, the
+correlations of a cyclic group and the partitions of a symmetric group,
+instead of from a dense matrix with one entry for each pair of points.
 
 Summary
 -------
@@ -17,6 +17,7 @@ Summary
 
     Pooling
     Kronecker
+    Partitions
     Factor
     Structure
 
@@ -32,6 +33,9 @@ Summary
         canonical
         nested
         block_shape
+        partitions
+        equalities
+        mobius
 
 Example
 -------
@@ -54,6 +58,7 @@ points, one weight on the diagonal and one off it:
 from __future__ import annotations
 
 import functools
+import itertools
 import math
 from collections.abc import Callable
 from typing import NamedTuple
@@ -594,14 +599,228 @@ class Kronecker(Realisation):
         return out.movedim(1, -1).reshape(*shape, *sizes, k.shape[-2])
 
 
+def partitions(size: int, most: int) -> tuple[tuple[int, ...], ...]:
+    """
+    The set partitions of ``size`` coordinates with at most ``most`` blocks,
+    as restricted growth strings: each coordinate is the number of its block,
+    the blocks numbered in the order of their first coordinate. They come in
+    lexicographic order, which is the order of the orbits of a symmetric group
+    on tuples of points, see :func:`discopy.neural.equivariant.tying`.
+
+    Parameters:
+        size : The number of coordinates.
+        most : The largest number of blocks.
+
+    Example
+    -------
+    >>> partitions(3, 2)
+    ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1))
+    >>> len(partitions(4, 4))
+    15
+    """
+    strings = ((), )
+    for _ in range(size):
+        strings = tuple(s + (k, ) for s in strings
+                        for k in range(max(s, default=-1) + 2))
+    return tuple(s for s in strings if max(s, default=-1) < most)
+
+
+def equalities(coordinates) -> int:
+    """
+    The pairs of coordinates that are equal, as the bits of a number: the
+    equality pattern of a tuple of points, or of a restricted growth string.
+
+    Parameters:
+        coordinates : The coordinates, numbers or arrays of numbers.
+
+    Example
+    -------
+    >>> equalities((3, 5, 3)), equalities((0, 1, 2)), equalities((7, 7, 7))
+    (2, 0, 7)
+    """
+    pairs = itertools.combinations(range(len(coordinates)), 2)
+    return sum((coordinates[i] == coordinates[j]) * 2 ** k
+               for k, (i, j) in enumerate(pairs))
+
+
+def mobius(strings: tuple[tuple[int, ...], ...]) -> tuple[tuple, ...]:
+    """
+    The change of basis from the orbit basis to the diagram basis of the
+    partitions: the entry ``[pi, sigma]`` is the product, over the blocks of
+    ``pi``, of ``(-1) ** (k - 1) * (k - 1)!`` where ``k`` is the number of
+    blocks of ``sigma`` inside the block, if ``sigma`` refines ``pi`` and
+    zero otherwise. It is the Möbius function of the lattice of partitions,
+    see `Maron et al. (2019) <https://arxiv.org/abs/1812.09902>`_.
+
+    Parameters:
+        strings : The partitions, see :func:`partitions`.
+
+    Example
+    -------
+    >>> mobius(partitions(2, 2))
+    ((1, -1), (0, 1))
+    """
+    pairs = tuple(itertools.combinations(range(len(strings[0])), 2))
+
+    def entry(pi, sigma):
+        if any(sigma[i] == sigma[j] and pi[i] != pi[j] for i, j in pairs):
+            return 0
+        counts = (len({s for s, p in zip(sigma, pi) if p == block})
+                  for block in set(pi))
+        return math.prod((-1) ** (k - 1) * math.factorial(k - 1)
+                         for k in counts)
+
+    return tuple(tuple(entry(pi, sigma) for sigma in strings)
+                 for pi in strings)
+
+
+class Partitions(Realisation):
+    """
+    The equivariant linear maps of a symmetric group on one or two points to
+    one or two points, i.e. on a tensor power of its action of degree at most
+    two on each side. The orbits on pairs are the set partitions of the
+    coordinates, the outputs' first, with at most as many blocks as points,
+    see :func:`partitions`. The operator of each partition is the sum over
+    the tuples that are equal inside its blocks, one :func:`torch.einsum`
+    that takes a diagonal for a block of several inputs and a sum for a block
+    of no output; the weights are changed to this basis by :func:`mobius`.
+    It costs ``O(B n^2 CD)`` for each of at most 15 partitions where
+    :class:`Dense` costs ``O(B n^4 CD)`` with a gathered weight.
+
+    Parameters:
+        dom : The action on the input points, the action of ``Symmetric[n]``
+              or its tensor with itself, with ``n >= 2``.
+        cod : The same for the output points.
+
+    Attributes:
+        n : The number of points of the action.
+        p : The degree of the input, one or two.
+        q : The degree of the output, one or two.
+        strings : The partitions of the ``q + p`` coordinates, one for each
+                  orbit and in the order of their numbers.
+
+    Raises:
+        TypeError : If an action is not of this form.
+
+    Example
+    -------
+    >>> import torch  # doctest: +EXTRA
+    >>> action = Symmetric[3].action()
+    >>> maps = Partitions(action, action)
+    >>> maps.orbits, maps.tying().tolist()
+    (2, [[0, 1, 1], [1, 0, 1], [1, 1, 0]])
+    >>> v, w = torch.tensor([[1.], [2.], [4.]]), torch.tensor([[[2.]], [[1.]]])
+    >>> maps(v, w).flatten().tolist()
+    [8.0, 9.0, 11.0]
+    >>> cube = action.tensor(action).tensor(action)
+    >>> Partitions(action, cube)  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    TypeError: Expected the action of a symmetric group or its tensor ...
+    """
+    def __init__(self, dom: Action, cod: Action):
+        p, q = self.degree(dom), self.degree(cod)
+        if p is None or q is None or dom.group is not cod.group:
+            raise TypeError("Expected the action of a symmetric group or its "
+                            f"tensor with itself twice, got {dom} and {cod}.")
+        strings = partitions(p + q, dom.group.n)
+        super().__init__(dom, cod, len(strings))
+        self.n, self.p, self.q, self.strings = dom.group.n, p, q, strings
+        self.register_buffer(
+            "mobius", torch.tensor(mobius(strings)), persistent=False)
+
+    @staticmethod
+    def degree(action: Action) -> int | None:
+        """
+        The degree of an action as a tensor power of the action of a
+        symmetric group on at least two points, if any.
+
+        Parameters:
+            action : The action.
+
+        Example
+        -------
+        >>> action = Symmetric[3].action()
+        >>> Partitions.degree(action), Partitions.degree(
+        ...     action.tensor(action)), Partitions.degree(Cyclic[3].action())
+        (1, 2, None)
+        """
+        group = action.group
+        if not issubclass(group, Symmetric) or group.n < 2\
+                or action.size not in (group.n, group.n ** 2):
+            return None
+        base, k = group.action(), 1 if action.size == group.n else 2
+        return k if action == (base if k == 1 else base.tensor(base))\
+            else None
+
+    def tying(self) -> numpy.ndarray:
+        """ The partition of the equalities of each pair of tuples. """
+        degree = self.p + self.q
+        grid = numpy.indices((self.n, ) * degree).reshape(degree, -1)
+        table = numpy.full(2 ** (degree * (degree - 1) // 2), -1)
+        for k, string in enumerate(self.strings):
+            table[equalities(string)] = k
+        return table[equalities(grid)].reshape(
+            self.n ** self.q, self.n ** self.p)
+
+    def forward(self, v: torch.Tensor, w: torch.Tensor,
+                b: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Apply the layer, see :meth:`Dense.forward`.
+
+        Parameters:
+            v : The input, of shape ``(..., |X|, C)``.
+            w : The weights, of shape ``(orbits, D, C)``.
+            b : The biases, of shape ``(bias_orbits, D)``, if any.
+        """
+        batch = v.shape[:-2]
+        x = v.reshape(*batch, *(self.n, ) * self.p, v.shape[-1])
+        inverse = self.mobius.to(w.dtype)
+        product = inverse @ w.flatten(1)  # ty: ignore[unsupported-operator]
+        u = product.reshape(w.shape)
+        out = sum(self.term(x, k, string)
+                  for k, string in zip(u, self.strings))
+        return self.bias(out.reshape(*batch, -1, out.shape[-1]), b)
+
+    def term(self, x: torch.Tensor, k: torch.Tensor,
+             string: tuple[int, ...]) -> torch.Tensor:
+        """
+        The operator of one partition, mixing the channels by ``k``: a block
+        with an input and an output is an axis of the einsum, a block of
+        inputs only is summed, a block of outputs only is copied, and two
+        outputs in one block are put on a diagonal.
+
+        Parameters:
+            x : The input, of shape ``(..., n, ..., n, C)``, ``p`` axes of
+                size ``n``.
+            k : The weights, of shape ``(D, C)``.
+            string : The partition, see :func:`partitions`.
+        """
+        letters = "ABCD"
+        ins, outs = string[self.q:], tuple(dict.fromkeys(string[:self.q]))
+        shared = tuple(block for block in outs if block in ins)
+        left, right = (
+            "".join(letters[block] for block in blocks)
+            for blocks in (ins, shared))
+        out = torch.einsum(f"...{left}c,dc->...{right}d", x, k)
+        start = out.ndim - len(shared) - 1
+        for i, block in enumerate(outs):
+            out = out if block in shared else out.unsqueeze(start + i)
+        out = out.expand(*out.shape[:start], *(self.n, ) * len(outs),
+                         out.shape[-1])
+        if self.q == 2 and len(outs) == 1:
+            return torch.diag_embed(out.movedim(-1, -2)).movedim(-3, -1)
+        return out
+
+
 def realise(dom: Action, cod: Action) -> Realisation:
     """
     The fastest realisation of the equivariant linear maps from ``dom`` to
     ``cod``, chosen by the structure of the actions alone: :class:`Pooling`
     if a side has one point, else :class:`Kronecker` if they are the same
-    action with a :func:`structure`, else :class:`Dense`. Whichever is
-    chosen, it numbers its orbits as
-    :func:`discopy.neural.equivariant.tying` and agrees with :class:`Dense`.
+    action with a :func:`structure`, else :class:`Partitions` if they are
+    covered, else :class:`Dense`. Whichever is chosen, it numbers its orbits
+    as :func:`discopy.neural.equivariant.tying` and agrees with :class:`Dense`.
 
     Parameters:
         dom : The action on the input points.
@@ -613,11 +832,16 @@ def realise(dom: Action, cod: Action) -> Realisation:
     >>> trivial = Action.trivial(Symmetric[3])
     >>> [type(realise(a, b)).__name__ for a, b in (
     ...     (action, trivial), (action, action),
-    ...     (Cyclic[3].action(), Cyclic[3].action()))]
-    ['Pooling', 'Kronecker', 'Kronecker']
+    ...     (action, action.tensor(action)),
+    ...     (Cyclic[3].action(), Cyclic[3].action().tensor(
+    ...         Cyclic[3].action())))]
+    ['Pooling', 'Kronecker', 'Partitions', 'Dense']
     """
     if dom.size == 1 or cod.size == 1:
         return Pooling(dom, cod)
     if dom == cod and structure(dom) is not None:
         return Kronecker(dom, cod)
+    if Partitions.degree(dom) and Partitions.degree(cod)\
+            and dom.group is cod.group:
+        return Partitions(dom, cod)
     return Dense(dom, cod)

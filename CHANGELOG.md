@@ -32,6 +32,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   correlation along the cyclic axes, directly or by the fast Fourier transform
   from `Kronecker.fft_from` points ([next#TBD]).
 
+- `neural.factorised.Partitions` computes the equivariant layers of a
+  symmetric group between its natural action and its tensor square, in either
+  direction or both, with one weight per set partition of the coordinates,
+  i.e. Möbius-inverted sums along the diagonals, and `realise` picks it for
+  those actions ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).

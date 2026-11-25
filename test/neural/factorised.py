@@ -197,6 +197,50 @@ def test_pooling():
     assert fast.orbits == 4 and fast.bias_orbits == 1
 
 
+def test_partitions():
+    """ Set partitions of one or two points on each side are Dense. """
+    torch, equivariant, factorised = modules()
+    seed = 0
+    for n in (2, 3, 4, 5):
+        base = Symmetric[n].action()
+        for p, q in itertools.product((1, 2), repeat=2):
+            dom = base if p == 1 else base.tensor(base)
+            cod = base if q == 1 else base.tensor(base)
+            fast = factorised.Partitions(dom, cod)
+            assert (fast.p, fast.q) == (p, q)
+            agrees(torch, equivariant, fast, seed)
+            seed += 1
+            if n >= 4:
+                assert fast.orbits == {2: 2, 3: 5, 4: 15}[p + q]
+
+
+def test_partitions_numbering():
+    """ Fewer points than coordinates leave out the partitions. """
+    _, _, factorised = modules()
+    assert [len(factorised.partitions(4, n)) for n in (1, 2, 3, 4)] == [
+        1, 8, 14, 15]
+    base = Symmetric[2].action()
+    both = base.tensor(base)
+    assert factorised.Partitions(both, both).orbits == 8
+    assert (factorised.Partitions(base, both).tying()
+            == tying(base, both)).all()
+
+
+def test_partitions_refused():
+    """ Other tensor powers and groups have no partitions. """
+    _, _, factorised = modules()
+    base = Symmetric[3].action()
+    cube = base.tensor(base).tensor(base)
+    for dom, cod in ((cube, base), (base, cube), (cube, cube),
+                     (Cyclic[3].action(), Cyclic[3].action()),
+                     (Symmetric[1].action(), Symmetric[1].action()),
+                     (Wreath[Symmetric[2], Symmetric[2]].action(),
+                      Wreath[Symmetric[2], Symmetric[2]].action()),
+                     (base, Symmetric[4].action())):
+        with raises(TypeError):
+            factorised.Partitions(dom, cod)
+
+
 def test_float32():
     """ Single precision agrees up to the size of the output. """
     torch, equivariant, factorised = modules()
@@ -250,7 +294,9 @@ def test_realise():
             (symmetric, Action.trivial(symmetric.group), "Pooling"),
             (Action.trivial(symmetric.group), pairs, "Pooling"),
             (symmetric, symmetric, "Kronecker"),
-            (rotations, rotations, "Kronecker"))):
+            (rotations, rotations, "Kronecker"),
+            (symmetric, pairs, "Partitions"),
+            (pairs, pairs, "Partitions"))):
         fast = factorised.realise(dom, cod)
         assert type(fast).__name__ == kind
         agrees(torch, equivariant, fast, seed)
@@ -274,11 +320,17 @@ def test_realise_refused():
         assert type(fast) is equivariant.Dense
         with raises(TypeError):
             factorised.Kronecker(dom, cod)
+        with raises(TypeError):
+            factorised.Partitions(dom, cod)
 
 
 def test_scale(monkeypatch):
     """ No orbit of pairs is ever computed: sizes beyond a dense matrix. """
     torch, equivariant, factorised = modules()
+    base = Symmetric[64].action()
+    start = time.perf_counter()
+    fast = factorised.Partitions(base.tensor(base), base.tensor(base))
+    assert fast.orbits == 15 and time.perf_counter() - start < 5
 
     def refuse(*_):
         raise AssertionError("The orbits of pairs were computed.")
@@ -309,6 +361,7 @@ def test_scale_refusal(monkeypatch):
     monkeypatch.setattr(Action, "tensor", refuse)
     start = time.perf_counter()
     assert factorised.structure(action) is None
+    assert factorised.Partitions.degree(action) is None
     assert time.perf_counter() - start < 5
 
 
@@ -343,7 +396,9 @@ def test_channels():
         factorised.Kronecker(rotations, rotations, False),
         factorised.Kronecker(rotations, rotations, True),
         factorised.Pooling(symmetric, trivial),
-        factorised.Pooling(trivial, pairs))
+        factorised.Pooling(trivial, pairs),
+        factorised.Partitions(symmetric, pairs),
+        factorised.Partitions(pairs, pairs))
     for seed, fast in enumerate(fasts):
         for channels in PAIRS:
             agrees(torch, equivariant, fast, seed, channels=channels)
@@ -423,11 +478,13 @@ def test_tying_device():
     """ The tables are read from a module in double precision or on CUDA. """
     torch, _, factorised = modules()
     symmetric, rotations = S3.action(), Cyclic[5].action()
+    pairs = symmetric.tensor(symmetric)
     fasts = (
         factorised.Kronecker(symmetric, symmetric),
         factorised.Kronecker(rotations, rotations),
         factorised.Pooling(symmetric, Action.trivial(S3)),
         factorised.Pooling(Action.trivial(S3), symmetric),
+        factorised.Partitions(symmetric, pairs),
         importorskip("discopy.neural.equivariant").Dense(rotations, rotations))
     for fast in fasts:
         want = tying(fast.dom, fast.cod)
