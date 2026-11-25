@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `actegory.Action` is a strict right action of a monoidal category of
+  parameters on a category of data, with its unit, multiplication and
+  functoriality laws as equations, and `actegory.Para` the parametric maps
+  over it, whose reparametrisations are arrows of the parameters: the
+  self-action gives back `para.Markov`, and `Action.deterministic` lets
+  Python functions act on Kleisli channels, so that weights tie by copying
+  in a cartesian category whatever the data ([next#TBD]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2690,6 +2698,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

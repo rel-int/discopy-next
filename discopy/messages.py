@@ -95,6 +95,7 @@ PAIR_TYPES = "A pair of types is checked as the boundary of its diagrams."
 PARA_REPARAM = (
     "A parametric map is equal only up to the reparametrisations that "
     "permute its parameters, which its hypergraph compares in order.")
+DIFFERENT_ACTIONS = "{} and {} are parametric over different actions."
 NO_ROTATION = (
     "There is no rotation of a morphism here, so its laws do not apply.")
 PARA_CURRY = "A closed category curries no map with coparameters."

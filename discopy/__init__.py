@@ -35,6 +35,7 @@ from discopy import (
     python,
     kleisli,
     monad,
+    actegory,
     enriched,
     matrix,
     tensor,
