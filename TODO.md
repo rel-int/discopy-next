@@ -4,4 +4,4 @@
 > > [P3] The `GoISituation` entry omits the symmetric requirement. `abc.GoISituation` is linear, traced and symmetric, so name it as a symmetric traced bang.
 
 - [WIP] @amp-T-f829d881-2026-11-25 21:22 discopy/hypergraph.py glue checks its boundary as trace does
-- [ ] CHANGELOG.md GoISituation is a symmetric traced bang
+- [WIP] @amp-T-f829d881-2026-11-25 21:22 CHANGELOG.md GoISituation is a symmetric traced bang
