@@ -92,6 +92,7 @@ PAIR_LENGTH = (
     "A pair of types has no single number of atoms for a trace or a curry "
     "to count.")
 PAIR_TYPES = "A pair of types is checked as the boundary of its diagrams."
+DIFFERENT_ACTIONS = "{} and {} are parametric over different actions."
 NO_ROTATION = (
     "There is no rotation of a morphism here, so its laws do not apply.")
 PARA_CURRY = "A closed category curries no map with coparameters."

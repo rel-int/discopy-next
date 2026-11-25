@@ -25,6 +25,7 @@ sharing.
     discopy.stream
     discopy.op
     discopy.para
+    discopy.actegory
     discopy.sum
     discopy.lens
     discopy.interaction
