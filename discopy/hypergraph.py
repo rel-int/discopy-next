@@ -1000,7 +1000,10 @@ class Hypergraph[category](
         >>> x = Ty('x')
         >>> f = Box('f', x @ x, x @ x).to_hypergraph()
         >>> assert f.glue().cod == x and not f.glue().is_acyclic
+        >>> assert f.glue(0) == f == f.glue(0, left=True)
         """
+        if n == 0:
+            return self
         (dom, inputs, dom_wires), (cod, outputs, cod_wires) = (
             (typ[n:], wires[:n], wires[n:]) if left
             else (typ[:-n], wires[-n:], wires[:-n])
