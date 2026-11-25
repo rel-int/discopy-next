@@ -192,6 +192,7 @@ from discopy.utils import (
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
+    text_width,
     unbiased,
 )
 
@@ -2534,6 +2535,10 @@ class Bubble(cat.Bubble, Box):
         draw_as_square (bool) : Whether to draw the bubble as a square.
         draw_as_frame (bool) : Whether to draw the bubble as a frame.
         draw_vertically (bool) : Whether to draw the frame slots vertically.
+        draw_left_to_right (bool) : Whether to draw the bubble as one box
+            with its args inside on a background of its ``frame_colour``,
+            flowing left to right across the drawing they are in, i.e.
+            top to bottom inside a bubble drawn left to right.
         kwargs : Passed to :class:`cat.Bubble`.
 
     Raises:
@@ -2576,22 +2581,49 @@ class Bubble(cat.Bubble, Box):
     .. image:: /_static/monoidal/coloured-frame.svg
         :align: center
 
+    A bubble drawn left to right is one box with its args flowing across it,
+    e.g. the meanings of "Very big car" in higher-order DisCoCat
+    :cite:p:`ToumiDeFelice25`, each word a lambda term whose body is a diagram:
+
+    >>> n, n_n = Ty('n'), Ty('n ← n')
+    >>> x, B, C = Box('x', Ty(), n), Box('B', n, n), Box('C', Ty(), n)
+    >>> style = dict(
+    ...     draw_left_to_right=True, color="green", frame_colour="red")
+    >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
+    ...            color="green", height=2)
+    >>> big = Bubble(x >> B, dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
+    >>> car = Bubble(C, dom=Ty(), cod=n, **style)
+    >>> very_big = Bubble(x >> B >> B, dom=very.cod @ n_n, cod=n_n,
+    ...                   drawing_name="λx ·", **style)
+    >>> very_big_car = Bubble(C >> B >> B, dom=n_n @ n, cod=n, **style)
+    >>> diagram = (very @ big @ car).foliation()\\
+    ...     >> very_big @ n >> very_big_car
+    >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
+
+    .. image:: /_static/monoidal/very-big-car.svg
+        :align: center
+
     """
     serialised_attrs = cat.Bubble.serialised_attrs + (
-        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
+        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically",
+        "draw_left_to_right")
 
     def __init__(
             self, *args: Diagram,
             drawing_name: str | None = None,
             draw_as_frame: bool | None = None,
             draw_as_square: bool | None = None,
-            draw_vertically=False, **kwargs):
+            draw_vertically=False, draw_left_to_right=False, **kwargs):
+        params = {attr: kwargs.pop(attr)
+                  for attr in BOX_DRAWING_ATTRIBUTES if attr in kwargs}
         cat.Bubble.__init__(self, *args, **kwargs)
         Box.__init__(self, self.name, self.dom, self.cod,
-                     data=self.data, is_dagger=self.is_dagger)
+                     data=self.data, is_dagger=self.is_dagger, **params)
         self.drawing_name = "" if drawing_name is None else drawing_name
         self.draw_vertically = draw_vertically
-        self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
+        self.draw_left_to_right = draw_left_to_right
+        self.frame_colour = params.get(
+            'frame_colour', BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
         can_draw_as_square = len(args) == 1
         can_draw_as_bubble = (can_draw_as_square
                               and len(self.dom) == len(self.arg.dom)
@@ -2612,8 +2644,18 @@ class Bubble(cat.Bubble, Box):
         return 1 + sum(arg.size for arg in self.args)
 
     def to_drawing(self):
-        method = "frame" if self.draw_as_frame else "bubble"
         args = [arg.to_drawing() for arg in self.args]
+        if self.draw_left_to_right:
+            nested = args[0].tensor(*args[1:])
+            label = text_width(self.drawing_name) + .25\
+                if self.drawing_name else 0
+            return Box(
+                self.drawing_name, self.dom, self.cod, nested=nested,
+                color=getattr(self, "color", "white"),
+                frame_colour=self.frame_colour,
+                min_width=label + nested.height + .5,
+                height=nested.width + 1).to_drawing()
+        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),

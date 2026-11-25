@@ -80,6 +80,8 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "color": lambda box:
         "black" if getattr(box, "draw_as_spider", False) else "white",
     "drawing_name": lambda box: box.name,
+    # A drawing drawn left to right inside the box, right of its label.
+    "nested": lambda _: None,
     "no_label": lambda box: any([
         box.draw_as_wires, box.draw_as_spider, box.draw_as_brakets,
         box.draw_as_controlled, box.draw_as_discards, box.draw_as_measures,
