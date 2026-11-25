@@ -3,8 +3,9 @@
 """
 Equivariant layers factorised along the construction of the group: the
 realisations of :mod:`discopy.neural.equivariant` that compute the linear maps
-from the sums over the blocks of a product, a wreath product or a power
-instead of from a dense matrix with one entry for each pair of points.
+from the sums over the blocks of a product, a wreath product or a power and
+the correlations of a cyclic group, instead of from a dense matrix with one
+entry for each pair of points.
 
 Summary
 -------
@@ -59,6 +60,7 @@ from typing import NamedTuple
 
 import numpy
 import torch
+from torch.nn import functional
 
 from discopy.group import (
     Action, Cyclic, FiniteGroup, Product, Symmetric, Wreath)
@@ -143,17 +145,21 @@ class Factor(NamedTuple):
     A *chain* ``(n_1, ..., n_L)`` is the natural action of a symmetric group,
     of the cyclic group of order two or of an imprimitive wreath product of
     these, see :func:`discopy.neural.wiring.chains`: two points are in one
-    of ``L + 1`` relations, how many of their first coordinates agree.
+    of ``L + 1`` relations, how many of their first coordinates agree. A
+    cyclic factor of order ``n`` has ``n`` relations, the difference of the
+    coordinates modulo ``n``.
 
     Parameters:
         shape : The sizes of the axes of the factor.
+        cyclic : Whether the factor is a cyclic group acting on itself.
 
     Example
     -------
-    >>> Factor((3, 3)).orbits
-    3
+    >>> Factor((3, 3)).orbits, Factor((5, ), cyclic=True).orbits
+    (3, 5)
     """
     shape: tuple[int, ...]
+    cyclic: bool = False
 
     @property
     def orbits(self) -> int:
@@ -162,7 +168,7 @@ class Factor(NamedTuple):
         of a pair: the rank of a pair of a chain is its length less the
         number of coordinates they agree on.
         """
-        return len(self.shape) + 1
+        return self.shape[0] if self.cyclic else len(self.shape) + 1
 
 
 def nested(array: numpy.ndarray) -> tuple:
@@ -306,8 +312,8 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
     of points and a thunk of the action with its structure, so that only an
     action of the right size is ever built: the action of a symmetric group,
     of the cyclic group of order two and of an imprimitive wreath product of
-    these, the power action of a wreath product and the products of such
-    actions.
+    these, the action of a cyclic group of order at least three on itself,
+    the power action of a wreath product and the products of such actions.
 
     Parameters:
         group : The group.
@@ -316,7 +322,7 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
     -------
     >>> [len(canonical(group)) for group in
     ...  (Wreath[Symmetric[3], Cyclic[2]], Cyclic[4], Cyclic[1])]
-    [2, 0, 0]
+    [2, 1, 0]
     >>> [size for size, _ in canonical(Wreath[Symmetric[3], Cyclic[2]])]
     [6, 9]
     """
@@ -341,6 +347,10 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
             or issubclass(group, Cyclic) and group.n == 2:
         return ((group.n, lambda: (
             group.action(), Structure.chain((group.n, )))), )
+    if issubclass(group, Cyclic) and group.n >= 3:
+        factor = Factor((group.n, ), cyclic=True)
+        return ((group.n, lambda: (
+            group.action(), Structure.of((factor, ), range(group.n)))), )
     return ()
 
 
@@ -348,9 +358,10 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
 def structure(action: Action) -> Structure | None:
     """
     The :class:`Structure` of an action, if it is the natural action of its
-    group on a product of chains, or a power of them: an action that is only
-    equal to such an action up to a relabelling of its points has none. Only
-    the candidates with as many points as the action are built.
+    group on a product of chains and cyclic groups, or a power of them: an
+    action that is only equal to such an action up to a relabelling of its
+    points has none. Only the candidates with as many points as the action
+    are built.
 
     Parameters:
         action : The action.
@@ -358,7 +369,7 @@ def structure(action: Action) -> Structure | None:
     Example
     -------
     >>> structure(Symmetric[3].action())
-    Structure(factors=(Factor(shape=(3,)),), tie=(0, 1))
+    Structure(factors=(Factor(shape=(3,), cyclic=False),), tie=(0, 1))
     >>> structure(Symmetric[1].action()) is None
     True
     """
@@ -371,31 +382,40 @@ def structure(action: Action) -> Structure | None:
 class Kronecker(Realisation):
     """
     The equivariant linear maps of the natural action of a product of chains
-    on itself, computed along the axes of the points instead of on the
-    matrix: the orbits on pairs are the tuples of depths of agreement along
-    the chains, see :func:`discopy.neural.wiring.orbitals`. A tuple of depths
-    is the difference of blocks of points, see
-    :func:`discopy.neural.wiring.Block`. The output is the sum, over the
-    blocks, of the sum of the input over each block, mixed by one matrix
-    ``(D, C)`` for each point and spread back: it costs ``O(|X|C + |X|D)``
-    for each of the ``prod(L + 1)`` blocks instead of ``O(|X|^2 CD)`` for
-    :class:`Dense`.
+    and cyclic groups on itself, computed along the axes of the points
+    instead of on the matrix: the orbits on pairs are the tuples of depths
+    of agreement along the chains, see :func:`discopy.neural.wiring.orbitals`,
+    and of differences along the cyclic axes. A tuple of depths is the
+    difference of blocks of points, see :func:`discopy.neural.wiring.Block`.
+    The output is the sum, over the blocks, of the sum of the input over each
+    block, mixed by one matrix ``(D, C)`` for each point and spread back: it
+    costs ``O(|X|C + |X|D)`` for each of the ``prod(L + 1)`` blocks instead
+    of ``O(|X|^2 CD)`` for :class:`Dense`. The cyclic axes are mixed by a
+    cross-correlation, directly as a circular convolution of at most three
+    axes, or by the fast Fourier transform: the transform is used when
+    ``fft`` is true, or when it is ``None`` and the cyclic axes have at
+    least :attr:`fft_from` points together or there are more than three.
 
     Parameters:
         dom : The action on the input points.
         cod : The action on the output points, equal to ``dom``.
+        fft : Whether to use the transform, ``None`` to choose by size.
 
     Attributes:
         structure : The :class:`Structure` of the action.
+        fft : Whether to use the transform, ``None`` to choose by size.
+        fft_from : The number of points of the cyclic axes from which the
+                   transform is used, if ``fft`` is ``None``.
 
     Raises:
         TypeError : If the action has no structure, or ``dom`` and ``cod``
-                    are different actions.
+                    are different actions, or ``fft`` is false with more
+                    than three cyclic axes.
 
     Example
     -------
-    The maps of a symmetric group have ``w[0]`` on the diagonal and ``w[1]``
-    off it:
+    The maps of a symmetric group have ``w[0]`` on the diagonal and
+    ``w[1]`` off it, those of a cyclic group are circulant:
 
     >>> import torch  # doctest: +EXTRA
     >>> action = Symmetric[3].action()
@@ -405,16 +425,44 @@ class Kronecker(Realisation):
     >>> v, w = torch.tensor([[1.], [2.], [4.]]), torch.tensor([[[2.]], [[1.]]])
     >>> kronecker(v, w).flatten().tolist()
     [8.0, 9.0, 11.0]
+    >>> rotations = Cyclic[3].action()
+    >>> shift = torch.tensor([[[0.]], [[1.]], [[0.]]])
+    >>> Kronecker(rotations, rotations)(v, shift).flatten().tolist()
+    [2.0, 4.0, 1.0]
+    >>> fourier = Kronecker(rotations, rotations, fft=True)
+    >>> fourier(v, shift).round().flatten().tolist()
+    [2.0, 4.0, 1.0]
     """
-    def __init__(self, dom: Action, cod: Action):
+    fft_from = 64
+
+    def __init__(self, dom: Action, cod: Action, fft: bool | None = None):
         found = structure(dom) if dom == cod else None
         if found is None:
             raise TypeError("Expected the same action of a product of "
-                            f"chains twice, got {dom} and {cod}.")
+                            f"chains and cyclic groups twice, got {dom} "
+                            f"and {cod}.")
+        if fft is False and len(self.axes(found)) > 3:
+            raise TypeError("Expected at most three cyclic axes without "
+                            f"the Fourier transform, got {found.shape}.")
         table = found.table
         super().__init__(dom, cod, int(table.max()) + 1)
-        self.structure = found
+        self.structure, self.fft = found, fft
         self.register_buffer("tie", torch.from_numpy(table), persistent=False)
+
+    @staticmethod
+    def axes(found: Structure, offset: int = 0) -> tuple[int, ...]:
+        """
+        The axes of the points that are cyclic.
+
+        Parameters:
+            found : The structure of the action.
+            offset : The number of axes before the points, e.g. the batch.
+        """
+        start, axes = offset, []
+        for factor in found.factors:
+            axes += [start] if factor.cyclic else []
+            start += len(factor.shape)
+        return tuple(axes)
 
     def tying(self) -> numpy.ndarray:
         """ The tie indexed by the rank of each pair along each factor. """
@@ -424,10 +472,23 @@ class Kronecker(Realisation):
         for factor in self.structure.factors:
             axes = coordinates[start:start + len(factor.shape)]
             agree = axes[:, :, None] == axes[:, None, :]
-            ranks.append(len(factor.shape) - numpy.cumprod(agree, 0).sum(0))
+            ranks.append((axes[0][None, :] - axes[0][:, None])
+                         % factor.shape[0] if factor.cyclic else
+                         len(factor.shape) - numpy.cumprod(agree, 0).sum(0))
             start += len(factor.shape)
         tie = self.tie.cpu().numpy()  # ty: ignore[call-non-callable]
         return tie[tuple(ranks)]
+
+    @staticmethod
+    def pool(x: torch.Tensor, axes: tuple[int, ...]) -> torch.Tensor:
+        """
+        The sum over some axes, kept as axes of size one.
+
+        Parameters:
+            x : The tensor.
+            axes : The axes to sum over, none included.
+        """
+        return x.sum(axes, keepdim=True) if axes else x
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
@@ -443,10 +504,11 @@ class Kronecker(Realisation):
         batch = v.shape[:-2]
         x = v.reshape(*batch, *self.structure.shape, v.shape[-1])
         u = w[self.tie]  # ty: ignore[invalid-argument-type]
-        for axis in range(len(factors)):
+        for axis, factor in enumerate(factors):
             zero = torch.zeros_like(u.narrow(axis, 0, 1))
-            u = u.flip(axis).diff(dim=axis, prepend=zero)
-        sizes = tuple(f.shape for f in factors)
+            u = u if factor.cyclic else u.flip(axis).diff(
+                dim=axis, prepend=zero)
+        sizes = tuple(f.shape for f in factors if not f.cyclic)
         out = sum(self.term(x, u, depth, len(batch))
                   for depth in orbitals(sizes))
         return self.bias(out.reshape(*batch, -1, out.shape[-1]), b)
@@ -455,8 +517,8 @@ class Kronecker(Realisation):
              depth: tuple[int, ...], offset: int) -> torch.Tensor:
         """
         The term of one tuple of depths: the sum of the input over the blocks
-        of points agreeing to these depths along the chains, mixed by their
-        weights.
+        of points agreeing to these depths along the chains, correlated
+        with their weights along the cyclic axes.
 
         Parameters:
             x : The input, of shape ``(..., *shape, C)``.
@@ -464,10 +526,72 @@ class Kronecker(Realisation):
             depth : One depth for each chain.
             offset : The number of axes of ``x`` before the points.
         """
-        layout = tuple(f.shape for f in self.structure.factors)
-        free = tuple(offset + a for a in Block.of(layout, depth).free)
-        pooled = x.sum(free, keepdim=True) if free else x
-        return torch.einsum("...c,dc->...d", pooled, u[depth])
+        factors, depths = self.structure.factors, iter(depth)
+        agreed = tuple(1 if f.cyclic else next(depths) for f in factors)
+        index = tuple(slice(None) if f.cyclic else a
+                      for f, a in zip(factors, agreed))
+        layout = tuple(f.shape for f in factors)
+        free = tuple(offset + a for a in Block.of(layout, agreed).free)
+        axes = self.axes(self.structure, offset)
+        return self.correlate(self.pool(x, free), u[index], axes)
+
+    def correlate(self, p: torch.Tensor, k: torch.Tensor,
+                  axes: tuple[int, ...]) -> torch.Tensor:
+        """
+        The mix of the channels with a cross-correlation along some cyclic
+        axes: ``out[y] = sum(k[s] @ p[y + s])`` where ``y + s`` is modulo the
+        size of each axis, the kernel is never flipped.
+
+        Parameters:
+            p : The input, of shape ``(..., C)``, the axes of size one
+                broadcast.
+            k : The kernel, of shape ``(*sizes, D, C)``.
+            axes : The axes of ``p`` the kernel runs over, none included.
+        """
+        if not axes:
+            return torch.einsum("...c,dc->...d", p, k)
+        sizes, last = k.shape[:len(axes)], tuple(range(-len(axes) - 1, -1))
+        fourier = self.fft if self.fft is not None else\
+            math.prod(sizes) >= self.fft_from or len(axes) > 3
+        method = self.fourier if fourier else self.direct
+        return method(p.movedim(axes, last), k).movedim(last, axes)
+
+    @staticmethod
+    def fourier(p: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
+        """
+        The cross-correlation along the axes before the channels, by the
+        Fourier transform: the conjugate of the transform of the kernel.
+
+        Parameters:
+            p : The input, of shape ``(..., *sizes, C)``.
+            k : The kernel, of shape ``(*sizes, D, C)``.
+        """
+        # pylint: disable=not-callable  # torch.fft is compiled, uninferable
+        n = k.ndim - 2
+        sizes, dims = k.shape[:n], tuple(range(-n - 1, -1))
+        spectrum = torch.einsum(
+            "...c,...dc->...d", torch.fft.rfftn(p, dim=dims),
+            torch.fft.rfftn(k, dim=tuple(range(n))).conj())
+        return torch.fft.irfftn(spectrum, s=sizes, dim=dims)
+
+    @staticmethod
+    def direct(p: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
+        """
+        The cross-correlation along the axes before the channels, by a
+        convolution of the input padded circularly, at most three axes.
+
+        Parameters:
+            p : The input, of shape ``(..., *sizes, C)``.
+            k : The kernel, of shape ``(*sizes, D, C)``.
+        """
+        n = k.ndim - 2
+        sizes, shape = k.shape[:n], p.shape[:-n - 1]
+        x = p.reshape(-1, *sizes, p.shape[-1]).movedim(-1, 1)
+        pad = tuple(m for size in reversed(sizes) for m in (0, size - 1))
+        conv = (functional.conv1d, functional.conv2d, functional.conv3d)[n - 1]
+        out = conv(functional.pad(x, pad, mode="circular"),
+                   k.movedim((-2, -1), (0, 1)))
+        return out.movedim(1, -1).reshape(*shape, *sizes, k.shape[-2])
 
 
 def realise(dom: Action, cod: Action) -> Realisation:
@@ -490,7 +614,7 @@ def realise(dom: Action, cod: Action) -> Realisation:
     >>> [type(realise(a, b)).__name__ for a, b in (
     ...     (action, trivial), (action, action),
     ...     (Cyclic[3].action(), Cyclic[3].action()))]
-    ['Pooling', 'Kronecker', 'Dense']
+    ['Pooling', 'Kronecker', 'Kronecker']
     """
     if dom.size == 1 or cod.size == 1:
         return Pooling(dom, cod)

@@ -27,6 +27,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   axes of the points, recognised by `structure` and picked by `realise`
   ([next#TBD]).
 
+- `neural.factorised.Factor` has cyclic factors, so that `Kronecker` computes
+  the layers of the cyclic groups and of their products with chains as a
+  correlation along the cyclic axes, directly or by the fast Fourier transform
+  from `Kronecker.fft_from` points ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).
