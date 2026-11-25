@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- A category draws left to right when its `Diagram` class sets
+  `draw_left_to_right = True`, and a `Bubble` whose args are drawn in
+  another direction than its own category is drawn as one box with its args
+  across it, e.g. the "Very big car" figure of higher-order DisCoCat: the
+  terms top to bottom, their bodies left to right.
+  `drawing.backend.Transposed` draws through the reflection along the
+  anti-diagonal, keeping the layout as it is ([next#728]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -2689,6 +2697,7 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
+[next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
