@@ -5,3 +5,4 @@
 - [x] Top level: draw(direction=...)
 - [x] Reproduce the Very big car figure as a doctest
 - [x] Changelog, checks
+- [ ] Apply toumix's rulings on the two design asks of #728 (relative bool vs direction; inner wire labels), defaults due 2026-11-27
