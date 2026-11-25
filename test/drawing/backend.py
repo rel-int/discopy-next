@@ -820,15 +820,20 @@ def test_left_to_right_separates_args_and_lifts_labels():
         def draw_text(self, text, i, j, **params):
             if params.get("verticalalignment") == "top":
                 self.labels.append(j)
+            else:
+                self.boxes[text] = j
 
         def output(self, path=None, show=True, **params):
             pass
 
+    Recorder.boxes = {}
     x = Ty('x')
     recorder = Recorder()
     Bubble(Primitive('f', x, x), Primitive('g', x, x)).draw(backend=recorder)
-    assert [ps for ps, adaptive in recorder.beziers if not adaptive
-            and len({y for _, y in ps}) == 1] != []
+    separators = [ps for ps, adaptive in recorder.beziers if not adaptive
+                  and len({y for _, y in ps}) == 1]
+    assert len(separators) == 1
+    assert recorder.boxes['g'] < separators[0][0][1] < recorder.boxes['f']
 
     recorder = Recorder()
     (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)

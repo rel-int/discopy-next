@@ -16,9 +16,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   terms top to bottom, their bodies left to right.
   `drawing.backend.Transposed` draws through the reflection along the
   anti-diagonal, keeping the layout as it is ([next#728]).
-- In a left-to-right drawing, wire labels sit above their wires, and a line
-  separates each of the args nested in a box from the next, so that no two
-  regions meet without one ([next#733]).
 
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
@@ -565,6 +562,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- In a left-to-right drawing, wire labels sit above their wires, and a line
+  separates each of the args nested in a box from the next, so that no two
+  regions meet without one ([next#733]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
