@@ -1388,8 +1388,9 @@ class Elementwise(Box):
     def __new__(cls, *args, data=None, **kwargs):
         return super().__new__(cls, data=data)
 
-    def __init__(self, arg, dom=None, cod=None, name="", func=None,
+    def __init__(self, arg=None, dom=None, cod=None, name="", func=None,
                  time_step=0, **params):
+        arg = params.pop("args", (arg, ))[0] if arg is None else arg
         if func is not None:
             self.func = func
         dom, cod = (
@@ -1426,7 +1427,8 @@ class Elementwise(Box):
         kwargs = "" if self.is_id_on_objects else (
             f", dom={self.dom!r}, cod={self.cod!r}")
         kwargs += f", name={self.name!r}" if self.name else ""
-        kwargs += "" if self.data is None else f", data={self.data!r}"
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        kwargs += "" if data is None else f", data={repr_nonfinite(data)}"
         kwargs += "" if self.func is type(self).func\
             else f", func={func_repr(self.func)}"
         kwargs += f", time_step={self.time_step}" if self.time_step else ""
@@ -1517,4 +1519,4 @@ class Equation(frobenius.Equation):
     """ The :class:`frobenius.Equation` of tensor diagrams. """
 
 
-Bubble = Elementwise
+Bubble = Elementwise.from_args

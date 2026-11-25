@@ -36,6 +36,7 @@ one call on its codomain, by level, as #513 does for a permutation.
 
 Accepted, 2026-11-16. #560 is carried out by
 [#729](https://github.com/rel-int/discopy-next/pull/729), with toumix's rulings of 2026-11-25:
-`Bubble` stays importable as an alias of `Box.from_args`, `Sum` does not fuse yet, and the function
+`Bubble` stays importable as an alias of `Box.from_args` (of `Elementwise.from_args` in `tensor` and
+`quantum`), `Sum` does not fuse yet, and the function
 a tensor bubble applies moves to `tensor.Elementwise`, a tensor box with args. #513 and #561 are
 open.

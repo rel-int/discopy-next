@@ -1129,4 +1129,4 @@ Id = Circuit.id
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 
-Bubble = Elementwise
+Bubble = Elementwise.from_args

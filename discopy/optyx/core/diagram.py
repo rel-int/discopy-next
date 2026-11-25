@@ -215,7 +215,7 @@ from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
 from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
-from discopy.utils import AxiomError, factory_name
+from discopy.utils import AxiomError, factory_name, from_tree
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
 from discopy.optyx.utils.misc import (
@@ -1571,6 +1571,19 @@ class Feedback(Box):
             if boundary != getattr(self, f"default_{attr}")(self.mem):
                 args += f", {attr}={repr(boundary)}"
         return f"{type(self).__name__}({args})"
+
+    def to_tree(self) -> dict:
+        """ The tree of a feedback: its arg, boundary, memory and ends. """
+        return {'factory': factory_name(type(self)), **{
+            attr: getattr(self, attr).to_tree() for attr in (
+                "arg", "dom", "cod", "mem", "state", "effect")}}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        arg, dom, cod, mem, state, effect = (
+            from_tree(tree[attr]) for attr in (
+                "arg", "dom", "cod", "mem", "state", "effect"))
+        return cls(arg, dom=dom, cod=cod, mem=mem, state=state, effect=effect)
 
     def to_path(self, dtype: type = complex):
         """A feedback loop has no path matrix until unrolled."""

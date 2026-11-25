@@ -1112,3 +1112,21 @@ def test_term_laws():
     assert first.alpha_eq(second)
     assert Renamed[TermBase].checked_params() == ()
     assert Canonical[TermBase].checked_params() == ()
+
+
+def test_legacy_Bubble_tree():
+    """ A tree dumped before #560 fused bubbles into boxes still loads. """
+    from discopy import monoidal, rigid
+    from discopy.utils import from_tree
+    ob = {'factory': 'cat.Ob', 'name': 'x'}
+    f = {'factory': 'cat.Box', 'name': 'f', 'dom': ob, 'cod': ob}
+    tree = {'factory': 'cat.Bubble', 'arg': f, 'dom': ob, 'cod': ob}
+    assert from_tree(tree) == Box('f', Ob('x'), Ob('x')).bubble()
+    x = rigid.Ty('x')
+    g = rigid.Box('g', x, x).bubble(name="b").r
+    tree = g.to_tree() | {'factory': 'rigid.Bubble'}
+    assert from_tree(tree) == g
+    h = monoidal.Box('h', monoidal.Ty('x'), monoidal.Ty('y'))
+    tree = h.bubble().to_tree() | {'factory': 'monoidal.Bubble'}
+    del tree['name']
+    assert from_tree(tree) == h.bubble()

@@ -2010,4 +2010,4 @@ class Agenda:
 Diagram.hypergraph_factory = Hypergraph
 
 
-Bubble = Elementwise
+Bubble = Elementwise.from_args

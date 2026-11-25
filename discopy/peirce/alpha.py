@@ -225,6 +225,8 @@ got white inside white.
             raise AxiomError(
                 "A cut changes the colour of its region, "
                 f"got {arg.colour.name} inside {dom.dom.name}.")
+        if params.pop("method", "bubble") != "bubble":
+            raise ValueError("A cut is a bubble, its method is 'bubble'.")
         super().__init__(name, dom, cod, args=(arg, ), **params)
 
     def __repr__(self):

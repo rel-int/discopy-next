@@ -549,9 +549,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   being a box with no args. The `Bubble` class of every module fuses into its
   `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)`,
   a box with `args=(f, )`, `isinstance(f, Bubble)` becomes `f.args`, and
-  `Bubble` stays an alias of `Box.from_args`. The function a tensor bubble
-  applies elementwise moves to `tensor.Elementwise`, the box
-  `tensor.Diagram.bubble` builds, and a plain tensor box carries none;
+  `Bubble` stays an alias of `Box.from_args`, or of `Elementwise.from_args` in
+  `tensor`, `quantum.circuit` and `quantum.zx`, and a tree dumped with a
+  `Bubble` factory still loads. The function a tensor bubble applies
+  elementwise moves to `tensor.Elementwise`, the box `tensor.Diagram.bubble`
+  builds, and a plain tensor box carries none;
   `biclosed.Application.args` is renamed `argument` ([next#729]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to

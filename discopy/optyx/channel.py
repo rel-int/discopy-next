@@ -2071,6 +2071,8 @@ class Feedback(Diagram, frobenius.Box):
     __repr__ = diagram.Feedback.__repr__
     dagger = diagram.Feedback.dagger
     to_drawing = diagram.Feedback.to_drawing
+    to_tree = diagram.Feedback.to_tree
+    from_tree = classmethod(diagram.Feedback.from_tree.__func__)
     grad = Channel.grad
 
     def double(self):

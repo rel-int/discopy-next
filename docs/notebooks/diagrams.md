@@ -338,8 +338,10 @@ class Cut(Box, Formula):
     """ A Cut is a Box in a Formula with one arg, i.e. a bubble. """
     serialised_attrs = ("*args", )
 
-    def __init__(self, arg):
-        Box.__init__(self, "", arg.dom, arg.cod, args=(arg, ))
+    def __init__(self, arg, dom=None, cod=None, **params):
+        Box.__init__(
+            self, "", arg.dom if dom is None else dom,
+            arg.cod if cod is None else cod, args=(arg, ), **params)
 
 class Valuation(Functor):
     """ A Valuation is a Functor into Boolean matrices

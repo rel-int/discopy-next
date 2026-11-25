@@ -944,7 +944,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
             return self.rebuild(**changes)
         return function
 
-    def rebuild(self, **changes) -> Box:
+    def rebuild(self, **changes) -> Self:
         """
         The box of the same type with the same :code:`serialised_attrs`, but
         for some ``changes``.
@@ -1092,8 +1092,9 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def from_tree(cls, tree: dict) -> Box:
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
         kwargs = {k: tree[k] for k in ('method', ) if k in tree}
-        if 'args' in tree:
-            kwargs['args'] = tuple(map(from_tree, tree['args']))
+        if 'args' in tree or 'arg' in tree:  # 'arg': a tree from before #560
+            kwargs['args'] = tuple(map(
+                from_tree, tree.get('args', [tree.get('arg')])))
         data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
         return cls(name=tree.get('name', ""), dom=dom, cod=cod, data=data,
                    is_dagger=is_dagger, **kwargs)

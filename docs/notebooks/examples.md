@@ -209,8 +209,10 @@ class Formula(frobenius.Diagram):
 class Cut(frobenius.Box, Formula):
     serialised_attrs = ("*args", )
 
-    def __init__(self, arg):
-        frobenius.Box.__init__(self, "", arg.dom, arg.cod, args=(arg, ))
+    def __init__(self, arg, dom=None, cod=None, **params):
+        frobenius.Box.__init__(
+            self, "", arg.dom if dom is None else dom,
+            arg.cod if cod is None else cod, args=(arg, ), **params)
 
 class Ligature(frobenius.Spider, Formula): pass
 class Predicate(frobenius.Box, Formula): pass
