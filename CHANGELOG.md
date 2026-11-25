@@ -576,7 +576,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   with no alias, over `discopy.linear.cat`, the free `abc.ComonadCategory`,
   i.e. bang, dereliction and digging with no tensor; contraction, weakening,
   laxator and exchange stay in `linear.monoidal`. `abc.GoISituation` states a
-  traced bang and a reflexive object, with no free one. Feedback and linear
+  symmetric traced bang and a reflexive object, with no free one. Feedback and linear
   do not import each other. `Hypergraph.glue` is the trace of a symmetric
   hypergraph with no condition on its category, which `plug` uses to rewrite
   ([next#737]).
