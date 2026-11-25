@@ -474,8 +474,9 @@ def takes_keywords(function) -> bool:
     with keywords is an operation of its own, see :func:`apply`, and the
     method itself is not one.
     """
+    parameters = inspect.signature(function).parameters.values()
     return any(parameter.kind == parameter.KEYWORD_ONLY
-               for parameter in inspect.signature(function).parameters.values())
+               for parameter in parameters)
 
 
 def operations(cls: type) -> dict[str, str]:
