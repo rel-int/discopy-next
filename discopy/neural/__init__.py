@@ -31,6 +31,10 @@ the orbits of the group on pairs of points, and
 :mod:`discopy.neural.factorised` computes them along the construction of the
 group, as sums over blocks, correlations and partitions rather than a dense
 matrix.
+the orbits of the group on pairs of points. :mod:`discopy.neural.augment`
+uses the same group on the data instead: random augmentation as a seeded
+Kleisli arrow, the Reynolds average of a function and the homomorphisms of
+:math:`G`-sets.
 
 .. autosummary::
     :template: module.rst
@@ -49,6 +53,7 @@ matrix.
     geometric
     equivariant
     factorised
+    augment
 
 Note
 ----

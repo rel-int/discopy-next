@@ -38,6 +38,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   i.e. Möbius-inverted sums along the diagonals, and `realise` picks it for
   those actions ([next#TBD]).
 
+- `neural.augment` uses a finite group on the data rather than on the
+  weights: `augment` applies one random element to an input and its label as
+  a Kleisli arrow of the `Seed` monad, `augmentation` as a `neural` box,
+  `symmetrise` is the Reynolds average of a function over the group, exact or
+  over samples, and `homomorphism` and `is_homomorphism` check that a function
+  of points commutes with an action as a homomorphism of `Writer` algebras
+  ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).
