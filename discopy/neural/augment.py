@@ -38,6 +38,7 @@ Summary
         symmetrise
         homomorphism
         is_homomorphism
+        strictness
 
 Example
 -------
@@ -61,12 +62,14 @@ from collections.abc import Callable
 
 import torch
 
+from discopy import para
 from discopy.group import Action, FiniteGroup
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Seed
 from discopy.monad.algebra import Homomorphism, Writer
-from discopy.neural.equivariant import Legs, act
+from discopy.neural.equivariant import Legs, act, equivariance
 from discopy.neural.network import Box, Dim, Dims
+from discopy.neural.torch import Module
 
 MAX_ORDER = 10_000
 """ The largest group :func:`symmetrise` sums over exactly. """
@@ -392,3 +395,76 @@ def is_homomorphism(function: Callable[[int], int],
     return all(
         bool(hom.preservation((g, x)))
         for g in dom.group.generators() for x in range(dom.size))
+
+
+def strictness(layer: para.Symmetric, dom: Action, cod: Action,
+               draws: int = 20, seed: int = 0) -> float:
+    """
+    How far a parametric map is from a strict homomorphism: the largest
+    ``|f(g.v, p) - g.f(v, p)|`` over the generators ``g``, ``draws`` random
+    values ``p`` of the weights and random inputs ``v``.
+
+    In the category of parametric maps of :math:`G`-sets or
+    :math:`G`-representations, with the parameters acted on trivially, a
+    parametric map ``(P, f : X @ P -> Y)`` is a strict homomorphism of
+    algebras of the :class:`~discopy.monad.algebra.Writer` monad of the
+    group exactly when ``f(-, p)`` commutes with the group for every value
+    ``p`` of its parameters. A finite sample of ``p`` cannot prove this: it
+    can only refute it, so a value near zero means that no draw found a
+    counterexample, and a layer that is equivariant at some weights only,
+    e.g. at zero, is caught by the draws.
+
+    The channels and the shapes are those of the legs of the layer: its
+    input and output are one leg each, ``Dim(|X|, C)`` and ``Dim(|Y|, D)``
+    with the unit dimensions dropped, and the weights are one tensor per leg
+    of its parameter space. Weights and inputs are standard normal, in
+    ``float64``, from a generator seeded by ``seed``, so that the result is
+    a pure function. The group acts on the points by :func:`act`, through
+    :func:`~discopy.neural.equivariant.equivariance`.
+
+    Parameters:
+        layer : A parametric network, e.g. from
+            :func:`~discopy.neural.equivariant.layer` and composites of them.
+        dom : The action on the points of the input.
+        cod : The action on the points of the output.
+        draws : The number of random values of the weights.
+        seed : The seed of the weights and the inputs.
+
+    Raises:
+        TypeError : If the actions are of different groups.
+
+    Example
+    -------
+    >>> import torch  # doctest: +EXTRA
+    >>> from discopy.group import Cyclic
+    >>> from discopy.neural.equivariant import layer
+    >>> from discopy.neural.network import Network
+    >>> rotations = Cyclic[3].action()
+    >>> strictness(layer(rotations, rotations), rotations, rotations) < 1e-9
+    True
+
+    A dense box with all nine weights free is not equivariant:
+
+    >>> x, w = Dims(3), Dims(Dim(3, 3))
+    >>> dense = para.Markov[Network](x, x, param=w, inside=Box(
+    ...     "W", x @ w, x, module=lambda v, W: v @ W))
+    >>> strictness(dense, rotations, rotations) > 1e-2
+    True
+    """
+    check(dom, cod)
+    generator = torch.Generator().manual_seed(seed)
+    (leg, ) = layer.dom.inside
+
+    def draw(shape: tuple[int, ...]) -> torch.Tensor:
+        return torch.randn(shape, generator=generator, dtype=torch.float64)
+
+    def distance(module: Module) -> float:
+        def function(u: torch.Tensor) -> torch.Tensor:
+            out = module(u.reshape(*u.shape[:-2], *leg.inside))
+            return out.reshape(*u.shape[:-2], cod.size, -1)
+        v = draw((4, ) + leg.inside).reshape(4, dom.size, -1)
+        return equivariance(function, dom, cod, v)
+    shapes = [dim.inside for dim in layer.param.inside]
+    return max((
+        distance(Module(layer, *map(draw, shapes))) for _ in range(draws)),
+        default=0.0)

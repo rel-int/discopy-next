@@ -17,7 +17,7 @@ from discopy import para
 from discopy.group import Action, Cyclic, Product, Symmetric, Wreath
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Seed
-from discopy.neural.network import Box, Dims, Network
+from discopy.neural.network import Box, Dim, Dims, Network
 
 TORUS = Product[Cyclic[3], Cyclic[3]]
 LINES = Wreath[Symmetric[2], Symmetric[2]]
@@ -473,23 +473,50 @@ def network(equivariant, torch, action):
         >> layer(action, invariant)
 
 
-def test_parametric_homomorphism():
+def parametric(torch, name, module, size, param):
+    """ A parametric box on the points of a layer of ``size`` points. """
+    x = Dims(size)
+    return para.Markov[Network](x, x, param=param, inside=Box(
+        name, x @ param, x, module=module))
+
+
+def test_strictness():
     """
     A network of tied layers is invariant for every value of its weights,
-    i.e. a strict homomorphism of parametric maps: 20 random draws.
+    i.e. a strict homomorphism of parametric maps, an untied one is not, and
+    the sample matters: a layer equivariant at the zero weights is caught.
     """
-    torch, _ = modules()
+    torch, augment = modules()
     equivariant = importorskip("discopy.neural.equivariant")
-    module = importorskip("discopy.neural.torch").Module
-    torch.manual_seed(6)
     for group in (Symmetric[5], Cyclic[6]):
         one, action = Action.trivial(group), group.action()
-        composite = network(equivariant, torch, action)
-        v = torch.randn(4, action.size, 1, dtype=torch.float64)
-        for _ in range(20):
-            weights = [torch.randn(dim.inside, dtype=torch.float64)
-                       for dim in composite.param.inside]
-            compiled = module(composite, *weights)
-            assert equivariant.equivariance(
-                lambda u, c=compiled: c(u[..., 0])[..., None, None],
-                action, one, v) < 1e-9
+        tied = network(equivariant, torch, action)
+        assert augment.strictness(tied, action, one) < 1e-9
+        dense = parametric(
+            torch, "W", lambda v, w: v @ w, action.size,
+            Dims(Dim(action.size, action.size)))
+        assert augment.strictness(dense, action, action) > 1e-2
+        bias = parametric(torch, "b", torch.add, action.size,
+                          Dims(action.size))
+        shifted = equivariant.layer(action, action) >> bias
+        assert augment.strictness(shifted, action, action) > 1e-2
+        assert augment.strictness(shifted, action, action, draws=0) == 0.0
+        zero = augment.strictness(
+            equivariant.layer(action, action), action, action)
+        assert zero < 1e-9
+
+
+def test_strictness_seed():
+    """ The same seed gives the same float, another one is still small. """
+    torch, augment = modules()
+    equivariant = importorskip("discopy.neural.equivariant")
+    action = Cyclic[6].action()
+    one = Action.trivial(Cyclic[6])
+    tied = network(equivariant, torch, action)
+    dense = parametric(torch, "W", lambda v, w: v @ w, 6, Dims(Dim(6, 6)))
+    assert augment.strictness(dense, action, action, seed=1)\
+        == augment.strictness(dense, action, action, seed=1)
+    assert augment.strictness(dense, action, action, seed=1)\
+        != augment.strictness(dense, action, action, seed=2)
+    assert all(augment.strictness(tied, action, one, seed=s) < 1e-9
+               for s in range(3))

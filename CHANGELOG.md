@@ -24,6 +24,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of points commutes with an action as a homomorphism of `Writer` algebras
   ([next#TBD]).
 
+- `neural.augment.strictness` is the largest distance to commuting with the
+  group of a parametric `neural` network over random draws of its weights, a
+  parametric map being a strict homomorphism exactly when it commutes for
+  every value of its weights ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).
