@@ -42,6 +42,8 @@ theory does not give.
   change.
 - A laxator split in two halves keeps each node on the same side of a straight wire, which a
   single blend of both coordinates does not; that is not a proof for curved wires.
+- The property matrix does not check rewrites: a step goes between parallel diagrams only, and
+  the matrix draws each object of a law with its own boundary, not from one hom.
 - The compact steps (snakes, Reidemeister moves) are not yet `Step` subclasses: a snake removal
   is a plain `Step` named after `normalize`, drawn by `Drawing.interpolate`.
 

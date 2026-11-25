@@ -80,6 +80,7 @@ x @ g >> Interchange(f, h, left=True)
 from __future__ import annotations
 
 from discopy import cat, messages, monoidal
+from discopy.testable import Testable
 from discopy.drawing import Drawing, tweened, to_gif
 from discopy.utils import AxiomError, factory
 
@@ -175,6 +176,18 @@ class Rewrite(cat.Arrow):
     """
     ob = monoidal.Diagram
     generator_factory = Layer
+
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Rewrites generate no terms yet, so the property matrix does not
+        check them: a step only goes between parallel diagrams, and the
+        matrix draws the objects of a law independently, each with its own
+        boundary, rather than from one hom.
+
+        >>> assert Rewrite not in Testable.enrolled()
+        """
+        return Testable.strategy.__func__(cls, **params)
 
     def whisker(self, above=None, below=None, left=None, right=None
                 ) -> Rewrite:
