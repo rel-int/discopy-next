@@ -25,7 +25,9 @@ steps with a detached prefix; :mod:`discopy.neural.lattice` and
 computation time, each with its trainer; :mod:`discopy.neural.train` holds
 the optimiser, the schedule, the weight average and the per-sample clip;
 :mod:`discopy.neural.geometric` runs a network along the blocks of its
-symmetry group rather than along its tables.
+symmetry group rather than along its tables. :mod:`discopy.neural.diagram`
+reads a wiring back as a network with a trace, whose rounds are those of
+the recursive networks.
 
 .. autosummary::
     :template: module.rst
@@ -42,6 +44,7 @@ symmetry group rather than along its tables.
     act
     train
     geometric
+    diagram
 
 Note
 ----

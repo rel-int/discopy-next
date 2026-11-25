@@ -11,7 +11,7 @@ from discopy.frobenius import Box, CMap, Ty
 from discopy.neural.signature import (
     Orbit, Signature, Sym, from_incidence, from_relation)
 from discopy.neural.wiring import (
-    Routing, from_map, memberships, primal, routing, table_of)
+    Routing, from_map, memberships, ports, primal, routing, table_of, where)
 
 MESSAGE, STATE = Ty("message"), Ty("state")
 
@@ -116,6 +116,26 @@ def test_from_map():
     box = Box("factor", Ty(), MESSAGE)
     with raises(ValueError, match="box 0 is wired to a box that is not"):
         from_map(CMap.from_wiring((box, box), [((0, 0), (1, 0))]))
+
+
+def test_ports():
+    x, y = Ty("x"), Ty("y")
+    assert ports(CMap.from_box(Box("f", x, y))) == ((0, 1), )
+    assert ports(CMap.from_wiring((), [])) == ()
+    assert ports(CMap.from_box(Box("cell", Ty(), Ty()))) == ((), )
+    box = Box("cell", Ty(), MESSAGE @ MESSAGE)
+    looped = CMap.from_wiring((box, ), [((0, 0), (0, 1))])
+    rows = ports(looped)
+    assert rows == ((1, 0), )
+    assert where(rows) == {1: (0, 0), 0: (0, 1)}
+    assert looped.edges[0] == 1
+
+
+def test_from_map_of_degenerate_maps():
+    assert from_map(CMap.from_wiring((), [])) == ()
+    assert from_map(CMap.from_box(Box("cell", Ty(), Ty()))) == ((), )
+    box = Box("cell", Ty(), MESSAGE @ MESSAGE)
+    assert from_map(CMap.from_wiring((box, ), [((0, 0), (0, 1))])) == ((), )
 
 
 def test_blocks_of_a_group():
