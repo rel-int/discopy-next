@@ -6,8 +6,8 @@
 coalgebras of *Categorical Deep Learning is an Algebraic Theory of All Architectures*, arXiv:2402.15332, App. J.2–J.5,
 stacked on the branch of `neural.datatype`.)
 
-- [ ] `Machine`: a cell `I @ S.d -> O @ S` with its feedback, the Mealy, Moore and unfolding cells of the paper's Figure 1
-- [ ] `Machine.unroll`: the first steps through monoidal streams, the initial state one input copied where it is read
-- [ ] `Coalgebra`: one image per box of the cell and a learned initial state, tied by one copy of the parameter
-- [ ] tests against independent Python loops, a torch RNN with the gradient of its shared weight, and `Network.trace`
-- [ ] CHANGELOG bullet
+- [x] `Machine`: a cell `I @ S.d -> O @ S` with its feedback, the Mealy, Moore and unfolding cells of the paper's Figure 1
+- [x] `Machine.unroll`: the first steps through monoidal streams, the initial state one input copied where it is read
+- [x] `Coalgebra`: one image per box of the cell and a learned initial state, tied by one copy of the parameter
+- [x] tests against independent Python loops, a torch RNN with the gradient of its shared weight, and `Network.trace`
+- [x] CHANGELOG bullet
