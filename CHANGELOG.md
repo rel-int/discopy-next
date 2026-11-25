@@ -21,6 +21,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and gradients: `realise` picks `Pooling` for a side of one point, else
   `Dense`, and `layer(..., fast=True)` uses it ([next#TBD]).
 
+- `neural.factorised.Kronecker` computes the equivariant layers of the natural
+  action of a product of chains, i.e. of symmetric groups, of the cyclic group
+  of order two and of their imprimitive wreath products and powers, along the
+  axes of the points, recognised by `structure` and picked by `realise`
+  ([next#TBD]).
+
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).

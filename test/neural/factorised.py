@@ -6,9 +6,10 @@ realisation is checked against the dense layer, in outputs and gradients.
 """
 
 import random
+import time
 from functools import partial
 
-from pytest import importorskip, raises
+from pytest import importorskip, mark, raises
 
 from discopy.group import Action, Cyclic, Product, Symmetric, Wreath
 from discopy.python.finset import Permutation
@@ -30,6 +31,10 @@ CHAINS = (
     Wreath[Symmetric[2], Symmetric[3]].action(power=True),
     CELLS.action(power=True))
 CHANNELS = (1, 2, 3, 5)
+PAIRS = ((2, 3), (3, 2), (1, 1))
+CELLS4 = Wreath[Wreath[Wreath[S3, S3], S3], S3]
+POWERS = (
+    Wreath[Product[Symmetric[2], Symmetric[2]], C2].action(power=True), )
 
 
 def conjugate(action):
@@ -99,6 +104,15 @@ def agrees(torch, equivariant, fast, seed=0, dtype=None, channels=None):
         tied, fast.dom, fast.cod, v.detach()) <= 1e-5
 
 
+def test_kronecker():
+    """ The chains of every product, wreath and power are Dense. """
+    torch, equivariant, factorised = modules()
+    for seed, action in enumerate(CHAINS):
+        fast = factorised.Kronecker(action, action)
+        assert isinstance(fast, equivariant.Realisation)
+        agrees(torch, equivariant, fast, seed)
+
+
 def test_pooling():
     """ A single point on either side is Dense, for any action. """
     torch, equivariant, factorised = modules()
@@ -123,15 +137,53 @@ def test_pooling():
         factorised.Pooling(symmetric, Action.trivial(Cyclic[3]))
 
 
+def test_float32():
+    """ Single precision agrees up to the size of the output. """
+    torch, equivariant, factorised = modules()
+    action = Symmetric[5].action()
+    for fast in (factorised.Kronecker(action, action),
+                 factorised.Pooling(action, Action.trivial(action.group))):
+        dense = equivariant.Dense(fast.dom, fast.cod)
+        v, w, b, _ = draw(torch, fast, 7, torch.float32)
+        got, want = fast(v, w, b), dense(v, w, b)
+        assert (got - want).abs().max() <= 1e-5 * (1 + want.abs().max())
+
+
+def test_structure():
+    """ The structures of the natural actions, and what has none. """
+    _, _, factorised = modules()
+    structure, Kronecker = factorised.structure, factorised.Kronecker
+    symmetric = Symmetric[3].action()
+    assert structure(symmetric).tie == (0, 1)
+    assert structure(Symmetric[1].action()) is None
+    power = structure(Wreath[Symmetric[3], Cyclic[2]].action(power=True))
+    assert power.tie == ((0, 1), (1, 2))
+    assert power.shape == (3, 3)
+    assert structure(Cyclic[2].action()).tie == (0, 1)
+    assert structure(Cyclic[1].action()) is None
+    assert structure(Product[Cyclic[1], Cyclic[3]].action()) is None
+    refused = (
+        Cyclic[3].action(), Cyclic[4].action(), Product[C3, C3].action(),
+        Wreath[Cyclic[3], Symmetric[2]].action(),
+        Wreath[Symmetric[2], Cyclic[3]].action(),
+        Action(Symmetric[3], 3, symmetric.images[::-1]))
+    for action in refused:
+        assert structure(action) is None
+        with raises(TypeError):
+            Kronecker(action, action)
+    with raises(TypeError):
+        Kronecker(symmetric, refused[-1])
+
+
 def test_realise():
-    """ A side of one point is Pooling, else Dense, equal to Dense. """
+    """ The realisation is chosen by structure, and equal to Dense. """
     torch, equivariant, factorised = modules()
     symmetric, rotations = Symmetric[4].action(), Cyclic[5].action()
     pairs = symmetric.tensor(symmetric)
     for seed, (dom, cod, kind) in enumerate((
             (symmetric, Action.trivial(symmetric.group), "Pooling"),
             (Action.trivial(symmetric.group), pairs, "Pooling"),
-            (symmetric, symmetric, "Dense"),
+            (symmetric, symmetric, "Kronecker"),
             (rotations, rotations, "Dense"),
             (symmetric, pairs, "Dense"),
             (pairs, pairs, "Dense"))):
@@ -141,7 +193,7 @@ def test_realise():
 
 
 def test_realise_refused():
-    """ What has no single point is Dense, and nothing raises. """
+    """ What has no realisation is Dense, and no other raises. """
     torch, equivariant, factorised = modules()
     symmetric = S3.action()
     cube = symmetric.tensor(symmetric).tensor(symmetric)
@@ -159,8 +211,132 @@ def test_realise_refused():
         fast = factorised.realise(dom, cod)
         assert type(fast) is equivariant.Dense
         assert (fast.tying() == tying(dom, cod)).all()
+        with raises(TypeError):
+            factorised.Kronecker(dom, cod)
         if seed < 4:
             agrees(torch, equivariant, fast, seed)
+
+
+def test_scale(monkeypatch):
+    """ No orbit of pairs is ever computed: sizes beyond a dense matrix. """
+    torch, equivariant, factorised = modules()
+
+    def refuse(*_):
+        raise AssertionError("The orbits of pairs were computed.")
+
+    monkeypatch.setattr(Action, "tensor", refuse)
+    monkeypatch.setattr(equivariant, "tying", refuse)
+    monkeypatch.setattr(factorised, "tying", refuse, raising=False)
+    action, orbits = Symmetric[1024].action(), 2
+    start = time.perf_counter()
+    fast = factorised.realise(action, action)
+    assert type(fast) is factorised.Kronecker and fast.orbits == orbits
+    assert time.perf_counter() - start < 5
+    out = fast(torch.ones(1, action.size, 1), torch.ones(orbits, 1, 1))
+    assert out.shape == (1, action.size, 1)
+
+
+def test_scale_refusal(monkeypatch):
+    """ A relabelled action is refused by size, without its tensor power. """
+    _, _, factorised = modules()
+
+    def refuse(*_):
+        raise AssertionError("The tensor of actions was computed.")
+
+    action = conjugate(Symmetric[1024].action())
+    assert action != Symmetric[1024].action()
+    monkeypatch.setattr(Action, "tensor", refuse)
+    start = time.perf_counter()
+    assert factorised.structure(action) is None
+    assert time.perf_counter() - start < 5
+
+
+def test_realise_conjugate():
+    """ A relabelled action has no structure: Dense, equal to the dense. """
+    torch, equivariant, factorised = modules()
+    canonical = (
+        Symmetric[5].action(), LINES.action(),
+        Wreath[S3, C2].action(power=True))
+    for seed, action in enumerate(canonical):
+        other = conjugate(action)
+        assert other != action and factorised.structure(other) is None
+        for dom, cod in ((other, other), (action, other), (other, action)):
+            fast = factorised.realise(dom, cod)
+            assert type(fast) is equivariant.Dense
+            dense = equivariant.Dense(dom, cod)
+            assert (fast.tying() == dense.tying()).all()
+            agrees(torch, equivariant, fast, seed)
+    for dom, cod in ((S3.action(), conjugate(S3.action())),
+                     (conjugate(S3.action()), S3.action())):
+        assert type(factorised.realise(dom, cod)) is equivariant.Dense
+
+
+def test_channels():
+    """ Fixed numbers of channels, every realisation. """
+    torch, equivariant, factorised = modules()
+    symmetric = S3.action()
+    pairs = symmetric.tensor(symmetric)
+    trivial = Action.trivial(S3)
+    fasts = (
+        factorised.Kronecker(symmetric, symmetric),
+        factorised.Pooling(symmetric, trivial),
+        factorised.Pooling(trivial, pairs))
+    for seed, fast in enumerate(fasts):
+        for channels in PAIRS:
+            agrees(torch, equivariant, fast, seed, channels=channels)
+
+
+@mark.slow
+def test_cases():
+    """ Wider products and powers over a base with several factors. """
+    torch, equivariant, factorised = modules()
+    for seed, action in enumerate(POWERS + (
+            Product[CELLS4, S3].action(), )):
+        fast = factorised.Kronecker(action, action)
+        agrees(torch, equivariant, fast, seed)
+
+
+@mark.slow
+def test_cases_slow():
+    """
+    A product with the symmetric group of nine points, on 81 points: the
+    dense reference computes the orbits of all the pairs of points, so a
+    bigger base, e.g. ``CELLS4`` with its 729 points, takes minutes.
+    """
+    torch, equivariant, factorised = modules()
+    action = Product[Wreath[S3, S3], Symmetric[9]].action()
+    agrees(torch, equivariant, factorised.Kronecker(action, action), 0)
+
+
+def test_imprimitive_never_builds_power(monkeypatch):
+    """ Recognising an imprimitive action does not build the power one. """
+    _, _, factorised = modules()
+    group = Wreath[Symmetric[8], Symmetric[8]]
+    action, build = group.action(), group.action
+
+    def guard(*args, power=False, **kwargs):
+        assert not power
+        return build(*args, power=power, **kwargs)
+
+    monkeypatch.setattr(group, "action", guard)
+    start = time.perf_counter()
+    assert factorised.structure(action) is not None
+    assert factorised.Kronecker(action, action).dom == action
+    assert time.perf_counter() - start < 5
+
+
+def test_float32_large():
+    """ Single precision stays within 1e-4 of the double precision Dense. """
+    torch, equivariant, factorised = modules()
+    lines = Wreath[Symmetric[8], Symmetric[8]].action()
+    fast = factorised.Kronecker(lines, lines)
+    dense = equivariant.Dense(fast.dom, fast.cod)
+    v, w, b, g = draw(torch, fast, 0)
+    want = gradients(torch, dense, v, w, b, g)
+    args = [t.detach().float().requires_grad_() for t in (v, w, b)]
+    got = gradients(torch, fast, *args, g.float())
+    for x, y in zip(got, want):
+        assert (x.double() - y).abs().max() <= 1e-4 * y.abs().max()
 
 
 def test_tying_device():
@@ -168,6 +344,7 @@ def test_tying_device():
     torch, equivariant, factorised = modules()
     symmetric, rotations = S3.action(), Cyclic[5].action()
     fasts = (
+        factorised.Kronecker(symmetric, symmetric),
         factorised.Pooling(symmetric, Action.trivial(S3)),
         factorised.Pooling(Action.trivial(S3), symmetric),
         equivariant.Dense(rotations, rotations))

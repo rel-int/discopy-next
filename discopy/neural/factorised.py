@@ -3,8 +3,8 @@
 """
 Equivariant layers factorised along the construction of the group: the
 realisations of :mod:`discopy.neural.equivariant` that compute the linear maps
-from the sums over the orbits of the points instead of from a dense matrix
-with one entry for each pair of points.
+from the sums over the blocks of a product, a wreath product or a power
+instead of from a dense matrix with one entry for each pair of points.
 
 Summary
 -------
@@ -15,6 +15,9 @@ Summary
     :toctree:
 
     Pooling
+    Kronecker
+    Factor
+    Structure
 
 .. admonition:: Functions
 
@@ -24,33 +27,44 @@ Summary
         :toctree:
 
         realise
+        structure
+        canonical
+        nested
+        block_shape
 
 Example
 -------
 A realisation is chosen by the structure of the actions alone, and it is
-equal to the dense layer, here the invariant maps of the symmetric group on
-three points, one weight on the orbit of all the points:
+equal to the dense layer, here the maps of the symmetric group on three
+points, one weight on the diagonal and one off it:
 
 >>> import torch  # doctest: +EXTRA
->>> from discopy.group import Symmetric
+>>> from discopy.neural.equivariant import Dense
 >>> action = Symmetric[3].action()
->>> trivial = Action.trivial(Symmetric[3])
->>> fast = realise(action, trivial)
+>>> fast = realise(action, action)
 >>> type(fast).__name__, fast.orbits
-('Pooling', 1)
->>> v, w = torch.tensor([[1.], [2.], [4.]]), torch.tensor([[[2.]]])
->>> dense = Dense(action, trivial)
+('Kronecker', 2)
+>>> v, w = torch.tensor([[1.], [2.], [4.]]), torch.tensor([[[2.]], [[1.]]])
+>>> dense = Dense(action, action)
 >>> fast(v, w).flatten().tolist(), dense(v, w).flatten().tolist()
-([14.0], [14.0])
+([8.0, 9.0, 11.0], [8.0, 9.0, 11.0])
 """
 
 from __future__ import annotations
 
+import functools
+import math
+from collections.abc import Callable
+from typing import NamedTuple
+
 import numpy
 import torch
 
-from discopy.group import Action
+from discopy.group import (
+    Action, Cyclic, FiniteGroup, Product, Symmetric, Wreath)
 from discopy.neural.equivariant import Dense, Realisation, labels
+from discopy.neural.wiring import Block, chains, orbitals
+from discopy.python.finset import Permutation
 
 
 class Pooling(Realisation):
@@ -121,13 +135,349 @@ class Pooling(Realisation):
         return self.bias(out, b)
 
 
+class Factor(NamedTuple):
+    """
+    A factor of the points of an action: the points are a row-major tensor
+    whose shape is the concatenation of the shapes of the factors.
+
+    A *chain* ``(n_1, ..., n_L)`` is the natural action of a symmetric group,
+    of the cyclic group of order two or of an imprimitive wreath product of
+    these, see :func:`discopy.neural.wiring.chains`: two points are in one
+    of ``L + 1`` relations, how many of their first coordinates agree.
+
+    Parameters:
+        shape : The sizes of the axes of the factor.
+
+    Example
+    -------
+    >>> Factor((3, 3)).orbits
+    3
+    """
+    shape: tuple[int, ...]
+
+    @property
+    def orbits(self) -> int:
+        """
+        The number of orbits on pairs of points of the factor, i.e. of ranks
+        of a pair: the rank of a pair of a chain is its length less the
+        number of coordinates they agree on.
+        """
+        return len(self.shape) + 1
+
+
+def nested(array: numpy.ndarray) -> tuple:
+    """
+    An array as nested tuples of integers.
+
+    Parameters:
+        array : The array.
+
+    Example
+    -------
+    >>> nested(numpy.arange(4).reshape(2, 2))
+    ((0, 1), (2, 3))
+    """
+    return tuple(map(nested, array)) if array.ndim > 1\
+        else tuple(map(int, array))
+
+
+class Structure(NamedTuple):
+    """
+    How the orbits on pairs of points of an action are laid out along its
+    factors: the orbit of a pair is ``tie[r_1, ..., r_m]`` where ``r_i`` is
+    the rank of the pair in the ``i``-th factor, see :class:`Factor`.
+
+    Parameters:
+        factors : The factors of the points.
+        tie : The orbit of each tuple of ranks, as nested tuples.
+
+    Example
+    -------
+    The orbits of a product are the pairs of orbits of its factors, numbered
+    row-major, and those of a power action of a wreath product the orbits
+    of the tuples of orbits under the top group:
+
+    >>> chain = Structure.chain((3, ))
+    >>> chain.tie, chain.product(chain).tie
+    ((0, 1), ((0, 1), (2, 3)))
+    >>> chain.power(Symmetric[2]).tie
+    ((0, 1), (1, 2))
+    """
+    factors: tuple[Factor, ...]
+    tie: tuple
+
+    @property
+    def table(self) -> numpy.ndarray:
+        """ The tie as an array, of shape the ranks of the factors. """
+        return numpy.array(self.tie)
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """ The shape of the points, the shapes of the factors in a row. """
+        return sum((factor.shape for factor in self.factors), ())
+
+    @classmethod
+    def of(cls, factors: tuple[Factor, ...], table) -> Structure:
+        """
+        The structure of the given factors and tie array.
+
+        Parameters:
+            factors : The factors of the points.
+            table : An array of shape the ranks of the factors.
+        """
+        return cls(tuple(factors), nested(numpy.asarray(table)))
+
+    @classmethod
+    def chain(cls, shape: tuple[int, ...]) -> Structure:
+        """
+        The structure of a chain: its orbits are its ranks.
+
+        Parameters:
+            shape : The sizes of the axes of the chain.
+        """
+        factor = Factor(tuple(shape))
+        return cls.of((factor, ), range(factor.orbits))
+
+    def product(self, other: Structure) -> Structure:
+        """
+        The structure of a product of groups: one factor after the other.
+
+        Parameters:
+            other : The structure of the right factor.
+        """
+        left, right = self.table, other.table
+        table = left.reshape(left.shape + right.ndim * (1, ))\
+            * (right.max() + 1) + right
+        return self.of(self.factors + other.factors, table)
+
+    def power(self, top: type[FiniteGroup]) -> Structure:
+        """
+        The structure of the power action of a wreath product by ``top`` of
+        a group with this structure: ``k`` copies of the factors, whose
+        tuples of orbits ``top`` permutes.
+
+        Parameters:
+            top : The group permuting the ``k`` copies.
+        """
+        table, k = self.table, top.action().size
+        o, m = int(table.max()) + 1, table.ndim
+        points = numpy.indices(k * (o, )).reshape(k, -1)
+
+        def image(permutation: Permutation) -> Permutation:
+            moved = numpy.empty_like(points)
+            moved[list(permutation)] = points
+            index = numpy.ravel_multi_index(tuple(moved), k * (o, ))
+            return Permutation([int(i) for i in index], o ** k)
+
+        action = Action(top, o ** k, tuple(map(image, top.action().images)))
+        classes = labels(action).reshape(k * (o, ))
+        indices = tuple(
+            table.reshape((m * j) * (1, ) + table.shape
+                          + (m * (k - 1 - j)) * (1, )) for j in range(k))
+        return self.of(k * self.factors, classes[indices])
+
+
+def block_shape(group: type) -> tuple[int, ...] | None:
+    """
+    The chain of the imprimitive action of a wreath product, if its axes are
+    all of size at least two, see :func:`discopy.neural.wiring.chains`.
+
+    Parameters:
+        group : A wreath product.
+
+    Example
+    -------
+    >>> block_shape(Wreath[Symmetric[3], Cyclic[2]])
+    (2, 3)
+    >>> block_shape(Wreath[Cyclic[3], Cyclic[2]]) is None
+    True
+    """
+    try:
+        shape = chains(group)[0]
+    except TypeError:
+        return None
+    return shape if min(shape) >= 2 else None
+
+
+@functools.cache
+def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
+    """
+    The actions of a group that have a :class:`Structure`, each as its number
+    of points and a thunk of the action with its structure, so that only an
+    action of the right size is ever built: the action of a symmetric group,
+    of the cyclic group of order two and of an imprimitive wreath product of
+    these, the power action of a wreath product and the products of such
+    actions.
+
+    Parameters:
+        group : The group.
+
+    Example
+    -------
+    >>> [len(canonical(group)) for group in
+    ...  (Wreath[Symmetric[3], Cyclic[2]], Cyclic[4], Cyclic[1])]
+    [2, 0, 0]
+    >>> [size for size, _ in canonical(Wreath[Symmetric[3], Cyclic[2]])]
+    [6, 9]
+    """
+    if issubclass(group, Product):
+        def joined(left, right):
+            a, b = left(), right()
+            return group.action(a[0], b[0]), a[1].product(b[1])
+
+        def pair(left, right):
+            return left[0] * right[0], lambda: joined(left[1], right[1])
+        return tuple(pair(a, b) for a in canonical(group.left)
+                     for b in canonical(group.right))
+    if issubclass(group, Wreath):
+        shape, base = block_shape(group), structure(group.base.action())
+        blocks = () if shape is None else ((math.prod(shape), lambda: (
+            group.action(), Structure.chain(shape))), )
+        tuples = () if base is None else (
+            (group.base.action().size ** group.top.action().size, lambda: (
+                group.action(power=True), base.power(group.top))), )
+        return blocks + tuples
+    if issubclass(group, Symmetric) and group.n >= 2\
+            or issubclass(group, Cyclic) and group.n == 2:
+        return ((group.n, lambda: (
+            group.action(), Structure.chain((group.n, )))), )
+    return ()
+
+
+@functools.cache
+def structure(action: Action) -> Structure | None:
+    """
+    The :class:`Structure` of an action, if it is the natural action of its
+    group on a product of chains, or a power of them: an action that is only
+    equal to such an action up to a relabelling of its points has none. Only
+    the candidates with as many points as the action are built.
+
+    Parameters:
+        action : The action.
+
+    Example
+    -------
+    >>> structure(Symmetric[3].action())
+    Structure(factors=(Factor(shape=(3,)),), tie=(0, 1))
+    >>> structure(Symmetric[1].action()) is None
+    True
+    """
+    candidates = (build() for size, build in canonical(action.group)
+                  if size == action.size)
+    return next((found for known, found in candidates
+                 if known == action), None)
+
+
+class Kronecker(Realisation):
+    """
+    The equivariant linear maps of the natural action of a product of chains
+    on itself, computed along the axes of the points instead of on the
+    matrix: the orbits on pairs are the tuples of depths of agreement along
+    the chains, see :func:`discopy.neural.wiring.orbitals`. A tuple of depths
+    is the difference of blocks of points, see
+    :func:`discopy.neural.wiring.Block`. The output is the sum, over the
+    blocks, of the sum of the input over each block, mixed by one matrix
+    ``(D, C)`` for each point and spread back: it costs ``O(|X|C + |X|D)``
+    for each of the ``prod(L + 1)`` blocks instead of ``O(|X|^2 CD)`` for
+    :class:`Dense`.
+
+    Parameters:
+        dom : The action on the input points.
+        cod : The action on the output points, equal to ``dom``.
+
+    Attributes:
+        structure : The :class:`Structure` of the action.
+
+    Raises:
+        TypeError : If the action has no structure, or ``dom`` and ``cod``
+                    are different actions.
+
+    Example
+    -------
+    The maps of a symmetric group have ``w[0]`` on the diagonal and ``w[1]``
+    off it:
+
+    >>> import torch  # doctest: +EXTRA
+    >>> action = Symmetric[3].action()
+    >>> kronecker = Kronecker(action, action)
+    >>> kronecker.orbits, kronecker.tying().tolist()
+    (2, [[0, 1, 1], [1, 0, 1], [1, 1, 0]])
+    >>> v, w = torch.tensor([[1.], [2.], [4.]]), torch.tensor([[[2.]], [[1.]]])
+    >>> kronecker(v, w).flatten().tolist()
+    [8.0, 9.0, 11.0]
+    """
+    def __init__(self, dom: Action, cod: Action):
+        found = structure(dom) if dom == cod else None
+        if found is None:
+            raise TypeError("Expected the same action of a product of "
+                            f"chains twice, got {dom} and {cod}.")
+        table = found.table
+        super().__init__(dom, cod, int(table.max()) + 1)
+        self.structure = found
+        self.register_buffer("tie", torch.from_numpy(table), persistent=False)
+
+    def tying(self) -> numpy.ndarray:
+        """ The tie indexed by the rank of each pair along each factor. """
+        coordinates = numpy.indices(self.structure.shape).reshape(
+            len(self.structure.shape), -1)
+        ranks, start = [], 0
+        for factor in self.structure.factors:
+            axes = coordinates[start:start + len(factor.shape)]
+            agree = axes[:, :, None] == axes[:, None, :]
+            ranks.append(len(factor.shape) - numpy.cumprod(agree, 0).sum(0))
+            start += len(factor.shape)
+        tie = self.tie.cpu().numpy()  # ty: ignore[call-non-callable]
+        return tie[tuple(ranks)]
+
+    def forward(self, v: torch.Tensor, w: torch.Tensor,
+                b: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Apply the layer, see :meth:`Dense.forward`.
+
+        Parameters:
+            v : The input, of shape ``(..., |X|, C)``.
+            w : The weights, of shape ``(orbits, D, C)``.
+            b : The biases, of shape ``(bias_orbits, D)``, if any.
+        """
+        factors = self.structure.factors
+        batch = v.shape[:-2]
+        x = v.reshape(*batch, *self.structure.shape, v.shape[-1])
+        u = w[self.tie]  # ty: ignore[invalid-argument-type]
+        for axis in range(len(factors)):
+            zero = torch.zeros_like(u.narrow(axis, 0, 1))
+            u = u.flip(axis).diff(dim=axis, prepend=zero)
+        sizes = tuple(f.shape for f in factors)
+        out = sum(self.term(x, u, depth, len(batch))
+                  for depth in orbitals(sizes))
+        return self.bias(out.reshape(*batch, -1, out.shape[-1]), b)
+
+    def term(self, x: torch.Tensor, u: torch.Tensor,
+             depth: tuple[int, ...], offset: int) -> torch.Tensor:
+        """
+        The term of one tuple of depths: the sum of the input over the blocks
+        of points agreeing to these depths along the chains, mixed by their
+        weights.
+
+        Parameters:
+            x : The input, of shape ``(..., *shape, C)``.
+            u : The weights by depth, of shape ``(*ranks, D, C)``.
+            depth : One depth for each chain.
+            offset : The number of axes of ``x`` before the points.
+        """
+        layout = tuple(f.shape for f in self.structure.factors)
+        free = tuple(offset + a for a in Block.of(layout, depth).free)
+        pooled = x.sum(free, keepdim=True) if free else x
+        return torch.einsum("...c,dc->...d", pooled, u[depth])
+
+
 def realise(dom: Action, cod: Action) -> Realisation:
     """
     The fastest realisation of the equivariant linear maps from ``dom`` to
     ``cod``, chosen by the structure of the actions alone: :class:`Pooling`
-    if a side has one point, else :class:`Dense`. Whichever is chosen, it
-    numbers its orbits as :func:`discopy.neural.equivariant.tying` and agrees
-    with :class:`Dense`.
+    if a side has one point, else :class:`Kronecker` if they are the same
+    action with a :func:`structure`, else :class:`Dense`. Whichever is
+    chosen, it numbers its orbits as
+    :func:`discopy.neural.equivariant.tying` and agrees with :class:`Dense`.
 
     Parameters:
         dom : The action on the input points.
@@ -135,13 +485,15 @@ def realise(dom: Action, cod: Action) -> Realisation:
 
     Example
     -------
-    >>> from discopy.group import Symmetric
     >>> action = Symmetric[3].action()
     >>> trivial = Action.trivial(Symmetric[3])
     >>> [type(realise(a, b)).__name__ for a, b in (
-    ...     (action, trivial), (trivial, action), (action, action))]
-    ['Pooling', 'Pooling', 'Dense']
+    ...     (action, trivial), (action, action),
+    ...     (Cyclic[3].action(), Cyclic[3].action()))]
+    ['Pooling', 'Kronecker', 'Dense']
     """
     if dom.size == 1 or cod.size == 1:
         return Pooling(dom, cod)
+    if dom == cod and structure(dom) is not None:
+        return Kronecker(dom, cod)
     return Dense(dom, cod)
