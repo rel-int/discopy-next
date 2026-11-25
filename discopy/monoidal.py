@@ -2658,6 +2658,9 @@ class Bubble(cat.Bubble, Box):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
+            if len(args) > 1:  # Slots keep coloured args apart, as frame does.
+                height = max(arg.height for arg in args)
+                args = [arg.slot(None, height=height) for arg in args]
             nested = args[0].tensor(*args[1:])
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0

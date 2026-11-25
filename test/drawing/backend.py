@@ -711,3 +711,19 @@ def test_bubble_of_args_drawn_in_different_directions():
     x = Ty('x')
     with raises(ValueError):
         Bubble(Box('f', x, x), Primitive('g', x, x)).to_drawing()
+
+
+def test_bubble_of_coloured_args_drawn_in_another_direction():
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    bubble = Bubble(Primitive('f', x, x), Primitive('g', x, x))
+    assert bubble.to_drawing().boxes[0].nested is not None
