@@ -1192,13 +1192,7 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        if box.nested is not None:
-            # Along its long sides a slant is hard to see: chop a corner off.
-            points = self.chop_corner(points, i, 2 * asymmetry)
-        else:
-            if box.is_conjugate or box.is_transpose:
-                asymmetry *= -1
-            points[i] = points[i].shift(x=asymmetry)
+        points = self.chop_corner(points, i, 2 * asymmetry)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
@@ -1218,7 +1212,8 @@ class Backend(ABC):
     def chop_corner(points, i, size):
         """
         A polygon with its ``i``-th corner cut off, ``size`` along both of
-        its sides, e.g. the box of a variant of a box with args.
+        its sides or half the shorter side, e.g. to tell a box from its
+        dagger, its transpose and its conjugate.
 
         >>> square = [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)]
         >>> Backend.chop_corner(square, 2, .25)[1:4]
@@ -1226,7 +1221,11 @@ class Backend(ABC):
         """
         if not size:
             return points
-        corner = points[i]
+        corner, neighbours = points[i], (
+            points[i - 1], points[(i + 1) % len(points)])
+        lengths = [sqrt((p.x - corner.x) ** 2 + (p.y - corner.y) ** 2)
+                   for p in neighbours]
+        size = min(size, *(length / 2 for length in lengths))
 
         def towards(point):
             dx, dy = point.x - corner.x, point.y - corner.y
@@ -1241,32 +1240,29 @@ class Backend(ABC):
         on a background of the box's ``frame_colour``, see
         :class:`Transposed`, centred in the space right of the box's label,
         and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of the background, a line separates each
-        from the next, so that no two regions meet without one. A reflected
+        wires plug into the edges of its background, with a margin of the
+        box's colour between one and the next. A reflected
         drawing reflects them, the last on top, and a transposed box or a
         conjugate turns them half way round, as it is turned itself.
         """
-        nested = box.nested
-        width = sum(drawing.width for drawing in nested)
+        nested, margin = box.nested, DEFAULT["nested_margin"]
+        width = sum(drawing.width for drawing in nested)\
+            + margin * (len(nested) - 1)
         height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
         start = left + (
             text_width(box.drawing_name) + .25 if box.drawing_name else 0)
         x, y = (start + right - height) / 2, centre[1] - width / 2
-        self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
-                          (x, y + width), facecolor=box.frame_colour)
         turn = bool(box.is_transpose or box.is_conjugate)
         flip, offset = box.mirror_nested != turn, 0
         for drawing in nested:
-            offset += drawing.width
-            origin = Point(x, y + offset - drawing.width if flip
-                           else y + width - offset)
-            Transposed(self, origin, drawing, flip=flip, reverse=turn)\
+            low = y + offset if flip else y + width - offset - drawing.width
+            self.draw_polygon(
+                (x, low), (x + height, low), (x + height, low + drawing.width),
+                (x, low + drawing.width), facecolor=box.frame_colour)
+            Transposed(self, Point(x, low), drawing, flip=flip, reverse=turn)\
                 .draw_drawing(drawing, **params)
-            if offset < width:
-                edge = y + offset if flip else y + width - offset
-                self.draw_bezier([Point(x + t * height / 3, edge)
-                                  for t in range(4)], adaptive=False)
+            offset += drawing.width + margin
         return Point((left + start) / 2, centre[1])
 
     @staticmethod
@@ -1650,6 +1646,11 @@ class Transposed(Backend):
             if not self.cod_is_after():
                 point = point.shift(y=2 * self.textpad)
             params = dict(params, verticalalignment="bottom")
+            # A label hangs along its wire, away from where it starts.
+            (x0, _), _ = self.compose((0, 0))
+            (x1, _), _ = self.compose((0, 1))
+            if x1 > x0:
+                params["horizontalalignment"] = "right"
         canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
@@ -1852,8 +1853,10 @@ class TikZ(Backend):
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west" if alignment == "top"\
-                else ", anchor=south west"
+            vertical = "north" if alignment == "top" else "south"
+            horizontal = "east" if params.get(
+                "horizontalalignment") == "right" else "west"
+            options += f", anchor={vertical} {horizontal}"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -2166,10 +2169,12 @@ class Typst(Backend):
         # Wire labels use va='top' (see draw_wire_label); park them to the
         # right of the wire like TikZ's ``anchor=west``, so the stroke does
         # not strike through the glyph.
+        side = "east" if params.get("horizontalalignment") == "right"\
+            else "west"
         if params.get("verticalalignment", "center") == "top":
-            extra["anchor"] = Str("west")
+            extra["anchor"] = Str(side)
         elif params.get("verticalalignment", "center") == "bottom":
-            extra["anchor"] = Str("south-west")
+            extra["anchor"] = Str(f"south-{side}")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)

@@ -796,7 +796,7 @@ def test_bubble_drawn_in_another_direction_fits_its_framed_args():
     assert drawing.height >= nested.width + 1
 
 
-def test_left_to_right_separates_args_and_lifts_labels():
+def test_left_to_right_args_have_a_margin_and_labels_lifted():
     from discopy.drawing.backend import Backend
     from discopy.monoidal import Bubble, Diagram
     from discopy.utils import factory
@@ -811,7 +811,11 @@ def test_left_to_right_separates_args_and_lifts_labels():
     class Recorder(Backend):
         def __init__(self):
             super().__init__()
-            self.beziers, self.labels, self.wires = [], [], []
+            self.beziers, self.labels, self.slots = [], [], []
+
+        def draw_polygon(self, *points, **params):
+            if params.get("facecolor") == "red":
+                self.slots.append(sorted({y for _, y in points}))
 
         def draw_bezier(self, points, adaptive=True):
             self.beziers.append(([tuple(p) for p in points], adaptive))
@@ -828,11 +832,11 @@ def test_left_to_right_separates_args_and_lifts_labels():
     Recorder.boxes = {}
     x = Ty('x')
     recorder = Recorder()
-    Bubble(Primitive('f', x, x), Primitive('g', x, x)).draw(backend=recorder)
-    separators = [ps for ps, adaptive in recorder.beziers if not adaptive
-                  and len({y for _, y in ps}) == 1]
-    assert len(separators) == 1
-    assert recorder.boxes['g'] < separators[0][0][1] < recorder.boxes['f']
+    Bubble(Primitive('f', x, x), Primitive('g', x, x),
+           frame_colour="red").draw(backend=recorder)
+    (g_low, g_high), (f_low, f_high) = sorted(recorder.slots)
+    assert g_low < recorder.boxes['g'] < g_high < f_low
+    assert f_low < recorder.boxes['f'] < f_high
 
     recorder = Recorder()
     (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)
@@ -1153,27 +1157,34 @@ def test_left_to_right_args_in_the_variants_of_a_box():
     class Recorder(Backend):
         def __init__(self):
             super().__init__()
-            self.polygons, self.texts = [], {}
+            self.polygons, self.texts, self.alignments = [], {}, set()
 
         def draw_polygon(self, *points, **params):
-            self.polygons.append(points)
+            self.polygons.append((points, params.get("facecolor")))
 
         def draw_text(self, text, i, j, **params):
             self.texts.setdefault(text, []).append(Point(i, j))
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.alignments.add(params.get("horizontalalignment"))
 
         def output(self, path=None, show=True, **params):
             pass
 
     x, y = pivotal.Ty('x'), pivotal.Ty('y')
     f, g = Primitive('f', x, y), Primitive('g', y, x)
-    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W")
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W",
+                    color="green", frame_colour="red")
     chopped = {}
     for name, diagram in [("W", W), ("dagger", W[::-1]),
                           ("transpose", W.r), ("conjugate", W[::-1].r),
                           ("reflected", W.r.to_drawing().dagger())]:
         recorder = Recorder()
         diagram.draw(backend=recorder, asymmetry=.25)
-        outline, = (p for p in recorder.polygons if len(p) == 5)
+        outline, = (p for p, c in recorder.polygons if c == "green")
+        top, bottom = sorted(  # One slot for each arg, with a margin.
+            (max(y for _, y in p), min(y for _, y in p))
+            for p, c in recorder.polygons if c == "red")[::-1]
+        assert top[1] - bottom[0] > 0
         xs, ys = [p[0] for p in outline], [p[1] for p in outline]
         chopped[name] = next(
             (cx == max(xs), cy == max(ys))
@@ -1186,6 +1197,8 @@ def test_left_to_right_args_in_the_variants_of_a_box():
             recorder.texts["y" if name in ("dagger", "conjugate") else "x"],
             key=lambda p: abs(p.y - f_at.y))
         assert (f_input.x > f_at.x) == turned
+        # A label hangs along its wire: from its end on the right if turned.
+        assert ("right" in recorder.alignments) == turned
     assert chopped == {  # Whether the corner cut off is right, top.
         "W": (True, False), "dagger": (True, True),
         "transpose": (False, True), "conjugate": (False, False),

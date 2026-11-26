@@ -180,7 +180,7 @@ from discopy.testable import (
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
-    COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
+    COLOUR_DRAWING_ATTRIBUTES, DRAWING_DEFAULT, TRANSPARENT)
 from discopy.utils import (
     factory,
     factory_key,
@@ -2694,7 +2694,8 @@ class Box(cat.Box, Diagram):
             height = max(arg.height for arg in framed)
             nested = tuple(
                 arg.stretch(height - arg.height) for arg in framed)
-            width = sum(arg.width for arg in nested)
+            width = sum(arg.width for arg in nested)\
+                + DRAWING_DEFAULT["nested_margin"] * (len(nested) - 1)
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
             box = Box(
