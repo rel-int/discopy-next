@@ -1153,7 +1153,8 @@ class Box[dtype](frobenius.Diagram.Box, Diagram[dtype]):
                 return np.array(self.data).reshape(
                     self.dim(self.dom @ self.cod).inside)
 
-    def grad(self, var, **params):
+    # overrides Diagram.grad, which pylint misreads through the slot
+    def grad(self, var, **params):  # pylint: disable=unused-argument
         return self.bubble(
             func=Diff(var), drawing_name=f"$\\partial {var}$")
 
