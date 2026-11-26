@@ -30,16 +30,15 @@ is the layers that commute with a finite group action, as weights tied along
 the orbits of the group on pairs of points, and
 :mod:`discopy.neural.factorised` computes them along the construction of the
 group, as sums over blocks, correlations and partitions rather than a dense
-matrix.
-the orbits of the group on pairs of points. :mod:`discopy.neural.augment`
+matrix. :mod:`discopy.neural.augment`
 uses the same group on the data instead: random augmentation as a seeded
 Kleisli arrow, the Reynolds average of a function and the homomorphisms of
 :math:`G`-sets.
-symmetry group rather than along its tables.
 :mod:`discopy.neural.datatype` is the syntax of recursive networks: the
 terms of an inductive datatype such as lists or trees, and the algebras that
-fold them, with one tied parameter in a category of parametric maps.
-symmetry group rather than along its tables. :mod:`discopy.neural.diagram`
+fold them, with one tied parameter in a category of parametric maps, and
+:mod:`discopy.neural.machine` its dual, the recurrent machines and their
+coalgebras. :mod:`discopy.neural.diagram`
 reads a wiring back as a network with a trace, whose rounds are those of
 the recursive networks.
 
@@ -62,6 +61,7 @@ the recursive networks.
     factorised
     augment
     datatype
+    machine
     diagram
 
 Note

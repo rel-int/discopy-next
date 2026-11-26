@@ -7,7 +7,8 @@ import discopy
 from discopy import markov, para, python
 from discopy.markov import Box, Diagram, Ty
 from discopy.neural.datatype import (
-    Algebra, Coalgebra, Datatype, LaxHomomorphism, Machine, chain)
+    Algebra, Datatype, LaxHomomorphism, chain)
+from discopy.neural.machine import Coalgebra, Machine
 from discopy.utils import AxiomError
 
 A, S, P = Ty("A"), Ty("S"), Ty("P")
@@ -492,9 +493,10 @@ def test_machine_cells():
         assert machine.feedback() == machine.cell.feedback(
             dom=machine.dom, cod=machine.cod, mem=machine.mem)
     assert [box.name for box in MOORE.boxes] == ["output", "update"]
-    assert MEALY.box("mealy") == MEALY.cell
-    assert (MOORE.reads(MOORE.box("output")),
-            MOORE.reads(MOORE.box("update"))) == (1, 1)
+    named = {box.name: box for box in MOORE.boxes}
+    assert MEALY.boxes == (MEALY.cell, )
+    assert (MOORE.reads(named["output"]), MOORE.reads(named["update"])) == (
+        1, 1)
     assert set(MEALY.atoms) == {I, O, S} == set(MOORE.atoms)
 
 
@@ -535,8 +537,6 @@ def test_machine_errors():
     other = Box("g", I @ S.delay(), I @ I.delay() @ S.delay())
     with pytest.raises(ValueError, match="delayed"):  # another delayed wire
         Machine(other >> Box("f", I @ I.delay() @ S.delay(), O @ S), I, O, S)
-    with pytest.raises(ValueError, match="Unknown box"):
-        MEALY.box("moore")
     with pytest.raises(TypeError):
         Machine("cell", I, O, S)
 
@@ -648,10 +648,10 @@ READS_IMAGE = Para(
 
 
 def test_hand_written_cells_unroll():
-    assert TWO.reads(TWO.box("f")) == 1 and TWO.mem == S @ T
+    assert TWO.reads(TWO.boxes[0]) == 1 and TWO.mem == S @ T
     assert TWO.unroll(1).dom == Ty("S", "T", "I0", "I1")
     assert IGNORES.unroll(1).dom == Ty("S", "I0", "I1")
-    assert READS.reads(READS.box("triple")) == 3
+    assert READS.reads(READS.boxes[0]) == 3
     assert READS.unroll(1).dom == Ty("S", "I0", "I1")
 
 
