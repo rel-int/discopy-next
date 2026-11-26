@@ -54,6 +54,24 @@ def test_sequence_of_a_name_is_one_wire():
     assert mem.now @ mem.later.now == symmetric.Ty('mem0', 'mem1')
 
 
+def test_power_and_copy():
+    """ The power of a stream of types is the type power, pointwise, with
+    the unit as zeroth power, so the copy of no wire is the discard. """
+    from discopy import markov
+    x, y, T = Ty.sequence(markov.Ty('x')), Ty(symmetric.Ty('y')), Ty[python.Ty]
+    assert x ** 0 == x ** -1 == y ** 0 == Ty() and T(int) ** 0 == T()
+    assert x ** 1 == x and steps(x ** 3) == steps(x @ x @ x)
+    assert y ** 2 == Ty(symmetric.Ty('y', 'y'))
+    for n in range(4):
+        copy = Stream[markov.Diagram].copy(x, n)
+        assert steps(copy.cod) == steps(x ** n)
+        assert [copy.now, copy.later.now] == [
+            markov.Diagram.copy(x.now, n),
+            markov.Diagram.copy(x.later.now, n)]
+    assert Stream[markov.Diagram].copy(x, 0).later.now\
+        == markov.Diagram.discard(x.later.now)
+
+
 def test_feedback_errors():
     x = Ty.sequence(symmetric.Ty('x'))
     with raises(ValueError):  # A constant stream needs constant types.
