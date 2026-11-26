@@ -7,7 +7,7 @@
 
 - [x] Mechanism: split Declaration (classmethod moves to Rule and Axiom), add Slot with per-level building, .extend mixins, lazy module exports, subscripts carrying their slots, the *_factory deprecation shim and the tests of ef86d2e9 (is_generator/generator stay, as atoms() already means the generators a term names)
 - [x] cat and monoidal on slots, equation_factory becomes Equation
-- [ ] The symmetric spine on slots: braided, balanced, traced, symmetric, markov, comarkov, spacial
+- [x] The symmetric spine on slots: braided, balanced, traced, symmetric, markov, comarkov, spacial
 - [ ] Dualities on slots: rigid, pivotal, ribbon, compact, frobenius, tensor (dtype fix), hypergraph, cmap
 - [ ] Exponentials and time on slots: biclosed, closed, feedback, stream, bang, interaction
 - [ ] Terms on slots, on Ty and TermBase
