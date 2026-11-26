@@ -67,11 +67,9 @@ import numpy
 import torch
 from torch.nn import functional
 
-from discopy.group import (
-    Action, Cyclic, FiniteGroup, Product, Symmetric, Wreath)
+from discopy.group import Action, Cyclic, Product, Symmetric, Wreath
 from discopy.neural.equivariant import Dense, Realisation, labels
 from discopy.neural.wiring import Block, chains, orbitals
-from discopy.python.finset import Permutation
 
 
 class Pooling(Realisation):
@@ -106,6 +104,8 @@ class Pooling(Realisation):
     ...
     TypeError: Expected an action on a single point, got ...
     """
+    index: torch.Tensor
+
     def __init__(self, dom: Action, cod: Action):
         if dom.size != 1 and cod.size != 1:
             raise TypeError("Expected an action on a single point, "
@@ -118,27 +118,19 @@ class Pooling(Realisation):
 
     def tying(self) -> numpy.ndarray:
         """ The orbit of each point of the longer side, as a row or column. """
-        index = self.index.cpu().numpy()  # ty: ignore[call-non-callable]
+        index = self.index.cpu().numpy()
         return index.reshape(1, -1) if self.into else index.reshape(-1, 1)
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
-        """
-        Apply the layer, see :meth:`Dense.forward`.
-
-        Parameters:
-            v : The input, of shape ``(..., |X|, C)``.
-            w : The weights, of shape ``(orbits, D, C)``.
-            b : The biases, of shape ``(bias_orbits, D)``, if any.
-        """
+        """ Apply the layer, see :meth:`Dense.forward`. """
         if self.into:
             pooled = v.new_zeros(*v.shape[:-2], self.orbits, v.shape[-1])
-            pooled = pooled.index_add(
-                -2, self.index, v)  # ty: ignore[invalid-argument-type]
+            pooled = pooled.index_add(-2, self.index, v)
             out = torch.einsum("...oc,odc->...d", pooled, w).unsqueeze(-2)
             return self.bias(out, b)
         out = torch.einsum("...c,odc->...od", v[..., 0, :], w)
-        out = out[..., self.index, :]  # ty: ignore[invalid-argument-type]
+        out = out[..., self.index, :]
         return self.bias(out, b)
 
 
@@ -211,7 +203,7 @@ class Structure(NamedTuple):
     >>> chain = Structure.chain((3, ))
     >>> chain.tie, chain.product(chain).tie
     ((0, 1), ((0, 1), (2, 3)))
-    >>> chain.power(Symmetric[2]).tie
+    >>> chain.power(Wreath[Symmetric[3], Symmetric[2]]).tie
     ((0, 1), (1, 2))
     """
     factors: tuple[Factor, ...]
@@ -261,27 +253,20 @@ class Structure(NamedTuple):
             * (right.max() + 1) + right
         return self.of(self.factors + other.factors, table)
 
-    def power(self, top: type[FiniteGroup]) -> Structure:
+    def power(self, group: type[Wreath]) -> Structure:
         """
-        The structure of the power action of a wreath product by ``top`` of
-        a group with this structure: ``k`` copies of the factors, whose
-        tuples of orbits ``top`` permutes.
+        The structure of the power action of a wreath product of a group
+        with this structure: ``k`` copies of the factors, whose tuples of
+        orbits the top group permutes, i.e. the power action on the trivial
+        action of the base on the orbits.
 
         Parameters:
-            top : The group permuting the ``k`` copies.
+            group : The wreath product, with ``k`` copies.
         """
-        table, k = self.table, top.action().size
+        table, k = self.table, group.degree()
         o, m = int(table.max()) + 1, table.ndim
-        points = numpy.indices(k * (o, )).reshape(k, -1)
-
-        def image(permutation: Permutation) -> Permutation:
-            moved = numpy.empty_like(points)
-            moved[list(permutation)] = points
-            index = numpy.ravel_multi_index(tuple(moved), k * (o, ))
-            return Permutation([int(i) for i in index], o ** k)
-
-        action = Action(top, o ** k, tuple(map(image, top.action().images)))
-        classes = labels(action).reshape(k * (o, ))
+        classes = labels(group.action(
+            Action.trivial(group.base, o), power=True)).reshape(k * (o, ))
         indices = tuple(
             table.reshape((m * j) * (1, ) + table.shape
                           + (m * (k - 1 - j)) * (1, )) for j in range(k))
@@ -346,16 +331,14 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
             group.action(), Structure.chain(shape))), )
         tuples = () if base is None else (
             (group.base.action().size ** group.top.action().size, lambda: (
-                group.action(power=True), base.power(group.top))), )
+                group.action(power=True), base.power(group))), )
         return blocks + tuples
-    if issubclass(group, Symmetric) and group.n >= 2\
-            or issubclass(group, Cyclic) and group.n == 2:
+    if issubclass(group, (Symmetric, Cyclic)) and group.n >= 2:
+        factor = Factor((group.n, ), cyclic=issubclass(group, Cyclic)
+                        and group.n >= 3)
         return ((group.n, lambda: (
-            group.action(), Structure.chain((group.n, )))), )
-    if issubclass(group, Cyclic) and group.n >= 3:
-        factor = Factor((group.n, ), cyclic=True)
-        return ((group.n, lambda: (
-            group.action(), Structure.of((factor, ), range(group.n)))), )
+            group.action(), Structure.of((factor, ), range(factor.orbits)))),
+        )
     return ()
 
 
@@ -475,8 +458,7 @@ class Kronecker(Realisation):
         self.free = tuple(
             self.block(found, depth)
             for depth in orbitals(tuple(factors[i].shape for i in chain)))
-        self.cyclic = tuple(
-            a - len(found.shape) - 1 for a in self.axes(found))
+        self.cyclic = self.axes(found)
 
     @staticmethod
     def block(found: Structure, depth: tuple[int, ...]) -> tuple[int, ...]:
@@ -502,17 +484,17 @@ class Kronecker(Realisation):
                      for a in Block.of(layout, agreed).free)
 
     @staticmethod
-    def axes(found: Structure, offset: int = 0) -> tuple[int, ...]:
+    def axes(found: Structure) -> tuple[int, ...]:
         """
-        The axes of the points that are cyclic.
+        The axes of the points that are cyclic, counted from the end of the
+        input.
 
         Parameters:
             found : The structure of the action.
-            offset : The number of axes before the points, e.g. the batch.
         """
-        start, axes = offset, []
+        start, axes = 0, []
         for factor in found.factors:
-            axes += [start] if factor.cyclic else []
+            axes += [start - len(found.shape) - 1] if factor.cyclic else []
             start += len(factor.shape)
         return tuple(axes)
 
@@ -543,14 +525,7 @@ class Kronecker(Realisation):
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
-        """
-        Apply the layer, see :meth:`Dense.forward`.
-
-        Parameters:
-            v : The input, of shape ``(..., |X|, C)``.
-            w : The weights, of shape ``(orbits, D, C)``.
-            b : The biases, of shape ``(bias_orbits, D)``, if any.
-        """
+        """ Apply the layer, see :meth:`Dense.forward`. """
         batch = v.shape[:-2]
         x = v.reshape(*batch, *self.structure.shape, v.shape[-1])
         g = w if self.tie is None else w[self.tie]
@@ -849,14 +824,7 @@ class Partitions(Realisation):
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
-        """
-        Apply the layer, see :meth:`Dense.forward`.
-
-        Parameters:
-            v : The input, of shape ``(..., |X|, C)``.
-            w : The weights, of shape ``(orbits, D, C)``.
-            b : The biases, of shape ``(bias_orbits, D)``, if any.
-        """
+        """ Apply the layer, see :meth:`Dense.forward`. """
         batch = v.shape[:-2]
         x = v.reshape(*batch, *(self.n, ) * self.p, v.shape[-1])
         inverse = self.mobius.to(w.dtype)
