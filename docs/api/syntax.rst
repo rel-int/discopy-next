@@ -7,9 +7,15 @@ and the property tests that check their axioms.
 .. raw:: html
     :file: architecture.html
 
-The diagram shows the syntax, the free categories of each level: software
-dependencies between their modules go top-to-bottom, left-to-right and
-forgetful functors between the categories go the other way.
+The diagram shows the syntax, the free categories of each level. Going down a
+column adds symmetry, going right along a row adds structure: ``feedback`` a
+delay and a trace, ``closed`` exponentials, ``feedback.closed`` both, and the
+last column duals, traced with the identity as delay; ``linear`` beside the
+plain levels adds a bang. A module imports the ones above it in its column and
+to its left on its row, except that ``linear`` and ``closed`` import nothing
+from ``feedback`` and ``feedback`` nothing from ``linear``; forgetful functors
+between the categories go the other way. Each module is pictured by its
+characteristic generator, drawn by the module itself.
 
 .. autosummary::
     :template: module.rst
