@@ -21,7 +21,6 @@ Summary
     Cap
     Unsnake
     Sum
-    Bubble
     Functor
     Equation
 
@@ -887,7 +886,8 @@ class Box(biclosed.Box, Diagram):
 
     def to_drawing(self):
         result = super().to_drawing()
-        result.is_transpose = self.is_transpose
+        if not self.args:
+            result.is_transpose = self.is_transpose
         return result
 
 
@@ -907,77 +907,6 @@ class Sum(biclosed.Sum, Box):
                 tuple(term.l for term in self.terms), self.cod.l, self.dom.l)
         return self.sum_factory(
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
-
-
-class Bubble(biclosed.Bubble, Box):
-    """
-    A rigid bubble is a biclosed bubble and a rigid box, which rotates as a
-    box does: its winding number turns, its args stay as they are inside.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        z (int) : The winding number of the bubble.
-        kwargs : Passed to :class:`biclosed.Bubble`.
-
-    Example
-    -------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f = Box('f', x, y)
-    >>> bubble = f.bubble()
-    >>> assert bubble.r.z == 1 and bubble.r.args == (f, )
-    >>> assert (bubble.r.dom, bubble.r.cod) == (y.r, x.r)
-    >>> assert bubble.r.l == bubble == bubble.l.r and bubble.l.l != bubble
-    >>> assert bubble.r != f.r.bubble()
-    >>> print(bubble.l)
-    (f).bubble().l
-
-    Its winding number is one of its :attr:`serialised_attrs`, so that its
-    dagger, its substitutions and its rotations keep it, as a box's do.
-
-    >>> assert bubble.r[::-1] == bubble[::-1].r
-    >>> assert bubble.r[::-1][::-1] == bubble.r
-    >>> from sympy.abc import phi  # doctest: +EXTRA
-    >>> g = Box('g', x, y, data=phi).bubble()
-    >>> assert g.r.subs(phi, 1) == g.subs(phi, 1).r
-    >>> assert g.r.lambdify(phi)(1) == g.lambdify(phi)(1).r
-    """
-    serialised_attrs = biclosed.Bubble.serialised_attrs + ("z", )
-
-    def __init__(self, *args: Diagram, z: int = 0, **kwargs):
-        self.z = z
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        if not self.z:
-            return super().__str__()
-        return str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
-
-    def __repr__(self):
-        if not self.z:
-            return super().__repr__()
-        return super().__repr__()[:-1] + f', z={self.z})'
-
-    def setoid(self):
-        return super().setoid() + (self.z, )
-
-    def to_tree(self) -> dict:
-        """
-        Serialise a rigid bubble, with its winding number.
-
-        >>> from discopy.utils import dumps, loads
-        >>> f = Box('f', Ty('x'), Ty('y')).bubble()
-        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
-        """
-        tree = super().to_tree()
-        if self.z:
-            tree['z'] = self.z
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        bubble = super().from_tree(tree)
-        bubble.z = tree.get('z', 0)
-        return bubble
 
 
 class Cup(BinaryBoxConstructor, Box):
@@ -1190,7 +1119,6 @@ biclosed.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
-Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 
 
@@ -1367,3 +1295,6 @@ class Equation(biclosed.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args

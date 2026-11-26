@@ -30,7 +30,6 @@ Summary
     Head
     Tail
     Sum
-    Bubble
     Functor
     Equation
     TermBase
@@ -847,54 +846,6 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
-class Bubble(symmetric.Bubble, Box):
-    """
-    A markov bubble is a symmetric bubble and a markov box: a total function
-    unless it says otherwise, whatever its args, and it keeps what it says
-    through dagger, substitution, rotation and markov functors.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        is_deterministic : Whether copying commutes with the bubble.
-        is_affine : Whether discarding commutes with the bubble.
-        kwargs : Passed to :class:`symmetric.Bubble`.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> sample = Box('sample', x, x, is_deterministic=False)
-    >>> noisy = sample.bubble(is_deterministic=False)
-    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
-    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
-    >>> assert Functor.id(Diagram)(noisy) == noisy
-    """
-    serialised_attrs = symmetric.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.deterministic, self.affine = is_deterministic, is_affine
-
-    def __repr__(self):
-        flags = "".join(f", {name}=False" for name in self.flags())
-        return super().__repr__()[:-1] + flags + ")" if flags\
-            else super().__repr__()
-
-    def setoid(self):
-        return super().setoid() + (self.deterministic, self.affine)
-
-    def to_tree(self) -> dict:
-        return {**super().to_tree(), **self.flags()}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        result = super().from_tree(tree)
-        result.deterministic = tree.get("is_deterministic", True)
-        result.affine = tree.get("is_affine", True)
-        return result
-
-
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -944,7 +895,8 @@ class Functor(symmetric.Functor):
             return function(  # ty: ignore[invalid-argument-type]
                 other.func, list(map(self, other.dom)))
         result = super().__call__(other)
-        if isinstance(other, Bubble) and isinstance(result, Bubble):
+        if isinstance(other, Box) and other.args\
+                and isinstance(result, Box) and result.args:
             return other.flagged(result)
         return result
 
@@ -969,7 +921,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -1174,3 +1125,6 @@ TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+
+
+Bubble = Box.from_args

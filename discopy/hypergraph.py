@@ -82,7 +82,6 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cat, cmap, messages
-from discopy import sum as formal_sum
 from discopy.abc import (
     BalancedCategory, BraidedCategory, ColouredMonoid, ComarkovCategory,
     CompactCategory, DaggerMonoidalCategory, HypergraphCategory,
@@ -3302,7 +3301,7 @@ class Hypergraph[category](
         assert_transparent(old)
         category = type(old).ar
         factory = cls if cls.category is category else cls[category]
-        if any(isinstance(box, formal_sum.Sum) for box in old.boxes):
+        if any(isinstance(box, cat.Sum) for box in old.boxes):
             raise AxiomError(messages.NO_SUMS.format(factory_name(factory)))
         functor = factory.functor(
             ob_map=lambda typ: typ, ar_map=factory.from_box,

@@ -321,11 +321,12 @@ class NamedGeneric:
     'Hypergraph[frobenius.Diagram]'
 
     A class with a ``subscript_bases`` classmethod also subclasses the
-    bases it returns for the values, e.g. a :class:`Sum <discopy.sum.Sum>`
-    of diagrams is a box of them:
+    bases it returns for the values, e.g. an interchanger of monoidal
+    diagrams is a rewrite of them:
 
-    >>> from discopy.sum import Sum
-    >>> assert issubclass(Sum[frobenius.Diagram], frobenius.Box)
+    >>> from discopy import monoidal
+    >>> assert issubclass(
+    ...     monoidal.Interchange[monoidal.Diagram], monoidal.Rewrite)
     """
     if TYPE_CHECKING:
         #: The names of the type parameters in DisCoPy, declared so that
@@ -358,17 +359,18 @@ class NamedGeneric:
                 values[0] if len(values) == 1 else values)
         if hasattr(cls, "__is_named_generic__"):
             cls = cls.__bases__[0]
-        owner = next((c for c in cls.__mro__ if c.__type_params__), None)
-        if owner is None:
+        attributes = next((
+            [param.__name__ for param in c.__type_params__]
+            for c in cls.__mro__ if c.__type_params__), None)
+        if attributes is None:
             raise TypeError(messages.NO_TYPE_PARAMETER.format(cls))
-        attributes = [param.__name__ for param in owner.__type_params__]
         cls_values = tuple(getattr(cls, attr, None) for attr in attributes)
         if cls not in NamedGeneric._cache:
             NamedGeneric._cache[cls] = {cls_values: cls}
         if values not in NamedGeneric._cache[cls]:
             origin = get_origin(cls)
             bases = origin.subscript_bases(*values)\
-                if "subscript_bases" in vars(owner) else ()
+                if hasattr(origin, "subscript_bases") else ()
 
             class C(origin, *bases):
                 __is_named_generic__ = True
@@ -436,7 +438,7 @@ def product(xs: Sequence, unit=1):
     return unit if not xs else product(xs[1:], unit * xs[0])
 
 
-def deprecated_alias(module_name: str, aliases: dict[str, str | type]):
+def deprecated_alias(module_name: str, aliases: dict[str, str]):
     """
     The module-level ``__getattr__`` of a module with one or more classes
     that were renamed, returning each new class with a
@@ -445,8 +447,7 @@ def deprecated_alias(module_name: str, aliases: dict[str, str | type]):
     Parameters:
         module_name : The ``__name__`` of the module deprecating names.
         aliases : A mapping from each deprecated name to its new name, in
-            the same module, or to its new dotted path when it moved, or to
-            the new class itself when it has no name, e.g. a subscript.
+            the same module, or to its new dotted path when it moved.
 
     Example
     -------
@@ -460,31 +461,20 @@ def deprecated_alias(module_name: str, aliases: dict[str, str | type]):
     discopy.rigid.PRO is deprecated, use discopy.rigid.Nat instead.
     >>> print(w[1].message)
     discopy.markov.Merge is deprecated, use discopy.comarkov.Merge instead.
-    >>> from discopy import monoidal
-    >>> with warnings.catch_warnings(record=True) as w:
-    ...     warnings.simplefilter("always")
-    ...     assert monoidal.Sum is monoidal.Diagram.sum_factory
-    >>> print(w[0].message)
-    discopy.monoidal.Sum is deprecated, use sum.Sum[monoidal.Diagram] instead.
     """
     def __getattr__(name):
-        if name not in aliases:
-            raise AttributeError(
-                f"module {module_name!r} has no attribute {name!r}")
-        import warnings
-        from importlib import import_module
-        alias = aliases[name]
-        if isinstance(alias, str):
-            new_module, _, new_name = alias.rpartition('.')
+        if name in aliases:
+            import warnings
+            from importlib import import_module
+            new_module, _, new_name = aliases[name].rpartition('.')
             new_module = new_module or module_name
-            new_path = f"{new_module}.{new_name}"
-            alias = getattr(import_module(new_module), new_name)
-        else:
-            new_path = factory_name(alias)
-        warnings.warn(
-            f"{module_name}.{name} is deprecated, use {new_path} instead.",
-            DeprecationWarning, stacklevel=2)
-        return alias
+            warnings.warn(
+                f"{module_name}.{name} is deprecated, "
+                f"use {new_module}.{new_name} instead.",
+                DeprecationWarning, stacklevel=2)
+            return getattr(import_module(new_module), new_name)
+        raise AttributeError(
+            f"module {module_name!r} has no attribute {name!r}")
     return __getattr__
 
 
@@ -619,6 +609,7 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_TYPE.format(factory))
     module = sys.modules.get(".".join(["discopy", *modules]))
     cls = getattr(module, factory, None)
+    cls = getattr(cls, "__self__", cls)  # an alias, e.g. Box.from_args
     if not is_discopy_class(cls):
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls

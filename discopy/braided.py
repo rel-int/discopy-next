@@ -17,7 +17,6 @@ Summary
     Braid
     Slide
     Sum
-    Bubble
     Functor
     TermBase
     Variable
@@ -70,7 +69,6 @@ from collections.abc import Callable
 from typing import ClassVar
 
 from discopy import monoidal, messages, rewrite
-from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.drawing import Drawing
@@ -303,20 +301,14 @@ def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     return method
 
 
-class Sum(formal_sum.Sum, Box):
+class Sum(monoidal.Sum, Box):
     """
-    A braided sum is a :class:`sum.Sum <discopy.sum.Sum>` and a braided box.
+    A braided sum is a monoidal sum and a braided box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
-    """
-
-
-class Bubble(monoidal.Bubble, Box):
-    """
-    A braided bubble is a monoidal bubble and a braided box.
     """
 
 
@@ -343,7 +335,6 @@ class Functor(monoidal.Functor):
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Rewrite = rewrite.Rewrite[Diagram]
 
 
@@ -474,3 +465,6 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

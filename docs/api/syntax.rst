@@ -4,6 +4,13 @@ syntax
 DisCoPy's mathematical core: a zoo of diagrams, categories and functors,
 and the property tests that check their axioms.
 
+.. raw:: html
+    :file: architecture.html
+
+The diagram shows the syntax, the free categories of each level: software
+dependencies between their modules go top-to-bottom, left-to-right and
+forgetful functors between the categories go the other way.
+
 .. autosummary::
     :template: module.rst
     :toctree: ../_api

@@ -219,7 +219,7 @@ def ast_size(_box) -> int:
     return 1
 
 
-class Join(feedback.Bubble, markov.Box):
+class Join(markov.Box):
     """
     The join of parallel diagrams, an e-box of the string diagrams of a
     semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
@@ -230,7 +230,8 @@ class Join(feedback.Bubble, markov.Box):
     Parameters:
         terms : The diagrams joined, with the same domain and codomain, that
             of the join at time step zero.
-        params : Passed to :class:`feedback.Bubble`, e.g. by :meth:`dagger`.
+        params : Passed to :meth:`markov.Box.from_args`, e.g. by
+            :meth:`dagger`.
 
     Example
     -------
@@ -245,10 +246,19 @@ class Join(feedback.Bubble, markov.Box):
     (x @ f >> h) + (x @ g >> h)
     """
     is_id_on_objects = True
+    serialised_attrs = (
+        "*args", "dom", "cod", "name", "is_dagger", "data", "time_step")
 
-    def __init__(self, *terms, **params):
+    def __init__(self, *terms, dom=None, cod=None, name="", time_step=0,
+                 **params):
+        terms = tuple(params.pop("args", ())) or terms
+        dom, cod = (
+            given if given is not None
+            else self.common(terms, attr).delay(time_step)
+            for attr, given in [("dom", dom), ("cod", cod)])
         params.pop("method", None)
-        super().__init__(*terms, method="join", **params)
+        markov.Box.__init__(self, name, dom, cod, args=terms, method="join",
+                            time_step=time_step, **params)
         for term in terms:
             assert_isparallel(
                 self, term.delay(self.time_step) if self.time_step else term)

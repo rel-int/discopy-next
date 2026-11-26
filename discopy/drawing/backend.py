@@ -958,7 +958,7 @@ class Backend(ABC):
         when it is dark, see :meth:`Matplotlib.dark_gid`.
         """
         draw_label_anyway = params.get('draw_box_labels', True) and getattr(
-            x, "always_draw_label", False)
+            x.inside[0], "always_draw_label", False) and str(x.inside[0])
         if not params.get('wire_labels', True) and not draw_label_anyway:
             return
         if getattr(x.inside[0], "skip_label", False):
@@ -970,13 +970,18 @@ class Backend(ABC):
         i += pad_i
         j -= pad_j
         fontsize = params.get('fontsize_types', params.get('fontsize', None))
-        background = getattr(x, "cod", None)
+        background = self.label_background(x)
         adaptive = background is None
         color = self.readable_foreground(
             "white" if adaptive else background.name)
         self.draw_text(
             label, i, j, verticalalignment='top', fontsize=fontsize,
             color=color, adaptive=adaptive)
+
+    @staticmethod
+    def label_background(typ):
+        """ The region a wire label is drawn on, the one to its right. """
+        return getattr(typ, "cod", None)
 
     @staticmethod
     def has_boundary_sides(typ):
@@ -1266,8 +1271,9 @@ class Backend(ABC):
         on a background of the box's ``frame_colour``, see
         :class:`Transposed`, centred in the space right of the box's label,
         and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of the background, and a daggered box
-        reflects them, the last on top.
+        wires plug into the edges of the background, a line separates each
+        from the next, so that no two regions meet without one, and a
+        daggered box reflects them, the last on top.
         """
         nested = box.nested
         width = sum(drawing.width for drawing in nested)
@@ -1285,6 +1291,10 @@ class Backend(ABC):
                            else y + width - offset)
             Transposed(self, origin, drawing, flip=box.is_dagger)\
                 .draw_drawing(drawing, **params)
+            if offset < width:
+                edge = y + offset if box.is_dagger else y + width - offset
+                self.draw_bezier([Point(x + t * height / 3, edge)
+                                  for t in range(4)], adaptive=False)
         return Point((left + start) / 2, centre[1])
 
     @staticmethod
@@ -1604,6 +1614,7 @@ class Transposed(Backend):
     def __init__(self, parent: Backend, origin: Point, graph: Drawing,
                  flip=False):
         self.parent, self.origin, self.flip = parent, origin, flip
+        self.textpad, self.lift = DEFAULT["textpad"][0], False
         self.width, self.height = graph.width, graph.height
         super().__init__()
 
@@ -1618,13 +1629,52 @@ class Transposed(Backend):
             SimpleNamespace(width=self.height, height=self.width),
             *args, **params)
 
+    @property
+    def turns(self) -> int:
+        """ The number of transpositions this backend draws through, two of
+        which cancel out, e.g. top-to-bottom args in a left-to-right box. """
+        return 1 + getattr(self.parent, "turns", 0)
+
+    def compose(self, point) -> tuple[Point, Backend]:
+        """ The image of a point through every transposition drawn through,
+        and the backend they draw on. """
+        point, canvas = self.map(point), self.parent
+        while isinstance(canvas, Transposed):
+            point, canvas = canvas.map(point), canvas.parent
+        return point, canvas
+
+    def cod_is_after(self) -> bool:
+        """ Whether the region right of a wire, its ``cod``, ends up above
+        it on the page, or right of it when the turns cancel out. """
+        (x0, y0), _ = self.compose((0, 0))
+        (x1, y1), _ = self.compose((1, 0))
+        return (y1 > y0) if self.turns % 2 else (x1 > x0)
+
+    def label_background(self, typ):
+        """ The region a wire label lies on: the side of its wire it is
+        lifted to, else its ``cod`` as when no turn is drawn through. """
+        return getattr(typ, "cod" if self.cod_is_after() or not self.lift
+                       else "dom", None)
+
+    def draw_wire_label(self, x, i, j, **params):
+        self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
+        # The name of a bubble labels its left side, which turns into its
+        # top or, reflected, its bottom: it stays inside, the side of its cod.
+        is_name = getattr(x.inside[0], "always_draw_label", False)
+        self.lift = self.turns % 2 and (
+            not is_name or self.cod_is_after())
+        super().draw_wire_label(x, i, j, **params)
+
     def draw_text(self, text, i, j, **params):
-        point = self.map((i, j))
-        if self.flip and params.get("verticalalignment") == "top":
-            # A wire label hangs below its point, lift it above its wire.
-            point = point.shift(
-                y=(params.get("fontsize") or DEFAULT["fontsize"]) / 72)
-        self.parent.draw_text(text, *point, **params)
+        point, canvas = self.compose((i, j))
+        if params.get("verticalalignment") == "top" and self.lift:
+            # A wire label hangs below its point, a textpad off its wire:
+            # stand it on a point the textpad above the wire instead, so
+            # that each backend lifts it by its own font size.
+            if not self.cod_is_after():
+                point = point.shift(y=2 * self.textpad)
+            params = dict(params, verticalalignment="bottom")
+        canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
         self.parent.draw_node(*self.map((i, j)), **params)
@@ -1819,13 +1869,15 @@ class TikZ(Backend):
         fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         """
-        is_wire_label = params.get("verticalalignment", "center") == "top"
+        alignment = params.get("verticalalignment", "center")
+        is_wire_label = alignment in ("top", "bottom")
         options = "style=none" + (
             ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west"
+            options += ", anchor=north west" if alignment == "top"\
+                else ", anchor=south west"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -2140,6 +2192,8 @@ class Typst(Backend):
         # not strike through the glyph.
         if params.get("verticalalignment", "center") == "top":
             extra["anchor"] = Str("west")
+        elif params.get("verticalalignment", "center") == "bottom":
+            extra["anchor"] = Str("south-west")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)

@@ -781,17 +781,326 @@ def test_left_to_right_labels_legend_and_dagger():
 
 
 def test_bubble_drawn_in_another_direction_fits_its_framed_args():
-    from discopy.monoidal import Bubble
     from discopy.ribbon import DualRailCup, Ty as RTy
 
-    class Across(Bubble):
+    class Across(Box):
         draw_left_to_right = True
 
     x = RTy('x')
     arg = DualRailCup(x @ x, x.r @ x.r)
-    drawing = Across(arg, dom=Ty(), cod=Ty()).to_drawing()
+    drawing = Across.from_args(arg, dom=Ty(), cod=Ty()).to_drawing()
     nested, = drawing.boxes[0].nested
     framed = arg.to_drawing().framed()
     assert framed.width != arg.to_drawing().width
     assert nested.width == framed.width
     assert drawing.height >= nested.width + 1
+
+
+def test_left_to_right_separates_args_and_lifts_labels():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.beziers, self.labels, self.wires = [], [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            self.beziers.append(([tuple(p) for p in points], adaptive))
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append(j)
+            else:
+                self.boxes[text] = j
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    Recorder.boxes = {}
+    x = Ty('x')
+    recorder = Recorder()
+    Bubble(Primitive('f', x, x), Primitive('g', x, x)).draw(backend=recorder)
+    separators = [ps for ps, adaptive in recorder.beziers if not adaptive
+                  and len({y for _, y in ps}) == 1]
+    assert len(separators) == 1
+    assert recorder.boxes['g'] < separators[0][0][1] < recorder.boxes['f']
+
+    recorder = Recorder()
+    (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)
+    wire_y = recorder.beziers[0][0][0][1]
+    assert recorder.labels and all(j > wire_y for j in recorder.labels)
+
+
+def test_left_to_right_label_padding_and_contrast():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wire_y = [], None
+
+        def draw_bezier(self, points, adaptive=True):
+            self.wire_y = points[0][1]
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((j, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Primitive('f', x, x).draw(backend=recorder, textpad=(.5, .0625))
+    assert recorder.labels
+    for j, color in recorder.labels:
+        assert j >= recorder.wire_y + .5 - 1e-9
+        assert color == "black"
+
+
+def test_left_to_right_labels_above_wires_in_a_daggered_box():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wires = [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            if len({y for _, y in points}) == 1:
+                self.wires.append(points[0][1])
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((j, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    bubble = Bubble(Primitive('f', x, x), dom=Ty(), cod=Ty())
+    recorder = Recorder()
+    bubble.to_drawing().dagger().draw(backend=recorder)
+    assert recorder.labels
+    for j, color in recorder.labels:
+        assert any(j - .125 <= y < j for y in recorder.wires)
+        assert color == "white"
+
+
+def test_labels_of_args_turned_back_top_to_bottom():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Wire
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wires = [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            if len({x for x, _ in points}) == 1:
+                self.wires.append(points[0][0])
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((i, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Across.from_args(Box('f', x, x), dom=Ty(), cod=Ty()).draw(
+        backend=recorder)
+    assert recorder.labels and recorder.wires
+    for i, color in recorder.labels:
+        assert any(0 < i - wire <= .125 for wire in recorder.wires)
+        assert color == "white"
+
+
+def test_label_contrast_through_three_turns_reflected_outside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.colours = []
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.colours.append(params["color"])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    inside = Across.from_args(Bubble(Primitive('f', x, x)))
+    Bubble(inside).to_drawing().dagger().draw(backend=recorder)
+    assert recorder.colours and set(recorder.colours) == {"white"}
+
+
+def test_left_to_right_labels_stand_on_their_point_in_tikz(tmp_path):
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    path = tmp_path / "ltr.tikz"
+    Primitive('f', Ty('x'), Ty('x')).draw(
+        to_tikz=True, fontsize_types=2, path=str(path))
+    tikz = path.read_text()
+    assert "anchor=south west" in tikz and "anchor=north west" not in tikz
+
+
+def test_label_contrast_through_two_turns_reflected():
+    from types import SimpleNamespace
+    from discopy.drawing.backend import Matplotlib, Point, Transposed
+
+    graph = SimpleNamespace(width=1, height=1)
+    outside = Transposed(Matplotlib(), Point(0, 0), graph)
+    inside = Transposed(outside, Point(0, 0), graph, flip=True)
+    assert inside.turns == 2 and not inside.cod_is_after()
+    typ = SimpleNamespace(dom="white", cod="black")
+    assert inside.label_background(typ) == "black"
+
+
+def test_left_to_right_frame_keeps_its_name_inside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.alignments = {}
+
+        def draw_text(self, text, i, j, **params):
+            self.alignments[text] = params.get("verticalalignment")
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    y, x = Primitive('y', Ty(), n), Primitive('x', Ty(), n)
+    with_ = Primitive('W', Ty(), n, args=(y, x), drawing_name="W",
+                      draw_as_frame=True, draw_vertically=True)
+    recorder = Recorder()
+    with_.bubble(dom=Ty(), cod=n).draw(backend=recorder)
+    assert recorder.alignments["W"] == "top"
+    assert recorder.alignments["n"] == "bottom"
+
+
+def test_frame_name_drawn_without_wire_labels():
+    from discopy.drawing.backend import Backend
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts = []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.append(text)
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    recorder = Recorder()
+    Box('f', x, x).bubble(
+        dom=x, cod=x, drawing_name="g", draw_as_frame=True
+    ).draw(backend=recorder, wire_labels=False)
+    assert "g" in recorder.texts and "x" not in recorder.texts
+
+
+def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts, self.frames = {}, []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = (j, params.get("verticalalignment"))
+
+        def draw_polygon(self, *points, **params):
+            self.frames.append([y for _, y in points])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    frame = Primitive('W', Ty(), n, args=(
+        Primitive('y', Ty(), n), Primitive('x', Ty(), n)), drawing_name="W",
+        draw_as_frame=True, draw_vertically=True)
+    for dagger in (False, True):
+        recorder = Recorder()
+        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        (drawing.dagger() if dagger else drawing).draw(backend=recorder)
+        j, alignment = recorder.texts["W"]
+        bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
+        assert alignment == ("bottom" if dagger else "top")
+        assert bottom < j < top
