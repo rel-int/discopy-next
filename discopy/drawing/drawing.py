@@ -1383,13 +1383,13 @@ which to_drawing recomputes.
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self
+        traced_dom = self.dom[:n] if left else self.dom[-n:]
+        traced_cod = self.cod[:n] if left else self.cod[-n:]
         if n > 1 and not any(
-                getattr(wire, "ribbon", None) for wire in self.dom.inside):
+                getattr(wire, "ribbon", None) for wire in traced_dom.inside):
             return self.trace(left=left).trace(n=n - 1, left=left)
         dom = self.dom[n:] if left else self.dom[:-n]
         cod = self.cod[n:] if left else self.cod[:-n]
-        traced_dom = self.dom[:n] if left else self.dom[-n:]
-        traced_cod = self.cod[:n] if left else self.cod[-n:]
         back = traced_dom.factory(
             *map(swap_colours, reversed(traced_dom.inside)))
         cap_cod, cup_dom = (

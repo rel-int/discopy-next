@@ -1366,15 +1366,21 @@ class Functor(monoidal.Functor):
     def __call__(self, other):
         if isinstance(other, Trace):
             arg = other.arg
-            while len(arg) == 1 and isinstance(arg.boxes[0], Trace)\
+            while len(arg.boxes) == 1 and isinstance(arg.boxes[0], Trace)\
+                    and (arg.dom, arg.cod) == (
+                        arg.boxes[0].dom, arg.boxes[0].cod)\
                     and arg.boxes[0].left == other.left:
                 arg = arg.boxes[0].arg
             n = len(self(arg.dom)) - len(self(other.dom))
             return self.cod.trace(self(arg), n, left=other.left)
         if isinstance(other, (Wire, Box)) and other.time_step:
-            cod = self.cod.ob if isinstance(other, Wire) else self.cod.ar
+            cod, mapping = (self.cod.ob, self.ob_map.mapping)\
+                if isinstance(other, Wire) else (
+                    self.cod.ar, self.ar_map.mapping)
             if getattr(cod, "delay", FeedbackCategory.delay)\
-                    is not FeedbackCategory.delay:
+                    is not FeedbackCategory.delay\
+                    and not (isinstance(mapping, Mapping)
+                             and other in mapping):
                 result = self(other.reset())
                 for _ in range(other.time_step):
                     result = result.delay()

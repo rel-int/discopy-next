@@ -779,3 +779,23 @@ def test_draw_the_trace_of_ribbons():
         braid = balanced.Braid(x, x).to_braided().to_drawing()
         assert drawing.width == braid.width + 1 + config.DRAWING_DEFAULT[
             "ribbon_width"]
+
+
+def test_functor_into_matrix_delays_only_unmapped_boxes():
+    from discopy.matrix import Matrix
+    x = Ty('x')
+    f = Box('f', x, x)
+    ob = {x: 1, x.delay(): 1}
+    assert Functor(ob, {f.delay(): [[2]]}, cod=Matrix[int])(f.delay())\
+        == Matrix[int]([2], 1, 1)
+    assert Functor(ob, {f: [[3]]}, cod=Matrix[int])(f.delay())\
+        == Matrix[int]([3], 1, 1)
+
+
+def test_functor_keeps_the_whisker_of_a_nested_trace():
+    x = Ty('x')
+    f = Box('f', x @ x, x @ x)
+    F = Functor(lambda ob: ob, lambda box: box)
+    for d in [(f.trace() @ x).trace(), (x @ f.trace()).trace(),
+              (f.trace() >> Box('g', x, x)).trace(left=True)]:
+        assert F(d) == d
