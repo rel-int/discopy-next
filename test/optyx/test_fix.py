@@ -376,9 +376,25 @@ def test_chi_bounds_the_bond_and_warns_past_the_budget():
     assert all("max_bond" not in params for _, params in backend.calls)
 
     backend = RecordingBackend()
-    with pytest.warns(UserWarning, match="needs dimension 2 but max_chi=1"):
-        lossy_delay().fix(tol=1e-2, max_chi=1, backend=backend)
-    assert [params["max_bond"] for _, params in backend.calls] == [1]
+    with pytest.warns(UserWarning, match="needs dimension 3 but max_chi=2"):
+        sampler(loss=.9).fix(tol=.5, max_chi=2, backend=backend)
+    assert [params["max_bond"] for _, params in backend.calls] == [2]
+
+
+def test_compressed_solvers_refuse_chi_one():
+    """Quimb's compressed QR divides by zero at `max_chi=1` once a bond
+    exceeds one, so `fix` and `power_fix` refuse it and name `max_chi >= 2`."""
+    for call in (
+            lambda: sampler().fix(tol=.5, max_chi=1),
+            lambda: lossy_delay().fix(tol=1e-2, max_chi=1),
+            lambda: sampler().power_fix(tol=.5, max_steps=2, max_chi=1)):
+        with pytest.raises(ValueError, match="max_chi >= 2") as caught:
+            call()
+        assert caught.value.__class__ is ValueError
+    reset = (Discard(qubit) @ qubits.Ket(0)).feedback(
+        mem=qubit, state=qubits.Ket(1))
+    assert np.isclose(
+        reset.power_fix(tol=1e-2, max_steps=3, max_chi=1).density_matrix, 1)
 
 
 def test_fix_truncates_a_growing_photon_budget():
