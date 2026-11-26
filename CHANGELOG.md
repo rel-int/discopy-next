@@ -901,6 +901,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.channel.Diagram.fix` and `power_fix` raise `ValueError` naming
+  `max_chi >= 2` when compressed contraction is asked for `max_chi=1` on a
+  network whose bond dimension exceeds one, rather than failing with
+  `LinAlgError` inside Quimb's stabilized QR, and `test_fix.py` checks
+  `max_chi=1` against the real `QuimbBackend` ([next#442]).
+
 - The dagger, transpose and conjugate of a box with args keep its
   `drawing_name`, and when its args are drawn in another direction its box has
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
