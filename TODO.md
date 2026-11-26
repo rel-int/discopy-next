@@ -1,0 +1,5 @@
+> Fix photonic slice of #731: Swap.to_tree and loads(dumps(box)) on optyx.photonic boxes
+
+- [ ] Fix photonic.Swap to_tree/from_tree and perm attribute
+- [ ] Add to_tree and from_tree round-trips for all remaining optyx.photonic Box subclasses
+- [ ] Add CHANGELOG.md entry
