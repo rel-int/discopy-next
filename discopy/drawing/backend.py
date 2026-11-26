@@ -1193,8 +1193,9 @@ class Backend(ABC):
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
         # The cut stops short of the wires, three quarters of the way.
-        wires = [positions[n][0] for n in positions
-                 if n.kind in ("box_dom", "box_cod") and n.j == j]
+        wires = [positions[Node(kind, i=k, j=j, x=x)][0]
+                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)]
+                 for k, x in enumerate(xs)]
         size = min([2 * asymmetry] + [
             .75 * abs(x - points[i][0]) for x in wires])
         corners, points = points, self.chop_corner(points, i, size)

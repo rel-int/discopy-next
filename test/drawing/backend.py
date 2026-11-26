@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from pytest import mark, raises
 
+from discopy.config import DRAWING_DEFAULT
 from discopy.drawing.backend import TikZ
 from discopy.monoidal import Ty, Box
 from discopy.braided import Braid
@@ -1184,7 +1185,8 @@ def test_left_to_right_args_in_the_variants_of_a_box():
         top, bottom = sorted(  # One slot for each arg, with a margin.
             (max(y for _, y in p), min(y for _, y in p))
             for p, c in recorder.polygons if c == "red")[::-1]
-        assert top[1] - bottom[0] > 0
+        margin = DRAWING_DEFAULT["nested_margin"]
+        assert abs(top[1] - bottom[0] - margin) < 1e-9
         xs, ys = [p[0] for p in outline], [p[1] for p in outline]
         chopped[name] = next(
             (cx == max(xs), cy == max(ys))
