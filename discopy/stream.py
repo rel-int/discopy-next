@@ -172,7 +172,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import cache
 
-from discopy import messages, symmetric, testable
+from discopy import messages, monoidal, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
 from discopy.testable import TestableGeneric
 from discopy.python import finset
@@ -400,7 +400,7 @@ class Ty[base](NamedGeneric):
             types.map(lambda x: cls(x).delay()))
 
     __matmul__ = symmetric.Ty.__matmul__
-    __pow__ = symmetric.Ty.__pow__
+    __pow__ = monoidal.List.__pow__
 
 
 NO_TREE = messages.NO_TREE_STREAM
