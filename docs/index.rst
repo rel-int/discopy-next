@@ -51,7 +51,6 @@ DisCoPy documentation
     notebooks/optyx/linear_logic
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
-    notebooks/optyx/strict_sloppy
     notebooks/optyx/zw_examples
     notebooks/optyx/bose_hubbard
     notebooks/optyx/distributed-412-code
@@ -64,6 +63,7 @@ DisCoPy documentation
     notebooks/21-05-03-tallcat
     notebooks/higher-order-discocat
     notebooks/parsing-arithmetic
+    notebooks/strict_sloppy
 
 .. toctree::
     :caption: Machine learning notebooks

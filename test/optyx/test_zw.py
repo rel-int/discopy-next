@@ -663,3 +663,10 @@ def test_endo_keeps_a_scalar_its_backend_owns():
     assert t.grad is not None
     assert Endo(t) == Endo(t.clone()) and len({Endo(t), Endo(t.clone())}) == 1
     assert Endo(.5).scalar == .5 and Endo(.5).conjugate() == Endo(.5)
+
+
+def test_zbox_fuses_merged_photons():
+    # each W[::-1] outputs a numpy dimension, which the spider must accept
+    merged = Create(1, 1, 1, 1) >> W(2).dagger() @ W(2).dagger()
+    array = (merged >> ZBox(2, 1, lambda _: 1)).to_tensor().eval().array
+    assert np.allclose(array, [0, 0, 2])

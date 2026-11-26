@@ -787,9 +787,10 @@ class TermBase(monoidal.TermBase):
     def wire(functor, wiring: list[int], dom: Ty):
         """
         The image under a functor of the wiring from a type to its wires at
-        the given indices, see :meth:`Diagram.wiring`.
+        the given indices, see :meth:`Diagram.wiring`, built in the domain
+        of the functor so that a subclass copies with its own boxes.
         """
-        return functor(Diagram.wiring(wiring, dom))
+        return functor(functor.dom.wiring(wiring, dom))
 
 
 class Variable(TermBase, monoidal.Variable):
