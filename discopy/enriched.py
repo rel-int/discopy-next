@@ -19,7 +19,7 @@ where :math:`\\varphi` takes the arrows of ``m`` first, see
 :meth:`Arrow.pairs`. This is a category for every monad, and a monoidal one
 when ``C`` is monoidal and ``M`` is commutative, see :meth:`Arrow.tensor`.
 For the list monad the composite of two lists is the list of composites,
-which is how :class:`~discopy.sum.Sum` composes: a sum is a list of arrows.
+which is how :class:`~discopy.cat.Sum` composes: a sum is a list of arrows.
 
 A functor ``F: C -> D`` extends to :math:`M_* C \\to D` when each hom of
 ``D`` is an algebra of ``M`` and composition in ``D`` is a homomorphism in
@@ -55,7 +55,7 @@ A list of arrows composes as a sum does:
 >>> assert (Arrow[cat.Arrow, List].id(x) >> m) == m == (m >> n.id(y))
 
 A functor into arrows extends along their sum, and the extension is a
-functor: it sends a list to a :class:`~discopy.sum.Sum` and preserves
+functor: it sends a list to a :class:`~discopy.cat.Sum` and preserves
 composition.
 
 >>> F = Functor(ob_map=lambda x: x, ar_map=lambda f: f,
