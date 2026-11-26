@@ -19,4 +19,4 @@
 - [x] `Head`, `Tail`, `FollowedBy` are carried down; a functor into a codomain without stream semantics raises on them
 - [x] `linear.symmetric` (exchange is the swap by default) and `linear.markov` (contraction and weakening of banged objects are copy and discard, no default bang)
 - [x] architecture pictures drawn by a committed script from each module, `ev` and `λ` labels, linear.symmetric and linear.markov in the diagram
-- [WIP] @T-f1b236df-2026-11-26 12:49 docs, changelog, an architecture decision record, references checked against the papers
+- [x] docs, changelog, an architecture decision record, references checked against the papers
