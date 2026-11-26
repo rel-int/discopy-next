@@ -851,7 +851,8 @@ class Box(biclosed.Box, Diagram):
 
     def to_drawing(self):
         if self.args and self.z and all(
-                type(arg).draw_left_to_right == self.draw_left_to_right
+                hasattr(arg, "rotate")
+                and type(arg).draw_left_to_right == self.draw_left_to_right
                 for arg in self.args):
             # A box drawn around its args is turned with them: each one as
             # many times as the box, and side by side in reverse order when
