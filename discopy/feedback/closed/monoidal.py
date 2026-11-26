@@ -127,6 +127,8 @@ class Diagram(closed.monoidal.Diagram, feedback.Diagram):
         a :class:`Diagram` as a closed feedback category is traced: each curry
         becomes its argument followed by :class:`Coeval`, traced over the
         curried wires.
+        The args of any other box, e.g. a delayed :class:`Feedback`, are
+        converted inside it.
 
         Example
         -------
@@ -151,6 +153,9 @@ class Diagram(closed.monoidal.Diagram, feedback.Diagram):
                 return (box.arg.to_compact() >> self.coeval_factory(
                     box.cod, left=box.left)).trace(
                         len(box.cod.exponent), left=not box.left)
+            if box.args:
+                return box.rebuild(
+                    args=tuple(arg.to_compact() for arg in box.args))
             return box
         result = self.id(self.dom)
         for layer in self.inside:

@@ -191,7 +191,7 @@ class Box(cat.Box, Arrow):
         return tree
 
     @classmethod
-    def from_tree(cls, tree: dict) -> Box:
+    def from_tree(cls, tree: dict):
         box = super().from_tree(tree)
         box.time_step = tree.get('time_step', 0)
         return box

@@ -70,7 +70,7 @@ def picture(name):
     if name == "feedback":
         return m.Box("f", x @ x.delay(), x @ x).feedback()
     if name == "feedback.balanced":
-        return m.Braid(x, x).trace()
+        return m.Braid(x, x).trace().to_braided()
     if name == "feedback.symmetric":
         return m.Swap(x, x).trace(left=True)
     if name == "feedback.markov":

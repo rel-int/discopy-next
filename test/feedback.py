@@ -422,6 +422,9 @@ def test_time_stepped_wires_below_feedback():
     ).to_compact().trace()
     c = h.curry()
     assert (c + c).to_compact() == c.to_compact() + c.to_compact()
+    k = closed.monoidal.Box('k', y @ y.d, y @ y)
+    g = k.curry() @ y.d >> closed.monoidal.Diagram.ev(y @ y, y.d)
+    assert g.feedback(mem=y).to_compact() == g.to_compact().feedback(mem=y)
     for level in (closed.monoidal, closed.markov):
         z = level.Ty('z')
         F = level.Functor({z: compact.Ty('z')}, {}, cod=compact.Diagram)
@@ -763,3 +766,12 @@ def test_free_delay_category():
         f.delay(-3)
     with raises(TypeError):
         cat.Box('f', x, y, time_step=1.5)
+
+
+def test_draw_the_trace_of_ribbons():
+    from discopy.feedback import balanced
+    x = balanced.Ty('x')
+    for left in (False, True):
+        ribbon = balanced.Braid(x, x).trace(left=left).to_braided()
+        drawing = ribbon.to_drawing()
+        assert len(drawing.dom) == len(drawing.cod) == len(ribbon.dom) == 2

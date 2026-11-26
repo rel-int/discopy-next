@@ -87,6 +87,22 @@ class Diagram(planar.Diagram, symmetric.Diagram):
         """
         return cls.swap(y, x.bang()) if is_dagger else cls.swap(x.bang(), y)
 
+    @classmethod
+    def crossing(cls, left: Ty, right: Ty) -> Diagram:
+        """
+        Any two wires cross by the swap, so that :meth:`wiring` permutes
+        wires that are not banged too, and copies and discards only the
+        banged ones.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.wiring([1, 0], x @ y) == Swap(x, y)
+        >>> Diagram.wiring([0, 0], x @ y)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: x @ y is not banged: ...
+        """
+        return cls.swap(left, right)
+
 
 class Box(planar.Box, symmetric.Box, Diagram):
     """

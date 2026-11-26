@@ -213,6 +213,7 @@ The regions of a crossing follow its strands, see
 from __future__ import annotations
 
 import itertools
+from copy import copy
 from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
@@ -340,6 +341,16 @@ class PlaneGraph(NamedTuple):
             sorted(self.positions.items(), key=lambda item: key(item[0])))
         return f"PlaneGraph(graph=nx.DiGraph({adjacency}), "\
                f"positions={positions})"
+
+
+def swap_colours(wire):
+    """
+    The wire a trace loops back along, the colours on its sides swapped,
+    e.g. a ribbon edge coming back up on the other side of its ribbon.
+    """
+    result = copy(wire)
+    result.dom, result.cod = wire.cod, wire.dom
+    return result
 
 
 @factory
@@ -1369,13 +1380,17 @@ which to_drawing recomputes.
         cod = self.cod[1:] if left else self.cod[:-1]
         traced_dom = self.dom[:1] if left else self.dom[-1:]
         traced_cod = self.cod[:1] if left else self.cod[-1:]
-        cap_cod, cup_dom = traced_dom ** 2, (
-            traced_dom @ traced_cod if left else traced_cod @ traced_dom)
-        cup = Box('cup', cup_dom, Ty(), draw_as_wires=True).to_drawing()
-        cap = Box('cap', Ty(), cap_cod, draw_as_wires=True).to_drawing()
+        back = traced_dom.factory(*map(swap_colours, traced_dom.inside))
+        cap_cod, cup_dom = (
+            back @ traced_dom, back @ traced_cod) if left else (
+            traced_dom @ back, traced_cod @ back)
+        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom),
+                  draw_as_wires=True).to_drawing()
+        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod,
+                  draw_as_wires=True).to_drawing()
         return (
-            cap @ dom >> traced_dom @ self >> cup @ cod if left
-            else dom @ cap >> self @ traced_dom >> cod @ cup)
+            cap @ dom >> back @ self >> cup @ cod if left
+            else dom @ cap >> self @ back >> cod @ cup)
 
     def dagger(self) -> Drawing:
         """ The reflection of a drawing along the the horizontal axis. """
