@@ -20,6 +20,7 @@ Summary
     Layer
     Diagram
     Box
+    Sum
     Functor
     Match
     Equation
@@ -156,6 +157,7 @@ and a :class:`discopy.markov.Application` may use one twice.
 from __future__ import annotations
 
 import itertools
+from contextvars import ContextVar
 from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
@@ -168,7 +170,6 @@ from typing import (
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
-from discopy import sum as formal_sum
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
 # pylint: disable-next=unused-import  # the redex a term prints as
@@ -1454,7 +1455,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         messages.NO_PLANAR_NORMAL_FORM)
 
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type[formal_sum.Sum]]
+    sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
     draw_left_to_right: ClassVar[bool] = False
     ob = Ty
@@ -1588,7 +1589,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         if not others:
             return self
         for other in others:
-            if isinstance(other, formal_sum.Sum):
+            if isinstance(other, Sum):
                 return self.sum_factory((self, )).tensor(*others)
             assert_isinstance(other, self.ar)
             assert_isinstance(self, other.ar)
@@ -2713,6 +2714,56 @@ class Box(cat.Box, Diagram):
         return getattr(Drawing, method)(*args, **kwargs)
 
 
+class Sum(cat.Sum, Box):
+    """
+    A sum is a tuple of diagrams :code:`terms`
+    with the same domain and codomain.
+
+    Parameters:
+        terms (tuple[Diagram, ...]) : The terms of the formal sum.
+        dom (Ty) : The domain of the formal sum.
+        cod (Ty) : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> f = Box('f', 'x', 'x')
+    >>> print(f @ (f + f))
+    (f @ x >> x @ f) + (f @ x >> x @ f)
+    """
+    def tensor(self, *others):
+        """
+        The tensor of sums distributes over the sum, i.e. its terms are the
+        ``n``-ary tensors of one term from each factor.
+
+        >>> f = Box('f', 'x', 'x')
+        >>> assert (f + f) @ (f + f) == sum(4 * [f @ f])
+        """
+        if not others:
+            return self
+        sums = [
+            other if isinstance(other, Sum) else self.sum_factory((other, ))
+            for other in others]
+        dom = self.dom.tensor(*(other.dom for other in sums))
+        cod = self.cod.tensor(*(other.cod for other in sums))
+        terms = tuple(
+            term.tensor(*rest) for term in self.terms
+            for rest in itertools.product(
+                *(other.terms for other in sums)))
+        return self.sum_factory(terms, dom, cod)
+
+    to_drawing = Diagram.to_drawing
+
+
+# The type a wire is read in while its type is mapped: the type itself when
+# it is of the level of the domain or above, so that a functor reads a type
+# of a higher level as that type (next#703). A context variable, not an
+# attribute of the functor, so that concurrent calls do not share it, and
+# paired with the functor that set it, so that another functor called from
+# an object map reads its own domain's level.
+_WIRE_LEVEL: ContextVar[tuple[object, type] | None] = ContextVar(
+    "WIRE_LEVEL", default=None)
+
+
 class Functor(cat.Functor):
     """
     A monoidal functor is a functor that preserves the tensor product.
@@ -2838,14 +2889,22 @@ class Functor(cat.Functor):
                 if not issubclass(self.cod.ob, abc.Category):
                     return self.cod.ob()
                 return self.cod.ob.id(self(other.dom))
-            head, *tail = map(self, other.inside)
+            level = other.factory if isinstance(other, self.dom.ob)\
+                else self.dom.ob
+            token = _WIRE_LEVEL.set((self, level))
+            try:
+                head, *tail = map(self, other.inside)
+            finally:
+                _WIRE_LEVEL.reset(token)
             return head.tensor(*tail)
         if isinstance(other, self.dom.ob.generator_factory):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
                 return self(other.dagger()).dagger()
-            result = super().__call__(self.dom.ob(other))
+            owner, level = _WIRE_LEVEL.get() or (self, self.dom.ob)
+            level = level if owner is self else self.dom.ob
+            result = super().__call__(level(other))
             if isinstance(other, Wire) and isinstance(result, Ty):
                 expected = self(other.dom), self(other.cod)
                 if (result.dom, result.cod) != expected:
@@ -3012,7 +3071,7 @@ Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
 Diagram.box_factory = Box
-Diagram.sum_factory = formal_sum.Sum[Diagram]
+Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
@@ -3611,8 +3670,7 @@ Diagram.term_factory = TermBase
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
-__getattr__ = deprecated_alias(
-    __name__, {"PRO": "Nat", "Sum": Diagram.sum_factory})
+__getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
 
 
 Bubble = Box.from_args

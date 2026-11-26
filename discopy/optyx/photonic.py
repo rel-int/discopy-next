@@ -255,7 +255,7 @@ import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
 from discopy.matrix import repr_nonfinite
-from discopy.utils import factory_name
+from discopy.utils import factory_name, from_tree
 from discopy.matrix import asarray, backend, is_field
 
 from discopy.optyx import channel
@@ -351,6 +351,11 @@ class Encode(EncodeChannel):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class Discard(DiscardChannel):
     """
@@ -362,6 +367,11 @@ class Discard(DiscardChannel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
 
 
 class PhotonThresholdMeasurement(Channel):
@@ -393,6 +403,11 @@ class NumberResolvingMeasurement(Measure):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
 
 
 class Create(Channel):
@@ -452,6 +467,22 @@ class AbstractGate(Channel, ABC):
     def _normal_form(self, dom, cod):
         return matrix_to_zw(self.array.reshape(dom, cod),
                             dense=self.backend != "numpy")
+
+    def to_tree(self) -> dict:
+        """
+        The tree of a gate: its parameters are its data, and the flags
+        :code:`is_gate_dagger` and :code:`is_conj` are written when set.
+
+        >>> from discopy.utils import dumps, loads
+        >>> for gate in (Phase(.2), BBS(.1, is_conj=True),
+        ...              TBS(.3, is_gate_dagger=True), MZI(.1, .2)):
+        ...     assert loads(dumps(gate)) == gate
+        """
+        tree = super().to_tree()
+        for flag in ("is_gate_dagger", "is_conj"):
+            if getattr(self, flag, False):
+                tree[flag] = True
+        return tree
 
     @cached_property
     def array(self):
@@ -623,6 +654,10 @@ class Phase(AbstractGate):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.angle!r})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
+
     def _compute_array(self):
         module = self.module
         return [module.exp(2 * np.pi * 1j * self.angle)]
@@ -733,6 +768,10 @@ class BBS(AbstractGate):
         is_conj = ", is_conj=True" if self.is_conj else ""
         return f"{factory_name(type(self))}({self.bias!r}{is_conj})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'], tree.get('is_conj', False))
+
     def _compute_array(self):
         module = self.module
         sin = module.sin((0.25 + self.bias) * np.pi)
@@ -811,6 +850,11 @@ class TBS(AbstractGate):
             ("is_gate_dagger", self.is_gate_dagger),
             ("is_conj", self.is_conj)] if value)
         return f"{factory_name(type(self))}({self.theta!r}{flags})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'], *(
+            tree.get(flag, False) for flag in ("is_gate_dagger", "is_conj")))
 
     @cached_property
     def global_phase(self):
@@ -927,6 +971,11 @@ class MZI(AbstractGate):
             ("is_conj", self.is_conj)] if value)
         return f"{factory_name(type(self))}"\
             f"({self.theta!r}, {self.phi!r}{flags})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['data'], *(
+            tree.get(flag, False) for flag in ("is_gate_dagger", "is_conj")))
 
     @cached_property
     def global_phase(self):
