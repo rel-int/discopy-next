@@ -7,4 +7,4 @@
 - [x] Reference API order: syntax, semantics, drawing, lambek, neural, optyx, quantum
 - [x] Drawing on its own page docs/api/drawing.rst, out of semantics, shown once
 - [x] Short names in every autosummary entry and title, with a test that fails on a full name
-- [ ] Changelog entry
+- [WIP] @T-dc6d2cec-2026-11-26 11:54 Changelog entry
