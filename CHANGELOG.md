@@ -582,6 +582,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   separates each of the args nested in a box from the next, so that no two
   regions meet without one ([next#733]).
 
+- The architecture diagram of the syntax moves from the docstring of
+  `discopy.abc` to the syntax page of the docs, with the sentence that
+  describes it ([next#732]).
+
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
   category, e.g. `Matrix`, no longer has them, and the function
@@ -902,6 +906,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
   gradients in `tensor`'s product and chain rules; `Box`'s docstring draws
   "concepts with attitude" from higher-order DisCoCat ([next#735]).
+
+- The architecture diagram of `discopy.abc` draws `discopy.bang` branching
+  off `discopy.monoidal`, inside the syntax, and the docstring of
+  `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
+  ([next#732]).
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
@@ -2726,6 +2735,7 @@ for the changelog of `1.2.1` and earlier.
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736

@@ -6,13 +6,6 @@ the characteristic generator of its categorical structure as an
 ``abc.abstractmethod``, e.g. :class:`BraidedCategory` is a
 :class:`MonoidalCategory` with an abstract :meth:`BraidedCategory.braid`.
 
-.. raw:: html
-    :file: ../docs/api/architecture.html
-
-The diagram shows the syntax, the free categories of each level: software
-dependencies between their modules go top-to-bottom, left-to-right and
-forgetful functors between the categories go the other way.
-
 Each class also declares its :func:`discopy.testable.axiom` equations, which
 every free category inherits along with the structure they axiomatise:
 :class:`Category` states the unitality and associativity of composition; a
