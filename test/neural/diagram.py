@@ -10,6 +10,17 @@ from itertools import combinations
 
 import pytest
 
+torch = pytest.importorskip("torch")
+
+from discopy import frobenius  # noqa: E402
+from discopy.neural import network  # noqa: E402
+from discopy.neural.diagram import (  # noqa: E402
+    MESSAGE, Fire, Gather, Reply, buckets, closed, interpret, legs, of,
+    on_nodes, pack, stack, wires)
+from discopy.neural.recursion import FactorNet, PeerNet  # noqa: E402
+from discopy.neural.torch import Module  # noqa: E402
+from discopy.neural.wiring import from_map, primal  # noqa: E402
+
 WIDTHS = (4, 6, 8, 5)
 TRIANGLE = ((0, 1, 2), )
 PATH = ((0, 1), (1, 2))
@@ -30,9 +41,6 @@ CASES = [("peer", TRIANGLE, False), ("peer", SUDOKU, False),
 
 
 def build(kind, units, split=False, halt=False, cell_split=False, gru=False):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.recursion import FactorNet, PeerNet
-    from discopy.neural.wiring import primal
     torch.manual_seed(0)
     if kind == "peer":
         net = PeerNet(WIDTHS, primal(units), 3, 2, 3, 1, halt=halt)
@@ -43,27 +51,31 @@ def build(kind, units, split=False, halt=False, cell_split=False, gru=False):
     return net.double()
 
 
-def clue(torch, units, seed=1):
+def clue(units, seed=1):
     cells = 1 + max(max(unit) for unit in units)
     g = torch.Generator().manual_seed(seed)
     return (torch.rand(2, cells, 3, generator=g) > 0.5).double()
 
 
-def uniform(torch, state, seed=2):
+def uniform(state, seed=2):
     g = torch.Generator().manual_seed(seed)
     return type(state)(*(
         2 * torch.rand(t.shape, generator=g, dtype=t.dtype) - 1
         for t in state))
 
 
+def weighted(tensors, seed=3):
+    g = torch.Generator().manual_seed(seed)
+    return sum((torch.rand(t.shape, generator=g, dtype=t.dtype) * t).sum()
+               for t in tensors)
+
+
 @pytest.mark.parametrize("kind, units, split", CASES)
 @pytest.mark.parametrize("cell_split", [False, True])
 @pytest.mark.parametrize("gru", [False, True])
 def test_round(kind, units, split, cell_split, gru):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of
     net = build(kind, units, split, cell_split=cell_split, gru=gru)
-    s = uniform(torch, net.initial(clue(torch, units)))
+    s = uniform(net.initial(clue(units)))
     given, memory = legs(net, s)
     out = of(net).arg.to_function(torch.Tensor)(*given, *memory)
     expected = legs(net, net.round(s))[1]
@@ -72,30 +84,11 @@ def test_round(kind, units, split, cell_split, gru):
         torch.testing.assert_close(got, want, **TOL)
 
 
-@pytest.mark.parametrize("kind, units", [("peer", TRIANGLE),
-                                         ("factor", PATH)])
-def test_halt_adds_no_parameter(kind, units):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of
-    from discopy.neural.torch import Module
-    net = build(kind, units, halt=True)
-    s = net.initial(clue(torch, units))
-    found = {id(p) for p in Module(of(net).arg).parameters()}
-    assert not found & {id(p) for p in net.halt.parameters()}
-    plain = build(kind, units)
-    shapes = [[leg.shape for leg in part] for part in legs(net, s)]
-    assert shapes == [[leg.shape for leg in part] for part in legs(
-        plain, plain.initial(clue(torch, units)))]
-    assert len(of(net).mem) == len(of(plain).mem)
-
-
 @pytest.mark.parametrize("kind, units, split", CASES)
 def test_trace(kind, units, split):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of
     net = build(kind, units, split)
     trace = of(net)
-    s = net.initial(clue(torch, units))
+    s = net.initial(clue(units))
     given = legs(net, s)[0]
     for rounds in range(1, net.rounds + 2):
         s = net.round(s)
@@ -106,11 +99,15 @@ def test_trace(kind, units, split):
 
 @pytest.mark.parametrize("kind, units", [("peer", TRIANGLE),
                                          ("factor", PATH)])
-def test_parameters_are_the_nets(kind, units):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import of
-    from discopy.neural.torch import Module
-    net = build(kind, units)
+@pytest.mark.parametrize("halt", [False, True])
+def test_parameters_are_the_nets(kind, units, halt):
+    net = build(kind, units, halt=halt)
+    plain = build(kind, units)
+    s = net.initial(clue(units))
+    assert [[leg.shape for leg in part] for part in legs(net, s)] == [
+        [leg.shape for leg in part]
+        for part in legs(plain, plain.initial(clue(units)))]
+    assert len(of(net).mem) == len(of(plain).mem)
     children = [name for name, _ in net.named_children()]
     keys, state = list(net.state_dict()), torch.get_rng_state()
     module = Module(of(net).arg)
@@ -126,25 +123,18 @@ def test_parameters_are_the_nets(kind, units):
 
 @pytest.mark.parametrize("kind, units, split", CASES)
 def test_unrolled_gradients(kind, units, split):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of
     net = build(kind, units, split)
-    leaf = clue(torch, units).requires_grad_()
+    leaf = clue(units).requires_grad_()
     s = net.initial(leaf)
     given = legs(net, s)[0]
     for _ in range(3):
         s = net.round(s)
     expected = legs(net, s)[1]
-    g = torch.Generator().manual_seed(3)
-    weights = [torch.rand(t.shape, generator=g, dtype=t.dtype)
-               for t in expected]
     out = of(net).to_function(torch.Tensor, rounds=3)(*given)
-    image = sum((w * t).sum() for w, t in zip(weights, out, strict=True))
-    table = sum((w * t).sum() for w, t in zip(weights, expected))
     wrt = list(net.parameters()) + [leaf]
-    got = torch.autograd.grad(image, wrt, retain_graph=True,
+    got = torch.autograd.grad(weighted(out), wrt, retain_graph=True,
                               allow_unused=True)
-    want = torch.autograd.grad(table, wrt, allow_unused=True)
+    want = torch.autograd.grad(weighted(expected), wrt, allow_unused=True)
     assert any(x is not None for x in want)
     for x, y in zip(got, want, strict=True):
         assert (x is None) == (y is None)
@@ -153,19 +143,13 @@ def test_unrolled_gradients(kind, units, split):
 
 
 def test_a_state_may_not_be_a_message():
-    from discopy.frobenius import Box, CMap, Ty
-    from discopy.neural.diagram import MESSAGE, interpret
-    from discopy.neural.network import Dims
-    box = Box("node", Ty(), MESSAGE @ MESSAGE)
-    looped = CMap.from_wiring((box, ), [((0, 0), (0, 1))])
+    box = frobenius.Box("node", frobenius.Ty(), MESSAGE @ MESSAGE)
+    looped = frobenius.CMap.from_wiring((box, ), [((0, 0), (0, 1))])
     with pytest.raises(ValueError, match="not a state"):
-        interpret(looped, {MESSAGE: Dims(1)}, {"node": abs})
+        interpret(looped, {MESSAGE: network.Dims(1)}, {"node": abs})
 
 
 def test_the_peers_must_be_symmetric():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import closed, of
-    from discopy.neural.recursion import PeerNet
     net = PeerNet(WIDTHS, ((1, 2), (0, 3), (3, 1), (2, 0)), 3, 2, 3, 1)
     for function in (closed, of):
         with pytest.raises(ValueError, match="symmetric"):
@@ -173,8 +157,6 @@ def test_the_peers_must_be_symmetric():
 
 
 def test_factor_named_as_nodes():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import of
     net = build("factor", PATH)
     net.factor = "cell"
     with pytest.raises(ValueError, match="named 'cell'"):
@@ -183,22 +165,17 @@ def test_factor_named_as_nodes():
 
 @pytest.mark.parametrize("kind, units, split", CASES)
 def test_gradients(kind, units, split):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of
     net = build(kind, units, split)
-    s = uniform(torch, net.initial(clue(torch, units)))
+    s = uniform(net.initial(clue(units)))
     given, memory = legs(net, s)
     expected = legs(net, net.round(s))[1]
-    g = torch.Generator().manual_seed(3)
-    weights = [torch.rand(t.shape, generator=g, dtype=t.dtype)
-               for t in expected]
     params = list(net.cell.parameters()) + [
         p for name in net.factors for p in getattr(net, name).parameters()]
     out = of(net).arg.to_function(torch.Tensor)(*given, *memory)
-    image = sum((w * t).sum() for w, t in zip(weights, out))
-    table = sum((w * t).sum() for w, t in zip(weights, expected))
+    image = weighted(out[:len(expected)])
     for got, want in zip(torch.autograd.grad(image, params),
-                         torch.autograd.grad(table, params), strict=True):
+                         torch.autograd.grad(weighted(expected), params),
+                         strict=True):
         torch.testing.assert_close(got, want, rtol=1e-10, atol=1e-10)
 
 
@@ -244,10 +221,8 @@ def named(trace):
 @pytest.mark.parametrize("kind, units", STACKED)
 @CELLS
 def test_stack_round(kind, units, cell_split, gru, halt):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of, pack, stack
     net = build(kind, units, halt=halt, cell_split=cell_split, gru=gru)
-    s = uniform(torch, net.initial(clue(torch, units)))
+    s = uniform(net.initial(clue(units)))
     given, memory = legs(net, s)
     trace, image = of(net), stack(of(net))
     packed = pack(trace, given, memory)
@@ -264,10 +239,8 @@ def test_stack_round(kind, units, cell_split, gru, halt):
 
 @pytest.mark.parametrize("units", [SUDOKU, K4, K33])
 def test_stack_regular_layout(units):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of, pack
     net = build("factor", units)
-    s = uniform(torch, net.initial(clue(torch, units)))
+    s = uniform(net.initial(clue(units)))
     memory = pack(of(net), *legs(net, s))[1]
     assert len(memory) == net.degree + 1 + net.arity
     for k in range(net.degree):
@@ -280,11 +253,9 @@ def test_stack_regular_layout(units):
 @pytest.mark.parametrize("kind, units", STACKED)
 @CELLS
 def test_stack_trace(kind, units, cell_split, gru, halt):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of, pack, stack
     net = build(kind, units, halt=halt, cell_split=cell_split, gru=gru)
     trace, image = of(net), stack(of(net))
-    s = net.initial(clue(torch, units))
+    s = net.initial(clue(units))
     given, memory = legs(net, s)
     packed = pack(trace, given, memory)[0]
     for rounds in range(1, net.rounds + 2):
@@ -296,20 +267,12 @@ def test_stack_trace(kind, units, cell_split, gru, halt):
             torch.testing.assert_close(got, expected, **TOL)
 
 
-def weighted(torch, tensors, seed=3):
-    g = torch.Generator().manual_seed(seed)
-    return sum((torch.rand(t.shape, generator=g, dtype=t.dtype) * t).sum()
-               for t in tensors)
-
-
 @pytest.mark.parametrize("kind, units", STACKED)
 @pytest.mark.parametrize("rounds", [1, 3])
 def test_stack_gradients(kind, units, rounds):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of, pack, stack
     net = build(kind, units)
     trace, image = of(net), stack(of(net))
-    given, memory = legs(net, net.initial(clue(torch, units)))
+    given, memory = legs(net, net.initial(clue(units)))
     leaves = [t.detach().requires_grad_() for t in given]
     packed = pack(trace, leaves, memory)[0]
     out = image.to_function(torch.Tensor, rounds=rounds)(*packed)
@@ -317,10 +280,9 @@ def test_stack_gradients(kind, units, rounds):
     want = pack(trace, leaves, reference)[1]
     assert shaped(out, image)
     wrt = [*net.parameters(), *leaves]
-    got = torch.autograd.grad(weighted(torch, out), wrt, retain_graph=True,
+    got = torch.autograd.grad(weighted(out), wrt, retain_graph=True,
                               allow_unused=True)
-    expected = torch.autograd.grad(weighted(torch, want), wrt,
-                                   allow_unused=True)
+    expected = torch.autograd.grad(weighted(want), wrt, allow_unused=True)
     assert expected[-1] is not None
     for a, b in zip(got, expected, strict=True):
         assert (a is None) == (b is None)
@@ -332,11 +294,9 @@ def test_stack_gradients(kind, units, rounds):
     (grid(3), 1), (grid(6), 1), (STAR, 2), (DISTINCT, 6), (K4, 1)])
 @pytest.mark.parametrize("rounds", [1, 3])
 def test_stack_calls_each_module_once_per_bucket(units, degrees, rounds):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import legs, of, pack, stack
     net = build("factor", units)
     trace = of(net)
-    s = net.initial(clue(torch, units))
+    s = net.initial(clue(units))
     packed = pack(trace, *legs(net, s))[0]
     image = stack(trace)
     modules = {box.name: box.module for box in image.arg.boxes
@@ -352,8 +312,6 @@ def test_stack_calls_each_module_once_per_bucket(units, degrees, rounds):
 
 
 def test_stack_boxes_do_not_grow_with_the_graph():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import of, stack
     sizes = [(len(named(of(net))), named(stack(of(net)))) for net in (
         build("factor", grid(n)) for n in (3, 6))]
     assert sizes == [(15, ["cell", "unit", "gather"]),
@@ -361,9 +319,6 @@ def test_stack_boxes_do_not_grow_with_the_graph():
 
 
 def test_stack_has_the_parameters_of_the_net():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import of, stack
-    from discopy.neural.torch import Module
     net = build("factor", PATH)
     found = [id(p) for p in Module(stack(of(net)).arg).parameters()]
     shared = [net.cell] + [getattr(net, name) for name in net.factors]
@@ -372,54 +327,42 @@ def test_stack_has_the_parameters_of_the_net():
 
 
 def test_stack_mixed_degrees_have_a_box_each():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import buckets, of, stack
     trace = of(build("factor", STAR))
     assert [len(group) for group in buckets(trace)[1]] == [3, 1, 3]
     assert named(stack(trace)) == ["cell", "cell", "unit", "gather"]
 
 
 def test_stack_buckets_are_nodes_then_factors():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import buckets, of
     parts, groups = buckets(of(build("factor", K4)))
     assert [len(group) for group in groups] == [4, 6]
     assert [parts[group[0]].name for group in groups] == ["cell", "unit"]
 
 
 def test_stack_one_node_has_no_node_axis():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import fold, of, stack
     box = [b for b in of(build("factor", ONE)).arg.boxes if b.module][-1]
-    assert fold(box, 1) is box
-    assert fold(box, 2).dom != box.dom
+    assert on_nodes(box, 1) is box
+    assert on_nodes(box, 2).dom != box.dom
     assert all(len(dim.inside) == 1
                for dim in stack(of(build("factor", ONE))).mem.inside[2:])
 
 
 def test_stack_same_name_other_module_is_another_bucket():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import buckets
-    from discopy.neural.network import Box, Dims, Function, Trace
-    boxes = [Box("f", Dims(2), Dims(2), module=module)
+    dims = network.Dims(2, 2, 2)
+    boxes = [network.Box("f", network.Dims(2), network.Dims(2), module=module)
              for module in (abs, abs, round)]
-    body = Function(Dims(2, 2, 2), [0, 1, 2]) >> boxes[0] @ boxes[1] @ boxes[2]
-    assert buckets(Trace(body, mem=Dims(2, 2, 2)))[1] == [[0, 1], [2]]
+    body = network.Function(dims, [0, 1, 2]) >> boxes[0] @ boxes[1] @ boxes[2]
+    assert buckets(network.Trace(body, mem=dims))[1] == [[0, 1], [2]]
 
 
 def test_wires_need_a_trace_drawn_by_interpret():
-    pytest.importorskip("torch")
-    from discopy.neural.diagram import wires
-    from discopy.neural.network import Box, Dims, Trace
+    box = network.Box("f", network.Dims(2), network.Dims(2), module=abs)
     with pytest.raises(ValueError, match="interpret"):
-        wires(Trace(Box("f", Dims(2), Dims(2), module=abs), mem=Dims(2)))
+        wires(network.Trace(box, mem=network.Dims(2)))
 
 
 @pytest.mark.parametrize("cell_split", [False, True])
 @pytest.mark.parametrize("gru", [False, True])
 def test_fire_on_stacked_nodes_is_the_loop(cell_split, gru):
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import Fire
     net = build("factor", PATH, cell_split=cell_split, gru=gru)
     fire, g = Fire(net.cell), torch.Generator().manual_seed(4)
     rand = lambda *shape: torch.rand(*shape, generator=g, dtype=torch.double)
@@ -434,10 +377,9 @@ def test_fire_on_stacked_nodes_is_the_loop(cell_split, gru):
 
 
 def test_reply_on_stacked_factors_is_the_loop():
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import Reply
     net = build("factor", PATH)
-    reply, g = Reply(getattr(net, net.factor)), torch.Generator().manual_seed(5)
+    reply = Reply(getattr(net, net.factor))
+    g = torch.Generator().manual_seed(5)
     beliefs = [torch.rand(2, 3, 4, generator=g, dtype=torch.double)
                for _ in range(2)]
     stacked = reply(*beliefs)
@@ -448,9 +390,6 @@ def test_reply_on_stacked_factors_is_the_loop():
 
 
 def test_gather_is_a_module_with_a_public_wiring():
-    torch = pytest.importorskip("torch")
-    from discopy.neural.diagram import Gather, legs, of, pack, stack
-    from discopy.neural.torch import Module
     gather = Gather((((0, 1), (2, 1)), ((1,), (0, )), ((0,), (0, 1))), (2, 1))
     assert eval(repr(gather), {"Gather": Gather}).wired == gather.wired
     assert gather.index.tolist() == [2, 1, 0, 0, 1]
@@ -460,7 +399,7 @@ def test_gather_is_a_module_with_a_public_wiring():
     assert second is b and third is a
     assert torch.equal(first, torch.cat([a, b[:, None]], 1)[:, [2, 1]])
     net = build("factor", PATH)
-    s = net.initial(clue(torch, PATH))
+    s = net.initial(clue(PATH))
     trace = of(net)
     packed = pack(trace, *legs(net, s))
     module = Module(stack(trace).arg)
@@ -478,8 +417,6 @@ def test_gather_is_a_module_with_a_public_wiring():
 
 @pytest.mark.parametrize("kind, units, split", CASES)
 def test_wiring_is_the_table(kind, units, split):
-    from discopy.neural.diagram import closed
-    from discopy.neural.wiring import from_map, primal
     net = build(kind, units, split)
     assert from_map(closed(net)) == (
         primal(units) if kind == "peer" else units)
