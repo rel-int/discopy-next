@@ -344,7 +344,7 @@ class Legs(torch.nn.Module):
         torch.Size([5, 1, 1])
         """
         kept = tensor.ndim - len(Dim(*shape).inside)
-        return tensor.reshape(*tensor.shape[:kept], *shape)
+        return tensor.reshape((*tensor.shape[:kept], *shape))
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
@@ -364,7 +364,7 @@ class Legs(torch.nn.Module):
             self.restore(v, self.dom.size, c),
             self.restore(w, self.orbits, d, c),
             None if b is None else self.restore(b, self.bias_orbits, d))
-        return out.reshape(*out.shape[:-2], *Dim(self.cod.size, d).inside)
+        return out.reshape((*out.shape[:-2], *Dim(self.cod.size, d).inside))
 
 
 def layer(dom: Action, cod: Action, channels: tuple[int, int] = (1, 1),
