@@ -914,6 +914,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The label of an exponential wire is made of the labels of its base and
+  exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
+  `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
+
 - A box with as many outputs as inputs, e.g. a swap drawn as a box, draws
   each output straight down from the input above it, rather than bending the
   wire below into the next box when the labels of its inputs and outputs have
@@ -2782,7 +2786,7 @@ for the changelog of `1.2.1` and earlier.
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
 [next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#748]: https://github.com/rel-int/discopy-next/pull/748
-[next#764]: https://github.com/rel-int/discopy-next/pull/764
+[next#762]: https://github.com/rel-int/discopy-next/pull/762
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
@@ -2793,6 +2797,7 @@ for the changelog of `1.2.1` and earlier.
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
+[next#764]: https://github.com/rel-int/discopy-next/pull/764
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
