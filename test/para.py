@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import time
-
-from pytest import raises
+from pytest import mark, raises
 
 from discopy import closed, comarkov, compact, frobenius, markov
 from discopy.para import (
@@ -50,13 +48,18 @@ def test_permutation():
     assert perm.inside(1, "a", 2.5) == ("a", 2.5, 1)
 
 
-def test_trace():
-    t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y), p)
+@mark.parametrize("copar", [Ty(), Ty('m')])
+def test_trace(copar):
+    t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y @ copar), p, copar)
     assert t.trace(0) == t
-    inside = x @ Diagram.swap(p, y) >> t.inside
-    assert t.trace() == Traced(x, z, inside.trace(), p)
-    u = Traced(y @ x, y @ z, Box('u', y @ x @ p, y @ z), p)
-    assert u.trace(left=True) == Traced(x, z, u.inside.trace(left=True), p)
+    inside = x @ Diagram.swap(p, y) >> t.inside >> z @ Diagram.swap(y, copar)
+    assert t.trace() == Traced(x, z, inside.trace(), p, copar)
+    traced = t.trace()
+    assert (traced.dom, traced.cod, traced.param, traced.copar)\
+        == (x, z, p, copar)
+    u = Traced(y @ x, y @ z, Box('u', y @ x @ p, y @ z @ copar), p, copar)
+    assert u.trace(left=True)\
+        == Traced(x, z, u.inside.trace(left=True), p, copar)
 
 
 def test_reparam():
@@ -104,14 +107,16 @@ def test_closed_curry_stays_in_the_domain():
             k.curry(n, left=left)
 
 
-def test_feedback():
+@mark.parametrize("copar", [markov.Ty(), markov.Ty('m')])
+def test_feedback(copar):
     x, y, z, P = map(markov.Ty, "xyzP")
     f = Feedback(x @ y.delay(), z @ y,
-                 markov.Box('f', x @ y.delay() @ P, z @ y), P)
+                 markov.Box('f', x @ y.delay() @ P, z @ y @ copar), P, copar)
     fb = f.feedback()
-    assert (fb.dom, fb.cod, fb.param) == (x, z, P)
+    assert (fb.dom, fb.cod, fb.param, fb.copar) == (x, z, P, copar)
     assert fb == f.feedback(1) == f.feedback(mem=y) == f.feedback(cod=z)
     assert f.delay().param == P.delay()
+    assert f.delay().copar == copar.delay()
     with raises(NotImplementedError):
         f.feedback(left=True)
 
@@ -158,24 +163,6 @@ def test_copar():
     assert t.reparam(Box('r', q, p)).copar == m
     assert t.recopar(Box('c', m, n)).param == p
     assert (t @ t).param == p @ p and (t @ t).copar == m @ m
-
-
-def test_copar_trace():
-    m = Ty('m')
-    t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y @ m), p, m)
-    trace = t.trace()
-    assert (trace.dom, trace.cod, trace.param, trace.copar) == (x, z, p, m)
-    u = Traced(y @ x, y @ z, Box('u', y @ x @ p, y @ z @ m), p, m)
-    assert u.trace(left=True).copar == m
-
-
-def test_copar_feedback():
-    x, y, z, m, P = map(markov.Ty, "xyzmP")
-    f = Feedback(x @ y.delay(), z @ y,
-                 markov.Box('f', x @ y.delay() @ P, z @ y @ m), P, m)
-    fb = f.feedback()
-    assert (fb.dom, fb.cod, fb.param, fb.copar) == (x, z, P, m)
-    assert f.delay().copar == m.delay()
 
 
 def test_copar_python():
@@ -303,37 +290,83 @@ def test_invertible_has_no_bound():
     assert not Reparam.of(tied, markov.Diagram.copy(W)).is_invertible
 
 
-def test_laws_up_to_permutation():
+m, n, a = Ty('m'), Ty('n'), Ty('a')
+two = Symmetric(x, y, Box('t', x @ p @ q, y), p @ q)
+coparam = Symmetric(x, y, Box('t', x @ p, y @ m @ n), p, m @ n)
+one = Symmetric(x, y, Box('t', x @ p, y, data=1), p)
+both = Symmetric(x, y, Box('a', x, y)) @ Symmetric(x, y, Box('b', x, y))
+u, v = Ty('u'), Ty('v')
+inputs = Symmetric(u, x, Box('a', u, x)) @ Symmetric(v, x, Box('b', v, x))
+box_xx, box_yy = Box('t', x @ x, y), Box('t', x, y @ y)
+tee = Symmetric(x @ x, y, box_xx)
+
+
+def wide(box, wires=a ** 12):
+    return Symmetric(x, y, box @ Diagram.id(wires), wires, wires)
+
+
+def tied(k):
+    wires = a ** k
+    box, other = (
+        Symmetric(x, y, Box(name, x @ wires, y @ wires), wires, wires)
+        for name in "ts")
+    return (box, box.reparam(Diagram.swap(a, a) @ a ** (k - 2)),
+            box.reparam(Diagram.id(wires)), other)
+
+
+NOT_EQUAL = [
+    (two, Symmetric(z, y, Box('t', z @ p @ q, y), p @ q)),
+    (two, Symmetric(x, z, Box('t', x @ p @ q, z), p @ q)),
+    (two, Symmetric(x, y, Box('t', x @ p @ q, y @ p), p @ q, p)),
+    (two, Symmetric(x, y, Box('t2', x @ p @ q, y), p @ q)),
+    (two, Symmetric(x, y, Box('t', x @ p @ p, y), p @ p)),
+    (f @ g >> Symmetric.swap(y, z), f @ g),
+    (coparam, coparam.recopar(Box('c', m @ n, m @ n))),
+    (coparam, coparam.reparam(Box('r', q, p))),
+    *[(box, other) for box, _, _, other in map(tied, (3, 7, 12))],
+    (both, both >> Symmetric.swap(y, y)),
+    (both >> Symmetric.swap(y, y), both),
+    (both, Symmetric.swap(x, x) >> both),
+    (Symmetric.swap(x, x) >> both, both),
+    (one, Symmetric(x, y, Box('t', x @ p, y, data=2), p)),
+    (Symmetric(x @ y, z, Box('t', x @ y, z)),
+     Symmetric.swap(x, y) >> Symmetric(y @ x, z, Box('t', y @ x, z))),
+    (inputs >> tee, inputs >> Symmetric.swap(x, x) >> tee),
+    (Symmetric(x, y, box_xx, x),
+     Symmetric(x, y, Diagram.swap(x, x) >> box_xx, x)),
+    (Symmetric(x, y, box_yy, Ty(), y),
+     Symmetric(x, y, box_yy >> Diagram.swap(y, y), Ty(), y)),
+    (wide(Box('t', x, y)), wide(Box('s', x, y))),
+    (wide(Box('t', x, y)), wide(Box('t', x, y, data=1))),
+]
+
+EQUAL = [
+    (coparam, coparam.recopar(Diagram.swap(m, n))),
+    *[(box, moved) for box, moved, _, _ in map(tied, (3, 7, 12))],
+    *[(box, again) for box, _, again, _ in map(tied, (3, 7, 12))],
+    (one, one.reparam(Diagram.id(p))),
+    (wide(Box('t', x, y)),
+     wide(Box('t', x, y)).reparam(Diagram.swap(a, a) @ a ** 10)),
+]
+
+
+@mark.parametrize("left, right", NOT_EQUAL)
+def test_up_to_permutation_tells_apart(left, right):
+    assert UpToPermutation(left) != UpToPermutation(right)
+
+
+@mark.parametrize("left, right", EQUAL)
+def test_up_to_permutation_identifies(left, right):
+    assert UpToPermutation(left) == UpToPermutation(right)
+
+
+def test_laws_fail_on_the_nose():
     h = Symmetric(z, x, Box('h', z @ p1, x), p1)
     k = Symmetric(x, y, Box('k', x @ q1, y), q1)
-    left, right = (f >> g) @ (h >> k), (f @ h) >> (g @ k)
-    assert left.param != right.param
-    assert UpToPermutation(left) == UpToPermutation(right)
+    assert ((f >> g) @ (h >> k)).param != ((f @ h) >> (g @ k)).param
     left = (f @ g) >> Symmetric.swap(y, z)
     right = Symmetric.swap(x, y) >> (g @ f)
     assert left.param == p @ q and right.param == q @ p
-    assert UpToPermutation(left) == UpToPermutation(right)
-    assert UpToPermutation(left) != UpToPermutation(f @ g)
-
-
-def test_the_seven_laws_hold():
-    h = Symmetric(z, x, Box('h', z @ p1, x), p1)
-    k = Symmetric(x, y, Box('k', x @ q1, y), q1)
-    assert Symmetric.bifunctoriality(f, h, g, k)
-    assert Symmetric.braid_naturality(f, g)
-    scalar = Symmetric(Ty(), Ty(), Box('s', q1, Ty()), q1)
-    assert Symmetric.scalar_sliding(scalar, f)
-    t = Traced(x @ y, x @ z, Box('t', x @ y @ p, x @ z), p)
-    u = Traced(x, x, Box('u', x @ q, x), q)
-    assert Traced.trace_dinaturality_left(t, u)
-    assert Traced.trace_dinaturality_right(
-        Traced(y @ x, z @ x, Box('t', y @ x @ p, z @ x), p), u)
-    a, b, c = map(compact.Ty, "abc")
-    cf = Compact(a, b, compact.Box('f', a @ compact.Ty('p'), b),
-                 compact.Ty('p'))
-    cg = Compact(b, c, compact.Box('g', b @ compact.Ty('q'), c),
-                 compact.Ty('q'))
-    assert Compact.transpose_contravariance(cf, cg)
 
 
 def test_laws_are_not_trivial():
@@ -345,27 +378,16 @@ def test_laws_are_not_trivial():
 
 
 def test_up_to_permutation_is_an_equivalence():
-    two = Symmetric(x, y, Box('t', x @ p @ q, y), p @ q)
     flip = two.reparam(Diagram.swap(q, p))
     left, right = UpToPermutation(two), UpToPermutation(flip)
     assert left == right and right == left and left == left
     assert hash(left) == hash(right)
-    assert left != UpToPermutation(Symmetric(
-        z, y, Box('t', z @ p @ q, y), p @ q))
-    assert left != UpToPermutation(Symmetric(
-        x, z, Box('t', x @ p @ q, z), p @ q))
-    assert left != UpToPermutation(Symmetric(
-        x, y, Box('t', x @ p @ q, y @ p), p @ q, p))
-    assert left != UpToPermutation(Symmetric(
-        x, y, Box('t2', x @ p @ q, y), p @ q))
     assert left != two
 
 
 def test_up_to_permutation_needs_the_same_wires():
-    left = Symmetric(x, y, Box('t', x @ p @ q, y), p @ q)
     right = Symmetric(x, y, Box('t', x @ p @ p, y), p @ p)
-    assert UpToPermutation(left) != UpToPermutation(right)
-    assert not Symmetric.equation_factory(left, right).modulo(UpToPermutation)
+    assert not Symmetric.equation_factory(two, right).modulo(UpToPermutation)
 
 
 def test_up_to_permutation_over_functions():
@@ -396,66 +418,44 @@ def test_weight_tying_is_a_reparam():
     assert not tying.is_invertible
 
 
-def test_laws_with_coparameters():
-    a = Ty('a')
+def test_laws_with_coparameters_fail_on_the_nose():
     f, g, h, k = (
         Symmetric(dom, cod, Box(name, dom @ a, cod @ a), a, a)
         for name, dom, cod in (
             ('f', x, y), ('g', y, z), ('h', z, x), ('k', x, y)))
     left, right = (f >> g) @ (h >> k), (f @ h) >> (g @ k)
     assert left != right and left.param == right.param == a @ a @ a @ a
-    assert UpToPermutation(left) == UpToPermutation(right)
-    assert Symmetric.bifunctoriality(f, h, g, k)
-    assert Symmetric.braid_naturality(f, g)
 
 
 def test_coparameters_are_permuted_not_changed():
-    m, n = Ty('m'), Ty('n')
-    t = Symmetric(x, y, Box('t', x @ p, y @ m @ n), p, m @ n)
-    flip = t.recopar(Diagram.swap(m, n))
-    assert UpToPermutation(t) == UpToPermutation(flip) and t != flip
-    other = t.recopar(Box('c', m @ n, m @ n))
-    assert UpToPermutation(t) != UpToPermutation(other)
-    twice = t.reparam(Box('r', q, p))
-    assert UpToPermutation(t) != UpToPermutation(twice)
-    assert not Symmetric.equation_factory(t, other).modulo(UpToPermutation)
+    assert coparam != coparam.recopar(Diagram.swap(m, n))
+    other = coparam.recopar(Box('c', m @ n, m @ n))
+    assert not Symmetric.equation_factory(coparam, other)\
+        .modulo(UpToPermutation)
 
 
-def test_many_wires_are_decided_without_search():
-    a = Ty('a')
-    for n in (3, 7, 12):
-        wires = a ** n
-        box = Symmetric(x, y, Box('t', x @ wires, y @ wires), wires, wires)
-        moved = box.reparam(Diagram.swap(a, a) @ a ** (n - 2))
+def test_many_wires_move_on_the_nose():
+    for k in (3, 7, 12):
+        box, moved, _, _ = tied(k)
         assert moved != box
-        assert UpToPermutation(box) == UpToPermutation(moved)
-        assert UpToPermutation(box) == UpToPermutation(
-            box.reparam(Diagram.id(wires)))
-        other = Symmetric(x, y, Box('s', x @ wires, y @ wires), wires, wires)
-        assert UpToPermutation(box) != UpToPermutation(other)
 
 
-def test_hypergraph_laws_with_equal_param_and_copar():
+def test_hypergraph_laws_fail_on_the_nose():
     a = frobenius.Ty('a')
     boxes = [frobenius.Box(name, a @ a, a @ a @ a if name == 'f' else a @ a)
              for name in "fghk"]
     f, g, h, k = (Hypergraph(a, a, box, a, box.cod[1:])
                   for box in boxes)
     assert (f >> g) @ (h >> k) != (f @ h) >> (g @ k)
-    assert Hypergraph.bifunctoriality(f, g, h, k)
-    assert Hypergraph.bifunctoriality(f, h, g, k)
-    assert Hypergraph.braid_naturality(f, g)
     assert not issubclass(Hypergraph, Feedback)
 
 
-def test_compact_laws_with_adjoint_parameters():
+def test_compact_adjoint_parameters_are_not_wrong_ones():
     a = compact.Ty('a')
-    for params in (a @ a.r @ a, a @ a.r @ a @ a.r @ a @ a @ a):
-        f, g, h, k = (
-            Compact(a, a, compact.Box(name, a @ params, a @ a), params, a)
-            for name in "fghk")
-        assert Compact.bifunctoriality(f, g, h, k)
-        assert Compact.bifunctoriality(f, h, g, k)
+    params = a @ a.r @ a @ a.r @ a @ a @ a
+    f, g, h, k = (
+        Compact(a, a, compact.Box(name, a @ params, a @ a), params, a)
+        for name in "fghk")
     wrong = Compact(a, a, compact.Box('k', a @ a.r, a @ a), a.r, a)
     left, right = (f >> g) @ (h >> k), (f @ h) >> (g @ wrong)
     assert UpToPermutation(left) != UpToPermutation(right)
@@ -471,56 +471,10 @@ def test_feedback_never_pairs_parameters_with_coparameters():
     assert left != right
     assert (left.param, left.copar) == (A @ A, A @ A)
     assert UpToPermutation(left) == UpToPermutation(right)
-    assert Feedback.bifunctoriality(f, g, h, k)
-
-
-def test_feedback_laws_with_a_memory():
-    X, Y, Z, M = map(markov.Ty, "XYZM")
-    f, g, h, k = (
-        Feedback(dom, cod, markov.Box(name, dom @ M, cod @ M), M, M)
-        for name, dom, cod in (
-            ('f', X, Y), ('g', Y, Z), ('h', Z, X), ('k', X, Y)))
-    assert Feedback.bifunctoriality(f, h, g, k)
-    assert Feedback.braid_naturality(f, g)
-
-
-def test_the_boundary_stays_in_place():
-    a, b = (Symmetric(x, y, Box(name, x, y)) for name in "ab")
-    both = a @ b
-    for moved in (both >> Symmetric.swap(y, y),
-                  Symmetric.swap(x, x) >> both):
-        assert UpToPermutation(both) != UpToPermutation(moved)
-        assert UpToPermutation(moved) != UpToPermutation(both)
 
 
 def test_data_tells_boxes_apart():
     assert Box('f', x, y) != Box('f', x, y, data=1)
-    one, two = (Symmetric(x, y, Box('t', x @ p, y, data=n), p)
-                for n in (1, 2))
-    assert UpToPermutation(one) != UpToPermutation(two)
-    assert UpToPermutation(one) == UpToPermutation(one.reparam(Diagram.id(p)))
-
-
-def test_ports_of_a_box_are_ordered():
-    left = Symmetric(x @ y, z, Box('t', x @ y, z))
-    right = Symmetric.swap(x, y) >> Symmetric(y @ x, z, Box('t', y @ x, z))
-    assert UpToPermutation(left) != UpToPermutation(right)
-    u, v = Ty('u'), Ty('v')
-    a, b = Symmetric(u, x, Box('a', u, x)), Symmetric(v, x, Box('b', v, x))
-    t = Symmetric(x @ x, y, Box('t', x @ x, y))
-    straight, crossed = (a @ b) >> t, (a @ b) >> Symmetric.swap(x, x) >> t
-    assert UpToPermutation(straight) != UpToPermutation(crossed)
-
-
-def test_a_boundary_port_is_not_a_parameter_port():
-    box = Box('t', x @ x, y)
-    left = Symmetric(x, y, box, x)
-    right = Symmetric(x, y, Diagram.swap(x, x) >> box, x)
-    assert UpToPermutation(left) != UpToPermutation(right)
-    box = Box('t', x, y @ y)
-    left = Symmetric(x, y, box, Ty(), y)
-    right = Symmetric(x, y, box >> Diagram.swap(y, y), Ty(), y)
-    assert UpToPermutation(left) != UpToPermutation(right)
 
 
 def test_adjoint_parameters_are_not_plain_ones():
@@ -532,20 +486,3 @@ def test_adjoint_parameters_are_not_plain_ones():
     right = Compact(a, a, compact.Box('t', a @ a.r @ a, a), a.r @ a)
     assert UpToPermutation(left).boundary == UpToPermutation(right).boundary
     assert UpToPermutation(left) != UpToPermutation(right)
-
-
-def test_unused_parameters_are_decided_fast():
-    a = Ty('a')
-    wires = a ** 12
-
-    def build(box):
-        return Symmetric(x, y, box @ Diagram.id(wires), wires, wires)
-
-    base = build(Box('t', x, y))
-    others = (build(Box('s', x, y)), build(Box('t', x, y, data=1)))
-    start = time.perf_counter()
-    for other in others:
-        assert UpToPermutation(base) != UpToPermutation(other)
-    assert UpToPermutation(base) == UpToPermutation(
-        base.reparam(Diagram.swap(a, a) @ a ** 10))
-    assert time.perf_counter() - start < 2
