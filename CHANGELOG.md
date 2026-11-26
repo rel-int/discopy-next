@@ -52,15 +52,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   to, e.g. `Nat` for `abc.PRO`, and `discolean/` proves the coherence of
   `discopy.monoidal`:
   Diagram(S) is the free model of the laws of `monoidal.Diagram` ([next#671]).
-- The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
+- `discopy.lambek.modality`, the Lambek calculus with a relevant modality
+  `!L*` of arXiv:2110.10641: the categorial types and diagrams of
+  `discopy.lambek.categorial` with the bang and the structural boxes of
+  `discopy.bang`, and the kappa terms of `discopy.bang` whose functions are
+  applied by `Eval`. Its `Functor` sends the exponentials through the closed
+  structure of its codomain only when that is a closed category, and through
+  `ob_map` and `ar_map` otherwise ([next#691]).
+- The notebook `docs/notebooks/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
-  Bill does too.*, with photons: each reading is a kappa term of
-  `discopy.bang`, sent by a `bang.Functor` to a diagram of
-  `discopy.optyx.core.zw` where a word vector is one photon over modes, `!`
-  the bosonic Fock space of those modes, the paper's k-extension the W node
-  and its basis copy the Z spider. Anaphora, ellipsis and both readings are
-  checked against the paper's formulas, and the two readings are shown to be
-  two maps ([next#674], [next#691]).
+  Bill does too.*, with photons: each reading is a term of
+  `discopy.lambek.modality` whose words have the paper's types, sent by a
+  functor to a diagram of `discopy.optyx.core.zw` where a word vector is one
+  photon over modes, `!` the bosonic Fock space of those modes, the paper's
+  k-extension the W node and its basis copy the Z spider. Anaphora, ellipsis
+  and both readings are checked against the paper's formulas, and the two
+  readings are shown to be two maps ([next#674], [next#691]).
 - The kappa calculus, the first-order half of the lambda calculus: each
   module below the closed categories has terms of its own, `Variable`,
   `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
@@ -902,6 +909,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A kappa term of `discopy.bang` copies, exchanges and discards its banged
+  variables with the boxes of the domain of the functor that evaluates it,
+  so that a subclass, e.g. `discopy.lambek.modality`, sends its own
+  structural boxes through `ar_map` ([next#691]).
 - `ZBox.truncation` of `discopy.optyx.core.zw` accepts a dimension given as
   a NumPy integer, e.g. the output of a W dagger, so a Z spider with two
   inputs or more no longer fails to truncate after one ([next#691]).
