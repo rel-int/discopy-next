@@ -600,7 +600,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         The tensor of two morphisms is the first whiskered by the domain of
         the second, then the second whiskered by the codomain of the first:
         with the laws above, those of a strict premonoidal category, which
-        unlike :meth:`bifunctoriality` hold of :class:`~discopy.monoidal`.
+        unlike :meth:`bifunctoriality` hold of :mod:`~discopy.monoidal`.
         """
         return cls.equation_factory(f @ g, f @ g.dom >> f.cod @ g)
 

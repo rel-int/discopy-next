@@ -1,7 +1,7 @@
 """
 Peirce's beta graphs: first-order logic as the calculus of neo-Peircean
 relations (NPR) of :cite:t:`BonchiEtAl24`, two cartesian bicategories on the
-same objects, white and black, as :class:`~discopy.frobenius` diagrams with
+same objects, white and black, as :mod:`~discopy.frobenius` diagrams with
 every wire coloured by its region.
 
 Peirce's lines of identity are the white spiders. The black structure is the

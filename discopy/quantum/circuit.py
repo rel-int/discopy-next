@@ -733,7 +733,7 @@ class Circuit(tensor.Diagram[complex]):
 
         Returns
         -------
-        :class:`~discopy.quantum.pennylane.PennylaneCircuit`
+        :class:`~discopy.quantum.pennylane.PennyLaneCircuit`
         """
         from discopy.quantum.pennylane import to_pennylane
         return to_pennylane(self, probabilities=probabilities,
