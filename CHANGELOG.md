@@ -901,6 +901,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The sides of a frame and of its slots are drawn with a black edge, as
+  those of boxes and bubbles are, wherever the regions on either side have
+  different colours, rather than with zero width ([next#742]).
+
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
   `monoidal.Functor.id(monoidal.Diagram)` on a box over `rigid.Ty('x')`, its
@@ -2742,6 +2746,7 @@ for the changelog of `1.2.1` and earlier.
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
+[next#742]: https://github.com/rel-int/discopy-next/pull/742
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
