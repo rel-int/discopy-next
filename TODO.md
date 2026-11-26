@@ -15,6 +15,6 @@
 
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `discopy.closed` is a package: `closed.monoidal` (was `biclosed`), a new `closed.symmetric`, `closed.markov` (was `closed`)
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `compact` subclasses `closed.symmetric`, eval and curry from cups and caps
-- [ ] `feedback.closed` repointed to `closed.markov`
+- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `feedback.closed` repointed to `closed.markov`
 - [ ] deprecated aliases for `discopy.biclosed` and the flat `discopy.closed` names, for one release
 - [ ] docs, paper, changelog and an architecture decision record
