@@ -3,7 +3,7 @@
 """
 The free traced category, folded into :mod:`~discopy.feedback`: a traced
 category is a feedback category whose delay is the identity, and a
-:class:`discopy.feedback.Trace` is a feedback whose memory is not delayed.
+:class:`~discopy.feedback.Trace` is a feedback whose memory is not delayed.
 
 Every name of this module is a deprecated alias of the one in
 :mod:`~discopy.feedback`, kept for one release.

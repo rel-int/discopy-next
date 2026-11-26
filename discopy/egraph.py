@@ -8,7 +8,7 @@ with sharing being a cartesian diagram, i.e. one whose boxes are total
 functions with one output each. An :class:`EGraph` over a copy-discard
 category is the same data structure with boxes of any arity that need not be
 cartesian: a diagram with sharing, i.e. a left-monogamous acyclic
-:class:`discopy.hypergraph.Hypergraph` whose boxes are the e-nodes, with an
+:class:`~discopy.hypergraph.Hypergraph` whose boxes are the e-nodes, with an
 equivalence on its spiders whose classes are the e-classes. We call it an
 e-graph, a monoidal e-graph or an e-hypergraph alike, egg's e-graphs being
 those over cartesian diagrams. A **section** chooses a producer for each

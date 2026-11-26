@@ -439,7 +439,7 @@ class Diagram[natural](
         """
         Whether the integer diagrams have a dagger: when the :attr:`natural`
         category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
-        into integer diagrams over e.g. :class:`discopy.python.Function`
+        into integer diagrams over e.g. :class:`~discopy.python.Function`
         reads a daggered box off its :code:`ar_map`.
 
         >>> from discopy import compact, python
@@ -809,7 +809,7 @@ class Diagram[natural](
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a trace, read off either form of
-        :meth:`discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
+        :meth:`~discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
         since an integer type is not a sequence: ``n`` counts the atoms of
         each half, or one number per half, one by default, and the memory is
         ``mem``, or what ``cod`` leaves of the codomain.

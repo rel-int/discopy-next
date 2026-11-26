@@ -75,7 +75,7 @@ def structure(category: str) -> str | tuple | None:
     r"""
     A category as an atom or a triple ``(slash, result, argument)``, its
     slashes associating to the left, ``None`` if it is malformed. Unlike
-    :func:`discopy.lambek.categorial.cat2ty`, it keeps the features.
+    :func:`~discopy.lambek.categorial.cat2ty`, it keeps the features.
 
     >>> structure(r"(S[dcl]\NP)/NP")
     ('/', ('\\', 'S[dcl]', 'NP'), 'NP')
@@ -183,7 +183,7 @@ class Derivation:
     def rule(self) -> str:
         """
         The rule of the derivation, read from the types of
-        :func:`discopy.lambek.categorial.cat2ty`: ``"fa"``, ``"ba"`` or
+        :func:`~discopy.lambek.categorial.cat2ty`: ``"fa"``, ``"ba"`` or
         ``"fc"`` when it is one, ``"lex"`` for a word, ``"u"`` for any other
         unary rule and ``"rule"`` for any other.
         """
@@ -211,7 +211,7 @@ class Derivation:
     def to_diagram(self) -> Diagram:
         """
         The derivation as a categorial diagram, see
-        :func:`discopy.lambek.categorial.tree2diagram`.
+        :func:`~discopy.lambek.categorial.tree2diagram`.
 
         >>> alice, runs = Derivation("NP", word="Alice"), Derivation(
         ...     r"S[dcl]\\NP", word="runs")
@@ -374,7 +374,7 @@ class Parser:  # pylint: disable=too-many-instance-attributes
         every span, else the best parse, as Bobcat's command line does. A
         sentence longer than the encoder reads is cut to the words it reads,
         as the reproduction does. Raw text is not tokenised here: split it
-        with :func:`discopy.lambek.tokenise.tokenise` and call the parser on
+        with :func:`~discopy.lambek.tokenise.tokenise` and call the parser on
         each of its sentences.
         """
         tree = self.derive(sentence)

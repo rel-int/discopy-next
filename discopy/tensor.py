@@ -553,7 +553,7 @@ class Functor(frobenius.Functor):
     def to_tree(self) -> dict:
         """
         Serialise a tensor functor, its dtype in the name of its codomain,
-        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        see :meth:`~discopy.cat.Functor.to_tree`, unless it has ``params``
         or a ``contractor``.
 
         >>> from discopy.utils import dumps, loads
@@ -1164,11 +1164,11 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         part the pair of its parts, so that a box holding nan equals itself
         and its hash is stable: the data labels a generator, it is not a
         number being compared. The winding number ``z`` is compared too, as
-        in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
-        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
-        :func:`discopy.utils.factory_name`, a class object hashing as its
-        address and a backend's descriptor, e.g. ``torch.float64``, being no
-        class at all.
+        in :meth:`rigid.Box.setoid <discopy.rigid.Box.setoid>`, and the time
+        step, as in :meth:`feedback.Box.setoid <discopy.feedback.Box.setoid>`.
+        The ``dtype`` is compared by its :func:`~discopy.utils.factory_name`,
+        a class object hashing as its address and a backend's descriptor,
+        e.g. ``torch.float64``, being no class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1299,7 +1299,7 @@ class Spider[dtype](frobenius.Spider, Box[dtype]):
 class Sum[dtype](frobenius.Sum, Box[dtype]):
     """
     A formal sum of tensor diagrams with the same domain and codomain, a
-    frobenius sum with the flags of a :class:`discopy.markov.Sum`.
+    frobenius sum with the flags of a :class:`~discopy.markov.Sum`.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.

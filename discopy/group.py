@@ -4,7 +4,7 @@
 Finite groups as normal forms, built from cyclic and symmetric groups by
 direct and wreath products, and their actions on finite sets.
 
-A group is a :class:`discopy.abc.Group`, i.e. a groupoid with one object:
+A group is a :class:`~discopy.abc.Group`, i.e. a groupoid with one object:
 its elements are its arrows, ``g >> h`` multiplies them in diagrammatic
 order, first ``g`` then ``h``, and ``g.dagger()`` is the inverse. A
 :class:`FiniteGroup` comes with its :meth:`FiniteGroup.generators`, the
@@ -16,7 +16,7 @@ for a wreath product, so that a group with a trillion elements is as cheap
 as its factors.
 
 An :class:`Action` of a group on ``range(size)`` is a functor into
-:class:`discopy.python.finset.Permutation`, given by the images of the
+:class:`~discopy.python.finset.Permutation`, given by the images of the
 generators and extended along words. Each group acts on a set of its own,
 :meth:`FiniteGroup.action`, and a product or a wreath product acts through
 actions of its factors. The :meth:`Action.orbits` are computed from the
@@ -595,7 +595,7 @@ class Wreath[base, top](FiniteGroup, TestableGeneric):
 class Action:
     """
     An action of a group on ``range(size)``, i.e. a functor from the group
-    to :class:`discopy.python.finset.Permutation`, given by the images of
+    to :class:`~discopy.python.finset.Permutation`, given by the images of
     its generators: an element acts by the product of the images along its
     :meth:`FiniteGroup.word`. It is a functor exactly when the images satisfy
     the relations between the generators.

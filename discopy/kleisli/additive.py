@@ -288,7 +288,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         """
         The equation of a law, compared by the boundary of its terms and
         what the monad observes of their outputs on the arguments of
-        :meth:`discopy.python.additive.Function.arguments`.
+        :meth:`~discopy.python.additive.Function.arguments`.
         """
         return Equation(*terms, up_to=lambda term: (
             term.dom, term.cod, tuple(
@@ -367,7 +367,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         """
         The disjoint union of two channels, called with :code:`@`: the
         input picks the side that runs, so unlike
-        :meth:`discopy.kleisli.multiplicative.Channel.tensor` this is
+        :meth:`~discopy.kleisli.multiplicative.Channel.tensor` this is
         unbiased.
 
         Parameters:
@@ -429,7 +429,8 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         Parameters:
             n : The number of summands to trace over.
             left : Whether to trace the first rather than the last
-                summands, see :meth:`discopy.abc.SymmetricCategory.left_trace`.
+                summands, see
+                :meth:`~discopy.abc.SymmetricCategory.left_trace`.
 
         Raises:
             ValueError : If the monad has no

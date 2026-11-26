@@ -27,7 +27,7 @@ Summary
 
 Example
 -------
-A :class:`discopy.python.finset.Function` is a function between finite sets
+A :class:`~discopy.python.finset.Function` is a function between finite sets
 read backwards, from the outputs it reads to the inputs, so that the copy is
 an arrow from ``1`` to ``2``. Its opposite is the category of finite sets and
 functions, where the merge of two elements is the function from ``2`` to

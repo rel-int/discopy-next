@@ -709,7 +709,7 @@ class Comarkov(Markov, MarkovCategory):
     hierarchy with both a copy and a merge: its spiders fuse, which is more
     than the laws of a Markov category ask for. A category with a copy and
     a merge and no law between the two is that of
-    :class:`discopy.neural.network.Network`.
+    :class:`~discopy.neural.network.Network`.
     """
     category = frobenius.Diagram
 

@@ -283,7 +283,7 @@ class Recursion(nn.Module):
     def heads(self, answer):
         """
         The three lattice heads read off the answer trace, as
-        :class:`discopy.neural.lattice.Heads`.
+        :class:`~discopy.neural.lattice.Heads`.
 
         Parameters:
             answer : The answer trace.

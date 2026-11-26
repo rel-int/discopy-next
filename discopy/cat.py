@@ -65,8 +65,8 @@ We can create dagger functors from the free category to itself:
 >>> assert F(arrow) == (h >> f >> g)[::-1]
 
 The dagger is a contravariant involutive identity-on-objects endofunctor,
-see :meth:`discopy.abc.DaggerCategory.dagger_involution` and
-:meth:`discopy.abc.DaggerCategory.dagger_contravariance`:
+see :meth:`~discopy.abc.DaggerCategory.dagger_involution` and
+:meth:`~discopy.abc.DaggerCategory.dagger_contravariance`:
 
 >>> assert f[::-1][::-1] == f
 >>> assert Id(x)[::-1] == Id(x)
@@ -114,7 +114,7 @@ variable, e.g. :mod:`~discopy.braided`, gets its terms from
 Every module up the hierarchy has terms of its own, subclasses of these
 which say what a context is: one variable in a category, a list of variables
 each used once and in order in a monoidal one, see
-:class:`discopy.monoidal.TermBase`. Below :mod:`~discopy.biclosed`, which
+:class:`~discopy.monoidal.TermBase`. Below :mod:`~discopy.biclosed`, which
 adds the abstraction of the lambda calculus, they are variants of the kappa
 calculus.
 """
@@ -202,7 +202,7 @@ class Ob(Serialisable["Ob"]):
         The kappa abstraction of a Python function from a variable of this
         type to a term, see :class:`Kappa`, as a type of a closed category
         applied to a function is a lambda abstraction, see
-        :class:`discopy.biclosed.Ty`.
+        :class:`~discopy.biclosed.Ty`.
 
         Parameters:
             function : The body, as a function of the variable.
@@ -321,8 +321,9 @@ class FreeCategory(Category):
         Derive the terms of a free category from its rules: a generator, or the
         conclusion of one of its :attr:`rules` chosen at random, its morphism
         premises sampled by the :meth:`strategy` of the category with one less
-        unit of ``fuel``, see :meth:`discopy.testable.Rule.strategy`. Once the
-        fuel runs out, only the rules with no morphism premise are applied. A
+        unit of ``fuel``, see
+        :meth:`Rule.strategy <discopy.testable.Rule.strategy>`. Once the fuel
+        runs out, only the rules with no morphism premise are applied. A
         conclusion that misses ``dom`` or ``cod`` is composed with a generator
         from or to it, so that both are honoured, with no filtering, whenever
         the :meth:`generator_strategy` reads them: that of a type does not,
@@ -334,7 +335,7 @@ class FreeCategory(Category):
             cod : The codomain, sampled if ``None``.
             fuel : How deep the rules nest.
             within : The class whose rules a term is derived from, e.g.
-                :class:`discopy.abc.MonoidalCategory` for the terms of the
+                :class:`~discopy.abc.MonoidalCategory` for the terms of the
                 underlying monoidal category, the category itself if
                 ``None``.
 
@@ -467,7 +468,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         The strategy the property matrix samples the terms of a free category
         from: its :meth:`search`, which a category with a combinatorial
         representation mixes with the :meth:`quotient_strategy` of it, e.g.
-        :meth:`discopy.symmetric.Diagram.strategy`.
+        :meth:`~discopy.symmetric.Diagram.strategy`.
 
         Parameters are those of :meth:`search`.
         """
@@ -607,7 +608,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         """
         The algebra of a monad on the arrows from ``dom`` to ``cod``, by which
         a functor into arrows extends to the change of base of its domain,
-        see :class:`discopy.enriched.Functor`: the formal
+        see :class:`~discopy.enriched.Functor`: the formal
         :class:`Sum` of a list of arrows, for the
         :attr:`~discopy.kleisli.monad.List` monad.
 
@@ -722,7 +723,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
 
     def to_tree(self) -> dict:
         """
-        Serialise a DisCoPy arrow, see :func:`discopy.utils.dumps`.
+        Serialise a DisCoPy arrow, see :func:`~discopy.utils.dumps`.
 
         Example
         -------
@@ -753,7 +754,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     @classmethod
     def from_tree(cls, tree: dict) -> Arrow:
         """
-        Decode a serialised DisCoPy arrow, see :func:`discopy.utils.loads`.
+        Decode a serialised DisCoPy arrow, see :func:`~discopy.utils.loads`.
 
         Parameters:
             tree : DisCoPy serialisation.
@@ -982,7 +983,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         The dagger of a box, that of its args too. Bubbling and daggering do
         not commute, as :meth:`__str__` prints them: the dagger of a bubble is
         not the bubble of a dagger, so that a functor cannot separate equal
-        bubbles, e.g. into :class:`discopy.tensor.Elementwise` where the two
+        bubbles, e.g. into :class:`~discopy.tensor.Elementwise` where the two
         have different arrays.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
@@ -1016,7 +1017,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         A box prints as its name, a box with args as a call on them, a
         daggered one as the dagger of the box: bubbling and daggering need
         not commute, so printing the dagger on the args would read back as
-        the other value, e.g. in :class:`discopy.tensor.Elementwise`.
+        the other value, e.g. in :class:`~discopy.tensor.Elementwise`.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
         >>> print(f.bubble().dagger())
@@ -1292,11 +1293,12 @@ class Functor(Category[type, "Functor"]):
     A daggered box is mapped as the dagger of the image of the box, when the
     codomain is a :class:`~discopy.abc.DaggerCategory` that
     :meth:`~discopy.abc.DaggerCategory.has_dagger`. When it is not, e.g.
-    a functor into :class:`discopy.stream.Stream`,
-    :class:`discopy.python.Function`,
-    :class:`discopy.python.additive.Function` or integer diagrams over
-    :class:`discopy.python.Function`, the image of a daggered box
-    is read off :code:`ar_map` like that of any other box.
+    a functor into :class:`~discopy.stream.Stream`,
+    :class:`python.Function <discopy.python.Function>`,
+    :class:`additive.Function <discopy.python.additive.Function>` or integer
+    diagrams over :class:`python.Function <discopy.python.Function>`, the
+    image of a daggered box is read off :code:`ar_map` like that of any other
+    box.
 
     >>> from discopy import python
     >>> F = Functor(
@@ -1315,7 +1317,7 @@ class Functor(Category[type, "Functor"]):
     def id(cls, dom: type | None = None) -> Self:
         """
         The identity functor on a given category ``dom``, with the shared
-        :func:`discopy.utils.identity` as both of its maps.
+        :func:`~discopy.utils.identity` as both of its maps.
 
         Parameters:
             dom : The domain of the functor.
@@ -1347,7 +1349,7 @@ class Functor(Category[type, "Functor"]):
         The composite sends each object and box to its image under ``other``
         of its image under ``self``: it is the composite of two functors that
         their maps determine. A functor that its maps do not determine, e.g.
-        :class:`discopy.balanced.DualRail`, has ``composes`` false: apply the
+        :class:`~discopy.balanced.DualRail`, has ``composes`` false: apply the
         two in turn instead.
 
         Example
@@ -1507,7 +1509,7 @@ class Transformation(Category[Functor, "Transformation"]):
         components :
             A mapping from objects ``x`` in the domain category to arrows
             ``components[x] : dom(x) -> cod(x)`` in the codomain category,
-            or :func:`discopy.utils.identity` for the identity, see
+            or :func:`~discopy.utils.identity` for the identity, see
             :meth:`id`.
         dom : The domain functor.
         cod : The codomain functor.
@@ -1570,7 +1572,7 @@ class Transformation(Category[Functor, "Transformation"]):
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
         identity arrow on ``dom(x)``, with the shared
-        :func:`discopy.utils.identity` as its components. A component is read
+        :func:`~discopy.utils.identity` as its components. A component is read
         by calling the transformation, as ``alpha(x)``: ``components[x]`` is
         what was given, i.e. ``x`` itself for the identity.
 
@@ -1793,10 +1795,10 @@ class Canonical[factory](TestableGeneric, tuple):
 
 class AlphaEquivalence(Equivalence):
     """
-    Terms with bound variables, an :class:`discopy.testable.Equivalence` up
+    Terms with bound variables, an :class:`~discopy.testable.Equivalence` up
     to their names, see :meth:`alpha_eq`: the terms of the kappa calculus,
     see :class:`TermBase`, and those of the lambda calculus, see
-    :class:`discopy.biclosed.TermBase`.
+    :class:`biclosed.TermBase <discopy.biclosed.TermBase>`.
 
     """
     def alpha_eq(self, *others: Term) -> bool:
@@ -2014,7 +2016,7 @@ class TermBase(Serialisable, AlphaEquivalence):
     are its arrows, see :meth:`normal_form_completeness`.
 
     The modules up the hierarchy subclass these terms and relax what a
-    context is, e.g. a :class:`discopy.monoidal.TermBase` has a list of
+    context is, e.g. a :class:`~discopy.monoidal.TermBase` has a list of
     variables, each used once and in order, around a stack of many inputs.
 
     Attributes:
@@ -2206,7 +2208,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         """
         The number of free occurrences of a variable: at most one in a
         linear term, any number where variables are copied and discarded,
-        see :class:`discopy.markov.TermBase`.
+        see :class:`~discopy.markov.TermBase`.
 
         Example
         -------
@@ -2663,7 +2665,7 @@ class Kappa(TermBase):
         variables : The variables to bind, the one of the body.
         body : The term in which they are bound.
         offset : The number of free variables left of the stack, none in a
-            category, see :class:`discopy.monoidal.Kappa`.
+            category, see :class:`~discopy.monoidal.Kappa`.
 
     Note
     ----
@@ -2887,7 +2889,7 @@ def kappa_calculus(
 
     This is for the levels below :mod:`~discopy.biclosed`: from there up a
     type applied to a Python function is a lambda abstraction, see
-    :class:`discopy.biclosed.Ty`, and a diagram reads with the kappa terms
+    :class:`~discopy.biclosed.Ty`, and a diagram reads with the kappa terms
     of the level it subclasses, e.g. a compact one with those of
     :mod:`~discopy.symmetric`.
 

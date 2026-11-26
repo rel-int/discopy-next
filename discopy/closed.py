@@ -6,7 +6,7 @@ products that are not strictly associative.
 Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
 with tuples, projections and ``let``, and reduced to Böhm trees by a
 :class:`Strategy`. Diagrams map to combinatorial maps, i.e.
-:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+:class:`~discopy.cmap.CMap`, with :meth:`~discopy.monoidal.Diagram.to_map`.
 
 Summary
 -------
@@ -72,8 +72,8 @@ Summary
 Axioms
 ------
 
-:meth:`discopy.biclosed.Diagram.curry` and
-:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
+:meth:`~discopy.biclosed.Diagram.curry` and
+:meth:`~discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)

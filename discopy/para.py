@@ -573,7 +573,7 @@ class Feedback(Markov, FeedbackCategory):
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`, in either
-        form of :meth:`discopy.abc.FeedbackCategory.feedback`.
+        form of :meth:`~discopy.abc.FeedbackCategory.feedback`.
 
         Parameters:
             n : The number of objects to feed back.

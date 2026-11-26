@@ -1,14 +1,14 @@
 """
 Peirce's beta graphs: first-order logic as the calculus of neo-Peircean
 relations (NPR) of :cite:t:`BonchiEtAl24`, two cartesian bicategories on the
-same objects, white and black, as :class:`discopy.frobenius` diagrams with
+same objects, white and black, as :class:`~discopy.frobenius` diagrams with
 every wire coloured by its region.
 
 Peirce's lines of identity are the white spiders. The black structure is the
 white one seen through a cut: the black copy is ``~copy``, the black
 composition :meth:`alpha.Diagram.relative_sum` and the black tensor
 :meth:`alpha.Diagram.par`. A :class:`Model` is a functor into
-:class:`discopy.tensor.Tensor` of ``bool``.
+:class:`~discopy.tensor.Tensor` of ``bool``.
 
 Summary
 -------

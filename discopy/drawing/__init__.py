@@ -45,7 +45,7 @@ def __getattr__(name):
 def draw(diagram, **params):
     """
     Draws a diagram with matplotlib, or as TikZ code with ``to_tikz=True``,
-    see :func:`discopy.drawing.backend.draw`.
+    see :func:`~discopy.drawing.backend.draw`.
 
     Parameters
     ----------
@@ -104,9 +104,9 @@ def from_picture(jpeg, config: dict):
     small OCR model reads the name of each box and the type of each
     labelled wire, the module is the smallest in which it decodes from the
     one whose structural primitives and types appear, and
-    :func:`discopy.drawing.picture.decode` builds the diagram. It needs
+    :func:`~discopy.drawing.picture.decode` builds the diagram. It needs
     PyTorch and trained weights, see
-    :func:`discopy.drawing.vision.from_picture` for the ``config``.
+    :func:`~discopy.drawing.vision.from_picture` for the ``config``.
     """
     from discopy.drawing import vision
     return vision.from_picture(jpeg, config)
