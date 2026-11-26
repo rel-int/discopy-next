@@ -326,7 +326,7 @@ class UpToPermutation:
     >>> assert UpToPermutation(f) != UpToPermutation(h)
     >>> m, n = Ty('m'), Ty('n')
     >>> t = Symmetric(x, y, Box('t', x @ p @ q, y @ m @ n), p @ q, m @ n)
-    >>> v =t.recopar(Symmetric.swap(m, n).inside)
+    >>> v = t.recopar(Symmetric.swap(m, n).inside)
     >>> assert t != v and UpToPermutation(t) == UpToPermutation(v)
     """
     para: Symmetric
@@ -603,8 +603,8 @@ class Reparam:
     equation, see :meth:`Symmetric.reparam`. They compose vertically with
     :meth:`then`, horizontally with ``>>`` and in parallel with ``@``, and the
     invertible ones, see :attr:`is_invertible`, are the isomorphisms up to
-    which :class:`UpToPermutation` compares maps. Maps compose when they are
-    equal up to the equation of the category, see :func:`same`, so none
+    which :class:`UpToPermutation` compares maps. They are checked and
+    composed up to the equation of the category, see :func:`same`, so none
     relates two maps that agree only on a model, e.g. two compiled networks.
     A reparametrisation covers the parameters only and needs parallel maps
     with the same coparameter.
@@ -741,7 +741,7 @@ class Reparam:
     def is_invertible(self) -> bool:
         """
         Whether `inside` is the identity with its outputs permuted among the
-        wires of one type, see :func:`isomorphic`.
+        wires of one type, see :func:`isomorphic` (diagram categories only).
         """
         category, inside = type(self.dom).category, self.inside
         return isomorphic(quotient(category, category.id(inside.dom)),

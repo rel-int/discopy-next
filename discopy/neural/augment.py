@@ -79,7 +79,8 @@ def sample(group: type[FiniteGroup]) -> Callable[[int], tuple]:
     A uniform element of a group, as a computation in the
     :data:`~discopy.kleisli.monad.Seed` monad: a pure function from a seed to
     an element and the seed for the next one, as
-    :func:`~discopy.kleisli.monad.uniform` does.
+    :func:`~discopy.kleisli.monad.uniform` does, of 63 bits, so that it fits
+    the int64 key of :class:`Augment`.
 
     Parameters:
         group : The finite group.
@@ -368,21 +369,10 @@ def strictness(layer: para.Symmetric, dom: Action, cod: Action,
     ``|f(g.v, p) - g.f(v, p)|`` over the generators ``g``, ``draws`` random
     values ``p`` of the weights and random inputs ``v``.
 
-    In the category of parametric maps of :math:`G`-sets or
-    :math:`G`-representations, with the parameters acted on trivially, a
-    parametric map ``(P, f : X @ P -> Y)`` is a strict homomorphism of
-    algebras of the :class:`~discopy.monad.algebra.Writer` monad of the
-    group exactly when ``f(-, p)`` commutes with the group for every value
-    ``p`` of its parameters. A finite sample of ``p`` cannot prove this: it
-    can only refute it, so a value near zero means that no draw found a
-    counterexample, and a layer that is equivariant at some weights only,
-    e.g. at zero, is caught by the draws.
-
-    The channels and the shapes are those of the legs of the layer: its
-    input and output are one leg each, ``Dim(|X|, C)`` and ``Dim(|Y|, D)``
-    with the unit dimensions dropped, and the weights are one tensor per leg
-    of its parameter space, all standard normal in ``float64`` from a
-    generator seeded by ``seed``.
+    The draws can only refute strictness, so a value near zero means that no
+    draw found a counterexample. The weights are one standard normal tensor
+    in ``float64`` per leg of the parameter space, from a generator seeded
+    by ``seed``.
 
     Parameters:
         layer : A parametric network, e.g. from
