@@ -1107,6 +1107,66 @@ class Hypergraph(hypergraph.Hypergraph):
             return Fraction(str(phase)) % 1 or 0
         return phase % 1
 
+    phases_drawn = (
+        0, Fraction(1, 2), Fraction(1, 4), Fraction(3, 4),
+        Fraction(1, 8), Fraction(1, 3), Fraction(2, 3), Fraction(1, 10))
+    """ The spider phases :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(  # pylint: disable=arguments-differ
+            cls, *, dom=None, cod=None, min_leaves=None, max_leaves=4,
+            max_scalars=1):
+        """
+        Generate graph-like ZX hypergraphs: green spiders wired by
+        :meth:`discopy.hypergraph.Hypergraph.draw_any` with Hadamard
+        :data:`H` boxes (so a spider behind Hadamards on its legs is red),
+        rational phases in :attr:`phases_drawn` and a Clifford or zero
+        :class:`Number` scalar.
+
+        Parameters:
+            dom : The domain, sampled from :meth:`discopy.rigid.Nat.strategy`
+                if ``None``.
+            cod : The codomain, sampled from
+                :meth:`discopy.rigid.Nat.strategy` if ``None``.
+            min_leaves : The minimum number of :data:`H` boxes.
+            max_leaves : The maximum number of :data:`H` boxes.
+            max_scalars : The maximum number of zero-legged spiders.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> graph = find(
+        ...     Hypergraph.strategy(dom=Nat(2), cod=Nat(1)),
+        ...     lambda g: g.boxes and any(g.phases) and g.scalar != ONE)
+        >>> assert (graph.dom, graph.cod) == (Nat(2), Nat(1))
+        >>> assert set(graph.boxes) == {H}
+        """
+        from hypothesis import strategies as st
+
+        min_boxes = min_leaves or 0
+
+        @st.composite
+        def hypergraphs(draw):
+            domain = draw(cls.ob.strategy()) if dom is None else dom
+            codomain = draw(cls.ob.strategy()) if cod is None else cod
+            n_boxes = draw(st.integers(min_boxes, max(min_boxes, max_leaves)))
+            _, _, _, wires, spider_types = cls.draw_any(
+                draw, st.just(Nat(1)), dom=domain, cod=codomain,
+                n_boxes=n_boxes)
+            n_scalars = max(0, draw(st.integers(0, max_scalars + 2)) - 2)
+            spider_types += n_scalars * [Nat(1)]
+            phases = [
+                draw(st.sampled_from(cls.phases_drawn)) for _ in spider_types]
+            power2 = draw(st.sampled_from((0, 1, -1, 2, -2)))
+            quarter = Fraction(draw(st.integers(0, 3)), 4)
+            number = Number(factor=0) if draw(st.integers(0, 7)) == 7\
+                else Number(power2, quarter)
+            return cls(
+                domain, codomain, n_boxes * (H, ), wires, spider_types,
+                phases=phases, scalar=number)
+
+        return hypergraphs()
+
     @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
         """
