@@ -38,6 +38,7 @@ Summary
     DaggerMonoidalCategory
     SpacialCategory
     PRO
+    DelayCategory
     FeedbackCategory
     TracedCategory
     ResiduatedMonoid

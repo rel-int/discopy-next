@@ -153,6 +153,9 @@ class Box(cat.Box, Arrow):
 
     def __init__(self, name: str, dom: Ob, cod: Ob, *args,
                  time_step: int = 0, **params):
+        assert_isinstance(time_step, int)
+        if time_step < 0:
+            raise NotImplementedError
         self.time_step = time_step
         super().__init__(name, dom, cod, *args, **params)
 

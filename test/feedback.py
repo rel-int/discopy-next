@@ -759,3 +759,7 @@ def test_free_delay_category():
         assert pickle.loads(pickle.dumps(term)) == term
     assert f.delay(-2) == cat.Box('f', x, y, data=[1]) != f
     assert f.bubble().delay().args == (f, )
+    with raises(NotImplementedError):
+        f.delay(-3)
+    with raises(TypeError):
+        cat.Box('f', x, y, time_step=1.5)
