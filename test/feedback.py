@@ -769,9 +769,13 @@ def test_free_delay_category():
 
 
 def test_draw_the_trace_of_ribbons():
+    from discopy import config
     from discopy.feedback import balanced
     x = balanced.Ty('x')
     for left in (False, True):
         ribbon = balanced.Braid(x, x).trace(left=left).to_braided()
         drawing = ribbon.to_drawing()
         assert len(drawing.dom) == len(drawing.cod) == len(ribbon.dom) == 2
+        braid = balanced.Braid(x, x).to_braided().to_drawing()
+        assert drawing.width == braid.width + 1 + config.DRAWING_DEFAULT[
+            "ribbon_width"]

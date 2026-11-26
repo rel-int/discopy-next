@@ -222,7 +222,8 @@ import networkx as nx
 
 from discopy import messages
 from discopy.drawing import backend, Node, Point
-from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
+from discopy.config import (
+    BOX_DRAWING_ATTRIBUTES, COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.abc import DaggerMonoidalCategory, TracedCategory
 from discopy.python import finset
 from discopy.utils import (
@@ -350,6 +351,7 @@ def swap_colours(wire):
     """
     result = copy(wire)
     result.dom, result.cod = wire.cod, wire.dom
+    result.ribbon = COLOUR_DRAWING_ATTRIBUTES["ribbon"](result)
     return result
 
 
@@ -1371,16 +1373,25 @@ which to_drawing recomputes.
         return result
 
     def trace(self, n=1, left=False) -> Drawing:
+        """
+        The trace of the last ``n`` wires, the first when ``left``, drawn as
+        a cap, the drawing and a cup, the loop coming back along each wire
+        with its colours swapped. The wires of a ribbon are traced in one
+        loop, so that the ribbon keeps its width all the way round; other
+        wires one at a time, the last first.
+        """
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self
-        if n > 1:
+        if n > 1 and not any(
+                getattr(wire, "ribbon", None) for wire in self.dom.inside):
             return self.trace(left=left).trace(n=n - 1, left=left)
-        dom = self.dom[1:] if left else self.dom[:-1]
-        cod = self.cod[1:] if left else self.cod[:-1]
-        traced_dom = self.dom[:1] if left else self.dom[-1:]
-        traced_cod = self.cod[:1] if left else self.cod[-1:]
-        back = traced_dom.factory(*map(swap_colours, traced_dom.inside))
+        dom = self.dom[n:] if left else self.dom[:-n]
+        cod = self.cod[n:] if left else self.cod[:-n]
+        traced_dom = self.dom[:n] if left else self.dom[-n:]
+        traced_cod = self.cod[:n] if left else self.cod[-n:]
+        back = traced_dom.factory(
+            *map(swap_colours, reversed(traced_dom.inside)))
         cap_cod, cup_dom = (
             back @ traced_dom, back @ traced_cod) if left else (
             traced_dom @ back, traced_cod @ back)
