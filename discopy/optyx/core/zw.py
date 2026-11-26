@@ -337,8 +337,8 @@ class ZBox(diagram.Spider, ZWBox):
                 np.array([amplitudes[0]], dtype=complex),
             )
 
-        spider_dim = min(input_dims) if self.legs_in > 0 \
-            else self.determine_output_dimensions(input_dims)[0]
+        spider_dim = int(min(input_dims) if self.legs_in > 0
+                         else self.determine_output_dimensions(input_dims)[0])
 
         # create the array
         if not isinstance(
