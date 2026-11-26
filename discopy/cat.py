@@ -16,8 +16,8 @@ Summary
     FreeCategory
     Arrow
     Box
+    Sum
     Id
-    Bubble
     Functor
     Transformation
     Equation
@@ -123,7 +123,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import suppress
-from functools import total_ordering, reduce
+from functools import cached_property, total_ordering, reduce
 from inspect import signature
 from itertools import count
 from typing import (
@@ -148,6 +148,7 @@ from discopy.utils import (  # noqa: F401
     MappingOrCallable,
     assert_isinstance,
     assert_iscomposable,
+    assert_isparallel,
     get_origin,
     identity,
 )
@@ -457,8 +458,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     see :class:`monoidal.Nat`.
     """
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type[formal_sum.Sum]]
-    bubble_factory: ClassVar[type["Bubble"]]
+    sum_factory: ClassVar[type["Sum"]]
     ob = Ob
 
     @classmethod
@@ -587,7 +587,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> assert Arrow.id() == Id() == Id(Ob())
         >>> assert Arrow.id('x') == Id('x') == Id(Ob('x'))
         """
-        if any(isinstance(other, formal_sum.Sum) for other in others):
+        if any(isinstance(other, Sum) for other in others):
             return self.sum_factory((self, )).then(*others)
         return super().then(*others)
 
@@ -608,7 +608,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         The algebra of a monad on the arrows from ``dom`` to ``cod``, by which
         a functor into arrows extends to the change of base of its domain,
         see :class:`discopy.enriched.Functor`: the formal
-        :class:`~discopy.sum.Sum` of a list of arrows, for the
+        :class:`Sum` of a list of arrows, for the
         :attr:`~discopy.kleisli.monad.List` monad.
 
         Parameters:
@@ -646,9 +646,12 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
             f"sum {dom} -> {cod}", cls,
             lambda arrows: sum(arrows, cls.zero(dom, cod)))
 
-    def bubble(self, *args, **kwargs) -> Bubble:
-        """ Unary operator on homsets. """
-        return self.bubble_factory(self, *args, **kwargs)
+    def bubble(self, *args, **kwargs) -> Box:
+        """
+        The box with this arrow and some others as ``args``, i.e. an operator
+        on homsets, see :meth:`Box.from_args`.
+        """
+        return self.box_factory.from_args(self, *args, **kwargs)
 
     @property
     def free_symbols(self) -> "set[sympy.Symbol]":
@@ -769,6 +772,11 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
 class Box(Arrow):
     """
     A box is an arrow with a :code:`name` and the tuple of just itself inside.
+    It is an operation symbol of arity n: it takes n arrows :code:`args` and
+    gives an arrow from :code:`dom` to :code:`cod`, a generator being a box of
+    arity zero. A box with args, also called a bubble, is sent by a
+    :class:`Functor` to the call of its :code:`method` on the images of its
+    args.
 
     Parameters:
         name : The name of the box.
@@ -776,6 +784,8 @@ class Box(Arrow):
         cod : The codomain of the box, i.e. the output.
         data (any) : Extra data in the box, default is :code:`None`.
         is_dagger : Whether the box is dagger.
+        args : The arrows inside the box, none for a generator.
+        method : The method a functor calls on the images of the args.
 
     Note
     ----
@@ -794,9 +804,22 @@ class Box(Arrow):
 
     >>> x, y = Ob('x'), Ob('y')
     >>> f = Box('f', x, y, data=[42])
-    >>> assert f.inside == (f, )
+    >>> assert f.inside == (f, ) and f.args == ()
+
+    A box with args is built by :meth:`Arrow.bubble`, its boundary that of
+    its args by default, or by :meth:`from_args`.
+
+    >>> bubble = f.bubble(name="b")
+    >>> assert bubble == Box("b", x, y, args=(f, ))
+    >>> assert bubble == Box.from_args(f, name="b")
+    >>> print(bubble)
+    (f).bubble(name='b')
+    >>> bubble
+    cat.Box('b', cat.Ob('x'), cat.Ob('y'), args=(cat.Box('f', cat.Ob('x'), \
+cat.Ob('y'), data=[42]),))
     """
-    serialised_attrs = ("name", "dom", "cod", "*", "is_dagger", "data")
+    serialised_attrs = (
+        "name", "dom", "cod", "*", "is_dagger", "data", "args", "method")
 
     @classmethod
     def strategy(
@@ -820,11 +843,70 @@ class Box(Arrow):
             del state['_name'], state['_data'], state['_dagger']
         super().__setstate__(state)
 
+    args: tuple[Arrow, ...] = ()
+    method = "bubble"
+
     def __init__(
-            self, name: str, dom: Ob, cod: Ob, data=None, is_dagger=False):
+            self, name: str, dom: Ob, cod: Ob, data=None, is_dagger=False,
+            args: tuple[Arrow, ...] = (), method="bubble"):
         assert_isinstance(name, str)
         self.name, self.data, self.is_dagger = name, data, is_dagger
+        self.args, self.method = tuple(args), method
         Arrow.__init__(self, (self, ), dom, cod, _scan=False)
+
+    @classmethod
+    def from_args(cls, *args: Arrow, dom: Ob | None = None,
+                  cod: Ob | None = None, name="", **params) -> Self:
+        """
+        The box with some ``args``, its boundary that of its args unless
+        given.
+
+        Parameters:
+            args : The arrows inside the box.
+            dom : The domain of the box, default is that of its args.
+            cod : The codomain of the box, default is that of its args.
+            name : The name of the box, empty by default.
+            params : Passed to the constructor, e.g. :code:`method`.
+
+        Raises:
+            ValueError : When dom (resp. cod) is None and the args do not all
+                have the same dom (resp. cod).
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> Box.from_args(Box('f', x, x), Box('g', y, x))
+        Traceback (most recent call last):
+        ...
+        ValueError: A bubble needs a dom given when its args do not all share \
+one, they have [cat.Ob('x'), cat.Ob('y')].
+        """
+        dom, cod = (
+            given if given is not None else cls.common(args, attr)
+            for attr, given in [("dom", dom), ("cod", cod)])
+        return cls(name, dom, cod, args=args, **params)
+
+    @staticmethod
+    def common(args: tuple[Arrow, ...], attr: str) -> Ob:
+        """ The domain or codomain the args all share. """
+        values = list(dict.fromkeys(getattr(arg, attr) for arg in args))
+        if len(values) != 1:
+            raise ValueError(messages.NO_COMMON_BOUNDARY.format(
+                attr, ", ".join(map(repr, values))))
+        return values[0]
+
+    @property
+    def arg(self):
+        """ The arrow inside the box if there is exactly one. """
+        if len(self.args) == 1:
+            return self.args[0]
+        raise ValueError(f"{self} has {len(self.args)} args.")
+
+    @property
+    def is_id_on_objects(self):
+        """ Whether the box has one arg, with its boundary. """
+        return len(self.args) == 1 and (
+            self.dom, self.cod) == (self.arg.dom, self.arg.cod)
 
     @property
     def free_symbols(self) -> "set[sympy.Symbol]":
@@ -838,20 +920,33 @@ class Box(Arrow):
                 if not hasattr(data, "shape") or data.shape != ():
                     return set().union(*map(recursive_free_symbols, data))
             return getattr(data, "free_symbols", set())
-        return recursive_free_symbols(self.data)
+        return recursive_free_symbols(self.data).union(
+            *[f.free_symbols for f in self.args])
 
     def subs(self, *args) -> Box:
         if not self.free_symbols:
             return self
-        return self.rebuild(data=rsubs(self.data, *args))
+        changes = {"data": rsubs(self.data, *args)}\
+            if self.data is not None or not self.args else {}
+        if self.args:
+            changes["args"] = tuple(arg.subs(*args) for arg in self.args)
+        return self.rebuild(**changes)
 
     def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
         if not self.free_symbols & set(symbols):
             return lambda *xs: self
-        return lambda *xs: self.rebuild(
-            data=rsubs(self.data, dict(zip(symbols, xs)), **kwargs))
+        args = [arg.lambdify(*symbols, **kwargs) for arg in self.args]
 
-    def rebuild(self, **changes) -> Box:
+        def function(*xs):
+            changes = {"data": rsubs(
+                self.data, dict(zip(symbols, xs)), **kwargs)}\
+                if self.data is not None or not self.args else {}
+            if self.args:
+                changes["args"] = tuple(f(*xs) for f in args)
+            return self.rebuild(**changes)
+        return function
+
+    def rebuild(self, **changes) -> Self:
         """
         The box of the same type with the same :code:`serialised_attrs`, but
         for some ``changes``.
@@ -871,6 +966,9 @@ class Box(Arrow):
         args = [fields.pop(name) for name in attrs[:star]]
         args += fields.pop(attrs[star][1:], ())
         names = utils.keywords(type(self).__init__)
+        if names is not None and not self.args:
+            for name in {"args", "method"} - names:
+                fields.pop(name, None)
         later = {} if names is None else {
             name: fields.pop(name) for name in attrs[star + 1:]
             if name not in names and name not in Box.serialised_attrs}
@@ -880,8 +978,22 @@ class Box(Arrow):
         return box
 
     def dagger(self) -> Box:
+        """
+        The dagger of a box, that of its args too. Bubbling and daggering do
+        not commute, as :meth:`__str__` prints them: the dagger of a bubble is
+        not the bubble of a dagger, so that a functor cannot separate equal
+        bubbles, e.g. into :class:`discopy.tensor.Elementwise` where the two
+        have different arrays.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> assert f.bubble().dagger() != f.dagger().bubble()
+        >>> assert f.bubble().dagger().dagger() == f.bubble()
+        """
+        changes = {"args": tuple(arg.dagger() for arg in self.args)}\
+            if self.args else {}
         return self.rebuild(
-            dom=self.cod, cod=self.dom, is_dagger=not self.is_dagger)
+            dom=self.cod, cod=self.dom, is_dagger=not self.is_dagger,
+            **changes)
 
     def __getitem__(self, key):
         if key == slice(None, None, -1):
@@ -892,34 +1004,72 @@ class Box(Arrow):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         str_data = '' if self.data is None else ", data=" + repr(self.data)
+        str_data += f", args={self.args!r}" if self.args else ""
+        str_data += "" if self.method == "bubble"\
+            else f", method={self.method!r}"
         return factory_name(type(self))\
             + f"({repr(self.name)}, {repr(self.dom)}, " \
               f"{repr(self.cod)}{str_data})"
 
     def __str__(self):
-        return str(self.name) + ("[::-1]" if self.is_dagger else '')
+        """
+        A box prints as its name, a box with args as a call on them, a
+        daggered one as the dagger of the box: bubbling and daggering need
+        not commute, so printing the dagger on the args would read back as
+        the other value, e.g. in :class:`discopy.tensor.Elementwise`.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> print(f.bubble().dagger())
+        (f).bubble()[::-1]
+        >>> print(f.dagger().bubble())
+        (f[::-1]).bubble()
+        >>> print(f.bubble(data=1))
+        (f).bubble(data=1)
+        """
+        if not self.args:
+            return str(self.name) + ("[::-1]" if self.is_dagger else '')
+        if self.is_dagger:
+            return f"{self.dagger()}[::-1]"
+        str_args = ",".join(map(str, self.args))
+        str_kwargs = [] if self.is_id_on_objects else [
+            f"dom={self.dom}", f"cod={self.cod}"]
+        str_kwargs += [f"name={self.name!r}"] if self.name else []
+        str_kwargs += [] if self.method == "bubble"\
+            else [f"method={self.method!r}"]
+        str_kwargs += [] if self.data is None else [f"data={self.data!r}"]
+        return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:
         """
         The atoms of a box: itself undaggered, and its boundary's. A box
         built from its arguments, e.g. a swap or a spider, names no
-        generator of its own: its string is a call on those arguments.
+        generator of its own: its string is a call on those arguments. A box
+        with args has the atoms of its boundary and its args.
         """
         arguments = getattr(self, "__getnewargs__", None)
         if callable(arguments):
             return [atom for arg in arguments()
                     if isinstance(arg, Ob) for atom in arg.atoms()]
+        if self.args:
+            return self.dom.atoms() + self.cod.atoms() + [
+                atom for arg in self.args for atom in arg.atoms()]
         return [self.dagger() if self.is_dagger else self]\
             + self.dom.atoms() + self.cod.atoms()
 
     def setoid(self):
         """
         The equality and hash of a box is given by hashing its type as well as
-        its internal attributes `name, dom, cod, is_dagger` and `data`. In
-        particular if the `data` is not hashable then neither is the `Box`.
+        its internal attributes `name, dom, cod, is_dagger` and `data`, its
+        `method` and its `args`. In particular if the `data` is not hashable
+        then neither is the `Box`.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> assert f.bubble(data=1) != f.bubble(data=2)
+        >>> assert f.bubble(method="m") != f.bubble()
         """
-        attributes = self.name, self.dom, self.cod, self.is_dagger, self.data
-        return (factory_key(type(self)), ) + attributes
+        args = tuple(f.setoid() for f in self.args)
+        return (factory_key(type(self)), self.name, self.dom, self.cod,
+                self.is_dagger, self.method, args, self.data)
 
     def __lt__(self, other):
         return self.name < other.name
@@ -934,195 +1084,165 @@ class Box(Arrow):
             tree['is_dagger'] = True
         if self.data is not None:
             tree['data'] = self.data
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Box:
-        name = tree['name']
-        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
-        return cls(name=name, dom=dom, cod=cod, data=data, is_dagger=is_dagger)
-
-
-class Bubble(Box):
-    """
-    A bubble is a box with arrow :code:`args` inside and an optional pair of
-    objects :code:`dom` and :code:`cod`.
-
-    Parameters:
-        args : The arrows inside the bubble.
-        dom : The domain of the bubble, default is that of :code:`args`.
-        cod : The codomain of the bubble, default is that of :code:`args`.
-        name (str) : An optional name for the bubble.
-        method (str) : The method to call when a functor is applied to it.
-        kwargs : Passed to the `__init__` of :class:`Box`.
-
-    Raises:
-        ValueError : When dom (resp. cod) is None and the args do not all
-            have the same dom (resp. cod).
-
-    Example
-    -------
-    >>> x, y = Ob('x'), Ob('y')
-    >>> Bubble(Box('f', x, x), Box('g', y, x))
-    Traceback (most recent call last):
-    ...
-    ValueError: A bubble needs a dom given when its args do not all share \
-one, they have [cat.Ob('x'), cat.Ob('y')].
-    """
-    serialised_attrs = (
-        "*args", "dom", "cod", "name", "method", "is_dagger", "data")
-
-    def __init__(
-            self, *args: Arrow, dom: Ob | None = None,
-            cod: Ob | None = None, name="", method="bubble", **kwargs):
-        dom, cod = (
-            given if given is not None else self.common(args, attr)
-            for attr, given in [("dom", dom), ("cod", cod)])
-        self.args, self.method = args, method
-        Box.__init__(self, name, dom, cod, **kwargs)
-
-    @staticmethod
-    def common(args: tuple[Arrow, ...], attr: str) -> Ob:
-        """ The domain or codomain the args all share. """
-        values = list(dict.fromkeys(getattr(arg, attr) for arg in args))
-        if len(values) != 1:
-            raise ValueError(messages.NO_COMMON_BOUNDARY.format(
-                attr, ", ".join(map(repr, values))))
-        return values[0]
-
-    @property
-    def arg(self):
-        """ The arrow inside the bubble if there is exactly one. """
-        if len(self.args) == 1:
-            return self.args[0]
-        raise ValueError(f"{self} has multiple args.")
-
-    @property
-    def is_id_on_objects(self):
-        """ Whether the bubble is identity on objects. """
-        return len(self.args) == 1 and (
-            self.dom, self.cod) == (self.arg.dom, self.arg.cod)
-
-    def setoid(self):
-        """
-        Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method,
-        is_dagger` and `data`, as for a :class:`Box`: if the `data` is not
-        hashable then neither is the bubble. Its string prints the `data`, so
-        that it reads back.
-
-        >>> f = Box('f', Ob('x'), Ob('y'))
-        >>> assert f.bubble(data=1) != f.bubble(data=2)
-        >>> print(f.bubble(data=1))
-        (f).bubble(data=1)
-
-        Bubbling and daggering do not commute, as :meth:`__str__` prints
-        them: the dagger of a bubble is not the bubble of a dagger, so that
-        a functor cannot separate equal bubbles, e.g. into
-        :class:`discopy.tensor.Bubble` where the two have different arrays.
-
-        >>> assert f.bubble().dagger() != f.dagger().bubble()
-        >>> assert f.bubble().dagger().dagger() == f.bubble()
-        """
-        args_data = tuple(f.setoid() for f in self.args)
-        return (factory_key(type(self)), ) + args_data + tuple(
-            getattr(self, x)
-            for x in ("dom", "cod", "name", "method", "is_dagger", "data"))
-
-    def __str__(self):
-        """
-        A bubble prints as a call on its args, a daggered one as the dagger
-        of the bubble inside it: bubbling and daggering need not commute, so
-        printing the dagger on the args would read back as the other value,
-        e.g. in :class:`discopy.tensor.Bubble`.
-
-        >>> f = Box('f', Ob('x'), Ob('y'))
-        >>> print(f.bubble().dagger())
-        (f).bubble()[::-1]
-        >>> print(f.dagger().bubble())
-        (f[::-1]).bubble()
-        """
-        if self.is_dagger:
-            return f"{self.dagger()}[::-1]"
-        str_args = ",".join(map(str, self.args))
-        str_kwargs = [] if self.is_id_on_objects else [
-            f"dom={self.dom}", f"cod={self.cod}"]
-        str_kwargs += [f"name={self.name!r}"] if self.name else []
-        str_kwargs += [] if self.method == "bubble"\
-            else [f"method={self.method!r}"]
-        str_kwargs += [] if self.data is None else [f"data={self.data!r}"]
-        return f"({str_args}).bubble({', '.join(str_kwargs)})"
-
-    def atoms(self) -> list:
-        """ The atoms of a bubble: those of its boundary and arguments. """
-        return self.dom.atoms() + self.cod.atoms() + [
-            atom for arg in self.args for atom in arg.atoms()]
-
-    def __repr__(self):
-        repr_args = ", ".join(map(repr, self.args))
-        repr_kwargs = "" if self.is_id_on_objects else (
-            f", dom={repr(self.dom)}, cod={repr(self.cod)}")
-        repr_kwargs += f", name={repr(self.name)}" if self.name else ""
-        repr_kwargs += "" if self.method == "bubble"\
-            else f", method={repr(self.method)}"
-        repr_kwargs += "" if self.data is None else f", data={self.data!r}"
-        repr_kwargs += ", is_dagger=True" if self.is_dagger else ""
-        return factory_name(type(self)) + (f"({repr_args}{repr_kwargs})")
-
-    @property
-    def free_symbols(self):
-        return super().free_symbols.union(*[f.free_symbols for f in self.args])
-
-    def subs(self, *args) -> Bubble:
-        if not self.free_symbols:
-            return self
-        changes = {"args": tuple(arg.subs(*args) for arg in self.args)}
-        if self.data is not None:
-            changes["data"] = rsubs(self.data, *args)
-        return self.rebuild(**changes)
-
-    def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
-        if not set(symbols) & self.free_symbols:
-            return lambda *xs: self
-        args = [arg.lambdify(*symbols, **kwargs) for arg in self.args]
-
-        def function(*xs):
-            changes = {"args": tuple(f(*xs) for f in args)}
-            if self.data is not None:
-                changes["data"] = rsubs(
-                    self.data, dict(zip(symbols, xs)), **kwargs)
-            return self.rebuild(**changes)
-        return function
-
-    def dagger(self) -> Bubble:
-        return self.rebuild(
-            args=tuple(arg.dagger() for arg in self.args),
-            dom=self.cod, cod=self.dom, is_dagger=not self.is_dagger)
-
-    def to_tree(self):
-        tree = {
-            'factory': factory_name(type(self)),
-            'args': [f.to_tree() for f in self.args],
-            'dom': self.dom.to_tree(),
-            'cod': self.cod.to_tree()}
-        if self.is_dagger:
-            tree['is_dagger'] = True
-        if self.data is not None:
-            tree['data'] = self.data
-        if self.name:
-            tree['name'] = self.name
+        if self.args:
+            tree['args'] = [f.to_tree() for f in self.args]
         if self.method != "bubble":
             tree['method'] = self.method
         return tree
 
     @classmethod
-    def from_tree(cls, tree):
-        args = [tree['arg']] if 'args' not in tree else tree['args']
+    def from_tree(cls, tree: dict) -> Box:
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        kwargs = {k: tree[k] for k in ('data', 'is_dagger', 'name', 'method')
-                  if k in tree}
-        return cls(*map(from_tree, args), dom=dom, cod=cod, **kwargs)
+        kwargs = {k: tree[k] for k in ('method', ) if k in tree}
+        if 'args' in tree or 'arg' in tree:  # 'arg': a tree from before #560
+            kwargs['args'] = tuple(map(
+                from_tree, tree.get('args', [tree.get('arg')])))
+        data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
+        return cls(name=tree.get('name', ""), dom=dom, cod=cod, data=data,
+                   is_dagger=is_dagger, **kwargs)
+
+
+class Sum(Box):
+    """
+    A sum is a tuple of arrows :code:`terms` with the same domain and
+    codomain, a box of the free category enriched in monoids.
+
+    Composition distributes over the sum: the terms of ``f >> g`` are the
+    composites of a term of ``f`` with a term of ``g``, and the unit is the
+    empty sum of a given type, the zero arrow. A sum of one term is equal to
+    that term, and a functor sends a sum to the sum of the images of its
+    terms.
+
+    Parameters:
+        terms : The terms of the formal sum.
+        dom : The domain of the formal sum.
+        cod : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
+    >>> f, g = Box('f', x, y), Box('g', y, z)
+    >>> zero = Sum((), x, y)
+    >>> assert f + zero == f == zero + f
+    >>> assert f >> (g + g) == (f >> g) + (f >> g) == (f + f) >> g
+    >>> print(f + f)
+    (f) + (f)
+    >>> f + f
+    cat.Sum(terms=(cat.Box('f', cat.Ob('x'), cat.Ob('y')), \
+cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
+
+    Important
+    ---------
+    Domain and codomain are optional only if the terms are non-empty.
+
+    Note
+    ----
+    The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
+    """
+    serialised_attrs = ("terms", "dom", "cod")
+
+    def __init__(
+            self, terms: tuple[Arrow, ...],
+            dom: Ob | None = None, cod: Ob | None = None):
+        terms = tuple(terms)
+        if not terms and (dom is None or cod is None):
+            raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
+        dom = terms[0].dom if dom is None else dom
+        cod = terms[0].cod if cod is None else cod
+        unit = self.sum_factory((), dom, cod) if terms else None
+        for arrow in terms:
+            assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
+        self.terms = terms
+        super().__init__("", dom, cod)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        """ The name of a sum is its :code:`repr`, computed when needed. """
+        str_args = "" if self.terms\
+            else f", dom={repr(self.dom)}, cod={repr(self.cod)}"
+        return factory_name(type(self))\
+            + f"(terms={repr(self.terms)}{str_args})"
+
+    @property
+    def is_generator(self):
+        return len(self.terms) == 1 and self.terms[0].is_generator
+
+    @property
+    def generator(self):
+        return self.terms[0].generator if self.is_generator else None
+
+    def setoid(self):
+        """ Ensure that a singleton sum is in fact equal to its only term. """
+        return self.terms[0].setoid() if len(self.terms) == 1 else (
+            factory_key(type(self)), self.terms, self.dom, self.cod)
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return " + ".join(f"({arrow})" for arrow in self.terms)\
+            if self.terms else\
+            f"{factory_name(type(self))}((), {self.dom}, {self.cod})"
+
+    def atoms(self) -> list:
+        """ The atoms of a sum: those of its boundary and of its terms. """
+        return self.dom.atoms() + self.cod.atoms() + [
+            atom for term in self.terms for atom in term.atoms()]
+
+    def __add__(self, other):
+        assert_isparallel(self, other)
+        other = other if isinstance(other, Sum)\
+            else self.sum_factory((other, ))
+        return self.sum_factory(
+            (*self.terms, *other.terms), self.dom, self.cod)
+
+    def __iter__(self):
+        yield from self.terms
+
+    def __len__(self):
+        return len(self.terms)
+
+    @unbiased
+    def then(self, other):
+        assert_iscomposable(self, other)
+        other = other if isinstance(other, Sum)\
+            else self.sum_factory((other, ))
+        terms = tuple(f.then(g) for f in self.terms for g in other.terms)
+        return self.sum_factory(terms, self.dom, other.cod)
+
+    def dagger(self):
+        terms = tuple(f.dagger() for f in self.terms)
+        return self.sum_factory(terms, self.cod, self.dom)
+
+    @property
+    def free_symbols(self):
+        return {x for box in self.terms for x in box.free_symbols}
+
+    def subs(self, *args):
+        terms = tuple(f.subs(*args) for f in self.terms)
+        return self.sum_factory(terms, self.dom, self.cod)
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: self.sum_factory(
+            tuple(box.lambdify(*symbols, **kwargs)(*xs) for box in self.terms),
+            dom=self.dom, cod=self.cod)
+
+    def to_tree(self):
+        return {
+            'factory': factory_name(type(self)),
+            'terms': [t.to_tree() for t in self.terms],
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree):
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        terms = tuple(map(from_tree, tree['terms']))
+        return cls(terms=terms, dom=dom, cod=cod)
+
+
+Bubble = Box.from_args
 
 
 @factory
@@ -1347,13 +1467,14 @@ which JSON cannot hold.
             if isinstance(result, tuple) and not issubclass(origin, Nat):
                 return self.cod.ob(*result)
             return self.cod.ob(result)
-        if isinstance(other, formal_sum.Sum):
+        if isinstance(other, Sum):
             return sum(map(self, other.terms),
                        self.cod.zero(self(other.dom), self(other.cod)))
-        if isinstance(other, Bubble) and hasattr(self.cod, other.method):
+        if isinstance(other, Box) and other.args\
+                and hasattr(self.cod, other.method):
             dom, cod = map(self, (other.dom, other.cod))
             if other.method == "bubble" and issubclass(self.cod, Arrow):
-                return self.cod.bubble_factory(
+                return self.cod.bubble(
                     *map(self, other.args), dom=dom, cod=cod, name=other.name,
                     data=other.data, is_dagger=other.is_dagger)
             return getattr(self.cod, other.method)(
@@ -1576,7 +1697,7 @@ which JSON cannot hold.
 
 Ob.equation_factory = Equation
 Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
-Arrow.bubble_factory = Bubble
+Arrow.sum_factory = Sum
 Arrow.functor_factory = Functor
 Id = Arrow.id
 
@@ -2825,8 +2946,3 @@ Arrow.term_factory = TermBase
 TermBase.equivalence_factory = AlphaEquation
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-
-# pylint: disable-next=wrong-import-position,ungrouped-imports  # a cat.Box
-from discopy import sum as formal_sum  # noqa: E402
-
-__getattr__ = utils.deprecated_alias(__name__, {"Sum": "discopy.sum.Sum"})

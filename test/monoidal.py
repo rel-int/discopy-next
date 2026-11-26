@@ -564,9 +564,9 @@ def test_Bubble_every_level():
             spacial, feedback, braided, balanced, symmetric, markov,
             comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
             frobenius, pregroup, categorial, abstract):
-        assert module.Diagram.bubble_factory is module.Bubble, module
         x, y = module.Ty('x'), module.Ty('y')
         bubble = module.Box('f', x, y).bubble(name="N")
+        assert type(bubble) is module.Box and bubble.args, module
         diagram = bubble >> module.Box('h', y, y)
         assert isinstance(diagram, module.Diagram) and diagram.cod == y
         assert module.Functor.id(module.Diagram)(diagram) == diagram
@@ -582,7 +582,7 @@ def test_Bubble_data():
     named = f.bubble(name="b", method="frame")
     for b in (from_tree(named.to_tree()), loads(dumps(named))):
         assert b == named and (b.name, b.method) == ("b", "frame")
-    assert "method" not in bubble.to_tree() and "name" not in bubble.to_tree()
+    assert "method" not in bubble.to_tree() and not bubble.to_tree()["name"]
     from discopy import monoidal
     assert (eval(repr(bubble)).data, eval(repr(bubble)).is_dagger) == (42, True)
 
@@ -594,8 +594,6 @@ def test_Bubble_identity_Functor():
     image = Functor.id(Diagram)(bubble)
     assert image == bubble and (image.drawing_name, image.draw_as_frame)\
         == ("L", True) and (image.data, image.is_dagger) == (42, True)
-    empty = Bubble(dom=Ty('x'), cod=Ty('y'))
-    assert Functor.id(Diagram)(empty) == empty
 
 
 def test_Box_globularity():
@@ -994,13 +992,13 @@ def test_Sum():
     x = Ty('x')
     f = Box('f', x, x)
     with raises(ValueError):
-        Diagram.sum_factory(())
+        Sum(())
     with raises(AxiomError):
-        Diagram.sum_factory((f, ), dom=Ty())
+        Sum((f, ), dom=Ty())
     with raises(AxiomError):
         f + Box('g', Ty(), x)
-    assert Diagram.sum_factory([f]) == f
-    assert {Diagram.sum_factory([f]): 42}[Diagram.sum_factory([f])] == 42
+    assert Sum([f]) == f
+    assert {Sum([f]): 42}[Sum([f])] == 42
     assert Id(x).then(*(3 * (f + f, ))) == sum(8 * [f >> f >> f])
     assert Id(Ty()).tensor(*(3 * (f + f, ))) == sum(8 * [f @ f @ f])
 

@@ -541,12 +541,6 @@ class Sum(symmetric.Sum, Box):
     """
 
 
-class Bubble(symmetric.Bubble, Box):
-    """
-    A comarkov bubble is a symmetric bubble and a comarkov box.
-    """
-
-
 class Functor(symmetric.Functor):
     """
     A comarkov functor is a symmetric functor that preserves merges.
@@ -606,7 +600,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.noise_factory = Noise
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -618,3 +611,6 @@ class Equation(symmetric.Equation):
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

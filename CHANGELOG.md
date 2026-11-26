@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- A category draws left to right when its `Diagram` class sets
+  `draw_left_to_right = True`, and a box whose args are drawn in
+  another direction than its own category is drawn as one box with its args
+  across it, e.g. the "Very big car" figure of higher-order DisCoCat: the
+  terms top to bottom, their bodies left to right.
+  `drawing.backend.Transposed` draws through the reflection along the
+  anti-diagonal, keeping the layout as it is ([next#728]).
+
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -94,7 +102,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `C` the Python functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
   along the classmethod `D.algebra(M, dom, cod)`, given for the new list monad
   `kleisli.monad.List` by `cat.Arrow`, which sends a list of arrows to their
-  `sum.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
+  `cat.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
@@ -555,6 +563,25 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
+  inside it, and the `method` a functor calls on their images, a generator
+  being a box with no args. The `Bubble` class of every module fuses into its
+  `Box` and `bubble_factory` goes: `f.bubble(...)` is `Box.from_args(f, ...)` (an
+  `Elementwise` in `tensor` and `quantum`),
+  a box with `args=(f, )`, `isinstance(f, Bubble)` becomes `f.args`, and
+  `Bubble` stays an alias of `Box.from_args`, or of `Elementwise.from_args` in
+  `tensor`, `quantum.circuit` and `quantum.zx`, and a tree dumped with a
+  `Bubble` factory still loads. The function a tensor bubble applies
+  elementwise moves to `tensor.Elementwise`, the box `tensor.Diagram.bubble`
+  builds, and a plain tensor box carries none;
+  `biclosed.Application.func` and `args` are spelled out as `function` and
+  `argument`, in its trees too, and a tree with the old keys still loads
+  ([next#729]).
+
+- In a left-to-right drawing, wire labels sit above their wires, and a line
+  separates each of the args nested in a box from the next, so that no two
+  regions meet without one ([next#733]).
+
 - The architecture diagram of the syntax moves from the docstring of
   `discopy.abc` to the syntax page of the docs, with the sentence that
   describes it ([next#732]).
@@ -847,13 +874,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - Every `Ob` but `cat.Ob` is `Wire` ([#566]), and `PRO` is `Nat` ([#727]):
   the old names still work, with a `DeprecationWarning`.
-- `cat.Sum` and `monoidal.Sum` are `sum.Sum` and `sum.Sum[monoidal.Diagram]`:
-  the formal sums of the arrows of a category are one module, `discopy.sum`,
-  and `Sum[C]` is a box of `C`. The old names still work, with a
-  `DeprecationWarning`; the other levels follow ([next#10]).
 
 ### Removed
 
+- `discopy.sum` goes, and `Sum` lives in each module again: `cat.Sum` is a box
+  of formal sums with their composition, `monoidal.Sum` adds the tensor and
+  each level's `Sum` subclasses its parent's: import `Sum` from the module of
+  its category, e.g. `monoidal.Sum` for `sum.Sum[monoidal.Diagram]`.
+  `Sum[C]` and the `subscript_bases` hook of `NamedGeneric` go with it
+  ([next#736]).
 - The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
   does not apply, now that a class with no tensor does not state it
   ([next#485]).
@@ -871,6 +900,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   leaves the `notebooks` extra ([next#715]).
 
 ### Fixed
+
+- A frame drawn left to right keeps its name inside it, in its top left
+  corner, rather than lifted above its top side like a wire label, and a
+  bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
+  gradients in `tensor`'s product and chain rules; `Box`'s docstring draws
+  "concepts with attitude" from higher-order DisCoCat ([next#735]).
 
 - The architecture diagram of `discopy.abc` draws `discopy.bang` branching
   off `discopy.monoidal`, inside the syntax, and the docstring of
@@ -2432,7 +2467,6 @@ for the changelog of `1.2.1` and earlier.
 [#830]: https://github.com/discopy/discopy/pull/830
 [next#1]: https://github.com/rel-int/discopy-next/pull/1
 [next#9]: https://github.com/rel-int/discopy-next/issues/9
-[next#10]: https://github.com/rel-int/discopy-next/issues/10
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
@@ -2698,8 +2732,13 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
+[next#728]: https://github.com/rel-int/discopy-next/pull/728
+[next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
+[next#733]: https://github.com/rel-int/discopy-next/pull/733
+[next#735]: https://github.com/rel-int/discopy-next/pull/735
+[next#736]: https://github.com/rel-int/discopy-next/pull/736
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

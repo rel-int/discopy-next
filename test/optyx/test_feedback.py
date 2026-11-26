@@ -347,3 +347,11 @@ def test_feedback_subs():
         return (cnot >> swap).feedback(state=qubits.Ket("+"))
     assert loop(phi).subs((phi, 0.5)) == loop(0.5)
     assert loop(phi).lambdify(phi)(0.5) == loop(0.5)
+
+
+def test_feedback_tree():
+    from discopy.utils import dumps, loads
+    swaps = Diagram.swap(qmode ** 2, qmode ** 2)
+    for fb in (open_delay(), open_delay().double(), swaps.feedback(
+            mem=qmode ** 2, effect=Diagram.id(qmode ** 2))):
+        assert loads(dumps(fb)) == fb

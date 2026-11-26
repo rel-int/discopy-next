@@ -276,3 +276,6 @@ NO_OFFSET = (
     "Expected an offset for the abstraction of no variable in {}, which "
     "has no stack to say where it stands.")
 WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."
+MIXED_DIRECTIONS = (
+    "The args of {} are drawn in different directions, left to right and "
+    "top to bottom: a bubble draws them all in one.")
