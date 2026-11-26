@@ -8,4 +8,4 @@
 - [ ] Docs, tests, changelog entry and the checks of CONTRIBUTING.md
 - [x] Rewrite: `discopy.rewrite` with `Rewrite`, a sesquicategory of diagrams, its `Layer` of steps rewritten at once, `Step` and its `Interchange` and `Slide`, and an ADR
 - [x] Rewrite: `normalization` returns a `Rewrite`, `Rewrite.to_gif` plays the laxators, and `Equation.path` and `Equation.to_gif` go
-- [WIP] @T-e8a5da2e-2026-11-26 09:34 Rewrite: `rigid.Unsnake`, the step of `snake_equations` with its own frames, and `normalization` made of interchangers and unsnakes
+- [x] Rewrite: `rigid.Unsnake`, the step of `snake_equations` with its own frames, and `normalization` made of interchangers and unsnakes
