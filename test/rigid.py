@@ -307,3 +307,11 @@ def test_str_transparency_of_a_rotated_box():
         assert box.atoms()[0] == f
         assert Diagram.str_transparency(box)
     assert Diagram.str_transparency(f.l @ f.r >> x.l @ f.r[::-1])
+
+
+def test_rotations_of_a_box_with_args_keep_its_drawing_name():
+    from discopy import rigid
+    x = rigid.Ty('x')
+    W = rigid.Box('f', x, x).bubble(drawing_name="W")
+    for box in (W.r, W.l, W.r.l, W.l.r, W.r[::-1]):
+        assert box.drawing_name == "W"

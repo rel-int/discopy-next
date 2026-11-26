@@ -118,7 +118,8 @@ jobs:
         fi
         uv run coverage report --show-missing
     - name: Test notebooks
-      # Execute every marimo notebook and fail if any cell errors, on each
+      # Execute every marimo notebook but those of UNEXECUTED in
+      # docs/export_notebooks.py and fail if any cell errors, on each
       # commit of main: a pull request is checked by its merge commit.
       if: github.event_name != 'pull_request'
       run:

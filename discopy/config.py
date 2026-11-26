@@ -49,6 +49,9 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "bubble_closing": lambda _: False,
     "frame_boundary": lambda _: False,
     "frame_colour": lambda _: "lightgrey",
+    # Whether a reflection of the drawing, not the dagger of the diagram,
+    # mirrors the drawings nested in a box.
+    "mirror_nested": lambda _: False,
     "draw_as_permutation": lambda _: False,
     "permutation_indices": lambda _: None,  # Used for drawing permutations.
     "draw_as_braid": lambda _: False,
@@ -80,6 +83,9 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "color": lambda box:
         "black" if getattr(box, "draw_as_spider", False) else "white",
     "drawing_name": lambda box: box.name,
+    # Framed drawings drawn left to right inside the box, one after the
+    # other, right of its label.
+    "nested": lambda _: None,
     "no_label": lambda box: any([
         box.draw_as_wires, box.draw_as_spider, box.draw_as_brakets,
         box.draw_as_controlled, box.draw_as_discards, box.draw_as_measures,

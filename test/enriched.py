@@ -11,7 +11,7 @@ from discopy.tensor import Dim, Tensor
 from discopy import monoidal
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.python import Function
-from discopy.sum import Sum
+from discopy.cat import Sum
 from discopy.utils import AxiomError
 
 x, y, z = map(cat.Ob, "xyz")

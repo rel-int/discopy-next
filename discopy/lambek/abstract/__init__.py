@@ -27,12 +27,12 @@ Summary
     Permutation
     Swap
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
     Lexicon
     TermBase
@@ -527,15 +527,6 @@ class Sum(closed.Sum, Box):
     "A formal sum of abstract diagrams."
 
 
-class Bubble(closed.Bubble, Box):
-    """
-    An abstract bubble is a closed bubble and an abstract box.
-
-    >>> A = Ty('A')
-    >>> assert (Box('f', A, A).bubble() >> Box('g', A, A)).cod == A
-    """
-
-
 class Functor(closed.Functor):
     """
     An abstract functor is a closed functor with abstract diagrams as domain.
@@ -662,7 +653,7 @@ class Lexicon(Functor):
         """
         args = []
         while isinstance(term, Application):
-            term, args = term.func, [term.args] + args
+            term, args = term.function, [term.argument] + args
         yield parent, position, term
         for i, arg in enumerate(args):
             yield from Lexicon.productions(arg, term, i)
@@ -735,8 +726,8 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function
@@ -747,13 +738,15 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
 Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Hypergraph = hypergraph.Hypergraph[Diagram]
+for law in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(Hypergraph, law, vars(closed.Hypergraph)[law])
 
 Position = Ty("o")
 """ The atomic type of positions in a string, an arbitrary atom. """
@@ -768,3 +761,6 @@ of type ``String``, ``Position(lambda x: x)`` is the empty string and
 
 # pylint: disable-next=wrong-import-position  # proofnet imports this module
 from discopy.lambek.abstract import proofnet  # noqa: E402
+
+
+Bubble = Box.from_args

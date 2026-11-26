@@ -124,4 +124,4 @@ def test_Bubble_winding():
     n, s = Ty('n'), Ty('s')
     word = Box('w', n, s)
     assert word.bubble().l.l.z == -2 and word.bubble().l.l.r.r == word.bubble()
-    assert word.bubble().l.l != Bubble(word, dom=n.l.l, cod=s.l.l)
+    assert word.bubble().l.l != word.bubble(dom=n.l.l, cod=s.l.l)

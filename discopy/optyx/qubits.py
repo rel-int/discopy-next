@@ -303,7 +303,7 @@ from discopy import quantum as quantum_discopy
 from discopy import symmetric
 from sympy import lambdify
 # from pytket import circuit as tket_circuit
-from discopy.utils import factory_name
+from discopy.utils import factory_name, from_tree
 from discopy.optyx.utils.misc import explode_channel
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -644,6 +644,11 @@ class Measure(MeasureChannel):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class Discard(DiscardChannel):
     """
@@ -658,6 +663,11 @@ class Discard(DiscardChannel):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class Encode(EncodeChannel):
     """
@@ -671,6 +681,11 @@ class Encode(EncodeChannel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
 
 
 # pylint: disable=invalid-name

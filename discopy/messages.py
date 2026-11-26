@@ -26,7 +26,8 @@ FREE_YANKING = (
 FREE_TWIST = (
     "A free twist is a box: the free balanced diagrams are not quotiented "
     "by the naturality of the twist.")
-NOT_FEEDBACK = "Cannot feed {} back into {}, expected {} as its input."
+NOT_FEEDBACK = (
+    "Cannot loop {} around {}, expected {} as its domain and codomain.")
 STREAM_SLIDING = (
     "A morphism slides along the feedback of streams only up to extensional "
     "equivalence, see discopy.feedback.")
@@ -143,9 +144,17 @@ FREE_FEEDBACK = (
 RIGID_TYPE_HAS_NO_DAGGER = "Rigid types have no dagger, use pivotal instead."
 RIGID_HAS_NO_DAGGER = (
     "Rigid cups and caps have no dagger, use pivotal instead.")
-FEEDBACK_HAS_NO_DAGGER = (
-    "Feedback has no dagger and no rotation, "
-    "either would feed its memory back in time.")
+TRACE_HAS_NO_ROTATION = (
+    "A trace rotates only in a pivotal category, {} has no rotation.")
+FEEDBACK_HAS_NO_ROTATION = (
+    "Feedback and feedforward have no rotation, only a trace does: the "
+    "half-turn of a delayed feedback would feed its memory forward in time.")
+MARKOV_HAS_NO_DAGGER = (
+    "A copy or a discard has no dagger: a Markov category is not a dagger "
+    "category.")
+COMARKOV_HAS_NO_DAGGER = (
+    "A merge or a noise has no dagger: a comarkov category is not a dagger "
+    "category.")
 MAP_HAS_NO_ADJOINTS = (
     "A map is compact whatever category hosts it, but a host that is not "
     "rigid has no adjoints or curries for the laws to quantify over.")
@@ -187,6 +196,9 @@ OVERLAPPING_BOXES = (
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+STRUCTURAL_HAS_NO_DAGGER = (
+    "A structural box but the exchange has no dagger: !L* has no rule from "
+    "its codomain back to its domain.")
 LAXATOR_ARITY = (
     "A laxator takes two types, or none for the unit, got {}.")
 NOT_BANGED = (
@@ -264,3 +276,6 @@ NO_OFFSET = (
     "Expected an offset for the abstraction of no variable in {}, which "
     "has no stack to say where it stands.")
 WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."
+MIXED_DIRECTIONS = (
+    "The args of {} are drawn in different directions, left to right and "
+    "top to bottom: a bubble draws them all in one.")
