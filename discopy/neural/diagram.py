@@ -17,11 +17,9 @@ the trace from zeros runs the first rounds of a cycle from its initial state.
 The boxes hold adaptors of the modules the network already owns, so that the
 parameters are the same objects.
 
-The image has one box per node and per factor, and so one module call each.
-:func:`stack` is the functor that sends a layer of boxes sharing a module to
-one box on a leading node axis, and the wiring between layers to an index
-gather: its image of a regular graph is the round of the network, with a
-number of boxes that does not grow with the graph.
+The image has one box, and so one module call, per node and per factor:
+:func:`stack` sends it to a round with a number of boxes that does not grow
+with the graph.
 
 Summary
 -------
@@ -54,7 +52,7 @@ Summary
         wires
         stacked
         pack
-        fold
+        on_nodes
         routes
         stack
 
@@ -409,12 +407,36 @@ def reads(cmap: frobenius.CMap, rows: tuple, slots: list, dims: list
             for leg in range(len(dim))]
 
 
-def boxes(cmap: frobenius.CMap, ar_map: dict, slots: list, dims: list,
-          given: list) -> tuple[list[Box], list[int]]:
+def routes(layer: list[Box]) -> list[int]:
     """
-    The boxes of the diagram, one per box of the map, and the route that
-    sends the legs they read to their inputs: first the boundary legs a box
-    reads, then the legs of its slots.
+    The leg each input of a layer of boxes reads, in the domain the legs they
+    read from the boundary then those of the memory, in the order of their
+    outputs.
+
+    Parameters:
+        layer : The boxes, each reading the legs it writes after those it
+                reads from the boundary.
+
+    Example
+    -------
+    >>> a = Box("a", Dims(2, 2), Dims(3))
+    >>> b = Box("b", Dims(4, 4, 4), Dims(5, 6))
+    >>> routes([a, b])
+    [0, 2, 1, 3, 4]
+    """
+    given = list(accumulate(
+        (len(box.dom) - len(box.cod) for box in layer), initial=0))
+    own = list(accumulate((len(box.cod) for box in layer), initial=0))
+    return [leg for n in range(len(layer))
+            for leg in (*range(given[n], given[n + 1]),
+                        *range(given[-1] + own[n], given[-1] + own[n + 1]))]
+
+
+def boxes(cmap: frobenius.CMap, ar_map: dict, slots: list, dims: list,
+          given: list) -> list[Box]:
+    """
+    The boxes of the diagram, one per box of the map, each reading the legs
+    it is given and writing those of its slots.
 
     Parameters:
         cmap : The closed map.
@@ -429,23 +451,17 @@ def boxes(cmap: frobenius.CMap, ar_map: dict, slots: list, dims: list,
     >>> pair = Signature((Orbit(MESSAGE, 1), Orbit(STATE, traced=True)))
     >>> cmap = from_relation(((1, ), (0, )), pair)
     >>> slots = [(0, 0), (0, 1), (1, 0), (1, 1)]
-    >>> parts, route = boxes(cmap, {NODE: abs}, slots, [Dims(1)] * 4,
-    ...                      [Dims(), Dims()])
-    >>> len(parts), route
-    (2, [0, 1, 2, 3])
+    >>> len(boxes(cmap, {NODE: abs}, slots, [Dims(1)] * 4,
+    ...           [Dims(), Dims()]))
+    2
     """
-    offsets = list(accumulate((len(dim) for dim in given), initial=0))
-    starts = list(accumulate((len(dim) for dim in dims), initial=0))
-    parts, route = [], []
+    parts = []
     for index, box in enumerate(cmap.boxes):
-        own = [n for n, slot in enumerate(slots) if slot[0] == index]
-        mine = Dims().tensor(*(dims[n] for n in own))
+        mine = Dims().tensor(*(dim for dim, slot in zip(dims, slots)
+                               if slot[0] == index))
         parts.append(Box(box.name, given[index] @ mine, mine,
                          module=ar_map[box.name]))
-        route += range(offsets[index], offsets[index + 1])
-        route += (offsets[-1] + starts[n] + leg
-                  for n in own for leg in range(len(dims[n])))
-    return parts, route
+    return parts
 
 
 def interpret(cmap: frobenius.CMap, ob_map: dict, ar_map: dict,
@@ -453,13 +469,12 @@ def interpret(cmap: frobenius.CMap, ob_map: dict, ar_map: dict,
     """
     The network with a trace a closed map is sent to: one box per box of the
     map, with one leg in and one out per port wired to another box and per
-    traced pair of ports, in the order of the ports, and one trace over all
-    the legs, whose body routes every leg out to the leg in at the other end
-    of its wire, and observes the legs it wrote.
+    traced pair of ports, and one trace over all the legs, whose body routes
+    every leg out to the leg in at the other end of its wire, and observes
+    the legs it wrote.
 
-    The box of a name is filled by the module ``ar_map[name]``, one object
-    for every box of that name, after the legs ``inputs[name]`` it reads
-    from the boundary of the network, e.g. the clue of a node.
+    The box of a name is filled by the module ``ar_map[name]``, after the
+    legs ``inputs[name]`` it reads from the boundary, e.g. the clue of a node.
 
     Parameters:
         cmap : A closed map, e.g. of :func:`~discopy.neural.signature.\
@@ -486,10 +501,10 @@ from_incidence`.
     dims = [ob_map[cmap.boxes[index].cod[position]]
             for index, position in slots]
     given = [inputs.get(box.name, Dims()) for box in cmap.boxes]
-    parts, route = boxes(cmap, ar_map, slots, dims, given)
+    parts = boxes(cmap, ar_map, slots, dims, given)
     mem = Dims().tensor(*dims)
     back = reads(cmap, rows, slots, dims)
-    body = Function(Dims().tensor(*given) @ mem, route)\
+    body = Function(Dims().tensor(*given) @ mem, routes(parts))\
         >> Network.id(Dims()).tensor(*parts)\
         >> Function(mem, back + back)
     return Trace(body, mem=mem)
@@ -687,7 +702,7 @@ def pack(trace: Network, given: tuple, memory: tuple) -> tuple[tuple, tuple]:
             stacked(memory, [len(box.cod) for box in parts], groups))
 
 
-def fold(box: Box, k: int) -> Box:
+def on_nodes(box: Box, k: int) -> Box:
     """
     The box on ``k`` nodes: the module of ``box``, one object, on legs with a
     node axis in front of their shape. One node has no node axis, since a
@@ -699,9 +714,9 @@ def fold(box: Box, k: int) -> Box:
 
     Example
     -------
-    >>> fold(Box("f", Dims(2), Dims(3), module=abs), 4)
+    >>> on_nodes(Box("f", Dims(2), Dims(3), module=abs), 4)
     neural.network.Box('f', Dims(Dim(4, 2)), Dims(Dim(4, 3)))
-    >>> fold(Box("f", Dims(2), Dims(3), module=abs), 1).dom
+    >>> on_nodes(Box("f", Dims(2), Dims(3), module=abs), 1).dom
     Dims(Dim(2))
     """
     if k == 1:
@@ -710,31 +725,6 @@ def fold(box: Box, k: int) -> Box:
                Dims(*(Dim(k) @ leg for leg in box.dom.inside)),
                Dims(*(Dim(k) @ leg for leg in box.cod.inside)),
                module=box.module)
-
-
-def routes(layer: list[Box]) -> list[int]:
-    """
-    The leg each input of a layer of boxes reads, in the domain the legs they
-    read from the boundary then those of the memory, in the order of their
-    outputs.
-
-    Parameters:
-        layer : The boxes, each reading the legs it writes after those it
-                reads from the boundary.
-
-    Example
-    -------
-    >>> a = Box("a", Dims(2, 2), Dims(3))
-    >>> b = Box("b", Dims(4, 4, 4), Dims(5, 6))
-    >>> routes([a, b])
-    [0, 2, 1, 3, 4]
-    """
-    given = list(accumulate(
-        (len(box.dom) - len(box.cod) for box in layer), initial=0))
-    own = list(accumulate((len(box.cod) for box in layer), initial=0))
-    return [leg for n in range(len(layer))
-            for leg in (*range(given[n], given[n + 1]),
-                        *range(given[-1] + own[n], given[-1] + own[n + 1]))]
 
 
 def stack(trace: Network) -> Network:
@@ -746,12 +736,7 @@ def stack(trace: Network) -> Network:
     gather on the node axis, :class:`Gather`.
 
     The ``k`` legs of a role are one leg ``Dim(k, width)``, see :func:`pack`
-    for the tensors. Boxes of different degrees are different buckets, one
-    call each and no padding, so that the number of boxes of a round is that
-    of the degrees, not of the nodes. The buckets are in the order of the
-    boxes of the trace, nodes then factors, so that on a regular graph the
-    image is the round of the network on its layout, ``(cells, state,
-    units)``.
+    for the tensors and :func:`buckets` for the layout.
 
     The module of a box must run on legs with node axes between the batch
     and the width, as :class:`Fire` and :class:`Reply` do. A bucket of one
@@ -774,7 +759,7 @@ def stack(trace: Network) -> Network:
     (20, 5)
     """
     parts, groups = buckets(trace)
-    layer = [fold(parts[group[0]], len(group)) for group in groups]
+    layer = [on_nodes(parts[group[0]], len(group)) for group in groups]
     given = Dims().tensor(*(box.dom[:len(box.dom) - len(box.cod)]
                             for box in layer))
     mem = Dims().tensor(*(box.cod for box in layer))
