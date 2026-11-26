@@ -703,7 +703,7 @@ Function.register(Diagram.Permutation)
 
 
 @Diagram.extend
-class Sum(markov.Sum, biclosed.Sum, Box):
+class Sum(markov.Sum, biclosed.Sum, Box):  # ty: ignore[inconsistent-mro]
     """
     A markov sum is a symmetric sum and a markov box,
     linear when every term is.
@@ -769,7 +769,8 @@ for law in (
         messages.CURRY_HAS_NO_DAGGER))
 for cls in (
         Diagram.Feedback, Diagram.Feedforward, Diagram.Head, Diagram.Tail):
-    cls.is_linear = property(lambda self: self.arg.is_linear)
+    cls.is_linear = property(  # ty: ignore[invalid-assignment]
+        lambda self: self.arg.is_linear)
 Ty.Under = Ty.Over = staticmethod(Exp)
 
 Id = Diagram.id

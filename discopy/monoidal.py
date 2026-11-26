@@ -1469,7 +1469,8 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         super().__setstate__(state)
 
     def __init__(
-            self, inside: tuple[Layer, ...], dom: Ty, cod: Ty, _scan=True):
+            self, inside: tuple[Layer, ...],  # ty: ignore[invalid-type-form]
+            dom: Ty, cod: Ty, _scan=True):
         inside = tuple(inside)
         if _scan:
             for layer in inside:
@@ -1906,7 +1907,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         return cat.Equation(foliated.foliation(), foliated)
 
     @classmethod
-    def Equation(cls, *terms: "Diagram") -> "Equation":
+    def Equation(cls, *terms: "Diagram") -> AbstractEquation:
         """
         The equation of a law, compared on the nose. A hypergraph is faithful
         only from :class:`discopy.symmetric.Diagram` on, whose

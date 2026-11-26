@@ -817,7 +817,7 @@ class Discard(Copy):
 
 
 @Diagram.extend
-class Sum(symmetric.Diagram.Sum, Box):
+class Sum(symmetric.Diagram.Sum, Box):  # ty: ignore[inconsistent-mro]
     """
     A markov sum is a symmetric sum and a markov box.
 

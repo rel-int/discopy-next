@@ -654,7 +654,7 @@ class Cospan(Box):
 
 
 @Diagram.extend
-class Cup(compact.Cup, Box):
+class Cup(compact.Cup, Box):  # ty: ignore[inconsistent-mro]
     """
     A frobenius cup is a compact cup in a frobenius diagram, i.e. the spider
     with two legs in, deterministic but not affine.
@@ -689,7 +689,7 @@ class Cup(compact.Cup, Box):
 
 
 @Diagram.extend
-class Cap(compact.Cap, Box):
+class Cap(compact.Cap, Box):  # ty: ignore[inconsistent-mro]
     """
     A frobenius cap is a compact cap in a frobenius diagram, i.e. the spider
     with two legs out, neither deterministic nor affine.

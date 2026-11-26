@@ -333,7 +333,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     Twist = classmethod(lambda cls, dom: cls.id(dom))
 
     @classmethod
-    def Equation(cls, *terms: Diagram) -> Equation:
+    def Equation(cls, *terms: Diagram) -> AbstractEquation:
         """
         The equation of a law, compared up to the isomorphism of the
         hypergraphs of its terms, the coherence theorem of symmetric

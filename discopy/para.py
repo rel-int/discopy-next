@@ -163,7 +163,8 @@ from typing import Self
 
 from discopy import (
     symmetric, markov, comarkov, closed, compact, frobenius, messages)
-from discopy.testable import Equation, TestableGeneric, quotient
+from discopy.testable import (
+    Equation, Equation as AbstractEquation, TestableGeneric, quotient)
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
@@ -222,7 +223,7 @@ class Symmetric[category](
         messages.PARA_REPARAM)
 
     @classmethod
-    def Equation(cls, *terms: Symmetric) -> Equation:
+    def Equation(cls, *terms: Symmetric) -> AbstractEquation:
         """
         The equation of a law, compared by the boundary and the hidden spaces
         of its terms and their inside up to the equation of the underlying

@@ -76,7 +76,8 @@ from discopy import (
     comarkov, frobenius, interaction, markov, messages, op, symmetric)
 from discopy.abc import (
     ComarkovCategory, MarkovCategory, SymmetricCategory, TracedCategory)
-from discopy.testable import Equation, TestableGeneric, quotient
+from discopy.testable import (
+    Equation, Equation as AbstractEquation, TestableGeneric, quotient)
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, get_origin, unbiased)
@@ -172,7 +173,7 @@ class Symmetric[category](SymmetricCategory, TestableGeneric):
     residual: category.ob = None  # ty: ignore[invalid-assignment]
 
     @classmethod
-    def Equation(cls, *terms: Symmetric) -> Equation:
+    def Equation(cls, *terms: Symmetric) -> AbstractEquation:
         """
         The equation of a law, compared by the boundary of its terms and the
         inside of their :meth:`to_int` up to the equation of the underlying

@@ -1485,7 +1485,8 @@ def factory(cls):
     cls.factory = cls
     module = sys.modules.get(cls.__module__)
     if module is not None and "__getattr__" not in vars(module):
-        module.__getattr__ = exports(cls.__module__)
+        module.__getattr__ = exports(  # ty: ignore[invalid-assignment]
+            cls.__module__)
     return cls
 
 

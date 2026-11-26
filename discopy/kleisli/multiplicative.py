@@ -83,7 +83,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category
-from discopy.testable import Equation, TestableGeneric
+from discopy.testable import (
+    Equation, Equation as AbstractEquation, TestableGeneric)
 from discopy.kleisli import channel
 from discopy.kleisli.monad import Maybe, Monad, Powerset, Seed, Subdistribution
 from discopy.python import function
@@ -206,7 +207,7 @@ class Channel[monad](Category, TestableGeneric):
     monad: Monad
 
     @classmethod
-    def Equation(cls, *terms: Channel) -> Equation:
+    def Equation(cls, *terms: Channel) -> AbstractEquation:
         """
         The equation of a law, compared by the boundary of its terms and
         what the monad observes of their outputs on the arguments of

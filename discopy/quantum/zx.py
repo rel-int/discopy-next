@@ -383,7 +383,8 @@ class Box(tensor.Box[complex], Diagram):
 
 
 @Diagram.extend
-class Elementwise(tensor.Elementwise[complex], Box):
+class Elementwise(  # ty: ignore[inconsistent-mro]
+        tensor.Elementwise[complex], Box):
     """
     A ZX elementwise box is a tensor one in a ZX diagram, which
     differentiates as a ZX box does.

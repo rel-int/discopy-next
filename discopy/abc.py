@@ -72,8 +72,9 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
-    Tensor, Testable, Under, Unit, Var, axiom, rule)
+    Atom, Bang, Delay, Equation, Equation as AbstractEquation, Hom, L, Obj,
+    Objs, Over, Perm, R, Repeat, Tensor, Testable, Under, Unit, Var, axiom,
+    rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -120,7 +121,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return cls.ob, cls.ar
 
     @classmethod
-    def Equation(cls, *terms) -> Equation:
+    def Equation(cls, *terms) -> AbstractEquation:
         """
         Construct an equation, using strict equality by default.
 
@@ -133,7 +134,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return Equation(*terms)
 
     @classmethod
-    def ob_equation(cls, *objects) -> Equation:
+    def ob_equation(cls, *objects) -> AbstractEquation:
         """
         Construct an equation of objects, using strict equality by default,
         as :meth:`Equation` does of morphisms: what
@@ -188,7 +189,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
 
     @axiom
     def unitality[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+            cls, f: Hom[C1, A, B]) -> AbstractEquation[Hom[C1, A, B]]:
         """ Left and right unitality of composition. """
         return cls.Equation(
             cls.id(f.dom).then(f), f, f.then(cls.id(f.cod)))
@@ -196,7 +197,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
     @axiom
     def associativity[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C], h: Hom[C1, C, D]
-    ) -> Equation[Hom[C1, A, D]]:
+    ) -> AbstractEquation[Hom[C1, A, D]]:
         """ Associativity of composition. """
         return cls.Equation(
             f.then(g).then(h), f.then(g.then(h)))

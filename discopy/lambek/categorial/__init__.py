@@ -240,7 +240,7 @@ class Functor(biclosed.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Diagram.Box, biclosed.TermBase):
+class TermBase(Diagram.Box, biclosed.TermBase):  # ty: ignore[inconsistent-mro]
     """
     A term in the internal language of a categorial grammar.
     """

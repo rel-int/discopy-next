@@ -70,7 +70,9 @@ from discopy.abc import (
     SymmetricCategory,
     TracedCategory,
 )
-from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
+from discopy.testable import (
+    Equation, Equation as AbstractEquation, Serialisable, TestableGeneric,
+    axiom)
 from discopy.cat import Ob, Sum
 from discopy.python.finset import Permutation
 from discopy.utils import (
@@ -261,7 +263,7 @@ class CMap[category](
     edges: Permutation
 
     @axiom
-    def cmap_roundtrip(cls, term: Self) -> Equation[Self]:
+    def cmap_roundtrip(cls, term: Self) -> AbstractEquation[Self]:
         """
         A map reads back from the diagram it decodes to, up to the order of
         its boxes, i.e. as a hypergraph, see :meth:`Equation`.
@@ -874,7 +876,7 @@ class CMap[category](
             loops=tuple(map(from_tree, tree['loops'])))
 
     @classmethod
-    def Equation(cls, *terms: "CMap") -> Equation:
+    def Equation(cls, *terms: "CMap") -> AbstractEquation:
         """
         The equation of a law, compared up to isomorphism by the hypergraphs
         of its terms: equality of maps compares their boxes and loops in the

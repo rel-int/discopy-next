@@ -1052,7 +1052,8 @@ class Sum(tensor.Diagram.Sum[complex], Box):
 
 
 @Circuit.extend
-class Elementwise(tensor.Elementwise[complex], Box):
+class Elementwise(  # ty: ignore[inconsistent-mro]
+        tensor.Elementwise[complex], Box):
     """
     A circuit elementwise box is a tensor one in a circuit, mixed when its
     boundary has both bits and qubits or its args are mixed. It

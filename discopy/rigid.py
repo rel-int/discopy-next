@@ -861,7 +861,7 @@ class Box(biclosed.Box, Diagram):
 
 
 @Diagram.extend
-class Sum(biclosed.Sum, Box):
+class Sum(biclosed.Sum, Box):  # ty: ignore[inconsistent-mro]
     """
     A rigid sum is a biclosed sum that can be transposed.
 
