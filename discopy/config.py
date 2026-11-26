@@ -123,7 +123,7 @@ DRAWING_DEFAULT: dict[str, Any] = {
     "margins": (0, 0),
     "textpad": (2**-4, 2**-4),
     # The margin between the drawings nested in a box, see draw_nested.
-    "nested_margin": .5,
+    "nested_margin": .25,
     "facecolor": "white",
     "edgecolor": "black",
     "use_tikzstyles": False,

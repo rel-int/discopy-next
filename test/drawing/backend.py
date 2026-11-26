@@ -1190,6 +1190,13 @@ def test_left_to_right_args_in_the_variants_of_a_box():
             (cx == max(xs), cy == max(ys))
             for cx in (min(xs), max(xs)) for cy in (min(ys), max(ys))
             if (cx, cy) not in outline)
+        (label, ) = recorder.texts["W"]  # In the corner opposite the cut.
+        assert ((label.x > (min(xs) + max(xs)) / 2),
+                (label.y > (min(ys) + max(ys)) / 2)) == tuple(
+            not side for side in chopped[name])
+        slot_xs = [x for p, c in recorder.polygons if c == "red"
+                   for x, _ in p]
+        assert abs((min(slot_xs) - min(xs)) - (max(xs) - max(slot_xs))) < 1e-9
         (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
         turned = name in ("transpose", "conjugate", "reflected")
         assert (f_at.y < g_at.y) == (name in ("transpose", "conjugate"))

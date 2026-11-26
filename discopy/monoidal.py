@@ -2696,16 +2696,18 @@ class Box(cat.Box, Diagram):
                 arg.stretch(height - arg.height) for arg in framed)
             width = sum(arg.width for arg in nested)\
                 + DRAWING_DEFAULT["nested_margin"] * (len(nested) - 1)
+            # As wide a margin around the args as above and below them, and
+            # room for the label in its corner.
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
             box = Box(
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
-                min_width=max(label + height + .5,
+                min_width=max(height + 1, label,
                               getattr(self, "min_width", 0)),
                 height=max(width + 1, getattr(self, "height", 0)))
-            # The box is drawn slanted as its own variant, its args as theirs.
+            # The box has a corner cut as its own variant, its args as theirs.
             box.is_dagger = self.is_dagger
             for attr in ("is_transpose", "is_conjugate"):
                 setattr(box, attr, bool(getattr(self, attr, False)))

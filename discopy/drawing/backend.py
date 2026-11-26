@@ -1192,13 +1192,19 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        points = self.chop_corner(points, i, 2 * asymmetry)
+        # The cut stops short of the wires, three quarters of the way.
+        wires = [positions[n][0] for n in positions
+                 if n.kind in ("box_dom", "box_cod") and n.j == j]
+        size = min([2 * asymmetry] + [
+            .75 * abs(x - points[i][0]) for x in wires])
+        corners, points = points, self.chop_corner(points, i, size)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
         label = positions[node]
         if box.nested is not None:
-            label = self.draw_nested(box, points, label, **params)
+            label = self.draw_nested(box, corners, corners[(i + 2) % 4],
+                                     **params)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *label,
@@ -1221,6 +1227,7 @@ class Backend(ABC):
         """
         if not size:
             return points
+        points = [Point(*point) for point in points]
         corner, neighbours = points[i], (
             points[i - 1], points[(i + 1) % len(points)])
         lengths = [sqrt((p.x - corner.x) ** 2 + (p.y - corner.y) ** 2)
@@ -1234,14 +1241,14 @@ class Backend(ABC):
         return points[:i] + [towards(points[i - 1]), towards(
             points[(i + 1) % len(points)])] + points[i + 1:]
 
-    def draw_nested(self, box, corners, centre, **params):
+    def draw_nested(self, box, corners, corner, **params):
         """
         Draw the drawings nested in a box left to right, one under the other,
-        on a background of the box's ``frame_colour``, see
-        :class:`Transposed`, centred in the space right of the box's label,
-        and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of its background, with a margin of the
-        box's colour between one and the next. A reflected
+        each on a slot of the box's ``frame_colour``, see :class:`Transposed`,
+        centred in the box, and return the centre of the box's label, in the
+        given ``corner``: the one opposite its cut corner, i.e. its top left
+        but for its variants. Their wires plug into the edges of their slots,
+        with a margin of the box's colour between one and the next. A reflected
         drawing reflects them, the last on top, and a transposed box or a
         conjugate turns them half way round, as it is turned itself.
         """
@@ -1250,9 +1257,8 @@ class Backend(ABC):
             + margin * (len(nested) - 1)
         height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
-        start = left + (
-            text_width(box.drawing_name) + .25 if box.drawing_name else 0)
-        x, y = (start + right - height) / 2, centre[1] - width / 2
+        bottom, top = min(y for _, y in corners), max(y for _, y in corners)
+        x, y = (left + right - height) / 2, (bottom + top - width) / 2
         turn = bool(box.is_transpose or box.is_conjugate)
         flip, offset = box.mirror_nested != turn, 0
         for drawing in nested:
@@ -1263,7 +1269,12 @@ class Backend(ABC):
             Transposed(self, Point(x, low), drawing, flip=flip, reverse=turn)\
                 .draw_drawing(drawing, **params)
             offset += drawing.width + margin
-        return Point((left + start) / 2, centre[1])
+        # The label lies in the band between the slots and the box's side.
+        dx = text_width(box.drawing_name) / 2 + .125
+        dy = (top - bottom - width) / 4
+        (cx, cy) = corner
+        return Point(cx + (dx if cx == left else -dx),
+                     cy + (dy if cy == bottom else -dy))
 
     @staticmethod
     def triangle_corners(positions, node):
