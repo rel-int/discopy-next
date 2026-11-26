@@ -2,6 +2,12 @@
 Layout as optimisation: a monoidal functor from diagrams to open quadratic
 programs, whose solution is a drawing.
 
+.. warning::
+
+    Work in progress: the interface may change without deprecation, and
+    the pivotal layout of :func:`to_pivotal_drawing` can stop in a local
+    minimum. :meth:`Diagram.draw` does not use this module.
+
 An :class:`OpenQP` from a type ``x`` to a type ``y`` is a convex quadratic
 program over real variables, an abscissa for each wire of ``x`` at its top
 and of ``y`` at its bottom among them, with a plane graph whose nodes each

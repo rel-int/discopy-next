@@ -9,8 +9,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `discopy.drawing.optimiser`, a layout apart from `Diagram.draw`, which
-  is unchanged: a monoidal functor from diagrams to `OpenQP`, the category
+- `discopy.drawing.optimiser`, work in progress: a layout apart from
+  `Diagram.draw`, which is unchanged: a monoidal functor from diagrams to `OpenQP`, the category
   of open quadratic programs over the abscissas of a drawing, where
   composition identifies the boundary variables and adds the costs and
   tensor adds a separation constraint. `optimiser.to_drawing` solves it with
