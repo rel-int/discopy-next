@@ -9,6 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The notebook `docs/notebooks/constraint-satisfaction.md` presents *Tiny
+  Recursive Message Passing* (arXiv:2610.18649) on `discopy.csp` and
+  `discopy.neural`: `csp.sudoku`, `csp.queens`, `csp.cnf` and `csp.maze` as
+  hypergraph diagrams with the maze drawn in the plane, solution counting by
+  `Language.functor(int)`, arc consistency by `Language.propagate` and solution
+  checking by `Language.holds`, and the 9x9 Sudoku `PeerNet` (16,485
+  parameters) and `FactorNet` (16,543 parameters) wired from `csp.scopes` with
+  one untrained lattice step ([next#600]).
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -2694,6 +2703,7 @@ for the changelog of `1.2.1` and earlier.
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#600]: https://github.com/rel-int/discopy-next/issues/600
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602
 [next#603]: https://github.com/rel-int/discopy-next/pull/603

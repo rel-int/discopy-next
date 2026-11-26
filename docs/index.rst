@@ -72,6 +72,7 @@ DisCoPy documentation
     notebooks/neural-church
     notebooks/diag-diff
     notebooks/learning-intertwiners
+    notebooks/constraint-satisfaction
 
 .. toctree::
     :caption: Extra
