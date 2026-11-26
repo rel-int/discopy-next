@@ -1489,6 +1489,8 @@ which JSON cannot hold.
             return self(other.dagger()).dagger()
         if isinstance(other, Box) and not other.is_dagger\
                 and (rule := getattr(other, "rule", None)) is not None\
+                and isinstance(getattr(
+                    type(self).dom, rule.name, None), type(rule))\
                 and isinstance(image := getattr(
                     self.cod, rule.name, None), type(rule)):
             return image(**{

@@ -97,7 +97,7 @@ from typing import (
     TYPE_CHECKING, Annotated, Any, ClassVar, Concatenate, ParamSpec, Self,
     TypeVar,
     TypeVarTuple,
-    get_args, get_origin)
+    get_args, get_origin, overload)
 
 from discopy import messages
 from discopy.utils import (
@@ -1432,6 +1432,14 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
         return {name: replace(value.bind(cls), name=name)
                 for name, value in visible.items()
                 if isinstance(value, kind)}
+
+    @overload
+    @classmethod
+    def slot[S: type](cls, root: S) -> S: ...
+
+    @overload
+    @classmethod
+    def slot[S: type](cls, root: Rule) -> Callable[[S], S]: ...
 
     @classmethod
     def slot[S: type](cls, root: S | Rule) -> S | Callable[[S], S]:
