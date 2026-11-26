@@ -309,6 +309,15 @@ def test_str_transparency_of_a_rotated_box():
     assert Diagram.str_transparency(f.l @ f.r >> x.l @ f.r[::-1])
 
 
+def test_normalization_yanks_snakes():
+    n = Ty('n')
+    f = Box('f', n, n)
+    snake = n @ Cap(n.r, n) >> Cup(n, n.r) @ n
+    rewrite = (f @ snake).foliation().normalization()
+    assert type(rewrite) is Diagram.rewrite_factory
+    assert rewrite.cod == f @ n == (f @ snake).foliation().normal_form()
+
+
 def test_rotations_of_a_box_with_args_keep_its_drawing_name():
     from discopy import rigid
     x = rigid.Ty('x')

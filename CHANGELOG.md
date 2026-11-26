@@ -9,6 +9,27 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.rewrite`, rewrites as explicit 2-cells between diagrams, a
+  sesquicategory (ADR 12): a `Rewrite[category]` is a sequence of `Layer`s,
+  each a diagram of the `category` with a hole for each `Step` that happens at
+  once, each level having its own, e.g. `monoidal.Rewrite`, with
+  `monoidal.Interchange` (`bifunctoriality` with identities, the side it winds
+  an argument), `braided.Slide` (`braid_naturality`, a box through a braid, and the third
+  Reidemeister move when the box is a braid, which turns slightly as it
+  slides while the wire keeps its curve and only moves up or down),
+  `braided.Unbraid` (`braid_then_inverse`, the second Reidemeister move) and
+  `rigid.Unsnake` (`snake_equations`, a snake straightened into a wire) as
+  steps, `Diagram.rewrite_to` the step from a diagram to one a move away, whiskering and
+  tensor. `Diagram.normalization` is the rewrite to the normal form, and
+  `braided.Diagram.naturality` is the codomain of `Slide.at`.
+  `Rewrite.to_gif(tween=n)` animates a rewrite as an isotopy: an interchanger
+  moves the two boxes apart, swaps their rows and moves them back
+  (`Drawing.interpolate`, `Drawing.apart`), a box slides through the braids or
+  swaps next to it (`Drawing.slide`), and between two drawings of one diagram
+  the laxator moves every node vertically then horizontally. Tweened, wires
+  between two ports are vertical at both ends (`draw(smooth_wires=True)`) and
+  every frame keeps the same axes, which `draw` now passes on as `xlim` and
+  `ylim` ([next#706]).
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -2769,6 +2790,7 @@ for the changelog of `1.2.1` and earlier.
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#723]: https://github.com/rel-int/discopy-next/pull/723
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
+[next#706]: https://github.com/rel-int/discopy-next/pull/706
 [next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709

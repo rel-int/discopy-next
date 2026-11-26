@@ -319,6 +319,14 @@ class NamedGeneric:
     >>> from discopy import frobenius
     >>> frobenius.Hypergraph.__name__
     'Hypergraph[frobenius.Diagram]'
+
+    A class with a ``subscript_bases`` classmethod also subclasses the
+    bases it returns for the values, e.g. an interchanger of monoidal
+    diagrams is a rewrite of them:
+
+    >>> from discopy import monoidal
+    >>> assert issubclass(
+    ...     monoidal.Interchange[monoidal.Diagram], monoidal.Rewrite)
     """
     if TYPE_CHECKING:
         #: The names of the type parameters in DisCoPy, declared so that
@@ -361,8 +369,10 @@ class NamedGeneric:
             NamedGeneric._cache[cls] = {cls_values: cls}
         if values not in NamedGeneric._cache[cls]:
             origin = get_origin(cls)
+            bases = origin.subscript_bases(*values)\
+                if hasattr(origin, "subscript_bases") else ()
 
-            class C(origin):
+            class C(origin, *bases):
                 __is_named_generic__ = True
 
                 def __reduce__(self):

@@ -298,6 +298,11 @@ def curve(a: Point, b: Point, steps: int = 8) -> list[tuple[Point, Point]]:
     return list(zip(points, points[1:]))
 
 
+def between(a: Point, b: Point, t: float) -> Point:
+    """ The point a fraction ``t`` of the way from ``a`` to ``b``. """
+    return Point(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y))
+
+
 def meet(test, path: list, other: list) -> bool:
     """ Whether ``test`` holds of a segment of ``path`` and of ``other``. """
     return any(test(*p, *q) for p in path for q in other)
@@ -715,6 +720,413 @@ which to_drawing recomputes.
                 (p.y for p in reference.positions.values()), default=0)
         if not result.is_feasible(reference):
             raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
+        return result
+
+    def interpolate(self, other: Drawing, t: float,
+                    left: bool | None = None) -> Drawing:
+        """
+        The drawing a fraction ``t`` of the way from ``self`` to ``other``,
+        when the drawings are of diagrams one interchanger apart: their plane
+        graphs are equal once the indices of two consecutive boxes are
+        swapped.
+
+        When the plane graphs are equal, e.g. two drawings of one diagram,
+        this is a laxator of :meth:`discopy.rewrite.Rewrite.to_gif`: every
+        node moves vertically, then horizontally. Along each half which side
+        of a straight wire a node is on is linear in ``t``, so a box that is
+        on the same side at both ends never crosses it, which moving both
+        ways at once does not ensure.
+
+        This is a planar isotopy, see
+        :class:`discopy.rewrite.Interchange`: the two boxes move apart
+        (:meth:`apart`), swap their rows and move back, so they never
+        overlap. The box moved to the right is the one for which both ends
+        pushed apart are still feasible drawings of their diagrams, see
+        :meth:`is_feasible`, e.g. a state that goes from under an effect to
+        the left of it moves left. When the drawings are not an
+        interchanger apart, this is :meth:`slide`.
+
+        Parameters:
+            other : The drawing to move to.
+            t : The fraction of the way, from ``0`` to ``1``.
+            left : Whether the upper of the two boxes is the one on the left,
+                guessed if ``None``, see :class:`discopy.rewrite.Interchange`.
+
+        Raises:
+            ValueError : When the drawings are not one move apart.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> a, b = (f @ x >> x @ g).to_drawing(), (x @ g >> f @ x).to_drawing()
+        >>> assert a.interpolate(b, 0) == a and a.interpolate(b, 1) == b
+        >>> box = Node("box", box=f, j=0)
+        >>> a.interpolate(b, .5).positions[box]
+        Point(x=0.5, y=1.0)
+        >>> a.interpolate(f.to_drawing(), .5)
+        Traceback (most recent call last):
+        ...
+        ValueError: These drawings are not of diagrams one move apart.
+
+        """
+        source = dict(zip(self.nodes, self.nodes))
+        edges = set(self.edges)
+        swaps = [{}] + [{j: j + 1, j + 1: j}
+                        for j in range(len(self.box_nodes) - 1)]
+        for swap in swaps:
+            mapping = {node: Node(node.kind, **dict(
+                node.data, j=swap[node.data["j"]]))
+                if node.data.get("j") in swap else node
+                for node in other.nodes}
+            if set(mapping.values()) == set(self.nodes) and edges == {
+                    (mapping[a], mapping[b]) for a, b in other.edges}:
+                break
+        else:
+            return self.slide(other, t)
+        if t == 1:
+            return other
+        start = dict(self.positions)
+        end = {mapping[node]: p for node, p in other.positions.items()}
+        stops = [start, end]
+        if not swap:
+            stops[1:1] = [{node: Point(p.x, end[node].y)
+                           for node, p in start.items()}]
+            stops = [stop for i, stop in enumerate(stops)
+                     if i in (0, 2) or stop not in (start, end)]
+        if swap:
+            orders = [sorted(swap)[::1 if left else -1]] if left is not None\
+                else sorted(
+                    [sorted(swap), sorted(swap)[::-1]], key=lambda order: (
+                        self.centre(order[1]).x - self.centre(order[0]).x
+                        + other.centre(swap[order[1]]).x
+                        - other.centre(swap[order[0]]).x) < 0)
+            left, right = next((
+                (j, k) for j, k in orders
+                if self.apart(j, k).is_feasible(self) and other.apart(
+                    swap[j], swap[k]).is_feasible(other)), orders[0])
+            stops[1:1] = [dict(self.apart(left, right).positions), {
+                mapping[node]: p for node, p in other.apart(
+                    swap[left], swap[right]).positions.items()}]
+            stops = [stops[0]] + [stops[1]] * (stops[1] != stops[0])\
+                + [stops[2]] * (stops[2] != stops[3]) + [stops[3]]
+        phase = min(int(t * (len(stops) - 1)), len(stops) - 2)
+        s = t * (len(stops) - 1) - phase
+        return self.relabel_nodes(positions={
+            node: between(stops[phase][node], stops[phase + 1][node], s)
+            for node in source}).resized(self, other, t)
+
+    def slide(  # pylint: disable=too-many-locals  # its matching
+            self, other: Drawing, t: float) -> Drawing:
+        """
+        The drawing a fraction ``t`` of the way from ``self`` to ``other``
+        when a box slides through the crossings next to it, i.e. the boxes
+        drawn as a braid or as wires, as by
+        :meth:`discopy.braided.Diagram.naturality`. The crossings that move
+        shrink into the box until ``t = .5``, the drawing then takes the
+        edges of ``other`` and they grow out of the other side of the box,
+        while every other node moves in a straight line, and a spider moves
+        its dot and its legs together, which keep their shape. The nodes of
+        the crossings follow, from where they start, the points they shrink
+        to in the current frame: a port on a strand of the box the port of
+        the box that strand leads to, so that its wires only shrink, a port
+        wired out of the crossings the point of the box nearest the other
+        end of its wire, every other port where its strand leaves the
+        crossings, and the node of each crossing the middle of its inputs
+        and outputs, or for a spider the corner of the box around its legs
+        on the side of the other end of its wire. Through a spider, only the
+        ports on its legs follow it: the other nodes of the crossings move
+        straight to where they are halfway, so the braid stays behind while
+        the dot passes, rather than sticking to it. So a wire passing a
+        spider goes under it, hidden near its legs with ``smooth_wires``,
+        see :meth:`discopy.drawing.backend.Backend.draw_halo`.
+
+        Parameters:
+            other : The drawing to move to.
+            t : The fraction of the way, from ``0`` to ``1``.
+
+        Raises:
+            ValueError : When the drawings are not of the same boxes in the
+                same order, or differ beyond one box and the crossings that
+                touch it.
+
+        Example
+        -------
+        >>> from discopy.braided import Ty, Box, Braid
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x, y)
+        >>> a = (x @ f >> Braid(x, y)).to_drawing()
+        >>> b = (Braid(x, x) >> f @ x).to_drawing()
+        >>> assert a.slide(b, 0) == a and a.slide(b, 1) == b
+        >>> middle = a.slide(b, .5)
+        >>> for node in middle.box_nodes: print(node, middle.positions[node])
+        Node('box', box=Braid(x, x), j=0) Point(x=1.0, y=1.25)
+        Node('box', box=f, j=1) Point(x=1.0, y=1.0)
+        """
+        ends = (self, other)
+        crossings = [{
+            node.j: (node.box, drawing.positions[node])
+            for node in drawing.box_nodes
+            if node.box.draw_as_braid or node.box.draw_as_wires}
+            for drawing in ends]
+        moving = [{j for j, crossing in mine.items()
+                   if crossing not in theirs.values()}
+                  for mine, theirs in (crossings, crossings[::-1])]
+
+        def key(node, k):
+            j, data = node.data.get("j"), dict(node.data)
+            if j in crossings[k]:
+                del data["j"]
+                return Node(node.kind, at=crossings[k][j][1], **data)
+            ranks = sorted(n.j for n in ends[k].box_nodes
+                           if n.j not in crossings[k])
+            return node if j is None else Node(
+                node.kind, **dict(data, j=ranks.index(j)))
+
+        labels = [{node: key(node, k) for node in drawing.nodes
+                   if node.data.get("j") not in moving[k]}
+                  for k, drawing in enumerate(ends)]
+        touched = {
+            labels[k][v].data.get("j") for k, drawing in enumerate(ends)
+            for edge in drawing.edges for u, v in (edge, edge[::-1])
+            if u.data.get("j") in moving[k] and v in labels[k]} - {None}
+        kept = [{(labels[k][a], labels[k][b]) for a, b in drawing.edges
+                 if a in labels[k] and b in labels[k]}
+                for k, drawing in enumerate(ends)]
+        if len(touched) != 1 or set(labels[0].values()) != set(
+                labels[1].values()) or not all(
+                    any(node.data.get("j") in touched for node in edge)
+                    for edge in kept[0] ^ kept[1]):
+            raise ValueError(messages.NO_INTERPOLATION)
+        middle = {
+            labels[0][node]: between(p, other.positions[next(
+                n for n, label in labels[1].items()
+                if label == labels[0][node])], .5)
+            for node, p in self.positions.items() if node in labels[0]}
+        k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
+        drawing = ends[k]
+        boxes = {node.j: node.box for node in drawing.box_nodes}
+
+        def strand(node):
+            indices = boxes[node.j].permutation_indices\
+                if boxes[node.j].draw_as_permutation else (1, 0)
+            kind, i = ("box_cod", indices.index(node.i))\
+                if node.kind == "box_dom" else ("box_dom", indices[node.i])
+            return Node(kind, i=i, j=node.j, x=boxes[node.j].dom[i]
+                        if kind == "box_dom" else boxes[node.j].cod[i])
+
+        def anchors(s):
+            current = {labels[k][node]: between(p, middle[labels[k][node]], s)
+                       for node, p in drawing.positions.items()
+                       if node in labels[k]}
+            box = next(node for node, label in labels[k].items()
+                       if label.kind == "box"
+                       and label.data.get("j") in touched)
+            (left, low), (right, high) = drawing.relabel_nodes(positions={
+                node: current[label] for node, label in labels[k].items()
+            }).rectangle(box.j)
+            dot = current[labels[k][box]]
+            legs = [p for label, p in current.items()
+                    if label.data.get("j") == labels[k][box].j]
+            width = max(abs(p.x - dot.x) for p in legs) + .25
+            height = max(abs(p.y - dot.y) for p in legs) or .25
+
+            ends_of = {}
+            for port in drawing.nodes:
+                if port in labels[k] and port.kind != "box"\
+                        and labels[k][port].data.get("j") in touched:
+                    queue = [port]
+                    while queue:
+                        node = queue.pop()
+                        for n in itertools.chain(
+                                drawing.graph.predecessors(node),
+                                drawing.graph.successors(node),
+                                [strand(node)] if node in ends_of else []):
+                            if n.data.get("j") in moving[k]\
+                                    and n.kind != "box" and n not in ends_of:
+                                ends_of[n] = current[labels[k][port]]
+                                queue.append(n)
+
+            def behind(node, _):
+                if node in ends_of:
+                    return ends_of[node]
+                if node.kind == "box" and box.box.draw_as_spider:
+                    return dot
+                if node.kind == "box":
+                    ports = {kind: [
+                        behind(n, None) for n in drawing.nodes
+                        if n.kind == kind and n.data.get("j") == node.j]
+                        for kind in ("box_dom", "box_cod")}
+                    return Point(
+                        sum(p.x for side in ports.values() for p in side)
+                        / sum(map(len, ports.values())),
+                        (min(p.y for p in ports["box_dom"])
+                         + max(p.y for p in ports["box_cod"])) / 2)
+                q = next((current[labels[k][n]] for n in itertools.chain(
+                    drawing.graph.predecessors(node),
+                    drawing.graph.successors(node))
+                    if n in labels[k] and n.kind != "box"), None)
+                if box.box.draw_as_spider:
+                    if q is None:
+                        return dot
+                    return dot.shift(
+                        width if q.x > dot.x else -width,
+                        height if q.y > dot.y else -height)
+                if q is None:
+                    while node not in labels[k]:
+                        node = next(drawing.graph.successors(
+                            strand(node) if node.kind == "box_dom" else node))
+                    q = current[labels[k][node]]
+                return Point(min(max(q.x, left), right),
+                             min(max(q.y, low), high))
+
+            return current, {node: behind(node, None)
+                             for node in drawing.nodes
+                             if node not in labels[k]}, set(ends_of)
+
+        current, anchor, on_legs = anchors(s)
+        _, start, _ = anchors(0)
+        _, fixed, _ = anchors(1)
+        shrink = max(0, 1 - 2 * s)
+        sliding = next(
+            node for node, label in labels[k].items()
+            if label.kind == "box" and label.data.get("j") in touched)
+
+        def position(node, p):
+            if node in labels[k]:
+                return current[labels[k][node]]
+            if node in on_legs or not sliding.box.draw_as_spider:
+                return anchor[node].shift(
+                    shrink ** 2 * (p.x - start[node].x),
+                    shrink * (p.y - start[node].y))
+            return between(p, fixed[node], 1 - shrink ** 2)
+        return drawing.relabel_nodes(positions={
+            node: position(node, p)
+            for node, p in drawing.positions.items()}).resized(self, other, t)
+
+    def strands(self) -> dict[Node, int]:
+        """
+        The strand of each node that is not a box, the index of the input
+        wire it follows down through the crossings, i.e. the boxes drawn as
+        a braid or as wires, see :meth:`slide`: a box that is not a
+        crossing ends its strands, and the nodes under it are on none.
+
+        Example
+        -------
+        >>> from discopy.braided import Ty, Braid
+        >>> x, y = Ty('x'), Ty('y')
+        >>> drawing = (Braid(x, y) >> Braid(x, y)[::-1]).to_drawing()
+        >>> sorted((node.kind, node.i, node.j, k)
+        ...        for node, k in drawing.strands().items()
+        ...        if node.kind == "box_cod")
+        [('box_cod', 0, 0, 1), ('box_cod', 0, 1, 0), ('box_cod', 1, 0, 0), \
+('box_cod', 1, 1, 1)]
+        """
+        result = {}
+        for node in self.nodes:
+            if node.kind != "dom":
+                continue
+            k, queue = node.i, [node]
+            while queue:
+                current = queue.pop()
+                result[current] = k
+                for following in self.graph.successors(current):
+                    if following.kind != "box":
+                        queue.append(following)
+                        continue
+                    box = following.box
+                    if not (box.draw_as_braid or box.draw_as_wires):
+                        continue
+                    indices = box.permutation_indices\
+                        if box.draw_as_permutation else (1, 0)
+                    queue.append(Node(
+                        "box_cod", i=indices.index(current.i),
+                        j=following.j,
+                        x=box.cod[indices.index(current.i)]))
+        return result
+
+    def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
+        """
+        The drawing with the width and height a fraction ``t`` of the way from
+        those of ``source`` to those of ``target``, wide enough for its nodes,
+        see :meth:`interpolate`.
+
+        >>> from discopy.monoidal import Box
+        >>> f, g = Box('f', 'x', 'y').to_drawing(), Box('g', 'x', 'y')
+        >>> f.resized(f, g.to_drawing(), .5).width
+        1.0
+        """
+        self.width = max(source.width + t * (target.width - source.width),
+                         max((p.x for p in self.positions.values()),
+                             default=0) + .5)
+        self.height = source.height + t * (target.height - source.height)
+        return self
+
+    def centre(self, j: int) -> Point:
+        """
+        The centre of the rectangle of box ``j``, see :meth:`rectangle`.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().centre(0)
+        Point(x=0.5, y=0.5)
+        """
+        (x0, y0), (x1, y1) = self.rectangle(j)
+        return Point((x0 + x1) / 2, (y0 + y1) / 2)
+
+    def rectangle(self, j: int) -> tuple[Point, Point]:
+        """
+        The bottom left and top right corners of box ``j``, as
+        :meth:`add_box_corners` draws them.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().rectangle(0)
+        (Point(x=0.25, y=0.25), Point(x=0.75, y=0.75))
+        """
+        drawing = self.relabel_nodes()
+        drawing.add_box_corners()
+        return tuple(drawing.positions[Node(f"box-corner-{a}{a}", j=j)]
+                     for a in range(2))
+
+    def apart(self, left: int, right: int, gap: float = .5) -> Drawing:
+        """
+        The drawing with box ``right`` pushed right, if need be, until box
+        ``left`` is ``gap`` left of it, with every node right of its left
+        edge but those of box ``left`` and those beyond it, i.e. on the side
+        away from box ``right`` and under it, whose wires never pass box
+        ``right``. Along an interchanger, :meth:`interpolate` moves the two
+        boxes apart, swaps their rows and moves them back: while they swap,
+        the right edge of the one and the left edge of the other move
+        linearly, so they never overlap.
+
+        Parameters:
+            left : The index of the box to keep on the left.
+            right : The index of the box to push right.
+            gap : The space to leave between them.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> f, g = Box('f', Ty('x'), Ty()), Box('g', Ty(), Ty('x'))
+        >>> drawing = (f >> g).to_drawing().apart(1, 0)
+        >>> drawing.rectangle(1)[1].x + .5 == drawing.rectangle(0)[0].x
+        True
+        """
+        (edge, _), (_, top) = self.rectangle(right)
+        (_, low), (end, high) = self.rectangle(left)
+        shift = end + gap - edge
+        if shift <= 0:
+            return self
+
+        def beyond(p):
+            return p.y < low if top > high else p.y > high
+
+        result = self.relabel_nodes(positions={
+            node: p.shift(x=shift) for node, p in self.positions.items()
+            if node.data.get("j") == right or p.x >= edge
+            and node.data.get("j") != left
+            and (p.x > end or not beyond(p))})
+        result.width = self.width + shift
         return result
 
     def wires(self) -> list[tuple[Node, Node]]:

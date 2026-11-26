@@ -37,6 +37,7 @@ forgetful functors between the categories go the other way.
     discopy.frobenius
     discopy.hypergraph
     discopy.cmap
+    discopy.rewrite
 
 Utilities shared by every module: serialisation, factories and configuration.
 

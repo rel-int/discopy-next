@@ -23,6 +23,7 @@ Summary
     Sum
     Functor
     Match
+    Interchange
     Equation
     TermBase
     Variable
@@ -66,7 +67,10 @@ We can check the Eckmann-Hilton argument, up to interchanger.
 >>> assert s0 @ s1 == s0 >> s1 == (s1 @ s0).interchange(0, 1)
 >>> assert s1 @ s0 == s1 >> s0 == (s0 @ s1).interchange(0, 1)
 
-.. image:: /_static/monoidal/EckmannHilton.gif
+Two interchangers take one scalar round the other, see
+:class:`discopy.rewrite.Interchange`:
+
+.. image:: /_static/rewrite/eckmann-hilton.gif
     :align: center
 
 Terms
@@ -169,7 +173,8 @@ from typing import (
     TYPE_CHECKING, cast)
 from warnings import warn
 
-from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
+from discopy import (
+    abc, cat, drawing, hypergraph, cmap, messages, rewrite, testable)
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
 # pylint: disable-next=unused-import  # the redex a term prints as
@@ -2409,6 +2414,75 @@ let(e(x2), lambda: h(x1), offset=1)))
             cache.add(str(diagram))
         return diagram
 
+    def normalization(
+            self, normalize: Callable | None = None, **params
+            ) -> rewrite.Rewrite:
+        """
+        The rewrite from the diagram to its :meth:`normal_form`, of its
+        :attr:`rewrite_factory`, with the same parameters and exceptions:
+        each step that keeps the number of layers is an interchanger, see
+        :meth:`Interchange.at`, any other a :class:`discopy.rewrite.Step`
+        named after ``normalize``, e.g. a snake removal.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> rewrite = (f @ x >> x @ g >> f @ x).normalization()
+        >>> print(rewrite)
+        f @ x >> Interchange(g, f)
+        >>> assert rewrite.cod == f @ x >> f @ x >> x @ g
+        """
+        normalize = type(self).normalize if normalize is None else normalize
+        steps = []
+
+        def recorded(diagram, **params):
+            for step in normalize(diagram, **params):
+                steps.append(step)
+                yield step
+        self.normal_form(normalize=recorded, **params)
+        result = self.rewrite_factory.id(self)
+        for diagram in steps:
+            try:
+                step = result.cod.rewrite_to(
+                    diagram, params.get("left", False))
+            except AxiomError:
+                step = self.rewrite_factory.box_factory(
+                    normalize.__name__, result.cod, diagram)
+            result = result >> step
+        return result
+
+    def rewrite_to(self, other: Diagram, left=False) -> rewrite.Rewrite:
+        """
+        The rewrite of one step from the diagram to ``other``, one move
+        apart: here an interchanger, see :meth:`Interchange.at`, and from
+        :mod:`discopy.rigid` up an unsnake too, see
+        :meth:`discopy.rigid.Diagram.rewrite_to`.
+
+        Parameters:
+            other : The diagram to rewrite into.
+            left : Whether the box above passes on the left when it can go
+                either side, as for two scalars.
+
+        Raises:
+            AxiomError : When the diagrams are not one move apart.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> print((f @ x >> x @ g).rewrite_to(x @ g >> f @ x))
+        Interchange(f, g, left=True)
+        """
+        if len(self) == len(other) and self != other:
+            i = next(i for i, (layer, that) in enumerate(
+                zip(self.inside, other.inside)) if layer != that)
+            if i + 1 < len(self):
+                step = Interchange.at(self, i, left)
+                if step.cod == other:
+                    return step
+        raise AxiomError(messages.NOT_ONE_MOVE.format(self, other))
+
     @classmethod
     def from_tree(cls, tree):
         if "inside" not in tree:
@@ -3082,6 +3156,127 @@ Diagram.box_factory = Box
 Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
+Rewrite = rewrite.Rewrite[Diagram]
+Diagram.rewrite_factory = classproperty(
+    lambda cls: rewrite.Rewrite[cls.factory])
+
+
+class Interchange[category](rewrite.Step):
+    """
+    The interchanger of a box ``top`` with a box ``bottom`` under it, which
+    moves ``bottom`` above ``top``: the instance of ``bifunctoriality`` with
+    identities that :class:`Diagram` breaks, a step of the rewrites of the
+    ``category``, that of ``top`` when not given.
+
+    Parameters:
+        top : The box above, i.e. before.
+        bottom : The box below, i.e. after, with the wires between them.
+        left : Whether ``top`` is on the left of ``bottom``, else right.
+
+    When ``top`` has no output and ``bottom`` no input, e.g. two scalars,
+    both sides give the same domain and codomain and ``left`` is the side
+    ``top`` passes on: the two wind in opposite directions.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> f, g = Box('f', x, x), Box('g', x, x)
+    >>> step = Interchange(f, g, left=True)
+    >>> assert type(step) is Interchange[Diagram]
+    >>> print(step.dom, "|", step.cod)
+    f @ x >> x @ g | x @ g >> f @ x
+    >>> assert step.dagger() == Interchange(g, f)
+    """
+    serialised_attrs = ("top", "bottom", "left")
+
+    @classmethod
+    def subscript_bases(cls, category) -> tuple[type, ...]:
+        """ The steps of the category, of which an interchanger is one. """
+        return (rewrite.Step[category], )
+
+    @staticmethod
+    def category_of(*args, **kwargs) -> type:
+        """ The category of the box ``top``, the first argument. """
+        return (args[0] if args else kwargs["top"]).factory
+
+    def __init__(self, top: Diagram, bottom: Diagram,
+                 left=False):
+        self.top, self.bottom, self.left = top, bottom, left
+        if left:
+            dom = top @ bottom.dom >> top.cod @ bottom
+            cod = top.dom @ bottom >> top @ bottom.cod
+        else:
+            dom = bottom.dom @ top >> bottom @ top.cod
+            cod = bottom @ top.dom >> bottom.cod @ top
+        rewrite.Step.__init__(self, f"Interchange({top}, {bottom}"
+                              + (", left=True)" if left else ")"), dom, cod)
+
+    def __repr__(self):
+        return f"monoidal.Interchange({self.top!r}, {self.bottom!r}"\
+            + (", left=True)" if self.left else ")")
+
+    def dagger(self) -> Interchange:
+        return type(self)(self.bottom, self.top, not self.left)
+
+    def frame(self, t: float) -> Drawing:
+        """
+        The two boxes move apart, swap their rows and move back, ``top`` on
+        its side, see :meth:`discopy.drawing.Drawing.interpolate`.
+
+        Parameters:
+            t : The fraction of the way, from ``0`` to ``1``.
+        """
+        return self.dom.to_drawing().interpolate(
+            self.cod.to_drawing(), t, left=self.left)
+
+    @classmethod
+    def at(cls, diagram: Diagram, i: int, left=False) -> rewrite.Rewrite:
+        """
+        The interchanger of layers ``i`` and ``i + 1`` of a diagram with one
+        box in each layer, whiskered by the rest: its codomain is
+        ``diagram.interchange(i, i + 1, left)``, see
+        :meth:`Diagram.interchange`.
+
+        Parameters:
+            diagram : The diagram to rewrite.
+            i : The layer of the box above.
+            left : Whether the box above is on the left when it can be
+                either, as for two scalars.
+
+        Raises:
+            AxiomError : When the two boxes are connected.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> diagram = f @ x @ x >> x @ x @ g >> f @ x @ x
+        >>> step = Interchange.at(diagram, 0)
+        >>> print(step)
+        Interchange(f, x @ g, left=True) >> f @ x @ x
+        >>> assert step.cod == diagram.interchange(0, 1)
+        >>> Interchange.at(f >> g, 0)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Boxes f and g do not commute.
+        """
+        top, bottom = diagram.boxes[i], diagram.boxes[i + 1]
+        off0, off1 = diagram.offsets[i], diagram.offsets[i + 1]
+        wires = diagram.inside[i + 1].dom
+        is_left = off1 >= off0 + len(top.cod)
+        is_right = off0 >= off1 + len(bottom.dom)
+        if is_left and (left or not is_right):
+            start, end = off0, off1 + len(bottom.dom)
+            step = cls(top, wires[off0 + len(top.cod):off1] @ bottom, True)
+        elif is_right:
+            start, end = off1, off0 + len(top.cod)
+            step = cls(top, bottom @ wires[off1 + len(bottom.dom):off0])
+        else:
+            raise AxiomError(messages.INTERCHANGER_ERROR.format(top, bottom))
+        return step.whisker(
+            diagram[:i], diagram[i + 2:], wires[:start], wires[end:])
+
+
 Drawing.ob = Ty
 Id = Diagram.id
 

@@ -55,6 +55,10 @@ def draw(diagram, **params):
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
         Whether to draw box labels, default is :code:`True`.
+    smooth_wires : bool, optional
+        Whether to draw a wire between two ports vertical at both ends, as a
+        cubic Bezier, rather than bending into the lower one, default is
+        :code:`False`.
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
@@ -152,13 +156,23 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     Parameters
     ----------
     diagrams : :class:`Diagram`, optional
-        Sequence of diagrams to draw.
+        Sequence of diagrams to draw, or of drawings.
     path : str
         Where to save the image, if :code:`None` the gif is only embedded.
     timestep : int, optional
         Time step in milliseconds, default is :code:`500`.
+    tween : int, optional
+        Frames per step, default is :code:`1`: from each diagram to the next
+        the drawing moves by :meth:`Drawing.interpolate`, guessing the move,
+        and raises :code:`ValueError` when two consecutive diagrams are not
+        one move apart. A rewrite says its moves instead, see
+        :meth:`discopy.rewrite.Rewrite.to_gif`. The wires between two ports
+        are then drawn vertical at both ends, i.e. with
+        :code:`smooth_wires=True`.
     loop : bool, optional
-        Whether to loop, default is :code:`False`
+        Whether to loop, default is :code:`False`, going back to the first
+        diagram by playing the gif backwards unless it ends where it starts,
+        e.g. the loop of an Eckmann-Hilton argument.
     params : any, optional
         Passed to :meth:`Diagram.draw`.
     """
@@ -166,7 +180,10 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         params.pop("path", None), params.pop("doctest", None))
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
+    tween = params.pop("tween", 1)
+    params.setdefault("smooth_wires", tween > 1)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    steps = tweened(steps, tween)
     params.setdefault("left_to_right", getattr(
         type(diagram), "draw_left_to_right", False))
     if 'figsize' not in params:
@@ -174,12 +191,17 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
             for attr in (attrs[::-1] if params["left_to_right"] else attrs))
+    if tween > 1:
+        params.setdefault("xlim", (0, max(step.width for step in steps)))
+        params.setdefault("ylim", (0, max(step.height for step in steps)))
     with TemporaryDirectory() as directory:
         for i, _diagram in enumerate(steps):
             tmp_path = os.path.join(directory, f'{i}.png')
             _diagram.draw(path=tmp_path, **dict(params, show=False))
             frames.append(Image.open(tmp_path))
-        if loop:
+        if loop and diagrams and diagrams[-1] == diagram:
+            frames = frames[:-1]
+        elif loop:
             frames = frames + frames[::-1]
 
         def save(actual_path):
@@ -203,6 +225,27 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         return HTML(image)
     except ImportError:
         return image
+
+
+def tweened(steps: list[Drawing], tween: int) -> list[Drawing]:
+    """
+    The drawings with ``tween - 1`` more between each one and the next, see
+    :meth:`Drawing.interpolate`.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> f, g = Box('f', x, x), Box('g', x, x)
+    >>> steps = [d.to_drawing() for d in (f @ x >> x @ g, x @ g >> f @ x)]
+    >>> assert len(tweened(steps, 4)) == 1 + 4
+    >>> assert len(tweened(steps + [f.to_drawing()], 1)) == 3
+    """
+    result = steps[:1]
+    for before, after in zip(steps, steps[1:]):
+        result += [before.interpolate(after, k / tween)
+                   for k in range(1, tween)] + [after]
+    return result
 
 
 def spiral(n_cups):

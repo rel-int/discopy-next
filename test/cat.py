@@ -754,12 +754,18 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "quantum.gates.Sqrt": "c(v, False, 1)",
     "quantum.zx.Spider": "c(1, 2, v)",
     "quantum.zx.Scalar": "c(v)",
+    "rewrite.Layer": 'c(M.Box("f", x, y))',
+    "rewrite.Step": 'c("s", M.Box("f", x, y), M.Box("g", x, y), data=v)',
+    "monoidal.Interchange": 'c(M.Box("f", x, y), M.Box("g", y, x), True)',
+    "rigid.Unsnake": "c(R.Ty(\"x\"), left=True)",
+    "braided.Slide": 'c(B.Box("f", B.Ty("x"), B.Ty("y")), B.Ty("z"))',
+    "braided.Unbraid": 'c(B.Ty("x"), B.Ty("y"), inverse=True)',
 }
 
 
 def example(cls, value):
     """ The box of a class that :data:`EXAMPLES` builds, with some data. """
-    from discopy import closed, monoidal, tensor
+    from discopy import braided, closed, monoidal, rewrite, rigid, tensor
     from discopy.lambek import categorial as cg
     from discopy.neural.network import Dims
     from discopy.quantum import circuit, gates
@@ -773,7 +779,8 @@ def example(cls, value):
     base = next(c for c in cls.__mro__ if factory_name(c) in templates)
     assert issubclass(base, owner), f"{owner} needs an example"
     ob = sys.modules[cls.__module__].Ty\
-        if issubclass(cls, monoidal.Layer) else cls.ob
+        if issubclass(cls, monoidal.Layer) else monoidal.Ty\
+        if issubclass(cls, (rewrite.Rewrite, rewrite.Layer)) else cls.ob
     x, y = (tensor.Dim(2), tensor.Dim(3)) if issubclass(cls, tensor.Box)\
         else (Dims(2), Dims(3)) if ob is Dims\
         else (Nat(1), Nat(1)) if ob is Nat else (ob('x'), ob('y'))
@@ -785,6 +792,7 @@ def example(cls, value):
     f, a, u = terms or (None, None, None)
     return eval(templates[factory_name(base)], dict(
         c=cls, x=x, y=y, v=value, f=f, a=a, u=u, sys=sys, closed=closed,
+        M=monoidal, B=braided, R=rigid,
         cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.box_factory(
             "f", x, y, data=v)))
 
@@ -830,7 +838,8 @@ def globs(patterns: str) -> list[str]:
 PIVOTALS = "{pivotal,ribbon,compact,frobenius}"
 BROKEN = {
     "rebuild": {
-        "*.Layer": "a layer keeps its *inside as boxes_or_types",
+        "{monoidal,symmetric,feedback,markov,comarkov,rigid,pivotal,compact,"
+        "frobenius}.Layer": "a layer keeps its *inside as boxes_or_types",
         "*.Merge *.Noise": "it keeps neither x nor n",
         "*.Cofunction": "it keeps its cofunc in an op",
         "*.Cospan": "it keeps left and right as legs",
@@ -861,6 +870,8 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
+        "rewrite.Layer monoidal.Interchange braided.{Slide,Unbraid} rigid.Unsnake":
+        "a rewrite has no tree of its own yet, only that of a box",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
         "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":

@@ -19,6 +19,7 @@ Summary
     Box
     Cup
     Cap
+    Unsnake
     Sum
     Functor
     Equation
@@ -160,15 +161,19 @@ from __future__ import annotations
 
 import copy
 
+from networkx import node_connected_component
+
 from collections.abc import Callable
 
 from typing import Iterator, Self, ClassVar
 
-from discopy import cat, monoidal, biclosed, messages
+from discopy import cat, monoidal, biclosed, messages, rewrite
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
 from discopy.testable import GENERATORS
 from discopy.cat import factory
+from discopy.drawing import Drawing
+from discopy.drawing.drawing import between
 from discopy.utils import (
     assert_isatomic,
     assert_isinstance,
@@ -176,6 +181,7 @@ from discopy.utils import (
     BinaryBoxConstructor,
     deprecated_alias,
     factory_name,
+    Point,
 )
 
 
@@ -682,6 +688,36 @@ class Diagram(biclosed.Diagram, RigidCategory):
 
     normalize = snake_removal
 
+    def rewrite_to(self, other: Diagram, left=False) -> rewrite.Rewrite:
+        """
+        The rewrite of one step from the diagram to ``other``: an
+        interchanger, see :meth:`discopy.monoidal.Diagram.rewrite_to`, or
+        an :class:`Unsnake` when ``other`` is the diagram without a cap and
+        the cup under it.
+
+        Parameters:
+            other : The diagram to rewrite into.
+            left : Passed to :meth:`discopy.monoidal.Diagram.rewrite_to`.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> snake = x @ Cap(x.r, x) >> Cup(x, x.r) @ x
+        >>> print(snake.rewrite_to(Id(x)))
+        Unsnake(x)
+        """
+        if len(self) == len(other) + 2:
+            i = next((i for i, (layer, that) in enumerate(
+                zip(self.inside, other.inside)) if layer != that),
+                len(other))
+            try:
+                step = Unsnake.at(self, i)
+            except AxiomError:
+                step = None
+            if step is not None and step.cod == other:
+                return step
+        return super().rewrite_to(other, left)
+
     def normal_form(self, **params):
         """
         Implements the normalisation of rigid categories,
@@ -1085,6 +1121,172 @@ biclosed.Diagram.to_rigid = to_rigid
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.functor_factory = Functor
+
+
+Rewrite = rewrite.Rewrite[Diagram]
+
+
+class Unsnake[category](rewrite.Step):
+    """
+    A snake yanked into a wire: the instance of ``snake_equations`` of
+    :class:`discopy.abc.RigidCategory`, from the snake of a type ``x`` to its
+    identity, a step of the rewrites of the ``category``, :class:`Diagram`
+    when not given.
+
+    Parameters:
+        x : The type of the wire.
+        left : Whether the snake bends through the left adjoint ``x.l``,
+            else through the right adjoint ``x.r``.
+        is_dagger : Whether the step goes the other way, from the wire to
+            the snake.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> step = Unsnake(x)
+    >>> print(step.dom, "|", step.cod)
+    x @ Cap(x.r, x) >> Cup(x, x.r) @ x | Id(x)
+    >>> print(Unsnake(x, left=True).dom)
+    Cap(x, x.l) @ x >> x @ Cup(x.l, x)
+    >>> print(step.dagger(), "|", step.dagger().cod)
+    Unsnake(x)[::-1] | x @ Cap(x.r, x) >> Cup(x, x.r) @ x
+
+    The snakes that :meth:`Diagram.normalize` yanks are unsnakes, between
+    interchangers that move the boxes in the way, see
+    :meth:`Diagram.rewrite_to`:
+
+    >>> n = Ty('n')
+    >>> f, g = Box('f', n, n), Box('g', n, n)
+    >>> diagram = g @ Cap(n.r, n) >> n @ n.r @ f >> Cup(n, n.r) @ n
+    >>> for layer in diagram.normalization().inside: print(layer)
+    g >> n @ Cap(n.r, n) >> Interchange(f, Cup(n, n.r))
+    g >> Unsnake(n) >> f
+    >>> _ = diagram.normalization().to_gif(
+    ...     tween=8, timestep=80, loop=True,
+    ...     doctest="docs/_static/rigid/unsnake.gif")
+
+    .. image:: /_static/rigid/unsnake.gif
+        :align: center
+    """
+    serialised_attrs = ("x", "*", "left", "is_dagger")
+
+    @classmethod
+    def subscript_bases(cls, category) -> tuple[type, ...]:
+        """ The steps of the category, of which an unsnake is one. """
+        return (rewrite.Step[category], )
+
+    @staticmethod
+    def category_of(*args, **kwargs) -> type:
+        """ Rigid diagrams, unless the class is given a category. """
+        return Diagram
+
+    def __init__(self, x: Ty, *, left=False, is_dagger=False):
+        self.x, self.left = x, left
+        if left:
+            snake = self.category.caps(x, x.l) @ x\
+                >> x @ self.category.cups(x.l, x)
+        else:
+            snake = x @ self.category.caps(x.r, x)\
+                >> self.category.cups(x, x.r) @ x
+        wire = self.category.id(x)
+        rewrite.Step.__init__(
+            self, f"Unsnake({x}" + (", left=True)" if left else ")"),
+            *((wire, snake) if is_dagger else (snake, wire)),
+            is_dagger=is_dagger)
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        return f"rigid.Unsnake({self.x!r}"\
+            + (", left=True)" if self.left else ")")
+
+    def dagger(self) -> Unsnake:
+        return type(self)(
+            self.x, left=self.left, is_dagger=not self.is_dagger)
+
+    def frame(self, t: float) -> Drawing:
+        """
+        The snake straightens and shrinks: each node of a strand moves in
+        a straight line to the bottom of its wire, and the height to zero,
+        that of a wire composed with other drawings, see
+        :meth:`discopy.drawing.Drawing.then`, so that the drawing around the
+        snake closes up without a jump at ``t = 1``, where it is the drawing
+        of the wire. The caps stay above the cups throughout.
+
+        Parameters:
+            t : The fraction of the way, from ``0`` to ``1``.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> step = Unsnake(x)
+        >>> assert step.frame(0) == step.dom.to_drawing()
+        >>> assert step.frame(1) == Id(x).to_drawing()
+        >>> middle = step.frame(.5)
+        >>> sorted(p.x for node, p in middle.positions.items()
+        ...        if node.kind in ("dom", "cod"))
+        [0.375, 1.375]
+        >>> middle.height
+        1.0
+        """
+        if self.is_dagger:
+            return self.dagger().frame(1 - t)
+        snake, wire = self.dom.to_drawing(), self.cod.to_drawing()
+        if t == 1:
+            return wire
+        strands = snake.graph.to_undirected()
+        target = {}
+        for node in snake.nodes:
+            if node.kind == "dom":
+                x = wire.positions[node].x
+                for other in node_connected_component(strands, node):
+                    target[other] = Point(x, 0)
+        result = snake.relabel_nodes(positions={
+            node: between(p, target[node], t)
+            for node, p in snake.positions.items()}).resized(snake, wire, t)
+        result.height = (1 - t) * snake.height
+        return result
+
+    @classmethod
+    def at(cls, diagram: Diagram, i: int) -> rewrite.Rewrite:
+        """
+        The unsnake of the cap at layer ``i`` and the cup at layer
+        ``i + 1`` of a diagram with one box in each layer, whiskered by the
+        rest: the diagram without them is its codomain.
+
+        Parameters:
+            diagram : The diagram to rewrite.
+            i : The layer of the cap.
+
+        Raises:
+            AxiomError : When the two layers are not a snake.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> diagram = y @ x @ Cap(x.r, x) >> y @ Cup(x, x.r) @ x
+        >>> print(Unsnake.at(diagram, 0))
+        y @ Unsnake(x)
+        >>> Unsnake.at(diagram >> diagram, 1)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Layers 1 and 2 are not a snake.
+        """
+        factory_ = cls if cls.category is not None else cls[diagram.factory]
+        cap, cup = diagram.boxes[i:i + 2] if i + 1 < len(diagram) else (
+            None, None)
+        if isinstance(cap, Cap) and isinstance(cup, Cup):
+            offset, wires = diagram.offsets[i], diagram.inside[i].dom
+            left = diagram.offsets[i + 1] == offset + 1
+            start = offset if left else offset - 1
+            if start >= 0:
+                step = factory_(cap.cod[:1] if left else cap.cod[1:],
+                                left=left)
+                outside = wires[:start], wires[start + 1:]
+                if diagram[i:i + 2] == outside[0] @ step.dom @ outside[1]:
+                    return step.whisker(
+                        diagram[:i], diagram[i + 2:], *outside)
+        raise AxiomError(messages.NOT_A_SNAKE.format(i, i + 1))
 
 
 Id = Diagram.id

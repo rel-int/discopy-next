@@ -55,6 +55,9 @@ NOT_MERGEABLE = "Layers {} and {} cannot be merged."
 LAYERS_DO_NOT_COMPOSE = "Compose diagrams, not layers: {}."
 INTERCHANGER_ERROR = "Boxes {} and {} do not commute."
 NO_BRAID_TO_SLIDE = "Box {} at layer {} has no braid to slide through."
+NOT_A_SNAKE = "Layers {} and {} are not a snake."
+NOT_A_BRAID_PAIR = "Layers {} and {} are not a braid and its inverse."
+NOT_ONE_MOVE = "{} and {} are not one move apart."
 WRONG_PERMUTATION = "Expected a permutation of length {}, got {}."
 NOT_A_PERMUTATION = "Expected a permutation of range({}), got {}."
 NOT_A_SWAP = "Expected the swap [1, 0], got {}."
@@ -259,6 +262,7 @@ NOT_A_RULE = (
 
 LAYOUT_LENGTH = "A layout of {} coordinates was given, {} expected."
 LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
+NO_INTERPOLATION = "These drawings are not of diagrams one move apart."
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")

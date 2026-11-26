@@ -1286,3 +1286,95 @@ def test_a_coloured_drawing_reads_back_from_its_repr():
     with raises(AssertionError):
         x = monoidal.Ty(monoidal.Wire("x"))
         eval(repr(f.to_drawing()))
+
+
+def test_interpolate_keeps_boxes_apart():
+    """
+    Across one interchanger no two boxes overlap, including the ones the
+    straight line drew through each other: found by discopy-lean.
+    """
+    x, unit = monoidal.Ty('x'), monoidal.Ty()
+    f, g = monoidal.Box('f', x, x ** 3), monoidal.Box('g', x ** 2, x)
+    e, s = monoidal.Box('e', x, unit), monoidal.Box('s', unit, x)
+    for source, target in [
+            (f @ x @ x >> x @ x @ x @ g, x @ g >> f @ x),
+            (e >> s, s @ x >> x @ e)]:
+        a, b = source.to_drawing(), target.to_drawing()
+        for k in range(41):
+            frame = a.interpolate(b, k / 40)
+            (x0, y0), (x1, y1) = frame.rectangle(0)
+            (u0, v0), (u1, v1) = frame.rectangle(1)
+            assert x1 <= u0 or u1 <= x0 or y1 <= v0 or v1 <= y0
+
+
+def test_interpolate_keeps_wires_out_of_boxes():
+    """
+    Across one interchanger no wire crosses another or a box, including a
+    wire that passes beside the box that moves, and a state under an effect
+    that must go left of it: found by discopy-lean.
+    """
+    x, unit = monoidal.Ty('x'), monoidal.Ty()
+    f0, f1 = monoidal.Box('f0', unit, x), monoidal.Box('f1', unit, x ** 3)
+    f2 = monoidal.Box('f2', unit, unit)
+    effect, state = monoidal.Box('e', x ** 2, unit), monoidal.Box('s', unit, x)
+    pair = monoidal.Box('p', unit, x ** 2)
+    for source, i in [
+            (f0 >> f1 @ x >> f2 @ x @ x @ x @ x, 1),
+            (effect @ x >> state @ x >> pair @ x @ x >> x @ x @ pair @ x @ x,
+             0)]:
+        a, b = source.to_drawing(), source.interchange(i, i + 1).to_drawing()
+        for k in range(21):
+            frame = a.interpolate(b, k / 20)
+            frame.add_box_corners()
+            shape = frame.shape()
+            assert not shape["crossings"] and not shape["through"]
+
+
+def test_slide_passes_behind_the_box():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+    assert a.slide(b, 0) == a and a.slide(b, 1) == b
+    middle = a.slide(b, .5)
+    j, = (node.j for node in middle.box_nodes if node.box.name == "f")
+    (x0, y0), (x1, y1) = middle.rectangle(j)
+    assert all(x0 <= p.x <= x1 and y0 <= p.y <= y1
+               for node, p in middle.positions.items()
+               if node.data.get("j") not in (None, j))
+
+
+def test_slide_through_a_spider_keeps_its_legs():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z, draw_as_spider=True)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+
+    def legs(drawing):
+        box, = (node for node in drawing.box_nodes if node.box.name == "f")
+        dot, j = drawing.positions[box], box.j
+        return sorted((node.kind, node.data.get("i"),
+                       round(p.x - dot.x, 6), round(p.y - dot.y, 6))
+                      for node, p in drawing.positions.items()
+                      if node.data.get("j") == j)
+    assert all(legs(a.slide(b, t)) == legs(a) for t in (.25, .5, .75))
+
+
+def test_slide_through_a_spider_leaves_the_braid_behind():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z, draw_as_spider=True)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+
+    def heights(t):
+        drawing = a.slide(b, t)
+        dot, = (p.y for node, p in drawing.positions.items()
+                if node.kind == "box" and node.box.name == "f")
+        braid, = (p.y for node, p in drawing.positions.items()
+                  if node.kind == "box" and node.box.is_crossing)
+        return dot, braid
+    (dot0, braid0), (dot1, braid1) = heights(.6), heights(.8)
+    assert dot1 < dot0 and braid1 >= braid0
