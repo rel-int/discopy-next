@@ -909,6 +909,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A box with as many outputs as inputs, e.g. a swap drawn as a box, draws
+  each output straight down from the input above it, rather than bending the
+  wire below into the next box when the labels of its inputs and outputs have
+  different widths ([next#748]).
+
 - The dagger, transpose and conjugate of a box with args keep its
   `drawing_name`, and when its args are drawn in another direction its box has
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
@@ -2771,6 +2776,7 @@ for the changelog of `1.2.1` and earlier.
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
 [next#745]: https://github.com/rel-int/discopy-next/pull/745
+[next#748]: https://github.com/rel-int/discopy-next/pull/748
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
