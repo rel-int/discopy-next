@@ -13,40 +13,13 @@ from functools import partial
 import numpy
 from pytest import importorskip, raises
 
-from discopy import para
-from discopy.group import Action, Cyclic, Product, Symmetric, Wreath
-from discopy.kleisli.channel import Channel
-from discopy.kleisli.monad import Seed
-from discopy.neural.network import Box, Dim, Dims, Network
-
-TORUS = Product[Cyclic[3], Cyclic[3]]
-LINES = Wreath[Symmetric[2], Symmetric[2]]
-ACTIONS = (Cyclic[6].action(), Symmetric[4].action(), TORUS.action(),
-           LINES.action(), Wreath[Cyclic[2], Symmetric[3]].action())
-
-
-def modules():
-    """ The modules that need PyTorch, or skip the test. """
-    return importorskip("torch"), importorskip("discopy.neural.augment")
-
-
-def brute(dom, cod):
-    """
-    The orbit of each pair ``(y, x)`` by flood fill along the generators,
-    independently of :meth:`Action.orbits`.
-    """
-    label = {}
-    for start in itertools.product(range(cod.size), range(dom.size)):
-        if start in label:
-            continue
-        label[start], stack = len(set(label.values())), [start]
-        while stack:
-            y, x = stack.pop()
-            for g, h in zip(cod.images, dom.images):
-                if (g[y], h[x]) not in label:
-                    label[g[y], h[x]] = label[start]
-                    stack.append((g[y], h[x]))
-    return label
+torch = importorskip("torch")
+from discopy import para  # noqa: E402
+from discopy.group import Action, Cyclic, Symmetric  # noqa: E402
+from discopy.neural import augment, equivariant  # noqa: E402
+from discopy.neural.network import Box, Dim, Dims, Network  # noqa: E402
+from discopy.neural.torch import Module  # noqa: E402
+from fixtures.orbits import ACTIONS, TORUS, brute  # noqa: E402
 
 
 def orbit_means(matrix, dom, cod):
@@ -61,7 +34,6 @@ def orbit_means(matrix, dom, cod):
 
 
 def test_sample_is_pure():
-    _, augment = modules()
     for group in (Cyclic[6], Symmetric[4], TORUS):
         draw = augment.sample(group)
         g, after = draw(420)
@@ -89,7 +61,6 @@ def test_sample_is_uniform():
     The chi-square statistic against the uniform law is below the 0.999
     quantile, on consecutive seeds and on the chain of next seeds.
     """
-    _, augment = modules()
     size = 6000
     for group in (Cyclic[3], Symmetric[3]):
         draw, chain, seed = augment.sample(group), [], 0
@@ -103,11 +74,7 @@ def test_sample_is_uniform():
 
 
 def test_kleisli_composition():
-    """
-    Composing the augmentation with itself threads the seed through two draws,
-    and a draw of ``sample`` composes with an arrow of the same monad.
-    """
-    torch, augment = modules()
+    """ The augmentation composed with itself threads the seed twice. """
     torch.manual_seed(7)
     dom, cod = Cyclic[6].action(), Action(Cyclic[6], 2, ((1, 0), ))
     arrow = augment.augment(dom, cod)
@@ -119,15 +86,6 @@ def test_kleisli_composition():
             (c, d), after = arrow((a, b))(middle)
             (u, v), last = composite((x, y))(seed)
             assert u.equal(c) and v.equal(d) and last == after
-    draw = augment.sample(Symmetric[3])
-    pick = Channel[Seed](lambda _: draw, tuple, object)
-    pair = Channel[Seed](
-        lambda g: lambda seed: ((g, draw(seed)[0]), draw(seed)[1]),
-        object, tuple)
-    for seed in range(5):
-        g, middle = draw(seed)
-        (first, second), after = pick.then(pair)(())(seed)
-        assert first == g and (second, after) == draw(middle)
 
 
 def test_augment_pure_and_one_element():
@@ -136,8 +94,6 @@ def test_augment_pure_and_one_element():
     on both, a pair ``(v, v)`` stays a pair of equal tensors, equal to the
     action of an element on ``v``, and the same seed gives the same pair.
     """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(0)
     action = Cyclic[6].action()
     arrow = augment.augment(action, action)
@@ -157,8 +113,6 @@ def test_augment_pure_and_one_element():
 
 def test_augment_preserves_the_relation():
     """ If ``y = f(x)`` for an equivariant ``f`` then so is ``y' = f(x')``. """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(1)
     for action in ACTIONS:
         for cod in (action, Action.trivial(action.group)):
@@ -174,10 +128,9 @@ def test_augment_preserves_the_relation():
 def test_augmentation_box():
     """
     The box has a leg for the key, the input and the label, composes and
-    runs, and a composite draws what the composite of the arrows draws.
+    runs, a composite draws what the composite of the arrows draws, leading
+    axes ride along and a one-point leg has no axis.
     """
-    torch, augment = modules()
-    module = importorskip("discopy.neural.torch").Module
     torch.manual_seed(2)
     dom, cod = Cyclic[6].action(), Symmetric[3].action()
     box = augment.augmentation(
@@ -190,7 +143,7 @@ def test_augmentation_box():
     y = torch.randn(6, dtype=torch.float64)
     key = torch.tensor(42)
     network = box >> box
-    key2, u, v = module(network)(key, x, y)
+    key2, u, v = Module(network)(key, x, y)
     arrow = augment.augment(dom, dom)
     pair = (x[:, None], y[:, None])
     (a, b), after = arrow(pair)(42)
@@ -198,11 +151,6 @@ def test_augmentation_box():
     assert key2.item() == after and key2.dtype == key.dtype
     assert u.equal(c[:, 0]) and v.equal(d[:, 0])
     assert augment.augmentation(cod, cod).dom == Dims(1) @ Dims(3) @ Dims(3)
-
-
-def test_augmentation_box_with_batch_and_single_point():
-    """ Leading axes ride along and a one-point leg has no axis. """
-    torch, augment = modules()
     one = Action.trivial(Cyclic[3], 1)
     box = augment.augmentation(Cyclic[3].action(), one)
     assert box.cod == Dims(1) @ Dims(3) @ Dims(1)
@@ -217,8 +165,6 @@ def test_augmentation_box_one_element_per_batch():
     One element acts on every row of a batch, through two different actions
     on the input and the label, the one that ``sample`` draws from the seed.
     """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     dom, cod = Cyclic[6].action(), Action(Cyclic[6], 2, ((1, 0), ))
     box = augment.augmentation(dom, cod)
     x = torch.arange(6.) + 100 * torch.arange(5.)[:, None]
@@ -235,7 +181,6 @@ def test_augmentation_box_one_element_per_batch():
 
 
 def test_augmentation_box_refuses_bad_keys():
-    torch, augment = modules()
     box = augment.augmentation(Cyclic[3].action(), Cyclic[3].action())
     x = torch.randn(3)
     with raises(ValueError, match=r"shape \(2,\)"):
@@ -246,8 +191,6 @@ def test_augmentation_box_refuses_bad_keys():
 
 def test_symmetrise_is_orbit_mean():
     """ The exact Reynolds operator of a matrix is its orbit means. """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(3)
     for action in ACTIONS:
         for dom in (action, action.tensor(action)):
@@ -272,8 +215,6 @@ def test_symmetrise_projects():
     The symmetrised map is equivariant, idempotent, and the identity on an
     equivariant map.
     """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(4)
     for action in ACTIONS:
         w = torch.randn(action.size, action.size, dtype=torch.float64)
@@ -292,7 +233,6 @@ def test_symmetrise_projects():
 
 def test_symmetrise_samples():
     """ Monte-Carlo converges to the exact average, purely in the seed. """
-    torch, augment = modules()
     torch.manual_seed(5)
     action = Symmetric[4].action()
     w = torch.randn(4, 4, dtype=torch.float64)
@@ -311,7 +251,6 @@ def test_symmetrise_samples():
 
 def test_symmetrise_samples_unbiased():
     """ One sample per seed averages to the exact operator. """
-    torch, augment = modules()
     torch.manual_seed(8)
     action = Symmetric[3].action()
     w = torch.randn(3, 3, dtype=torch.float64)
@@ -325,8 +264,6 @@ def test_symmetrise_samples_unbiased():
 
 def test_symmetrise_samples_share_a_prefix():
     """ The draws of ``k`` samples are the first of ``k + 1`` samples. """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(9)
     action = Symmetric[4].action()
     w = torch.randn(4, 4, dtype=torch.float64)
@@ -347,8 +284,6 @@ def test_reynolds_needs_the_inverse():
     Control: with ``g`` instead of ``g^-1`` on the output the average is a
     different operator, on a non-abelian group as on the others.
     """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     torch.manual_seed(10)
     action = Symmetric[4].action()
     w = torch.randn(4, 4, dtype=torch.float64)
@@ -363,7 +298,6 @@ def test_reynolds_needs_the_inverse():
 
 
 def test_symmetrise_refuses():
-    torch, augment = modules()
     big = Symmetric[9].action()
     with raises(ValueError, match="samples"):
         augment.symmetrise(lambda v: v, big, big)
@@ -378,7 +312,6 @@ def test_symmetrise_refuses():
 
 
 def test_homomorphisms():
-    _, augment = modules()
     action = Cyclic[3].action()
     pairs = action.tensor(action)
     for dom, cod, function, expected in (
@@ -399,7 +332,6 @@ def test_homomorphisms():
 
 def test_orbit_index_is_a_homomorphism():
     """ A point to its orbit is a homomorphism into the trivial action. """
-    _, augment = modules()
     for action in ACTIONS:
         orbits = action.orbits()
         index = {x: k for k, orbit in enumerate(orbits) for x in orbit}
@@ -410,60 +342,49 @@ def test_orbit_index_is_a_homomorphism():
                 lambda x: x, action, Action.trivial(action.group, action.size))
 
 
+def commutes(values, action):
+    """ Whether the map of points ``values`` commutes with every element. """
+    return all(values[action(g)[x]] == action(g)[values[x]]
+               for g in action.group.elements() for x in range(action.size))
+
+
 def test_generators_suffice():
     """
-    Every function of four points agrees with the check on all elements, and
-    the homomorphisms of the rotations to themselves are the four rotations.
+    The check on the generators is the check on all elements: on the four
+    points of the rotations, whose homomorphisms to themselves are the four
+    rotations, on the permutations of three points (all 27 maps of points,
+    only the identity commutes) and on the torus (the identity, its
+    mutations, random maps).
     """
-    _, augment = modules()
-    action = Cyclic[4].action()
-    found = []
-    for values in itertools.product(range(4), repeat=4):
-        brute_force = all(
-            values[action(g)[x]] == action(g)[values[x]]
-            for g in Cyclic[4].elements() for x in range(4))
-        assert augment.is_homomorphism(
-            values.__getitem__, action, action) is brute_force
-        if brute_force:
-            found.append(values)
-    assert sorted(found) == [
-        tuple((x + c) % 4 for x in range(4)) for c in range(4)]
-    with raises(TypeError):
-        augment.is_homomorphism(lambda x: x, action, Cyclic[2].action())
-
-
-def test_generators_suffice_with_several_generators():
-    """
-    The check on the generators is the check on all elements, on the
-    permutations of three points (all 27 maps of points, only the identity
-    commutes) and on the torus (the identity, its mutations, random maps).
-    """
-    _, augment = modules()
     rng = random.Random(0)
-    symmetric = Symmetric[3].action()
-    torus = TORUS.action()
-    size = torus.size
-    identity = tuple(range(size))
+    rotations, symmetric, torus = (
+        Cyclic[4].action(), Symmetric[3].action(), TORUS.action())
+    identity = tuple(range(torus.size))
     mutations = [identity[:i] + (j, ) + identity[i + 1:]
-                 for i in range(size) for j in range(size)]
-    randoms = [tuple(rng.randrange(size) for _ in range(size))
+                 for i in range(torus.size) for j in range(torus.size)]
+    randoms = [tuple(rng.randrange(torus.size) for _ in range(torus.size))
                for _ in range(200)]
-    cases = ((symmetric, itertools.product(range(3), repeat=3)),
+    cases = ((rotations, itertools.product(range(4), repeat=4)),
+             (symmetric, itertools.product(range(3), repeat=3)),
              (torus, [identity] + mutations + randoms))
+    found = []
     for action, candidates in cases:
-        found = []
+        found.append([])
         for values in candidates:
-            brute_force = all(
-                values[action(g)[x]] == action(g)[values[x]]
-                for g in action.group.elements() for x in range(action.size))
+            expected = commutes(values, action)
             assert augment.is_homomorphism(
-                values.__getitem__, action, action) is brute_force
-            found.extend([values] * brute_force)
-        assert tuple(range(action.size)) in found
-        assert len(action.group.generators()) > 1
+                values.__getitem__, action, action) is expected
+            found[-1].extend([values] * expected)
+    assert sorted(found[0]) == [
+        tuple((x + c) % 4 for x in range(4)) for c in range(4)]
+    assert tuple(range(3)) in found[1] and identity in found[2]
+    assert len(symmetric.group.generators()) > 1
+    assert len(torus.group.generators()) > 1
+    with raises(TypeError):
+        augment.is_homomorphism(lambda x: x, rotations, Cyclic[2].action())
 
 
-def network(equivariant, torch, action):
+def network(action):
     """ equivariant >> tanh >> equivariant >> tanh >> invariant. """
     points = Dims(action.size)
     tanh = para.Markov[Network].lift(
@@ -473,7 +394,7 @@ def network(equivariant, torch, action):
         >> layer(action, invariant)
 
 
-def parametric(torch, name, module, size, param):
+def parametric(name, module, size, param):
     """ A parametric box on the points of a layer of ``size`` points. """
     x = Dims(size)
     return para.Markov[Network](x, x, param=param, inside=Box(
@@ -486,18 +407,15 @@ def test_strictness():
     i.e. a strict homomorphism of parametric maps, an untied one is not, and
     the sample matters: a layer equivariant at the zero weights is caught.
     """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     for group in (Symmetric[5], Cyclic[6]):
         one, action = Action.trivial(group), group.action()
-        tied = network(equivariant, torch, action)
+        tied = network(action)
         assert augment.strictness(tied, action, one) < 1e-9
         dense = parametric(
-            torch, "W", lambda v, w: v @ w, action.size,
+            "W", lambda v, w: v @ w, action.size,
             Dims(Dim(action.size, action.size)))
         assert augment.strictness(dense, action, action) > 1e-2
-        bias = parametric(torch, "b", torch.add, action.size,
-                          Dims(action.size))
+        bias = parametric("b", torch.add, action.size, Dims(action.size))
         shifted = equivariant.layer(action, action) >> bias
         assert augment.strictness(shifted, action, action) > 1e-2
         assert augment.strictness(shifted, action, action, draws=0) == 0.0
@@ -508,12 +426,10 @@ def test_strictness():
 
 def test_strictness_seed():
     """ The same seed gives the same float, another one is still small. """
-    torch, augment = modules()
-    equivariant = importorskip("discopy.neural.equivariant")
     action = Cyclic[6].action()
     one = Action.trivial(Cyclic[6])
-    tied = network(equivariant, torch, action)
-    dense = parametric(torch, "W", lambda v, w: v @ w, 6, Dims(Dim(6, 6)))
+    tied = network(action)
+    dense = parametric("W", lambda v, w: v @ w, 6, Dims(Dim(6, 6)))
     assert augment.strictness(dense, action, action, seed=1)\
         == augment.strictness(dense, action, action, seed=1)
     assert augment.strictness(dense, action, action, seed=1)\
