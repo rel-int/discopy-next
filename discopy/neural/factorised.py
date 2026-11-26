@@ -448,6 +448,7 @@ class Kronecker(Realisation):
     [2.0, 4.0, 1.0]
     """
     fft_from = 64
+    tie: torch.Tensor | None
 
     def __init__(self, dom: Action, cod: Action, fft: bool | None = None):
         found = structure(dom) if dom == cod else None
