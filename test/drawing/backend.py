@@ -1158,7 +1158,7 @@ def test_left_to_right_args_in_the_variants_of_a_box():
     class Recorder(Backend):
         def __init__(self):
             super().__init__()
-            self.polygons, self.texts, self.alignments = [], {}, set()
+            self.polygons, self.texts, self.alignments = [], {}, []
 
         def draw_polygon(self, *points, **params):
             self.polygons.append((points, params.get("facecolor")))
@@ -1166,7 +1166,7 @@ def test_left_to_right_args_in_the_variants_of_a_box():
         def draw_text(self, text, i, j, **params):
             self.texts.setdefault(text, []).append(Point(i, j))
             if params.get("verticalalignment") in ("top", "bottom"):
-                self.alignments.add(params.get("horizontalalignment"))
+                self.alignments.append(params.get("horizontalalignment"))
 
         def output(self, path=None, show=True, **params):
             pass
@@ -1207,7 +1207,8 @@ def test_left_to_right_args_in_the_variants_of_a_box():
             key=lambda p: abs(p.y - f_at.y))
         assert (f_input.x > f_at.x) == turned
         # A label hangs along its wire: from its end on the right if turned.
-        assert ("right" in recorder.alignments) == turned
+        # Each of the four nested wires, not those outside, is turned.
+        assert recorder.alignments.count("right") == 4 * turned
     assert chopped == {  # Whether the corner cut off is right, top.
         "W": (True, False), "dagger": (True, True),
         "transpose": (False, True), "conjugate": (False, False),
