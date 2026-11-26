@@ -16,7 +16,7 @@
 - [x] `feedback.closed.monoidal`, `feedback.closed.balanced`, `feedback.closed.symmetric`: the free traced categories over the closed levels, no Int at the planar one
 - [x] `pivotal`, `ribbon`, `compact`, `frobenius` sit under their `feedback.closed` level: the delay is the identity by default, `Feedback(f)` is `Trace(f)`, an axiom equates the trace with cap, f, cup
 - [x] `frobenius`: the delay preserves the spiders
-- [ ] `Head`, `Tail`, `FollowedBy` are carried down; a functor into a codomain without stream semantics raises on them
+- [x] `Head`, `Tail`, `FollowedBy` are carried down; a functor into a codomain without stream semantics raises on them
 - [ ] `linear.symmetric` (exchange is the swap by default) and `linear.markov` (contraction and weakening of banged objects are copy and discard, no default bang)
 - [ ] architecture pictures drawn by a committed script from each module, `ev` and `λ` labels, linear.symmetric and linear.markov in the diagram
 - [ ] docs, changelog, an architecture decision record, references checked against the papers
