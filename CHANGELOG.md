@@ -901,6 +901,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The dagger, transpose and conjugate of a box with args keep its
+  `drawing_name`, and when its args are drawn in another direction its box has
+  a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
+  and a transpose or a conjugate turns its args half way round with it
+  ([next#745]).
+
 - The sides of a frame and of its slots are drawn with a black edge, as
   those of boxes and bubbles are, wherever the regions on either side have
   different colours, rather than with zero width, e.g. around each term of
@@ -2748,6 +2754,7 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
+[next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
