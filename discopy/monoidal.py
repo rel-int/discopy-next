@@ -406,7 +406,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
     def __init__(self, *inside):
         self.inside = inside
 
-    def tensor(self, *others: "List") -> "List":
+    def tensor(self, *others: "List") -> Self:
         for other in others:
             assert_isinstance(other, type(self))
         return type(self)(
@@ -439,7 +439,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         for i in range(len(self)):
             yield self[i:i + 1]
 
-    def __pow__(self, n_times: int) -> "List":
+    def __pow__(self, n_times: int) -> Self:
         n_times = index(n_times)
         return self.tensor(*(n_times - 1) * [self]) if n_times > 0\
             else type(self)()
