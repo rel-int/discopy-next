@@ -273,6 +273,10 @@ class Unitype(Exp):
     def __str__(self):
         return "U"
 
+    @property
+    def drawing_name(self) -> str:
+        return str(self)
+
     def atoms(self) -> list:
         """ The unitype names itself, i.e. its base. """
         return [self.base]
