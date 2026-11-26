@@ -235,7 +235,7 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError, factory_name
+from discopy.utils import AxiomError, factory_name, from_tree
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -2112,6 +2112,11 @@ class Measure(Channel):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dom!r})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of its domain, the one argument it is built from. """
+        return cls(from_tree(tree['dom']))
+
     def inflate(self, d):
         r""" A specific choice of inflation for the Measure channel.
         The diagram discards the internal states and measures
@@ -2155,6 +2160,26 @@ class Encode(Channel):
         states = "" if self.internal_states is None else \
             f", internal_states={self.internal_states!r}"
         return f"{factory_name(type(self))}({self.dom!r}{states})"
+
+    def to_tree(self) -> dict:
+        """
+        The tree of a box, with the internal states of its modes if any.
+
+        >>> from discopy.utils import dumps, loads
+        >>> box = Encode(mode @ bit, internal_states=([1, 0], ))
+        >>> assert loads(dumps(box)) == box
+        """
+        tree = super().to_tree()
+        if self.internal_states is not None:
+            tree['internal_states'] = [
+                list(state) for state in self.internal_states]
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states', None)
+        return cls(from_tree(tree['dom']), None if states is None
+                   else tuple(map(list, states)))
 
     def inflate(self, d):
         r"""
@@ -2205,6 +2230,11 @@ class Discard(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dom!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of its domain, the one argument it is built from. """
+        return cls(from_tree(tree['dom']))
 
     def inflate(self, d):
         """
