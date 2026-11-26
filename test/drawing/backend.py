@@ -1138,16 +1138,16 @@ def test_frame_sides_have_an_edge_between_two_colours():
     assert 0 not in coloured_slot.widths
 
 
-def test_left_to_right_args_in_a_dagger_box():
+def test_left_to_right_args_in_the_variants_of_a_box():
+    from discopy import pivotal
     from discopy.drawing.backend import Backend
-    from discopy.monoidal import Diagram
-    from discopy.utils import factory
+    from discopy.utils import Point, factory
 
     @factory
-    class Body(Diagram):
+    class Body(pivotal.Diagram):
         draw_left_to_right = True
 
-    class Primitive(Box, Body):
+    class Primitive(pivotal.Box, Body):
         pass
 
     class Recorder(Backend):
@@ -1159,22 +1159,32 @@ def test_left_to_right_args_in_a_dagger_box():
             self.polygons.append(points)
 
         def draw_text(self, text, i, j, **params):
-            self.texts[text] = j
+            self.texts.setdefault(text, []).append(Point(i, j))
 
         def output(self, path=None, show=True, **params):
             pass
 
-    x, y = Ty('x'), Ty('y')
+    x, y = pivotal.Ty('x'), pivotal.Ty('y')
     f, g = Primitive('f', x, y), Primitive('g', y, x)
-    W = Box('W', x, y, args=(f, g), drawing_name="W")
-    corners = {}
-    for name, diagram in [("W", W), ("dagger", W[::-1])]:
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W")
+    chopped = {}
+    for name, diagram in [("W", W), ("dagger", W[::-1]),
+                          ("transpose", W.r), ("conjugate", W[::-1].r)]:
         recorder = Recorder()
         diagram.draw(backend=recorder, asymmetry=.25)
-        outline, = (  # The one shape with a corner shifted: the box.
-            p for p in recorder.polygons if len({x for x, _ in p}) == 3)
-        right = max(x for x, _ in outline)
-        corners[name] = next(y for x, y in outline if x == right)
-        assert recorder.texts["W"] is not None
-        assert recorder.texts["f"] > recorder.texts["g"]
-    assert corners["W"] < corners["dagger"]
+        outline, = (p for p in recorder.polygons if len(p) == 5)
+        xs, ys = [p[0] for p in outline], [p[1] for p in outline]
+        chopped[name] = next(
+            (cx == max(xs), cy == max(ys))
+            for cx in (min(xs), max(xs)) for cy in (min(ys), max(ys))
+            if (cx, cy) not in outline)
+        (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
+        turned = name in ("transpose", "conjugate")
+        assert (f_at.y < g_at.y) == turned
+        f_input = min(  # The label of the wire into f, its x or its y.
+            recorder.texts["x" if name in ("W", "transpose") else "y"],
+            key=lambda p: abs(p.y - f_at.y))
+        assert (f_input.x > f_at.x) == turned
+    assert chopped == {  # Whether the corner cut off is right, top.
+        "W": (True, False), "dagger": (True, True),
+        "transpose": (False, True), "conjugate": (False, False)}

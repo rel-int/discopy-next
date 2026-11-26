@@ -902,9 +902,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Fixed
 
 - The dagger, transpose and conjugate of a box with args keep its
-  `drawing_name`, and when its args are drawn in another direction its box is
-  slanted as its variant is, e.g. on its top right for a dagger, while its args
-  are drawn as they are; only a reflection of the drawing mirrors them
+  `drawing_name`, and when its args are drawn in another direction its box has
+  a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
+  and a transpose or a conjugate turns its args half way round with it
   ([next#745]).
 
 - The sides of a frame and of its slots are drawn with a black edge, as

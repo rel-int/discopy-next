@@ -2635,7 +2635,8 @@ class Box(cat.Box, Diagram):
         for attr in BOX_DRAWING_ATTRIBUTES:
             # A box with args is given an empty name unless told otherwise.
             given = attr not in vars(box) or (
-                attr == "drawing_name" and box.args and not box.drawing_name)
+                attr == "drawing_name" and box.args and not box.drawing_name
+                and attr not in changes)
             if attr in vars(self) and given:
                 setattr(box, attr, getattr(self, attr))
         if self.args and box.args:
