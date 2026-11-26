@@ -24,7 +24,8 @@ category is balanced (with the trivial twist)".
   `ribbon` under `feedback.closed.balanced`, `compact` under `feedback.closed.symmetric`,
   `frobenius` under `feedback.closed.markov` and `compact`.
 - On them the delay is the identity by default, as `CompactCategory.twist` is, so
-  `Feedback(f)` is `Trace(f)`. `Trace` stays a box of its own, as `Spider(0, 2)` stays distinct
+  `Feedback(f)` is `Trace(f)`, and a wire or a box built with a time step raises rather than
+  being reset in silence. `Trace` stays a box of its own, as `Spider(0, 2)` stays distinct
   from `Cup`, and `PivotalCategory.trace_duals` equates it with a cap, `f` and a cup. A semantic
   category may choose another delay, a strong monoidal endofunctor, which preserves duals; in a
   `HypergraphCategory` it preserves the spiders too, `spider_delay`.

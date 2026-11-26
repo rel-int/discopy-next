@@ -351,6 +351,12 @@ def test_traced_levels_with_duals_delay_trivially():
         assert f.feedback(left=True) == module.Trace(f, left=True)
         assert f.trace().open_traces() == x @ module.Diagram.caps(x, x.r)\
             >> f @ x.r >> x @ module.Diagram.cups(x, x.r)
+        assert module.Trace(f, mem=x @ x).open_traces()\
+            == f.trace(2).open_traces()
+        for timed in (lambda: pivotal.Wire('x', time_step=1),
+                      lambda: module.Box('f', x, x, time_step=1)):
+            with raises(AxiomError):
+                timed()
     g = Gate('g', qubit, qubit)
     assert qubit.delay() != qubit and g.delay().time_step == 1
 
@@ -380,6 +386,11 @@ def test_time_stepped_wires_below_feedback():
     g = closed.monoidal.Box('g', y @ y.delay(), y @ y)
     assert isinstance(g.feedback(), closed.monoidal.Feedback)
     assert g.delay().time_step == 1 and (y << y).delay() != y.d << y.d
+    h = closed.monoidal.Box('h', y @ y, y @ y)
+    traced = (h.curry() @ y >> closed.monoidal.Diagram.ev(y @ y, y)).trace()
+    assert traced.to_compact() == (
+        h.curry() @ y >> closed.monoidal.Diagram.ev(y @ y, y)
+    ).to_compact().trace()
 
 
 def test_FollowedBy_delay():

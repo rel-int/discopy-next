@@ -138,6 +138,9 @@ class Diagram(closed.monoidal.Diagram, feedback.Diagram):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, feedback.Trace):
+                return box.arg.to_compact().trace(
+                    len(box.mem), left=box.left)
             if isinstance(box, Curry) and not box.n:
                 return box.arg.to_compact()
             if isinstance(box, Curry):

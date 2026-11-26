@@ -52,8 +52,8 @@ from __future__ import annotations
 from discopy import symmetric
 from discopy.cat import factory
 from discopy.linear import monoidal as planar
-from discopy.linear.monoidal import (  # noqa: F401
-    Ty, BangOb)  # pylint: disable=unused-import
+# pylint: disable-next=unused-import
+from discopy.linear.monoidal import Ty, BangOb  # noqa: F401
 
 
 class Layer(symmetric.Layer):

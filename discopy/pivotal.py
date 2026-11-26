@@ -75,7 +75,17 @@ from discopy.abc import (
     PivotalCategory, RigidCategory)
 from discopy.feedback.closed import monoidal as planar
 from discopy.cat import factory
-from discopy.utils import deprecated_alias
+from discopy.utils import AxiomError, deprecated_alias
+
+
+def assert_untimed(identity_delay: bool, time_step: int):
+    """
+    Raise :class:`AxiomError` for a time step at a level whose delay is the
+    identity, where it would mean nothing: a category with a delay of its
+    own, e.g. one whose wires are streams, keeps its time steps.
+    """
+    if identity_delay and time_step:
+        raise AxiomError(messages.TIME_STEP_WITHOUT_DELAY.format(time_step))
 
 
 class Wire(feedback.Wire, rigid.Wire):
@@ -92,9 +102,16 @@ class Wire(feedback.Wire, rigid.Wire):
     Example
     -------
     >>> from discopy import pivotal
-    >>> x = Wire('x', time_step=2)
-    >>> assert x.l == x.r == Wire('x', 1, time_step=2) and x.l.l == x
-    >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r.d.d'
+    >>> x = Wire('x')
+    >>> assert x.l == x.r == Wire('x', 1) and x.l.l == x
+    >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r'
+
+    Its delay is the identity, so a time step means nothing and raises.
+
+    >>> Wire('x', time_step=2)
+    Traceback (most recent call last):
+    ...
+    discopy.utils.AxiomError: Got time step 2, but the delay of this ...
     """
     @property
     def l(self) -> Wire:
@@ -122,14 +139,9 @@ class Wire(feedback.Wire, rigid.Wire):
         del n_steps
         return self
 
-    def reset(self) -> Wire:
-        """
-        A wire at time step zero, the delay being no way to undo a time step
-        the wire was built with.
-
-        >>> assert Wire('x', time_step=1).reset() == Wire('x')
-        """
-        return feedback.Wire.delay(self, -self.time_step)
+    def __init__(self, *args, time_step: int = 0, **params):
+        assert_untimed(type(self).delay is Wire.delay, time_step)
+        super().__init__(*args, time_step=time_step, **params)
 
     def dagger(self) -> Wire:
         """
@@ -237,7 +249,10 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
                     box.dom, box.cod)
             if not isinstance(box, Trace):
                 return box
-            return self.dual_trace(box.arg.open_traces(), box.left)
+            result = box.arg.open_traces()
+            for _ in box.mem.inside:
+                result = self.dual_trace(result, box.left)
+            return result
         result = self.id(self.dom)
         for layer in self.inside:
             for box, offset in layer.boxes_and_offsets:
@@ -331,6 +346,7 @@ class Box(rigid.Box, planar.Box, Diagram):
     delay = Diagram.delay
 
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
+        assert_untimed(type(self).delay is Diagram.delay, time_step)
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
         self._time_step = time_step
 

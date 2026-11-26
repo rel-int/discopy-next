@@ -604,7 +604,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   free feedback categories over `closed.monoidal`, `feedback.balanced`,
   `closed.symmetric` and `closed.markov`, traced once the delay is the
   identity, and `pivotal`, `ribbon`, `compact` and `frobenius` sit under them:
-  their delay is the identity by default, so their feedback is their
+  their delay is the identity by default, a time step there raises, so
+  their feedback is their
   `Trace`, a box of its own that `Diagram.open_traces` sends to a cap, the
   diagram and a cup, as `abc.PivotalCategory.trace_duals` says, and
   `abc.HypergraphCategory.spider_delay` says the delay preserves spiders. A
