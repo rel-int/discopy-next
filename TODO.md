@@ -9,4 +9,4 @@
 - [x] Rewrite: `discopy.rewrite` with `Rewrite`, a sesquicategory of diagrams, its `Layer` of steps rewritten at once, `Step` and its `Interchange` and `Slide`, and an ADR
 - [x] Rewrite: `normalization` returns a `Rewrite`, `Rewrite.to_gif` plays the laxators, and `Equation.path` and `Equation.to_gif` go
 - [x] Rewrite: `rigid.Unsnake`, the step of `snake_equations` with its own frames, and `normalization` made of interchangers and unsnakes
-- [WIP] @T-e8a5da2e-2026-11-26 16:05 Rewrite: braided Reidemeister moves, `braided.Unbraid` for `braid_then_inverse` (II) and `Slide` of a braid through a wire drawn as a triple point (III)
+- [x] Rewrite: braided Reidemeister moves, `braided.Unbraid` for `braid_then_inverse` (II) and `Slide` of a braid through a wire drawn as a triple point (III)
