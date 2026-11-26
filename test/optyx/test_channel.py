@@ -443,6 +443,8 @@ def test_a_channel_traces_through_its_own_cup():
     assert np.allclose(np.asarray(
         cnot.trace(left=True).eval().tensor.array).reshape(2, 2), np.ones(
             (2, 2)))
+    with pytest.raises(ValueError):
+        cnot.trace(-1)
     snake = (Diagram.caps(qubit, qubit) @ qubit
              >> qubit @ Diagram.cups(qubit, qubit))
     assert np.allclose(np.asarray(

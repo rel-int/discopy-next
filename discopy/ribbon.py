@@ -164,6 +164,8 @@ class Diagram(pivotal.Diagram, traced.Diagram, RibbonCategory):
 
         .. image:: /_static/balanced/twist_dual_rail.svg
         """
+        if width == 0:
+            return self
         return self.open_traces().to_braided(width, colour)
 
 

@@ -114,6 +114,7 @@ def test_symmetric_and_markov_structure_of_the_bang():
     assert F(Contraction(x)) == markov.Copy(x.bang())
     assert F(Weakening(x)) == markov.Discard(x.bang())
     assert F(Dereliction(x)) == markov.Dereliction(x)
+    assert isinstance(markov.Swap(x, y), markov.Function)
 
 
 def test_bang_is_drawn_with_an_exclamation_mark():

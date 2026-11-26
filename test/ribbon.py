@@ -172,6 +172,7 @@ def test_feedback_to_ribbons_is_built_from_its_argument():
     x = Ty('x')
     g = Box('g', x @ x, x @ x)
     rails = g.to_ribbons()
+    assert Trace(g).to_ribbons(width=0) == Trace(g)
     assert Trace(g).to_ribbons()\
         == (x @ Cap(x, x.r) >> g @ x.r >> x @ Cup(x, x.r)).to_ribbons()
     assert Head(g).to_ribbons() == rails.head

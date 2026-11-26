@@ -8,15 +8,17 @@ and the property tests that check their axioms.
     :file: architecture.html
 
 The diagram shows the syntax, the free categories of each level. Going down a
-column adds symmetry, going right along a row adds structure: ``feedback`` a
-delay and a trace, ``closed`` exponentials, ``feedback.closed`` both, and the
-last column duals, traced with the identity as delay; ``linear`` beside the
-plain levels adds a bang. A module imports the ones above it in its column and
-to its left on its row, except that ``linear`` and ``closed`` import nothing
-from ``feedback`` and ``feedback`` nothing from ``linear``; forgetful functors
-between the categories go the other way. Each module is pictured by its
-characteristic generator, drawn by the module itself: ``docs/architecture.py``
-draws the pictures and writes the table.
+column adds structure to the tensor: scalars that slide, braids, twists,
+symmetry, then copies; going right along a row adds structure to the
+category: ``feedback`` a delay and a trace, ``closed`` exponentials,
+``feedback.closed`` both, and the last column duals, traced with the identity
+as delay; ``linear`` beside the plain levels adds a bang. A module imports the
+ones above it in its column, and ``feedback.closed`` imports ``feedback`` and
+``closed`` on its row, but ``linear``, ``feedback`` and ``closed`` import
+nothing from one another; forgetful functors between the categories go the
+other way. Each module is pictured by its characteristic generator, drawn by
+the module itself: ``docs/architecture.py`` draws the pictures and writes the
+table.
 
 .. autosummary::
     :template: module.rst

@@ -132,6 +132,9 @@ class Permutation(markov.Permutation, swaps.Permutation, Box):
     """ A permutation in a Markov linear diagram. """
 
 
+Function.register(Permutation)
+
+
 class Swap(Permutation, markov.Swap, swaps.Swap, Box):
     """ A swap in a Markov linear diagram. """
 

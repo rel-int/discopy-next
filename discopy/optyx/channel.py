@@ -235,7 +235,8 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import (
+    AxiomError, assert_istraceable, factory_name, from_tree)
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -458,6 +459,7 @@ class Diagram(frobenius.Diagram):
             n : The number of wires to trace.
             left : Whether to trace on the left rather than the right.
         """
+        assert_istraceable(self, n, left)
         result = self
         for _ in range(n):
             result = self.trace_factory(result, left)

@@ -122,6 +122,15 @@ class Wire(feedback.Wire, rigid.Wire):
         del n_steps
         return self
 
+    def reset(self) -> Wire:
+        """
+        A wire at time step zero, the delay being no way to undo a time step
+        the wire was built with.
+
+        >>> assert Wire('x', time_step=1).reset() == Wire('x')
+        """
+        return feedback.Wire.delay(self, -self.time_step)
+
     def dagger(self) -> Wire:
         """
         The dagger of a pivotal object coincides with its left and right

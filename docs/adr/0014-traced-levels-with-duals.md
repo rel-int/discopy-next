@@ -30,8 +30,9 @@ category is balanced (with the trivial twist)".
   `HypergraphCategory` it preserves the spiders too, `spider_delay`.
 - `Head`, `Tail` and `FollowedBy` are carried down; a functor into a codomain without streams
   raises on them, as it did on a trace.
-- The planar level has no Int: Int, and the theorem of Hasegawa that a traced category is closed
-  if and only if its embedding into Int has a right adjoint, start at `balanced`.
+- The planar level has no Int construction. It starts at `balanced`, and so does the theorem of
+  Hasegawa that a traced category is closed if and only if its embedding into Int has a right
+  adjoint.
 - `linear.symmetric` takes the swap for the exchange, `linear.markov` the copy and discard of a
   banged object for its contraction and weakening, with no default bang: the identity is a
   linear exponential comonad only when every morphism is deterministic.
