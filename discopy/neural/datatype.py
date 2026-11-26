@@ -36,9 +36,10 @@ the fold of a term a lax algebra of the free monad of the datatype, in the
 The free monad is the free category of the terms with holes, so every
 coherence law is a :class:`discopy.para.Cell` between maps of a given shape,
 checked by the equation of its category: :meth:`Algebra.lift` is the free
-monad on maps, :meth:`Algebra.lift_cell` on cells,
-:meth:`Algebra.unitality` and :meth:`Algebra.associativity` are the cells of the lax algebra, copies of the parameter, and
-:class:`LaxHomomorphism` the folds of a datatype that are lax and not tied.
+monad on maps, :meth:`Algebra.lift_cell` on cells, :meth:`Algebra.unitality`
+and :meth:`Algebra.associativity` are the cells of the lax algebra, copies of
+the parameter, and :class:`LaxHomomorphism` the folds of a datatype that are
+lax and not tied.
 The base is the free copy-discard category: no box is copyable or
 discardable, so a reparametrisation by a box is rejected by every cell
 where the parameter is copied twice or discarded.
