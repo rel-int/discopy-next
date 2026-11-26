@@ -16,6 +16,7 @@ Summary
     Box
     Braid
     Slide
+    Unbraid
     Sum
     Functor
     TermBase
@@ -72,10 +73,11 @@ from discopy import monoidal, messages, rewrite
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.drawing import Drawing
+from discopy.drawing.drawing import between
 from discopy.monoidal import Ty
 from discopy.utils import (
     assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
-    factory_name, from_tree)
+    factory_name, from_tree, Point)
 
 
 class Wire(monoidal.Wire):
@@ -149,6 +151,36 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                 return self.ar(
                     inside, self.dom, self.cod, _scan=False).simplify()
         return self
+
+    def rewrite_to(self, other: Diagram, left=False) -> rewrite.Rewrite:
+        """
+        The rewrite of one step from the diagram to ``other``: an
+        interchanger, see :meth:`discopy.monoidal.Diagram.rewrite_to`, or
+        an :class:`Unbraid` when ``other`` is the diagram without a braid and
+        its inverse, as :meth:`simplify` removes them.
+
+        Parameters:
+            other : The diagram to rewrite into.
+            left : Passed to :meth:`discopy.monoidal.Diagram.rewrite_to`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> diagram = Braid(x, y) >> Braid(x, y)[::-1]
+        >>> print(diagram.rewrite_to(diagram.simplify()))
+        Unbraid(x, y)
+        """
+        if len(self) == len(other) + 2:
+            i = next((i for i, (layer, that) in enumerate(
+                zip(self.inside, other.inside)) if layer != that),
+                len(other))
+            try:
+                step = Unbraid.at(self, i)
+            except AxiomError:
+                step = None
+            if step is not None and step.cod == other:
+                return step
+        return super().rewrite_to(other, left)
 
     def naturality(self, i: int, left=True, down=True, braid=None) -> Diagram:
         """
@@ -412,12 +444,56 @@ class Slide[category](rewrite.Step):
     def frame(self, t: float) -> Drawing:
         """
         The crossings shrink into the box and grow out of its other side,
-        see :meth:`discopy.drawing.Drawing.slide`.
+        see :meth:`discopy.drawing.Drawing.slide`. When the box is itself a
+        crossing, the third Reidemeister move, the three crossings of the
+        domain shrink with their ports towards a point until ``t = .5``,
+        where they meet in a triple point, and those of the codomain grow
+        out of it. They shrink by ``s`` vertically and by ``s * (2 - s)``
+        horizontally, so that the ports leave the boundary downwards before
+        they move sideways. The point is halfway between the centres of the
+        two triangles.
 
         Parameters:
             t : The fraction of the way, from ``0`` to ``1``.
+
+        Example
+        -------
+        >>> x, y, z = map(Ty, "xyz")
+        >>> step = Slide(Braid(y, z), x)
+        >>> print(step.dom)
+        x @ Braid(y, z) >> Braid(x, z) @ y >> z @ Braid(x, y)
+        >>> print(step.cod)
+        Braid(x, y) @ z >> y @ Braid(x, z) >> Braid(y, z) @ x
+        >>> assert step.frame(0) == step.dom.to_drawing()
+        >>> assert step.frame(1) == step.cod.to_drawing()
+        >>> middle = step.frame(.5)
+        >>> sorted({p for node, p in middle.positions.items()
+        ...         if node.kind == "box"})
+        [Point(x=1.5, y=1.5)]
+        >>> _ = step.to_gif(tween=12, timestep=80, loop=True,
+        ...     doctest="docs/_static/braided/reidemeister-3.gif")
+
+        .. image:: /_static/braided/reidemeister-3.gif
+            :align: center
         """
-        return self.dom.to_drawing().slide(self.cod.to_drawing(), t)
+        source, target = self.dom.to_drawing(), self.cod.to_drawing()
+        if not (getattr(self.box, "draw_as_braid", False)
+                or getattr(self.box, "draw_as_wires", False)):
+            return source.slide(target, t)
+        centres = [[p for node, p in drawing.positions.items()
+                    if node.kind == "box"] for drawing in (source, target)]
+        centre = between(*(
+            Point(sum(p.x for p in ps) / len(ps), sum(p.y for p in ps)
+                  / len(ps)) for ps in centres), .5)
+        drawing, scale = (source, 1 - 2 * t) if t < .5\
+            else (target, 2 * t - 1)
+        return drawing.relabel_nodes(positions={
+            node: between(source.positions[node], target.positions[node], t)
+            if node.kind in ("dom", "cod") else Point(
+                centre.x + (p.x - centre.x) * scale * (2 - scale),
+                centre.y + (p.y - centre.y) * scale)
+            for node, p in drawing.positions.items()}).resized(
+                source, target, t)
 
     @classmethod
     # pylint: disable-next=too-many-arguments  # naturality's arguments
@@ -451,6 +527,152 @@ class Slide[category](rewrite.Step):
             raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
         return step.whisker(
             diagram[:start], diagram[start + len(step.dom):], *outside)
+
+
+class Unbraid[category](rewrite.Step):
+    """
+    A braid followed by its inverse pulled apart into parallel wires: the
+    instance of ``braid_then_inverse``, or ``inverse_then_braid``, of
+    :class:`discopy.abc.BraidedCategory`, the second Reidemeister move, a
+    step of the rewrites of the ``category``, :class:`Diagram` when not
+    given.
+
+    Parameters:
+        x : The type that starts on the left.
+        y : The type that starts on the right.
+        inverse : Whether the inverse comes first, from ``y @ x``.
+        is_dagger : Whether the step goes the other way, from the wires to
+            the braids.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> step = Unbraid(x, y)
+    >>> print(step.dom, "|", step.cod)
+    Braid(x, y) >> Braid(x, y)[::-1] | Id(x @ y)
+    >>> print(Unbraid(x, y, inverse=True).dom)
+    Braid(x, y)[::-1] >> Braid(x, y)
+    >>> _ = Unbraid.at(Braid(x, y) >> Braid(x, y)[::-1], 0).to_gif(
+    ...     tween=12, timestep=60, loop=True,
+    ...     doctest="docs/_static/braided/unbraid.gif")
+
+    .. image:: /_static/braided/unbraid.gif
+        :align: center
+    """
+    serialised_attrs = ("x", "y", "*", "inverse", "is_dagger")
+
+    @classmethod
+    def subscript_bases(cls, category) -> tuple[type, ...]:
+        """ The steps of the category, of which an unbraid is one. """
+        return (rewrite.Step[category], )
+
+    @staticmethod
+    def category_of(*args, **kwargs) -> type:
+        """ Braided diagrams, unless the class is given a category. """
+        return Diagram
+
+    def __init__(self, x: Ty, y: Ty, *, inverse=False, is_dagger=False):
+        self.x, self.y, self.inverse = x, y, inverse
+        braid = self.category.braid(x, y)
+        braids = braid[::-1] >> braid if inverse else braid >> braid[::-1]
+        wires = self.category.id(braids.dom)
+        rewrite.Step.__init__(
+            self, f"Unbraid({x}, {y}"
+            + (", inverse=True)" if inverse else ")"),
+            *((wires, braids) if is_dagger else (braids, wires)),
+            is_dagger=is_dagger)
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        return f"braided.Unbraid({self.x!r}, {self.y!r}"\
+            + (", inverse=True)" if self.inverse else ")")
+
+    def dagger(self) -> Unbraid:
+        return type(self)(self.x, self.y, inverse=self.inverse,
+                          is_dagger=not self.is_dagger)
+
+    def frame(self, t: float) -> Drawing:
+        """
+        The strands pull apart and shrink: each node of a strand, see
+        :meth:`discopy.drawing.Drawing.strands`, moves in a straight line to
+        the bottom of its wire and each crossing to the middle of its
+        strands, while the height goes to zero, that of wires composed with
+        other drawings, as for :meth:`discopy.rigid.Unsnake.frame`.
+
+        Parameters:
+            t : The fraction of the way, from ``0`` to ``1``.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> step = Unbraid(x, y)
+        >>> assert step.frame(0) == step.dom.to_drawing()
+        >>> assert step.frame(1) == step.cod.to_drawing()
+        >>> step.frame(.5).height
+        1.0
+        """
+        if self.is_dagger:
+            return self.dagger().frame(1 - t)
+        braids, wires = self.dom.to_drawing(), self.cod.to_drawing()
+        if t == 1:
+            return wires
+        strands = braids.strands()
+        bottoms = {node.i: Point(p.x, 0) for node, p in wires.positions.items()
+                   if node.kind == "dom"}
+        target = {node: bottoms[k] for node, k in strands.items()}
+        for node in braids.nodes:
+            if node.kind == "box":
+                ports = [p for port, p in target.items()
+                         if port.kind == "box_dom" and port.j == node.j]
+                target[node] = between(*ports, .5)
+        result = braids.relabel_nodes(positions={
+            node: between(p, target[node], t)
+            for node, p in braids.positions.items()}).resized(
+                braids, wires, t)
+        result.height = (1 - t) * braids.height
+        return result
+
+    @classmethod
+    def at(cls, diagram: Diagram, i: int) -> rewrite.Rewrite:
+        """
+        The unbraid of the braid at layer ``i`` and its inverse at layer
+        ``i + 1`` of a diagram with one box in each layer, whiskered by the
+        rest: the diagram without them is its codomain.
+
+        Parameters:
+            diagram : The diagram to rewrite.
+            i : The layer of the first braid.
+
+        Raises:
+            AxiomError : When the two layers are not a braid and its inverse.
+
+        Example
+        -------
+        >>> x, y, z = Ty('x'), Ty('y'), Ty('z')
+        >>> diagram = z @ Braid(x, y) >> z @ Braid(x, y)[::-1]
+        >>> print(Unbraid.at(diagram, 0))
+        z @ Unbraid(x, y)
+        >>> print(Unbraid.at(diagram[::-1] >> diagram, 1))
+        z @ Braid(x, y) >> z @ Unbraid(x, y, inverse=True) \
+>> z @ Braid(x, y)[::-1]
+        >>> Unbraid.at(Braid(x, y) >> Braid(y, x), 0)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Layers 0 and 1 are not a braid and its \
+inverse.
+        """
+        factory_ = cls if cls.category is not None else cls[diagram.factory]
+        first, second = diagram.boxes[i:i + 2] if i + 1 < len(diagram)\
+            else (None, None)
+        if isinstance(first, Braid) and first[::-1] == second\
+                and diagram.offsets[i] == diagram.offsets[i + 1]:
+            x, y = (first.cod if first.is_dagger else first.dom)
+            step = factory_(x, y, inverse=first.is_dagger)
+            offset, wires = diagram.offsets[i], diagram.inside[i].dom
+            outside = wires[:offset], wires[offset + 2:]
+            return step.whisker(diagram[:i], diagram[i + 2:], *outside)
+        raise AxiomError(messages.NOT_A_BRAID_PAIR.format(i, i + 1))
 
 
 Id = Diagram.id

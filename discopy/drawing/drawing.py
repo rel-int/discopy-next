@@ -1005,6 +1005,47 @@ which to_drawing recomputes.
             node: position(node, p)
             for node, p in drawing.positions.items()}).resized(self, other, t)
 
+    def strands(self) -> dict[Node, int]:
+        """
+        The strand of each node that is not a box, the index of the input
+        wire it follows down through the crossings, i.e. the boxes drawn as
+        a braid or as wires, see :meth:`slide`: a box that is not a
+        crossing ends its strands, and the nodes under it are on none.
+
+        Example
+        -------
+        >>> from discopy.braided import Ty, Braid
+        >>> x, y = Ty('x'), Ty('y')
+        >>> drawing = (Braid(x, y) >> Braid(x, y)[::-1]).to_drawing()
+        >>> sorted((node.kind, node.i, node.j, k)
+        ...        for node, k in drawing.strands().items()
+        ...        if node.kind == "box_cod")
+        [('box_cod', 0, 0, 1), ('box_cod', 0, 1, 0), ('box_cod', 1, 0, 0), \
+('box_cod', 1, 1, 1)]
+        """
+        result = {}
+        for node in self.nodes:
+            if node.kind != "dom":
+                continue
+            k, queue = node.i, [node]
+            while queue:
+                current = queue.pop()
+                result[current] = k
+                for following in self.graph.successors(current):
+                    if following.kind != "box":
+                        queue.append(following)
+                        continue
+                    box = following.box
+                    if not (box.draw_as_braid or box.draw_as_wires):
+                        continue
+                    indices = box.permutation_indices\
+                        if box.draw_as_permutation else (1, 0)
+                    queue.append(Node(
+                        "box_cod", i=indices.index(current.i),
+                        j=following.j,
+                        x=box.cod[indices.index(current.i)]))
+        return result
+
     def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
         """
         The drawing with the width and height a fraction ``t`` of the way from

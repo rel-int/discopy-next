@@ -759,6 +759,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "monoidal.Interchange": 'c(M.Box("f", x, y), M.Box("g", y, x), True)',
     "rigid.Unsnake": "c(R.Ty(\"x\"), left=True)",
     "braided.Slide": 'c(B.Box("f", B.Ty("x"), B.Ty("y")), B.Ty("z"))',
+    "braided.Unbraid": 'c(B.Ty("x"), B.Ty("y"), inverse=True)',
 }
 
 
@@ -869,7 +870,7 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
-        "rewrite.Layer monoidal.Interchange braided.Slide rigid.Unsnake":
+        "rewrite.Layer monoidal.Interchange braided.{Slide,Unbraid} rigid.Unsnake":
         "a rewrite has no tree of its own yet, only that of a box",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
