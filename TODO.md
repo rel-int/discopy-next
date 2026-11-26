@@ -7,7 +7,7 @@
 > > the first example looks awesome but the others look weird: why are the diagrams inside squished? why is the chopped corner missing?
 
 - [x] Cut the variant's corner off a frame drawn top to bottom around its args, with its label in the corner opposite, as for a box (draft in the commit after this one)
-- [ ] Regenerate the baselines the frame corners and labels change, and test the cut corner of each variant of a frame and its reflection by Drawing.dagger
+- [WIP] @T-01a21910-172b-776c-90fa-049292bd4f49-2026-11-26 18:22 Regenerate the baselines the frame corners and labels change, and test the cut corner of each variant of a frame and its reflection by Drawing.dagger
 - [ ] Show toumix W, W[::-1], W.r and W[::-1].r in a 2x2 square for args on top of one another and side by side, each drawn at its own size
 - [x] Fall back for an arg without rotate in rigid.Box.to_drawing (Codex, discussion_r4712123856)
 - [x] Reserve the width of a frame's label when it moves to the corner (Codex, discussion_r4712123881)
