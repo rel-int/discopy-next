@@ -8,4 +8,4 @@
 
 - [WIP] @T-dfc2c559-2026-11-26 16:59 publish the notebooks the `docs` job renders on `main` to a branch, from a job of its own with write access
 - [WIP] @T-dfc2c559-2026-11-26 16:59 embed that branch's HTML in the Read the Docs build instead of the link pages, without running any notebook there
-- [ ] docs, tests and changelog
+- [WIP] @T-dfc2c559-2026-11-26 16:59 docs, tests and changelog
