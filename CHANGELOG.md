@@ -610,8 +610,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `abc.PivotalCategory.trace_duals` says, the feedback of a delayed memory
   stays a `Feedback` box, and `abc.HypergraphCategory.spider_delay` says the
   delay preserves spiders. A functor into a codomain whose delay is the
-  identity, e.g. `Tensor`, sends a delayed box its `ar_map` does not map to
-  the image of the box. A
+  identity, e.g. `Tensor`, sends a delayed box that is not a key of its
+  `ar_map` to the image of the box itself. A
   category whose trace is not a box, e.g. tensors, circuits or optyx
   channels, takes `Diagram.dual_trace` as its `trace_factory`.
   `linear.symmetric` takes the swap for the exchange and `linear.markov` the

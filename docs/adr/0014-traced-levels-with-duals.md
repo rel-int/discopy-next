@@ -34,7 +34,7 @@ pivotal with time steps?", and the identity delay moved to the semantics.
   `Feedback` box, not reduced through cups.
 - The identity delay is a property of semantics, as the identity twist is: `Tensor`, `Matrix`
   and the like keep it, and a functor into them sends a time step to the identity, mapping a
-  delayed box that its `ar_map` does not map as the box itself. A functor into a codomain with
+  delayed box that is not a key of its `ar_map` as the box itself. A functor into a codomain with
   a delay of its own keeps the time steps.
 - `Head`, `Tail` and `FollowedBy` are carried down; a functor into a codomain without streams
   raises on them, as it did on a trace.
@@ -60,7 +60,9 @@ pivotal with time steps?", and the identity delay moved to the semantics.
   C3; `ribbon.DualRail` dispatches on `balanced.Braid` to keep sending it to dual rail braids.
 - A trace rotates, a delayed feedback does not: the rotation and adjunction of pivotal
   diagrams fail on a `Feedback` box, as they did before.
-- Delay zero and no delay are not told apart yet: a time step is an `int`, zero by default.
+- A wire or a box with a time step of its own is not told apart from one with no delay: its
+  time step is an `int`, zero by default. Only a structural box, e.g. a `Feedback`, reads
+  `time_step is None`, as it has none of its own.
 - No `letrec`: a cycle in a term is the push-before-pop of the relational machine calculus,
   [#734](https://github.com/rel-int/discopy-next/pull/734).
 

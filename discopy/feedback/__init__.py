@@ -275,6 +275,7 @@ In the category of streams, this is just the identity.
 from __future__ import annotations
 
 from copy import copy
+from collections.abc import Mapping
 from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
@@ -1311,8 +1312,9 @@ class Functor(monoidal.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
     and traces. Into a codomain whose delay is the identity, e.g.
-    :class:`discopy.tensor.Tensor`, a delayed box that :code:`ar_map` does
-    not map goes to the image of the box itself, as its delay does.
+    :class:`discopy.tensor.Tensor`, a delayed box that is not a key of a
+    mapping :code:`ar_map` goes to the image of the box itself, as its
+    delay does; a callable :code:`ar_map` gets the delayed box.
 
     Parameters:
         ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
@@ -1394,11 +1396,10 @@ class Functor(monoidal.Functor):
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),
                 mem=self(other.mem), **left)
-        if isinstance(other, Box) and other.time_step:
-            try:
-                return super().__call__(other)
-            except KeyError:
-                return self(other.reset())
+        if isinstance(other, Box) and other.time_step\
+                and isinstance(self.ar_map.mapping, Mapping)\
+                and other not in self.ar_map.mapping:
+            return self(other.reset())
         return super().__call__(other)
 
 
