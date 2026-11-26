@@ -31,8 +31,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   representations of a finite group that commute with it, with one weight per
   orbit of the group on pairs of points: `tying` is the orbit of each pair,
   `Dense` the layer on tensors with channels, `layer` the layer as a
-  parametric map of `neural` networks and `equivariance` the distance of a
-  function to commuting with the group ([next#740]).
+  parametric map of `neural` networks, `equivariance` the distance of a
+  function to commuting with the group and `check` the group two actions
+  share ([next#740]).
 
 - `neural.factorised` computes equivariant layers along the construction of
   the group instead of on a dense matrix, checked equal to `Dense` in outputs
@@ -48,7 +49,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `neural.factorised.Factor` has cyclic factors, so that `Kronecker` computes
   the layers of the cyclic groups and of their products with chains as a
   correlation along the cyclic axes, directly or by the fast Fourier transform
-  from `Kronecker.fft_from` points ([next#740]).
+  from `Kronecker.fft_from`, 96 points ([next#740]).
 
 - `neural.factorised.Partitions` computes the equivariant layers of a
   symmetric group between its natural action and its tensor square, in either
@@ -86,38 +87,29 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   recursive networks of Categorical Deep Learning, Appendix J
   ([next#740]).
 
-- `neural.datatype` has `Machine`, a Mealy, Moore or unfolding cell with its
+- `neural.machine` has `Machine`, a Mealy, Moore or unfolding cell with its
   feedback and its unrolling through `discopy.stream`, and `Coalgebra`, one
   image for each box of the cell whose unrolled image is tied by one copy of
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#740]).
 
-- `neural.datatype` has `Algebra.lift`, `Algebra.lift_cell`, `Algebra.unitality` and
-  `Algebra.associativity`, the free monad on parametric maps and the cells of
-  the lax algebra of an algebra with a parameter, `Datatype.substitute` and
+- `neural.datatype` has `Algebra.lift`, `Algebra.lift_reparam`, `Algebra.unitality`
+  and `Algebra.associativity`, the free monad on parametric maps and the
+  2-cells of the lax algebra of an algebra with a parameter, `Datatype.substitute` and
   `plug`, the multiplication of the free monad, and `LaxHomomorphism`, the
   folds of a datatype given by a map from the parameter to itself and the
   parameter of the algebra, whose axioms are checked as equations: the
   squares of Categorical Deep Learning, Appendix F and J, the copy being the
   tied fold ([next#740]).
 
-- `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
-  between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
-  `then`, horizontal composition `>>` and `@`, and `is_invertible`;
-  `para.UpToPermutation` compares maps up to the permutations of their
-  parameters and of their coparameters, decided by `para.isomorphic`, an
-  isomorphism of hypergraphs that keeps the boundary in order, so that the
-  laws of every para category that failed for want of a reparametrisation
-  now hold modulo it ([next#740]).
-
-- `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
-  between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
-  `then`, horizontal composition `>>` and `@`, and `is_invertible`;
-  `para.UpToPermutation` compares maps up to the permutations of their
-  parameters and of their coparameters, decided by `para.isomorphic`, an
-  isomorphism of hypergraphs that keeps the boundary in order, so that the
-  laws of every para category that failed for want of a reparametrisation
-  now hold modulo it ([next#740]).
+- `para.Reparam` is a 2-cell of parametric maps as data, a reparametrisation
+  between parallel maps, with `Reparam.of(f, r)` the 2-cell of `f.reparam(r)`,
+  `Reparam.id`, vertical composition `then`, horizontal composition `>>` and
+  `@`, and `is_invertible`; `para.UpToPermutation` compares maps up to the
+  permutations of their parameters and of their coparameters, decided by
+  `para.isomorphic`, an isomorphism of hypergraphs that keeps the boundary in
+  order, so that the laws of every para category that failed for want of a
+  reparametrisation now hold modulo it ([next#740]).
 
 - `neural.network.Unroll(rounds, sequence=True)`, and the `sequence` option of
   `Network.unroll`, `to_function` and `to_lens`, read a trace as a stream: the
@@ -2801,7 +2793,6 @@ for the changelog of `1.2.1` and earlier.
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#740]: https://github.com/rel-int/discopy-next/pull/740
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
-[next#740]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#723]: https://github.com/rel-int/discopy-next/pull/723
