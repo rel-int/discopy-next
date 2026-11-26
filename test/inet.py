@@ -142,7 +142,7 @@ def test_from_hypergraph_and_custom_roundtrip():
 
     custom_hg = Box("f", x, x @ x @ x).to_hypergraph()
     decoded = Net.from_hypergraph(custom_hg)
-    assert decoded.to_hypergraph() == custom_hg
+    assert decoded.to_hypergraph(n_dom=1) == custom_hg
 
 
 def test_lafont_fig_11():

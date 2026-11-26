@@ -2,9 +2,9 @@
 
 """
 Interaction nets :cite:p:`Lafont97`, checked against double-pushout rewriting
-in :mod:`discopy.hypergraph`, and their Geometry of Interaction token machine,
-checked against :func:`discopy.interaction.Int` over
-:class:`discopy.python.additive.Function`.
+in :mod:`discopy.hypergraph`, and their Geometry of Interaction token machine
+:cite:p:`JoyalEtAl96,Abramsky96`, checked against
+:func:`discopy.interaction.Int` over :class:`discopy.python.additive.Function`.
 
 A :class:`Signature` gives each :class:`Symbol` an auxiliary arity and maps
 active pairs of symbols to right-hand-side nets. A :class:`Net` stores its
@@ -34,6 +34,8 @@ Summary
         :toctree:
 
         combinators
+        int_cell
+        int_path
 
 Example
 -------
@@ -55,11 +57,14 @@ steps, matching the double-pushout normal form of
 
 from __future__ import annotations
 
+import functools
+import operator
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Literal, Self
 
-from discopy import frobenius, hypergraph
+from discopy import frobenius, hypergraph, interaction
+from discopy.python import additive
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,10 @@ Rules = (
     | Callable[[Symbol, Symbol], "Net | None"]
 )
 Endpoint = int | tuple[int, int]
+Context = tuple[tuple[int, ...], tuple[int, ...]]
+PathResult = tuple[int, Context] | Literal["erased", "undefined"]
+
+UNLABELLED_COMBINATORS = frozenset({Symbol("γ"), Symbol("δ"), Symbol("ε")})
 
 
 class Signature:
@@ -136,20 +145,15 @@ class Signature:
     """
 
     def __init__(
-        self,
-        arities: Arities,
-        rules: Rules | None = None,
-        symbols: Iterable[Symbol | str] = (),
-        expr: str | None = None,
+        self, arities: Arities, rules: Rules | None = None,
+        symbols: Iterable[Symbol | str] = (), expr: str | None = None,
     ):
         if isinstance(arities, Mapping):
             self.arities: Mapping[Symbol, int] | Callable[[Symbol], int] = {
-                Symbol.cast(k): int(v) for k, v in arities.items()
-            }
+                Symbol.cast(k): int(v) for k, v in arities.items()}
             default_symbols = tuple(self.arities.keys())
         else:
-            self.arities = arities
-            default_symbols = ()
+            self.arities, default_symbols = arities, ()
         if rules is None:
             self.rules: (
                 Mapping[tuple[Symbol, Symbol], Net]
@@ -158,8 +162,7 @@ class Signature:
         elif isinstance(rules, Mapping):
             self.rules = {
                 (Symbol.cast(a), Symbol.cast(b)): rhs
-                for (a, b), rhs in rules.items()
-            }
+                for (a, b), rhs in rules.items()}
         else:
             self.rules = rules
         chosen = tuple(Symbol.cast(s) for s in symbols)
@@ -516,6 +519,172 @@ class Net:
         has_unlabelled = Symbol("δ") in arities
         return combinators(labels if labels and not has_unlabelled else None)
 
+    def port_table(self) -> tuple[list[int], list[int]]:
+        """Return ``(cell_of, slot_of)`` arrays over all ports of the net."""
+        cell_of = [-1] * len(self.link)
+        slot_of = [-1] * len(self.link)
+        for cell_idx, cports in enumerate(self.ports):
+            for slot, p in enumerate(cports):
+                cell_of[p] = cell_idx
+                slot_of[p] = slot
+        return cell_of, slot_of
+
+    def has_vicious_circle(self) -> bool:
+        """
+        Whether the directed ``principal -> auxiliary`` graph has a cycle
+        (Lafont's vicious circle :cite:p:`Lafont97`).
+        """
+        cell_of, slot_of = self.port_table()
+        state = [0] * len(self.cells)
+        for start in range(len(self.cells)):
+            curr = start
+            while curr >= 0 and state[curr] == 0:
+                state[curr] = 1
+                target = self.link[self.ports[curr][0]]
+                curr = cell_of[target] if slot_of[target] > 0 else -1
+            if curr >= 0 and state[curr] == 1:
+                return True
+            walk = start
+            while walk >= 0 and state[walk] == 1:
+                state[walk] = 2
+                target = self.link[self.ports[walk][0]]
+                walk = cell_of[target] if slot_of[target] > 0 else -1
+        return False
+
+    def assert_unlabelled_combinators(self) -> None:
+        """Raise ``ValueError`` unless every cell is ``γ``, ``δ`` or ``ε``."""
+        for sym in self.cells:
+            if sym not in UNLABELLED_COMBINATORS:
+                raise ValueError(
+                    f"Token machine requires unlabelled γ/δ/ε, got {sym!r}.")
+
+    def path(
+        self, port: int, context: Context = ((), ())
+    ) -> PathResult:
+        r"""
+        Trace a Geometry of Interaction token entering free ``port`` with
+        ``context`` ``(gamma_stack, delta_stack)`` over ``{1, 2}``.
+
+        Entering ``γ`` or ``δ`` at auxiliary ``i`` pushes ``i`` onto that
+        symbol's stack and leaves by the principal port; entering at the
+        principal port pops ``a`` and leaves by auxiliary ``a`` (or returns
+        ``"undefined"`` if empty); entering ``ε`` returns ``"erased"``.
+
+        Example
+        -------
+        An identity wire forwards any token unchanged, and a ``γ``-``γ``
+        active pair pushes then pops to yield the same path as its normal form:
+
+        >>> sig = combinators()
+        >>> wire = Net.from_wires(sig, [], [(0, 1)])
+        >>> wire.path(0, ((1,), ()))
+        (1, ((1,), ()))
+        >>> pair = Net.from_wires(sig, ['γ', 'γ'], [
+        ...     ((0, 0), (1, 0)),
+        ...     (0, (0, 1)), (1, (0, 2)),
+        ...     (2, (1, 1)), (3, (1, 2)),
+        ... ])
+        >>> assert pair.path(0) == pair.reduce().path(0) == (2, ((), ()))
+        """
+        self.assert_unlabelled_combinators()
+        if not 0 <= port < len(self.free):
+            raise ValueError(f"Invalid free port {port}.")
+        g_stack, d_stack = list(context[0]), list(context[1])
+        cell_of, slot_of = self.port_table()
+        current = self.link[port]
+        while current >= len(self.free):
+            cell_idx, slot = cell_of[current], slot_of[current]
+            sym = self.cells[cell_idx]
+            if sym == Symbol("ε"):
+                return "erased"
+            stack = d_stack if sym.name == "δ" else g_stack
+            if slot == 0:
+                if not stack:
+                    return "undefined"
+                branch = stack.pop()
+                current = self.link[self.ports[cell_idx][branch]]
+            else:
+                stack.append(slot)
+                current = self.link[self.ports[cell_idx][0]]
+        return (current, (tuple(g_stack), tuple(d_stack)))
+
+    def to_int(self) -> interaction.Diagram:
+        """
+        Compile an unlabelled combinator net into a morphism of
+        ``Int(python.additive.Function)``, composing :func:`int_cell` with
+        ``Int`` cups, caps and permutations.
+
+        Each free port has type ``T(X, X)`` with
+        ``X = additive.Function.ob(tuple)``, followed by one sink wire
+        ``T(X, O)`` carrying ``"erased"`` and ``"undefined"`` outcomes.
+
+        Example
+        -------
+        >>> sig = combinators()
+        >>> wire = Net.from_wires(sig, [], [(0, 1)])
+        >>> assert int_path(wire.to_int(), 0, ((2,), ())) == (1, ((2,), ()))
+        >>> pair = Net.from_wires(sig, ['γ', 'γ'], [
+        ...     ((0, 0), (1, 0)),
+        ...     (0, (0, 1)), (1, (0, 2)),
+        ...     (2, (1, 1)), (3, (1, 2)),
+        ... ])
+        >>> assert int_path(pair.to_int(), 1) == pair.path(1) == (3, ((), ()))
+        """
+        self.assert_unlabelled_combinators()
+        func = additive.Function
+        int_diag: Any = interaction.Diagram[func]
+        port_ty, sink_ty = int_port_and_sink()
+        n_free = len(self.free)
+        factors, items = self.int_factors(port_ty, sink_ty)
+        cell_cups = [
+            (u, self.link[u]) for u in range(n_free, len(self.link))
+            if u < self.link[u]]
+        n_sinks = max(1, len(self.cells))
+        desired = [
+            *(("port", u) for u in range(n_free)),
+            *(("port", end) for pair in cell_cups for end in pair),
+            *(("sink", idx) for idx in range(n_sinks))]
+        doms = [port_ty if kind == "port" else sink_ty for kind, _ in items]
+        perm = int_diag.permutation(
+            [items.index(target) for target in desired], doms)
+        closers: list[Any] = [
+            int_diag.id(port_ty ** n_free),
+            *(int_diag.cups(port_ty, port_ty) for _ in cell_cups),
+            int_diag.id(sink_ty) if n_sinks == 1 else int_diag(
+                func.merge(func.ob(tuple), n_sinks),
+                sink_ty ** n_sinks, sink_ty)]
+        return (
+            functools.reduce(operator.matmul, factors)
+            >> perm
+            >> functools.reduce(operator.matmul, closers))
+
+    def int_factors(
+        self, port_ty: interaction.Ty, sink_ty: interaction.Ty
+    ) -> tuple[list[Any], list[tuple[str, int]]]:
+        """Generator tensor factors and wire tags for :meth:`to_int`."""
+        int_diag: Any = interaction.Diagram[additive.Function]
+        n_free = len(self.free)
+        factors: list[Any] = []
+        items: list[tuple[str, int]] = []
+        for u, v in enumerate(self.link[:n_free]):
+            if u < v < n_free:
+                factors.append(int_diag.caps(port_ty, port_ty))
+                items.extend([("port", u), ("port", v)])
+        for cell_idx, sym in enumerate(self.cells):
+            factors.append(int_cell(sym))
+            for p in self.ports[cell_idx]:
+                target = self.link[p] if self.link[p] < n_free else p
+                items.append(("port", target))
+            items.append(("sink", cell_idx))
+        if not self.cells:
+            empty_fn = additive.Function(
+                lambda x, tag=0: x,
+                additive.Function.ob(), additive.Function.ob(tuple))
+            empty_dom = interaction.Ty[additive.Function.ob]()
+            factors.append(int_diag(empty_fn, empty_dom, sink_ty))
+            items.append(("sink", 0))
+        return factors, items
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Net):
             return False
@@ -659,6 +828,71 @@ class Rewriter:
             new_link[new_p] = port_map[self.link[old_p]]
         return Net(
             self.net.signature, new_cells, new_link, loops=self.loops)
+
+
+def int_port_and_sink() -> tuple[interaction.Ty, interaction.Ty]:
+    """Return ``(port_ty, sink_ty)`` in ``Int(python.additive.Function)``."""
+    func = additive.Function
+    state_ty, empty_ty = func.ob(tuple), func.ob()
+    int_ty = interaction.Ty[func.ob]
+    return int_ty(state_ty, state_ty), int_ty(state_ty, empty_ty)
+
+
+def int_cell(symbol: Symbol | str) -> interaction.Diagram:
+    """
+    Return the ``Int(python.additive.Function)`` morphism of a single
+    combinator cell ``γ``, ``δ`` or ``ε``.
+
+    Each port has type ``T(X, X)`` with ``X = additive.Function.ob(tuple)``,
+    followed by a sink ``T(X, O)`` for ``"erased"`` and ``"undefined"``.
+    """
+    sym = Symbol.cast(symbol)
+    if sym not in UNLABELLED_COMBINATORS:
+        raise ValueError(f"Unsupported combinator cell {sym!r}.")
+    func = additive.Function
+    state_ty = func.ob(tuple)
+    int_ty = interaction.Ty[func.ob]
+    int_diag: Any = interaction.Diagram[func]
+    port_ty, sink_ty = int_port_and_sink()
+    if sym == Symbol("ε"):
+        inside_eps = func(
+            lambda ctx, tag=0: (("erased",), 1), state_ty, state_ty ** 2)
+        return int_diag(inside_eps, int_ty(), port_ty @ sink_ty)
+    is_delta = sym.name == "δ"
+
+    def step(ctx: Context, tag: int = 0) -> tuple[Any, int]:
+        g_stack, d_stack = ctx
+        if tag == 2:
+            stack = d_stack if is_delta else g_stack
+            if not stack:
+                return (("undefined",), 3)
+            new_ctx = (
+                (g_stack, d_stack[:-1]) if is_delta
+                else (g_stack[:-1], d_stack))
+            return (new_ctx, stack[-1])
+        aux = 2 - tag
+        new_ctx = (
+            (g_stack, (*d_stack, aux)) if is_delta
+            else ((*g_stack, aux), d_stack))
+        return (new_ctx, 0)
+
+    inside = func(step, state_ty ** 3, state_ty ** 4)
+    return int_diag(inside, int_ty(), port_ty @ port_ty @ port_ty @ sink_ty)
+
+
+def int_path(
+    diagram: interaction.Diagram, port: int, context: Context = ((), ()),
+) -> PathResult:
+    """
+    Evaluate an ``Int(python.additive.Function)`` net morphism produced by
+    :meth:`Net.to_int` on a token entering free ``port`` with ``context``.
+    """
+    inside: Any = diagram.inside
+    n_free = len(inside.dom)
+    if not 0 <= port < n_free:
+        raise ValueError(f"Invalid free port {port} for {n_free} ports.")
+    out, out_tag = inside(context, n_free - 1 - port)
+    return out[0] if out_tag == n_free else (out_tag, out)
 
 
 def combinators(labels: Iterable[Any] | int | None = None) -> Signature:
