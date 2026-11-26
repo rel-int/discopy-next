@@ -558,12 +558,13 @@ def test_Bubble_dagger():
 def test_Bubble_every_level():
     from discopy import (
         spacial, feedback, braided, balanced, symmetric, markov, comarkov,
-        biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
+        closed, rigid, pivotal, ribbon, compact, frobenius)
     from discopy.lambek import pregroup, categorial, abstract
     for module in (
             spacial, feedback, braided, balanced, symmetric, markov,
-            comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
-            frobenius, pregroup, categorial, abstract):
+            comarkov, closed.monoidal, closed.symmetric, closed.markov,
+            rigid, pivotal, ribbon, compact, frobenius, pregroup, categorial,
+            abstract):
         x, y = module.Ty('x'), module.Ty('y')
         bubble = module.Box('f', x, y).bubble(name="N")
         assert type(bubble) is module.Box and bubble.args, module
@@ -1217,8 +1218,7 @@ def test_box_factory():
     circuits and the networks. """
     from discopy import (
         cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
-        pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
-        tensor)
+        pivotal, ribbon, closed, compact, frobenius, feedback, tensor)
     from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
@@ -1227,8 +1227,9 @@ def test_box_factory():
     assert network.Network.box_factory is network.Box
     for module in (
             monoidal, braided, balanced, symmetric, traced, markov, rigid,
-            pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
-            tensor, categorial, abstract, pregroup, zx):
+            pivotal, ribbon, closed.monoidal, closed.symmetric,
+            closed.markov, compact, frobenius, feedback, tensor, categorial,
+            abstract, pregroup, zx):
         assert module.Diagram.box_factory is module.Box, module
 
 
@@ -1337,13 +1338,13 @@ def test_one_output():
 
 
 def test_pack():
-    X, Y, Z = map(closed.Ty, "XYZ")
-    left, right = closed.Box('f', X, Y), closed.Box('g', X, Z)
+    X, Y, Z = map(closed.markov.Ty, "XYZ")
+    left, right = closed.markov.Box('f', X, Y), closed.markov.Box('g', X, Z)
     with raises(ValueError):
         TermBase.from_diagram(left @ right)
-    diagram = left @ right >> closed.Pack(Y * Z)
+    diagram = left @ right >> closed.markov.Pack(Y * Z)
     term = TermBase.from_diagram(diagram)
-    assert term.eval() == diagram and term.category is closed.Diagram
+    assert term.eval() == diagram and term.category is closed.markov.Diagram
     assert str(term.normal_form())\
         == "(X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))"
 

@@ -1890,7 +1890,7 @@ class CMap[category](
 
         Example
         -------
-        >>> from discopy.closed import Ty, Box, CMap
+        >>> from discopy.closed.markov import Ty, Box, CMap
         >>> x, y, z = map(Ty, "xyz")
         >>> f = Box("f", x @ y, z)
         >>> assert f.to_map().curry().to_compact()\\

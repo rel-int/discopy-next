@@ -63,7 +63,7 @@ Summary
 Axioms
 ------
 
-:meth:`discopy.biclosed.Diagram.curry` and
+:meth:`discopy.closed.monoidal.Diagram.curry` and
 :meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
@@ -88,9 +88,9 @@ from functools import cached_property, reduce
 from inspect import signature
 from typing import Callable, ClassVar, Dict, Self
 
-from discopy import monoidal, biclosed, markov, cmap, hypergraph, messages
+from discopy import closed, monoidal, markov, cmap, hypergraph, messages
 from discopy.abc import (
-    ClosedCategory, DaggerMonoidalCategory, MonoidalCategory)
+    ClosedMarkovCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
@@ -98,18 +98,18 @@ from discopy.utils import (
     AxiomError, assert_isinstance, factory_key, factory_name, from_tree)
 
 
-class Wire(biclosed.Wire):
+class Wire(closed.symmetric.Wire):
     """
-    A closed object is a biclosed object, see
-    :class:`discopy.feedback.closed.Wire` for one with a time step.
+    A closed Markov object is a symmetric closed object, see
+    :class:`discopy.feedback.closed.markov.Wire` for one with a time step.
     """
 
 
 @factory
-class Ty(biclosed.Ty):
+class Ty(closed.symmetric.Ty):
     """
-    A closed type is a biclosed type in a symmetric category where left and
-    right exponentials coincide, i.e. `X << Y == X ** Y == Y >> X`.
+    A closed Markov type is a symmetric closed type, i.e. where left and
+    right exponentials coincide, `X << Y == X ** Y == Y >> X`, with products.
 
     Applying a closed type to a function yields an :class:`Term` e.g.
 
@@ -155,7 +155,7 @@ class Ty(biclosed.Ty):
         return self.inside[0].factors
 
     @classmethod
-    def from_biclosed(cls, old: biclosed.Ty) -> Self:
+    def from_biclosed(cls, old: closed.monoidal.Ty) -> Self:
         """
         Translate a biclosed type into a closed type, collapsing left and
         right exponentials into a single exponential.
@@ -165,33 +165,20 @@ class Ty(biclosed.Ty):
 
         Example
         -------
-        >>> x, y = biclosed.Ty("x"), biclosed.Ty("y")
+        >>> x, y = closed.monoidal.Ty("x"), closed.monoidal.Ty("y")
         >>> assert Ty.from_biclosed(x << y) == Ty.from_biclosed(y >> x)
         """
-        return biclosed.Functor(
+        return closed.monoidal.Functor(
             ob_map=lambda x: cls(x.inside[0].name),
             cod=cls.constant_factory.functor.cod)(old)
 
 
-class Exp(Wire, biclosed.Exp):
+class Exp(Wire, closed.symmetric.Exp):
     """
-    An exponential object in a markov category, called with ``**``, ``<<``
-    or ``>>`` alike.
+    An exponential object in a closed Markov category, called with ``**``,
+    ``<<`` or ``>>`` alike.
     """
-
     ob = Ty
-
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        "The name of an exponential is its print, read when needed."
-        return Exp.__str__(self)
-
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"
-
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({self.base!r}, {self.exponent!r})"
 
 
 class Product(Wire):
@@ -301,9 +288,9 @@ class Unitype(Exp):
 
 
 @factory
-class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
+class Diagram(markov.Diagram, closed.symmetric.Diagram, ClosedMarkovCategory):
     """
-    A closed diagram is both a markov and a biclosed diagram.
+    A closed Markov diagram is both a markov and a symmetric closed diagram.
 
     A diagram applied to another post-composes their tensor with an `Eval`.
     """
@@ -326,12 +313,6 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     def is_linear(self):
         return all(box.is_linear for box in self.boxes)
 
-    @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left: bool = True):
-        if not exponent:
-            return cls.id(base)
-        return cls.eval_factory(exponent >> base, left=left)
-
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
@@ -339,8 +320,6 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         messages.CURRY_HAS_NO_DAGGER)
     dagger_monoidality_monoidal = DaggerMonoidalCategory.dagger_monoidality\
         .weaken(within=MonoidalCategory)
-    currying_symmetry = ClosedCategory.currying_symmetry.failing(
-        messages.FREE_CURRY)
 
     def to_term(self) -> Term:
         """
@@ -408,43 +387,21 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         return constant(args[0] if len(args) == 1 else Tuple(*args))
 
 
-class Box(markov.Box, biclosed.Box, Diagram):
-    "A closed box is a markov and biclosed box in a closed diagram."
+class Box(markov.Box, closed.symmetric.Box, Diagram):
+    "A closed Markov box is a markov and symmetric closed box."
     is_linear = True
 
 
-class Eval(biclosed.Eval, Box):
-    "The evaluation of an exponential type."
-    serialised_attrs = biclosed.Eval.serialised_attrs + ("*", )
-    drawing_name = "__call__"
-
-    def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle reads. """
-        return self.x, self.left
-
-    def __str__(self):
-        """
-        The name of the evaluation, with its side when it is on the right:
-        an exponential of a closed category is on either side, so its type
-        alone does not say which.
-
-        >>> x, y = Ty('x'), Ty('y')
-        >>> print(Eval(x << y, left=False))
-        Eval(y >> x, left=False)
-        """
-        return self.name if self.left else self.name[:-1] + ", left=False)"
+class Eval(closed.symmetric.Eval, Box):
+    "The evaluation of an exponential type in a closed Markov diagram."
 
 
-class Coeval(biclosed.Coeval, Box):
+class Coeval(closed.symmetric.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
-    serialised_attrs = biclosed.Coeval.serialised_attrs + ("*", )
-    __getnewargs__ = Eval.__getnewargs__
-    __str__ = Eval.__str__
 
 
-class Curry(biclosed.Curry, Box):
-    "The currying of a closed diagram, linear when its argument is."
-    serialised_attrs = biclosed.Curry.serialised_attrs
+class Curry(closed.symmetric.Curry, Box):
+    "The currying of a closed Markov diagram, linear when its argument is."
 
     @property
     def is_linear(self):
@@ -453,9 +410,6 @@ class Curry(biclosed.Curry, Box):
     def __getnewargs__(self):
         """ The arguments of the constructor, which a pickle reads. """
         return self.arg, self.n, self.left
-
-    def __str__(self):
-        return self.name
 
 
 class Pack(Box):
@@ -536,14 +490,14 @@ class Function(markov.Function, Box):
     is_linear = False
 
 
-class Permutation(markov.Permutation, Box):
+class Permutation(markov.Permutation, closed.symmetric.Permutation, Box):
     "A permutation in a closed diagram."
 
 
 Function.register(Permutation)
 
 
-class Swap(Permutation, markov.Swap, Box):
+class Swap(Permutation, markov.Swap, closed.symmetric.Swap, Box):
     "Symmetric swap in a closed diagram."
 
 
@@ -555,7 +509,7 @@ class Discard(markov.Discard, Copy):
     "A markov discard in a closed category."
 
 
-class Sum(markov.Sum, biclosed.Sum, Box):
+class Sum(markov.Sum, closed.symmetric.Sum, Box):
     """
     A markov sum is a symmetric sum and a markov box,
     linear when every term is.
@@ -570,7 +524,7 @@ class Sum(markov.Sum, biclosed.Sum, Box):
         return all(term.is_linear for term in self.terms)
 
 
-class Functor(biclosed.Functor, markov.Functor):
+class Functor(closed.symmetric.Functor, markov.Functor):
     """
     A closed functor is a markov functor that preserves evaluation, currying
     and packing. When the codomain has no products, i.e. its objects have no
@@ -634,7 +588,7 @@ Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Id = Diagram.id
 
 
-class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
+class TermBase(Box, closed.monoidal.TermBase, closed.monoidal.Normalising):
     """
     A term in the internal language of a closed category, i.e. a lambda term
     which need not be linear: this module implements closed markov categories
@@ -730,7 +684,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         return permutation >> functor.cod.id(functor(self.dom)) @ discard
 
     def share(self, functor: Functor,
-              *contexts: list[biclosed.Variable]) -> Diagram:
+              *contexts: list[closed.monoidal.Variable]) -> Diagram:
         """
         The structural morphism from the image of the free variables of the
         term to that of the concatenation of ``contexts``, copying each
@@ -787,7 +741,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         return self
 
     @classmethod
-    def from_biclosed(cls, term: biclosed.TermBase) -> Term:
+    def from_biclosed(cls, term: closed.monoidal.TermBase) -> Term:
         """
         Translate a biclosed term into a closed term, dropping planarity by
         collapsing left and right exponentials and applications.
@@ -803,16 +757,16 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
 
         Example
         -------
-        >>> X, Y = biclosed.Ty("X"), biclosed.Ty("Y")
+        >>> X, Y = closed.monoidal.Ty("X"), closed.monoidal.Ty("Y")
         >>> g, x = (Y << X)("g"), X("x")
         >>> print(TermBase.from_biclosed(g(x)))
         g(x)
         """
-        functor = biclosed.Functor(
+        functor = closed.monoidal.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
             ar_map=lambda c: cls.ob.constant_factory(
                 c.name, functor(c.cod), data=c.data),
-            dom=biclosed.Diagram, cod=cls.functor.cod)
+            dom=closed.monoidal.Diagram, cod=cls.functor.cod)
         return functor(term)
 
     @classmethod
@@ -822,7 +776,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         :meth:`generate`.
 
         Parameters:
-            params : Passed to :meth:`biclosed.TermBase.shapes`.
+            params : Passed to :meth:`closed.monoidal.TermBase.shapes`.
         """
         return super().strategy(**params)
 
@@ -831,9 +785,10 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
     def generate(  # a shape, a naming and whether it takes constants
             cls, cod, choices, types, letters, constants=True):
         """
-        Build a term as :meth:`biclosed.TermBase.generate` does, except
-        that a closed term need not be linear: its :class:`biclosed.Sampler`
-        may use a bound variable any number of times, or not at all.
+        Build a term as :meth:`closed.monoidal.TermBase.generate` does, except
+        that a closed term need not be linear: its
+        :class:`closed.monoidal.Sampler` may use a bound variable any number
+        of times, or not at all.
 
         Example
         -------
@@ -844,7 +799,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         >>> print(TermBase.generate(Y << X, [4, 0], [X], "x"))
         X(lambda x0: c0)
         """
-        return biclosed.Sampler(
+        return closed.monoidal.Sampler(
             cls, iter(choices), types, letters, linear=False,
             constants=constants).term(cod)
 
@@ -925,14 +880,14 @@ type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
 
 
-class Constant(TermBase, biclosed.Constant):
+class Constant(TermBase, closed.monoidal.Constant):
     """
     A constant term, evaluated in a context by discarding it. It prints as
     its bare name, so that terms read like textbook effectful lambda
     calculus and ``eval(str(term)) == term`` under the obvious variable
     naming convention, e.g. ``query = (E >> E)("query")``.
     """
-    serialised_attrs = biclosed.Constant.serialised_attrs
+    serialised_attrs = closed.monoidal.Constant.serialised_attrs
 
     def __str__(self):
         return self.name
@@ -944,12 +899,12 @@ class Constant(TermBase, biclosed.Constant):
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
         return self.weaken(functor, context)\
-            >> biclosed.Constant.eval(self, functor)
+            >> closed.monoidal.Constant.eval(self, functor)
 
 
-class Variable(TermBase, biclosed.Variable):
+class Variable(TermBase, closed.monoidal.Variable):
     "A variable, evaluated in a context by discarding the other variables."
-    serialised_attrs = biclosed.Variable.serialised_attrs
+    serialised_attrs = closed.monoidal.Variable.serialised_attrs
 
     def eval(self, functor=None, context=None):
         return self.weaken(functor or self.functor, context)
@@ -961,7 +916,7 @@ class Variable(TermBase, biclosed.Variable):
         return substitution.inside.get(self, self)
 
 
-class Application(TermBase, biclosed.Application):
+class Application(TermBase, closed.monoidal.Application):
     """
     The application ``function(argument)`` of a term to another.
 
@@ -969,13 +924,13 @@ class Application(TermBase, biclosed.Application):
         overlap : The variables free in both ``function`` and ``argument``,
             which :meth:`eval` copies.
     """
-    serialised_attrs = biclosed.Application.serialised_attrs
+    serialised_attrs = closed.monoidal.Application.serialised_attrs
     function: Term
     argument: Term
 
     def __init__(self, function: Term, argument: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
-        biclosed.Application.__init__(self, function, argument)
+        closed.monoidal.Application.__init__(self, function, argument)
 
     def __check_dom__(self, func, args, left):
         self.overlap = [x for x in func.freevars if x in args.freevars]
@@ -1006,18 +961,18 @@ class Application(TermBase, biclosed.Application):
             self.argument.substitute(substitution))
 
 
-class Abstraction(TermBase, biclosed.Abstraction):
+class Abstraction(TermBase, closed.monoidal.Abstraction):
     """
     The abstraction ``var.cod(lambda var: body)`` of a variable in a term,
     which need not occur in it or may occur several times.
     """
-    serialised_attrs = biclosed.Abstraction.serialised_attrs
+    serialised_attrs = closed.monoidal.Abstraction.serialised_attrs
     var: Variable
     body: Term
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
-        biclosed.Abstraction.__init__(self, var, body)
+        closed.monoidal.Abstraction.__init__(self, var, body)
 
     def __check_dom__(self):
         self.freevars = [x for x in self.body.freevars if x != self.var]
@@ -1058,7 +1013,7 @@ class Compound(TermBase):
         dom : The domain of the term, i.e. the types of its free variables.
         cod : The codomain of the term.
     """
-    def __init__(self, dom: biclosed.Ty, cod: biclosed.Ty):
+    def __init__(self, dom: closed.monoidal.Ty, cod: closed.monoidal.Ty):
         super().__init__(type(self).__name__, dom, cod)
         del self.name
 
@@ -1320,7 +1275,7 @@ class Let(Compound):
         return f"let({self.expression}, lambda{params}: {self.body})"
 
     @property
-    def rest(self) -> list[biclosed.Variable]:
+    def rest(self) -> list[closed.monoidal.Variable]:
         "The free variables of the body that the statement does not bind."
         return [x for x in self.freevars if x in self.body.freevars]
 

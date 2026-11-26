@@ -715,22 +715,25 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "linear.monoidal.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
     "linear.monoidal.Exchange": "c(x, y, True)",
     "linear.monoidal.Laxator": "c(x, y)",
-    "biclosed.{Eval,Coeval}": "c(x << y)",
-    "closed.{Eval,Coeval}": "c(x << y)",
-    "feedback.closed.{Eval,Coeval}": "c(x << y, time_step=1)",
-    "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
-    "feedback.closed.Curry":
+    "closed.monoidal.{Eval,Coeval}": "c(x << y)",
+    "closed.symmetric.{Eval,Coeval} closed.markov.{Eval,Coeval}": "c(x << y)",
+    "feedback.closed.markov.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "closed.{monoidal,symmetric,markov}.Curry":
+    "c(box(c, x @ y, x, v), 1, False)",
+    "feedback.closed.markov.Curry":
     "c(box(c, x @ y, x, v), 1, False, time_step=1)",
-    "biclosed.Constant": 'c("c", x, data=v)',
-    "{closed,lambek.categorial}.Constant {biclosed,closed}.Variable":
+    "closed.monoidal.Constant": 'c("c", x, data=v)',
+    "{closed.markov,lambek.categorial}.Constant "
+    "closed.{monoidal,markov}.Variable":
     'c("c", x)',
-    "{biclosed,closed}.Application lambek.categorial.FA": "c(f, a)",
-    "{biclosed,closed,lambek.categorial}.Abstraction": "c(u, f(u))",
-    "closed.{Pack,Unpack}": "c(x * y)",
-    "feedback.closed.{Pack,Unpack}": "c(x * y, 1)",
-    "closed.Tuple": "c(a, u)",
-    "closed.Projection": "c(closed.Tuple(a, u), 1)",
-    "closed.Let": "c(closed.Tuple(a), [u], u)",
+    "closed.{monoidal,markov}.Application lambek.categorial.FA": "c(f, a)",
+    "{closed.monoidal,closed.markov,lambek.categorial}.Abstraction":
+    "c(u, f(u))",
+    "closed.markov.{Pack,Unpack}": "c(x * y)",
+    "feedback.closed.markov.{Pack,Unpack}": "c(x * y, 1)",
+    "closed.markov.Tuple": "c(a, u)",
+    "closed.markov.Projection": "c(closed.markov.Tuple(a, u), 1)",
+    "closed.markov.Let": "c(closed.markov.Tuple(a), [u], u)",
     "lambek.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
     "lambek.categorial.{FTR,BTR}": "c(y, a)",
     "lambek.categorial.TypeRaising": "c(y, a, y << (x >> y))",
@@ -843,19 +846,20 @@ BROKEN = {
         "*.Cofunction": "it keeps its cofunc in an op",
         "*.Cospan": "it keeps left and right as legs",
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
-        "{closed,feedback.closed}.{Pack,Unpack}":
+        "{closed.markov,feedback.closed.markov}.{Pack,Unpack}":
         "it is built from its type alone",
     },
     "dagger": {
         "*.{Constant,Variable,Abstraction,Application} "
-        "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
+        "closed.markov.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
-        "{closed,markov,lambek.abstract,feedback.closed,feedback.markov}"
+        "{closed.markov,markov,lambek.abstract,feedback.closed.markov,"
+        "feedback.markov}"
         ".{Copy,Discard,Function} "
         "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
         "its category has no dagger",
@@ -1092,12 +1096,12 @@ def test_terms_of_a_level(level, structure):
 
 
 def test_terms_from_biclosed_up():
-    from discopy import biclosed, compact, symmetric
+    from discopy import closed, compact, symmetric
     x = compact.Ty('x')
     diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
     term = diagram.to_term()
     assert type(term) is symmetric.Kappa and term.eval() == diagram
-    assert type(x(lambda a: a)) is biclosed.Abstraction
+    assert type(x(lambda a: a)) is closed.monoidal.Abstraction
 
 
 def test_term_laws():

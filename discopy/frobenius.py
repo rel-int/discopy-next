@@ -1009,6 +1009,8 @@ CMap = cmap.CMap[Diagram]
 
 Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
     feedback.structural_boxes(Diagram, Box)
+for name in ("map_agreement", "term_factory"):
+    setattr(Diagram, name, vars(markov.Diagram)[name])
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

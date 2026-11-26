@@ -850,7 +850,7 @@ class Normalising(Testable):
     """
     The laws of beta reduction, for terms with a ``normal_form`` reached by
     each of their :attr:`reduction_strategies`, e.g.
-    :class:`discopy.closed.TermBase`.
+    :class:`discopy.closed.markov.TermBase`.
     """
     reduction_strategies: ClassVar[tuple] = ()
 
@@ -950,7 +950,7 @@ class TermBase(Box, AlphaEquivalence):
         """
         Translate the term into the internal language of a closed category.
         """
-        from discopy.closed import TermBase
+        from discopy.closed.markov import TermBase
         return TermBase.from_biclosed(self)
 
     def __call__(self, other, left=False):

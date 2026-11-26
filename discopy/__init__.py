@@ -12,7 +12,6 @@ from discopy import (
     spacial,
     braided,
     symmetric,
-    biclosed,
     linear,
     rigid,
     pivotal,

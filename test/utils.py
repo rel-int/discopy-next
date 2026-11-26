@@ -113,10 +113,10 @@ def test_named_generic_pickle_subscript():
 
 def test_deprecated_ob():
     from discopy import (
-        biclosed, braided, compact, feedback, frobenius, pivotal, rigid)
+        braided, closed, compact, feedback, frobenius, pivotal, rigid)
     from discopy.lambek import pregroup
     from discopy.quantum import circuit
-    for module in (rigid, braided, biclosed, pivotal, frobenius, feedback,
+    for module in (rigid, braided, closed.monoidal, pivotal, frobenius, feedback,
                    circuit, pregroup, compact):
         with warns(DeprecationWarning):
             assert module.Ob is module.Wire
@@ -125,9 +125,9 @@ def test_deprecated_ob():
 
 
 def test_wire_tree_roundtrip():
-    from discopy import biclosed, braided, feedback, frobenius, pivotal, rigid
+    from discopy import closed, braided, feedback, frobenius, pivotal, rigid
     from discopy.quantum import circuit
-    for x in (rigid.Wire('x'), braided.Wire('x'), biclosed.Wire('x'),
+    for x in (rigid.Wire('x'), braided.Wire('x'), closed.monoidal.Wire('x'),
               pivotal.Wire('x'), frobenius.Wire('x'), feedback.Wire('x'),
               circuit.Digit(2)):
         assert from_tree(x.to_tree()) == x
@@ -179,12 +179,12 @@ def test_MappingOrCallable():
 
 def test_value_errors_have_messages():
     from discopy import closed, lens, symmetric
-    x, y = closed.Ty('x'), closed.Ty('y')
+    x, y = closed.markov.Ty('x'), closed.markov.Ty('y')
     for function, message in [
             (lambda: rigid.Box('f', 'x', 'y').curry(2), "split 2"),
-            (lambda: closed.Box('f', x, y).uncurry(), "exponential"),
-            (lambda: closed.Box('f', x, y << x @ x).uncurry(1), "uncurry 1"),
-            (lambda: closed.Box('f', x, y << x).uncurry(-1), "split -1"),
+            (lambda: closed.markov.Box('f', x, y).uncurry(), "exponential"),
+            (lambda: closed.markov.Box('f', x, y << x @ x).uncurry(1), "uncurry 1"),
+            (lambda: closed.markov.Box('f', x, y << x).uncurry(-1), "split -1"),
             (lambda: lens.Symmetric[symmetric.Diagram].permutation(
                 [0, 0], [x, x]), "permutation"),
             (lambda: pushout(2, 3, [1], [0, 1]), "equal length"),
@@ -504,7 +504,7 @@ def test_unbiased_keyword_operand():
 
 DETERMINISTIC_HASHES = """
 from discopy import (cat, monoidal, symmetric, markov, comarkov, frobenius,
-                     biclosed, closed, rigid, tensor, matrix, python, testable)
+                     closed, rigid, tensor, matrix, python, testable)
 x, y = monoidal.Ty('x'), monoidal.Ty('y')
 f = monoidal.Box('f', x, y)
 g = cat.Box('f', cat.Ob('x'), cat.Ob('y'))
@@ -515,8 +515,8 @@ print([hash(value) for value in (
     markov.Copy(markov.Ty('x')), comarkov.Merge(comarkov.Ty('x')),
     frobenius.Spider(1, 2, frobenius.Ty('x')),
     rigid.Cup(rigid.Ty('x'), rigid.Ty('x').r),
-    biclosed.Ty('x') >> biclosed.Ty('y'),
-    closed.Ty('x') >> closed.Ty('y'), matrix.NumPy(),
+    closed.monoidal.Ty('x') >> closed.monoidal.Ty('y'),
+    closed.markov.Ty('x') >> closed.markov.Ty('y'), matrix.NumPy(),
     tensor.Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]),
     monoidal.List[type](int, str), python.Ty(int, str),
     testable.Equation(g, g.dagger()))])

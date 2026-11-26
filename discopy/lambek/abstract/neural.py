@@ -554,7 +554,7 @@ class Parser(nn.Module):
         >>> net = parser.search(
         ...     ["Alice", "loves", "Bob"], torch.zeros(3, 8), k=2, width=2)
         >>> net.sequent.goal
-        lambek.abstract.Ty(closed.Wire('s'))
+        lambek.abstract.Ty(closed.markov.Wire('s'))
         """
         mask = states.new_ones(1, len(states), dtype=torch.bool)
         beams = self.tagger.beam(states[None], mask, k=k, atoms=atoms)

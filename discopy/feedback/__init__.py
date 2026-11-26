@@ -14,7 +14,7 @@ This package is the monoidal level, its submodules the levels of the
 hierarchy with feedback, each subclassing the ordinary module of the same
 name: :mod:`~discopy.feedback.balanced`, :mod:`~discopy.feedback.symmetric`
 for the usual notion of trace, :mod:`~discopy.feedback.markov` for the syntax
-of streams, :mod:`~discopy.feedback.comarkov` and
+of streams, :mod:`~discopy.feedback.comarkov` and the package
 :mod:`~discopy.feedback.closed`. The ordinary modules are not feedback
 categories, except :mod:`~discopy.pivotal` and the levels below it, whose
 wires still carry a time step. Note that these diagrams are planar, so that

@@ -83,8 +83,8 @@ while the operations on morphisms swap the parameters out of the way,
 the same as :meth:`Traced.trace`:
 
 >>> from discopy import closed
->>> a, b, c, P = map(closed.Ty, "abcP")
->>> k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
+>>> a, b, c, P = map(closed.markov.Ty, "abcP")
+>>> k = Closed(a @ b, c, closed.markov.Box('k', a @ b @ P, c), P)
 >>> assert k.curry(left=True).cod == c << b
 >>> assert k.curry(left=False).cod == a >> c
 
@@ -169,7 +169,8 @@ from discopy.feedback import markov as feedback_markov
 from discopy.feedback import symmetric as traced
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
-    ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
+    ClosedCategory, ClosedMarkovCategory, ComarkovCategory, CompactCategory,
+    FeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, factory_name,
@@ -480,7 +481,7 @@ class Comarkov(Symmetric, ComarkovCategory):
         return cls.lift(cls.category.merge(x, n))
 
 
-class Closed(Markov, ClosedCategory):
+class Closed(Markov, ClosedMarkovCategory):
     """
     Parametric maps over a closed underlying `category` form a closed
     category, currying with the parameters swapped out of the way.
@@ -499,7 +500,7 @@ class Closed(Markov, ClosedCategory):
         .failing(messages.FREE_CURRY)
     currying_symmetry = ClosedCategory.currying_symmetry.failing(
         messages.FREE_CURRY)
-    category = closed.Diagram
+    category = closed.markov.Diagram
 
     @classmethod
     def ev(cls, base: Symmetric.ob, exponent: Symmetric.ob, left: bool = True
@@ -527,8 +528,8 @@ class Closed(Markov, ClosedCategory):
         Currying no object is the identity, as for every other curry.
 
         >>> from discopy import closed
-        >>> a, P = closed.Ty('a'), closed.Ty('P')
-        >>> k = Closed(a, a, closed.Box('k', a @ P, a), P)
+        >>> a, P = closed.markov.Ty('a'), closed.markov.Ty('P')
+        >>> k = Closed(a, a, closed.markov.Box('k', a @ P, a), P)
         >>> assert k.curry(0) == k == k.curry(0, left=False)
         """
         if n < 0 or n > len(self.dom):

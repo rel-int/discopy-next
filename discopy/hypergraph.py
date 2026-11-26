@@ -326,7 +326,7 @@ class Hypergraph[category](
             closed, compact, feedback, frobenius, markov, symmetric)
         from discopy.lambek import abstract
         return tuple(category.Diagram for category in (
-            symmetric, markov, compact, frobenius, closed, feedback,
+            symmetric, markov, compact, frobenius, closed.markov, feedback,
             abstract))
 
     MAX_ARITY = 3

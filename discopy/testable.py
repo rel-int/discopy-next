@@ -1266,7 +1266,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
 
         >>> from discopy.cat import Arrow, Box
         >>> from discopy.monoidal import Ty
-        >>> from discopy.biclosed import TermBase
+        >>> from discopy.closed.monoidal import TermBase
         >>> assert Arrow in Testable.enrolled() and Ty in Testable.enrolled()
         >>> assert Box not in Testable.enrolled()
         >>> from discopy.lambek.abstract.proofnet import ProofNet
@@ -1539,7 +1539,7 @@ class Equivalence(Testable):
 
     Example
     -------
-    >>> from discopy.biclosed import Ty, TermBase
+    >>> from discopy.closed.monoidal import Ty, TermBase
     >>> X = Ty("X")
     >>> f, g = (X << X)("f"), (X << X)("g")
     >>> terms = X(lambda x: f(x)), X(lambda y: f(y)), g

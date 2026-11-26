@@ -28,7 +28,6 @@ forgetful functors between the categories go the other way.
     discopy.markov
     discopy.comarkov
     discopy.closed
-    discopy.biclosed
     discopy.linear
     discopy.rigid
     discopy.pivotal

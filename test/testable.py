@@ -236,7 +236,7 @@ def test_weaken():
 
 
 def test_weaken_shape_of_self():
-    from discopy.biclosed import TermBase, Ty as Type
+    from discopy.closed.monoidal import TermBase, Ty as Type
     x = Type("x")
     for law in (TermBase.symmetry, TermBase.alpha_renaming,
                 TermBase.alpha_completeness):
@@ -413,22 +413,22 @@ def test_copying():
 
 def test_str_transparency():
     from hypothesis.errors import Unsatisfiable
-    from discopy import biclosed, closed, monoidal
+    from discopy import closed, monoidal
     x, y = monoidal.Ty('x'), monoidal.Ty('y')
     f = monoidal.Box('f', x, y)
     diagram = f @ x >> f[::-1] @ x
     assert monoidal.Diagram.str_environment(diagram)['f'] == f
     assert monoidal.Diagram.str_transparency(term=diagram)
-    X, Y = biclosed.Ty('X'), biclosed.Ty('Y')
-    assert biclosed.TermBase.str_transparency(
+    X, Y = closed.monoidal.Ty('X'), closed.monoidal.Ty('Y')
+    assert closed.monoidal.TermBase.str_transparency(
         term=X(lambda v: (Y << X)('g')(v)))
-    E = closed.Ty('E')
+    E = closed.markov.Ty('E')
     query = (E >> E)('query')
-    assert closed.TermBase.str_transparency(term=query(query(E('e'))))
-    F = closed.Ty('F')
-    assert closed.Ty.str_transparency(term=(E * F) >> E.product(F, E))
-    U = closed.Ty(closed.Unitype())
-    assert closed.Ty.str_transparency(term=E.product(U) >> U)
+    assert closed.markov.TermBase.str_transparency(term=query(query(E('e'))))
+    F = closed.markov.Ty('F')
+    assert closed.markov.Ty.str_transparency(term=(E * F) >> E.product(F, E))
+    U = closed.markov.Ty(closed.markov.Unitype())
+    assert closed.markov.Ty.str_transparency(term=E.product(U) >> U)
     assert find(Box.strategy(), lambda _: True).name.isidentifier()
     for clash in [monoidal.Box('x', x, x), monoidal.Box('Id', x, x)]:
         with raises(NameError):

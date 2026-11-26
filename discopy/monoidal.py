@@ -97,15 +97,16 @@ Traceback (most recent call last):
 ValueError: Expected exactly one output, got y @ z: a term has one.
 
 This loses no diagram where the category has products: a
-:class:`discopy.closed.Pack` box turns any closed diagram into one with
-exactly one output, of :class:`discopy.closed.Product` type. A closed diagram
-reads as a lambda term by default, see :meth:`discopy.closed.Diagram.to_term`,
-and as a kappa term with :meth:`TermBase.from_diagram`.
+:class:`discopy.closed.markov.Pack` box turns any closed diagram into one
+with exactly one output, of :class:`discopy.closed.markov.Product` type. A
+closed diagram reads as a lambda term by default, see
+:meth:`discopy.closed.markov.Diagram.to_term`, and as a kappa term with
+:meth:`TermBase.from_diagram`.
 
 >>> from discopy import closed
->>> X, Y, Z = map(closed.Ty, "XYZ")
->>> F, G = closed.Box('f', X, Y), closed.Box('g', X, Z)
->>> packed = F @ G >> closed.Pack(Y * Z)
+>>> X, Y, Z = map(closed.markov.Ty, "XYZ")
+>>> F, G = closed.markov.Box('f', X, Y), closed.markov.Box('g', X, Z)
+>>> packed = F @ G >> closed.markov.Pack(Y * Z)
 >>> assert len(packed.cod) == 1
 >>> print(TermBase.from_diagram(packed).normal_form())
 (X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
@@ -148,10 +149,11 @@ A term is drawn as its diagram:
 .. image:: /_static/monoidal/let.svg
     :align: center
 
-The modules above have terms of their own, down to :mod:`discopy.biclosed`
-where they are lambda terms: a :class:`discopy.symmetric.Kappa` binds its
-variables in any order, a :class:`discopy.markov.Kappa` need not use them
-and a :class:`discopy.markov.Application` may use one twice.
+The modules above have terms of their own, down to
+:mod:`discopy.closed.monoidal` where they are lambda terms: a
+:class:`discopy.symmetric.Kappa` binds its variables in any order, a
+:class:`discopy.markov.Kappa` need not use them and a
+:class:`discopy.markov.Application` may use one twice.
 """
 
 from __future__ import annotations
@@ -1818,7 +1820,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         refused. Every box is a constant, structural ones included, e.g. a
         swap, and no wire is ever copied, discarded or crossed. Closed
         Markov diagrams read as lambda terms instead, see
-        :meth:`discopy.closed.Diagram.to_term`.
+        :meth:`discopy.closed.markov.Diagram.to_term`.
 
         Example
         -------
@@ -3198,7 +3200,7 @@ class TermBase(cat.TermBase):
                  letters: Sequence[str | None]) -> cat.TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
-        :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
+        :meth:`discopy.closed.monoidal.TermBase.generate` does: its inputs are
         bound by a kappa or left free, named ``v0, v1, ...``, and the
         variable bound at each level is named by the letter at that level,
         see :class:`Sampler`.

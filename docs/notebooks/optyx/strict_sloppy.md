@@ -171,13 +171,13 @@ class BasisCopy(Diagram):
 
 
 copies = {"k-extension": KExtension, "basis copy": BasisCopy}
-n, s = closed.Ty("N"), closed.Ty("S")
+n, s = closed.markov.Ty("N"), closed.markov.Ty("S")
 VP = s << n
 types = {"John": n, "Bill": n, "Mary": n, "code": n, "guitar": n,
          "sleeps": VP, "snores": VP, "He": n << n, "plays": VP << n,
          "likes": VP << n, "his": (n << n) << n, "does too": VP << VP}
 John, Bill, Mary, code, guitar, sleeps, snores, He, plays, likes, his, \
-    does_too = (closed.Variable(name, typ) for name, typ in types.items())
+    does_too = (closed.markov.Variable(name, typ) for name, typ in types.items())
 ```
 
 The arrays `a` of the words are drawn with their arguments first, the order
@@ -199,7 +199,7 @@ def meaning(term, copy):
     The map of a reading, sent by a closed functor into a diagram class that
     chooses the copy, and applied to the states of its words.
     """
-    functor = closed.Functor(ob_map={n: N, s: S}, ar_map={}, cod=copy)
+    functor = closed.markov.Functor(ob_map={n: N, s: S}, ar_map={}, cod=copy)
     states = [a[word.name].transpose(order.get(kinds.get(word.name), None))
               for word in term.freevars]
     words = Diagram.id(Dim(1)).tensor(*(
@@ -216,7 +216,7 @@ k-extension the paper finds
 `sleeps(ε(John)) ⊗ snores(He(k)) + sleeps(ε(k)) ⊗ snores(He(John))`.
 
 ```python {.marimo}
-anaphora = closed.Tuple(sleeps(John), snores(He(John)))
+anaphora = closed.markov.Tuple(sleeps(John), snores(He(John)))
 meaning(anaphora, KExtension).draw(figsize=(6, 6))
 ```
 
@@ -240,7 +240,7 @@ With k-extension the paper finds
 `pg = plays(guitar)`.
 
 ```python {.marimo}
-ellipsis = VP(lambda vp: closed.Tuple(
+ellipsis = VP(lambda vp: closed.markov.Tuple(
     vp(John), does_too(vp)(Mary)))(plays(guitar))
 meaning(ellipsis, KExtension).draw(figsize=(6, 6))
 ```
@@ -275,7 +275,7 @@ John's code* is used twice, once for *John* and once for *does too* and
 *Bill*.
 
 ```python {.marimo}
-strict = VP(lambda vp: closed.Tuple(vp(John), does_too(vp)(Bill)))(
+strict = VP(lambda vp: closed.markov.Tuple(vp(John), does_too(vp)(Bill)))(
     likes(his(code)(John)))
 mo.md(f"`{strict}`")
 ```
@@ -289,7 +289,7 @@ abstracted and used twice, and *John*, *Bill* and *likes* are each used
 twice, so each subject owns its own code.
 
 ```python {.marimo}
-sloppy = (n << n)(lambda h: closed.Tuple(
+sloppy = (n << n)(lambda h: closed.markov.Tuple(
     likes(h(John))(John), does_too(likes(h(Bill)))(Bill)))(his(code))
 mo.md(f"`{sloppy}`")
 ```

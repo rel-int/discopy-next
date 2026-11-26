@@ -12,9 +12,15 @@
 > Base: this builds on #737 (feedback and linear as packages), which is not merged yet and moves `feedback/closed.py`. Branch from #737's branch `amp/feedback-bang-packages` (head b9a2073 when this was written) and open the PR against that branch, saying in the description that it is stacked on #737. If #737 merges first, retarget to `main`.
 >
 > Decide yourself whether the old `discopy.biclosed` and the flat `discopy.closed` names keep deprecated aliases for one release, the way `discopy/traced.py` did, and say which in the PR.
+>
+> One change to the layout, from Alexis: "it seems like we need a subsubpackage feedback.closed.symmetric and feedback.closed.markov".
+>
+> For this PR: make `discopy.feedback.closed` a package and move what #737 has as `feedback/closed.py` into `feedback.closed.markov`, over `closed.markov`. That replaces "repoint `feedback.closed` to `closed.markov`" in the brief. Keep or alias the old `feedback.closed` names the same way you choose for `biclosed` and the flat `closed`.
+>
+> Not in this PR: `feedback.closed.symmetric`, the traced symmetric closed category without copying. It is the next PR, after this one. Leave a one-line mention of it in the package docstring and nothing else.
 
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `discopy.closed` is a package: `closed.monoidal` (was `biclosed`), a new `closed.symmetric`, `closed.markov` (was `closed`)
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `compact` subclasses `closed.symmetric`, eval and curry from cups and caps
-- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `feedback.closed` repointed to `closed.markov`
-- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 deprecated aliases for `discopy.biclosed` and the flat `discopy.closed` names, for one release
+- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `feedback.closed` is a package, `feedback.closed.markov` over `closed.markov`
+- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 no alias for `discopy.biclosed` or the flat `discopy.closed` names, as ADR 1 rules
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 docs, paper, changelog and an architecture decision record

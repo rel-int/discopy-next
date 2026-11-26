@@ -594,11 +594,11 @@ class Function(Box):
         comarkov.
 
         >>> from discopy import closed
-        >>> closed.Copy(closed.Ty('x')).dagger()
+        >>> closed.markov.Copy(closed.markov.Ty('x')).dagger()
         Traceback (most recent call last):
             ...
-        discopy.utils.AxiomError: Copy(x) has no dagger: closed.Diagram \
-is not a dagger category.
+        discopy.utils.AxiomError: Copy(x) has no dagger: \
+closed.markov.Diagram is not a dagger category.
         """
         if not issubclass(self.ar, ComarkovCategory):
             raise AxiomError(messages.NOT_A_DAGGER.format(
