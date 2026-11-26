@@ -13,7 +13,7 @@
 > > yes let's go!
 
 - [x] `abc.BiclosedCategory` is `ClosedMonoidalCategory`, `abc.ClosedCategory` is `ClosedSymmetricCategory`, no alias
-- [ ] `feedback.closed.monoidal`, `feedback.closed.balanced`, `feedback.closed.symmetric`: the free traced categories over the closed levels, no Int at the planar one
+- [WIP] @T-f1b236df-2026-11-26 11:20 `feedback.closed.monoidal`, `feedback.closed.balanced`, `feedback.closed.symmetric`: the free traced categories over the closed levels, no Int at the planar one
 - [ ] `pivotal`, `ribbon`, `compact`, `frobenius` sit under their `feedback.closed` level: the delay is the identity by default, `Feedback(f)` is `Trace(f)`, an axiom equates the trace with cap, f, cup
 - [ ] `frobenius`: the delay preserves the spiders
 - [ ] `Head`, `Tail`, `FollowedBy` are carried down; a functor into a codomain without stream semantics raises on them
