@@ -254,6 +254,11 @@ LAYOUT_INFEASIBLE = "The open program of this diagram is {}."
 LAYOUT_WEIGHTS = "The weights of a layout cannot be negative."
 OPTIMISED_DAGGER = (
     "An optimised drawing has no dagger: lay out the dagger of the diagram.")
+PLANAR_NOT_PIVOTAL = (
+    "A pivotal layout draws boxes, cups and caps, not swaps or spiders.")
+PLANAR_LOOP = "A pivotal layout does not draw closed loops yet."
+PLANAR_START = (
+    "The monoidal layout this pivotal layout starts from is not valid.")
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")

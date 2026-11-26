@@ -17,7 +17,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   OSQP, the optional extra `optimiser`, keeping the isotopy class and
   weighing the straightness of the wires against the width of the drawing
   and of its boxes, and returns an `optimiser.Optimised` drawing whose wires
-  go through waypoints ([next#688]).
+  go through waypoints ([next#688]). `optimiser.to_pivotal_drawing` draws a
+  pivotal diagram as a planar map with a fixed rotation system, its boxes
+  rotating and its wires free, up to isotopy: a box has a centre and a
+  rotation, cups and caps are turning points of a wire, and each step of the
+  descent from the monoidal layout is a quadratic program, kept only when
+  the drawing stays valid ([next#689]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -2612,6 +2617,7 @@ for the changelog of `1.2.1` and earlier.
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
 [next#688]: https://github.com/rel-int/discopy-next/pull/688
+[next#689]: https://github.com/rel-int/discopy-next/pull/689
 [next#692]: https://github.com/rel-int/discopy-next/pull/692
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
