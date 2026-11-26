@@ -1545,3 +1545,17 @@ def test_laws():
     term = find(TermBase.strategy(), lambda term: term.stack and "let" in str(
         term))
     assert all(law(term) for law in laws)
+
+
+def test_Functor_reads_a_higher_level_type_as_itself():
+    """ A functor of a lower level than the types of a box reads each of them
+    as itself, so that its images compose and a dict keyed on the type finds
+    it (next#703). """
+    from discopy import rigid, symmetric
+    for x in (rigid.Ty('x'), symmetric.Ty('x')):
+        f, F = Box('f', x, x), Functor.id(Diagram)
+        assert F(x) == x and F(f).dom == F(f.dom) and F(f >> f) == f >> f
+        assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
+    G = rigid.Functor({rigid.Ty('y'): rigid.Ty('z')}, {})
+    F = Functor(lambda _: G(rigid.Wire('y')), {})  # G reads its own level
+    assert F(Ty('x')) == rigid.Ty('z')
