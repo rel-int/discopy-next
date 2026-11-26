@@ -445,13 +445,9 @@ class Slide[category](rewrite.Step):
         """
         The crossings shrink into the box and grow out of its other side,
         see :meth:`discopy.drawing.Drawing.slide`. When the box is itself a
-        crossing, the third Reidemeister move, the three crossings of the
-        domain shrink with their ports towards a point until ``t = .5``,
-        where they meet in a triple point, and those of the codomain grow
-        out of it. They shrink by ``s`` vertically and by ``s * (2 - s)``
-        horizontally, so that the ports leave the boundary downwards before
-        they move sideways. The point is halfway between the centres of the
-        two triangles.
+        braid, this is the third Reidemeister move, the Yang-Baxter equation,
+        and the braid slides as a spider with no dot would: its legs keep
+        their shape and the wire passes under them.
 
         Parameters:
             t : The fraction of the way, from ``0`` to ``1``.
@@ -476,24 +472,11 @@ class Slide[category](rewrite.Step):
         .. image:: /_static/braided/reidemeister-3.gif
             :align: center
         """
-        source, target = self.dom.to_drawing(), self.cod.to_drawing()
-        if not (getattr(self.box, "draw_as_braid", False)
-                or getattr(self.box, "draw_as_wires", False)):
-            return source.slide(target, t)
-        centres = [[p for node, p in drawing.positions.items()
-                    if node.kind == "box"] for drawing in (source, target)]
-        centre = between(*(
-            Point(sum(p.x for p in ps) / len(ps), sum(p.y for p in ps)
-                  / len(ps)) for ps in centres), .5)
-        drawing, scale = (source, 1 - 2 * t) if t < .5\
-            else (target, 2 * t - 1)
-        return drawing.relabel_nodes(positions={
-            node: between(source.positions[node], target.positions[node], t)
-            if node.kind in ("dom", "cod") else Point(
-                centre.x + (p.x - centre.x) * scale * (2 - scale),
-                centre.y + (p.y - centre.y) * scale)
-            for node, p in drawing.positions.items()}).resized(
-                source, target, t)
+        indices = (0, len(self.cod.inside) - 1) if self.down\
+            else (len(self.dom.inside) - 1, 0)
+        return self.dom.to_drawing().slide(
+            self.cod.to_drawing(), t, indices if getattr(
+                self.box, "draw_as_braid", False) else None)
 
     @classmethod
     # pylint: disable-next=too-many-arguments  # naturality's arguments
