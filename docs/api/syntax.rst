@@ -11,13 +11,13 @@ The diagram shows the syntax, the free categories of each level. Going down a
 column adds structure to the tensor: scalars that slide, braids, twists,
 symmetry, then copies; going right along a row adds structure to the
 category: ``feedback`` a delay and a trace, ``closed`` exponentials,
-``feedback.closed`` both, and the last column duals, traced with the identity
-as delay; ``linear`` beside the plain levels adds a bang. A module imports the
+``feedback.closed`` both, and the last column duals, whose trace at delay
+zero is a cap and a cup; ``linear`` beside the plain levels adds a bang. A module imports the
 ones above it in its column, and ``feedback.closed`` imports ``feedback`` and
 ``closed`` on its row, but ``linear``, ``feedback`` and ``closed`` import
 nothing from one another; forgetful functors between the categories go the
-other way. Each module is pictured by its characteristic generator, drawn by
-the module itself: ``docs/architecture.py`` draws the pictures and writes the
+other way. Each module is pictured by its characteristic generator or equation,
+drawn by the module itself: ``docs/architecture.py`` draws the pictures and writes the
 table.
 
 .. autosummary::

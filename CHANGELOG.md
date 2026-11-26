@@ -599,6 +599,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the architecture diagram of the docs by `docs/architecture.py`:
   `abc.BiclosedCategory` is `abc.ClosedMonoidalCategory` and
   `abc.ClosedCategory` is `abc.ClosedSymmetricCategory`, with no alias.
+  `feedback.cat` is the free `abc.DelayCategory`, a category with a delay
+  and no tensor, which `abc.FeedbackCategory` now extends.
   `feedback.closed.monoidal`, `feedback.closed.balanced` and
   `feedback.closed.symmetric` are new, beside `feedback.closed.markov`: the
   free feedback categories over `closed.monoidal`, `feedback.balanced`,

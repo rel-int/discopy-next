@@ -10,8 +10,9 @@ A traced category is a feedback category whose delay is the identity: the
 wires of a feedback diagram carry a time step, and a :class:`Trace` is a
 :class:`Feedback` whose memory is not delayed.
 
-This package is the monoidal level, its submodules the levels of the
-hierarchy with feedback, each subclassing the ordinary module of the same
+This package is the monoidal level, :mod:`~discopy.feedback.cat` the free
+category with a delay and no tensor, and its other submodules the levels of
+the hierarchy with feedback, each subclassing the ordinary module of the same
 name: :mod:`~discopy.feedback.balanced`, :mod:`~discopy.feedback.symmetric`
 for the usual notion of trace, :mod:`~discopy.feedback.markov` for the syntax
 of streams, :mod:`~discopy.feedback.comarkov` and the package
@@ -25,6 +26,7 @@ the interpretation of streams, the main example of a feedback category.
     :template: module.rst
     :toctree: ../_api
 
+    cat
     balanced
     symmetric
     markov
@@ -1520,4 +1522,4 @@ Bubble = Box.from_args
 # The levels with feedback subclass this one, so they are imported last.
 # pylint: disable-next=wrong-import-position
 from discopy.feedback import (  # noqa: E402,F401
-    balanced, symmetric, markov, comarkov, closed)
+    cat, balanced, symmetric, markov, comarkov, closed)

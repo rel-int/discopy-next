@@ -374,6 +374,11 @@ def test_traced_levels_with_duals():
         assert isinstance(g.feedback(), module.Feedback)
         assert not isinstance(g.feedback(), module.Trace)
         assert g.feedback().open_traces() == g.feedback()
+        k = module.Box('k', x.delay() @ x @ x, x @ x @ x)
+        nested = k.trace().feedback(mem=x, left=True)
+        assert isinstance(nested, module.Feedback)
+        assert nested.open_traces()\
+            == k.trace().open_traces().feedback(mem=x, left=True)
     spider = frobenius.Spider(1, 2, frobenius.Ty('x'))
     assert spider.delay() == frobenius.Spider(1, 2, frobenius.Ty('x').d)
 
@@ -741,3 +746,16 @@ def test_foliation_idempotence():
         foliated = diagram.foliation()
         assert Equation(diagram, foliated)
         assert foliated.foliation() == foliated
+
+
+def test_free_delay_category():
+    import pickle
+    from discopy.feedback import cat
+    from discopy.utils import dumps, loads
+    x, y = cat.Ob('x'), cat.Ob('y')
+    f = cat.Box('f', x, y, data=[1]).delay(2)
+    for term in (x.delay(), f, f >> f[::-1], f.bubble(name="b").delay()):
+        assert loads(dumps(term)) == term
+        assert pickle.loads(pickle.dumps(term)) == term
+    assert f.delay(-2) == cat.Box('f', x, y, data=[1]) != f
+    assert f.bubble().delay().args == (f, )

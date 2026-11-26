@@ -203,7 +203,9 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
     def open_traces(self) -> Diagram:
         """
         Send each :class:`Trace` to a cap, its argument and a cup, which is
-        what :meth:`discopy.abc.PivotalCategory.trace_duals` says it is.
+        what :meth:`discopy.abc.PivotalCategory.trace_duals` says it is, and
+        open those inside the args of any other box, e.g. a delayed
+        :class:`Feedback`, which stays a box.
 
         Example
         -------
@@ -219,6 +221,9 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
                 return self.sum_factory(
                     tuple(term.open_traces() for term in box.terms),
                     box.dom, box.cod)
+            if box.args and not isinstance(box, Trace):
+                return box.rebuild(
+                    args=tuple(arg.open_traces() for arg in box.args))
             if not isinstance(box, Trace):
                 return box
             result = box.arg.open_traces()

@@ -663,17 +663,11 @@ class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
     """
 
 
-class FeedbackCategory[
-        C0: ColouredMonoid, C1: FeedbackCategory](MonoidalCategory[C0, C1]):
+class DelayCategory[C0, C1: DelayCategory](Category[C0, C1]):
     """
-    A feedback category is a :class:`MonoidalCategory` with a monoidal
-    endofunctor :meth:`delay` and an operator :meth:`feedback` from
-    morphisms ``x @ m.delay() -> y @ m`` to morphisms ``x -> y``, see
-    :cite:t:`KatisEtAl02` and :cite:t:`DiLavoreEtAl22`.
-
-    The laws of feedback are stated once here: vanishing, joining, strength,
-    tightening and sliding. A :class:`TracedCategory` is a feedback category
-    whose delay is the identity.
+    A delay category is a :class:`Category` with an endofunctor
+    :meth:`delay`, the part of a :class:`FeedbackCategory` that needs no
+    tensor. :mod:`discopy.feedback.cat` is the free one.
     """
     def delay(self, n_steps: int = 1) -> C1:
         """
@@ -685,6 +679,40 @@ class FeedbackCategory[
         del n_steps
         return self  # ty: ignore[invalid-return-type]
 
+    @axiom
+    def delay_unit[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Delaying by no time step is the identity. """
+        return cls.equation_factory(f.delay(0), f)
+
+    @axiom
+    def delay_composition[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]
+    ) -> Equation[Hom[
+            C1, Delay[C1, Delay[C1, A]], Delay[C1, Delay[C1, B]]]]:
+        """ Delaying twice is delaying by two time steps. """
+        return cls.equation_factory(f.delay().delay(), f.delay(2))
+
+    @rule
+    def delaying[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Hom[C1, Delay[C1, A], Delay[C1, B]]:
+        """ The delay of a morphism by one time step. """
+        return f.delay()
+
+
+class FeedbackCategory[
+        C0: ColouredMonoid, C1: FeedbackCategory](
+            DelayCategory[C0, C1], MonoidalCategory[C0, C1]):
+    """
+    A feedback category is a :class:`MonoidalCategory` and a
+    :class:`DelayCategory` whose delay is monoidal, with an operator
+    :meth:`feedback` from morphisms ``x @ m.delay() -> y @ m`` to morphisms
+    ``x -> y``, see :cite:t:`KatisEtAl02` and :cite:t:`DiLavoreEtAl22`.
+
+    The laws of feedback are stated once here: vanishing, joining, strength,
+    tightening and sliding. A :class:`TracedCategory` is a feedback category
+    whose delay is the identity.
+    """
     @abstractmethod
     def feedback(
             self, n: int | None = None, left: bool = False, *,
@@ -706,20 +734,6 @@ class FeedbackCategory[
             cod : The codomain of the feedback.
             mem : The memory to feed back.
         """
-
-    @axiom
-    def delay_unit[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
-        """ Delaying by no time step is the identity. """
-        return cls.equation_factory(f.delay(0), f)
-
-    @axiom
-    def delay_composition[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]
-    ) -> Equation[Hom[
-            C1, Delay[C1, Delay[C1, A]], Delay[C1, Delay[C1, B]]]]:
-        """ Delaying twice is delaying by two time steps. """
-        return cls.equation_factory(f.delay().delay(), f.delay(2))
 
     @axiom
     def vanishing[A: Obj[C0], B: Obj[C0]](
@@ -776,12 +790,6 @@ class FeedbackCategory[
         return cls.equation_factory(
             (f >> y @ k).feedback(dom=x, cod=y, mem=k.cod),
             (x @ k.delay() >> f).feedback(dom=x, cod=y, mem=k.dom))
-
-    @rule
-    def delaying[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Hom[C1, Delay[C1, A], Delay[C1, B]]:
-        """ The delay of a morphism by one time step. """
-        return f.delay()
 
     @rule
     def feedback_right[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](

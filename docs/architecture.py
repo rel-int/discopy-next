@@ -18,12 +18,11 @@ HEAD = [
     ("closed", "closed", "exponentials"),
     ("feedback.closed", "feedback.closed", "both"),
     ("duals", None, "trace = cups at delay 0")]
-NOTE = {"feedback.closed.monoidal": "no Int here"}
 GRID = [
-    [["cat"], ["linear.cat"], [], [], [], []],
+    [["cat"], ["linear.cat"], ["feedback.cat"], [], [], []],
     [["monoidal"], ["linear.monoidal"], ["feedback"],
-     ["closed.monoidal", "rigid"], ["feedback.closed.monoidal"], ["pivotal"]],
-    [["spacial"], [], [], [], [], []],
+     ["closed.monoidal"], ["feedback.closed.monoidal"], ["pivotal"]],
+    [["spacial"], [], [], ["rigid"], [], []],
     [["braided"], [], [], [], [], []],
     [["balanced"], [], ["feedback.balanced"], [],
      ["feedback.closed.balanced"], ["ribbon"]],
@@ -40,7 +39,8 @@ LABELS = {
 def picture(name):
     """ The characteristic diagram of a module, drawn by itself. """
     m = importlib.import_module("discopy." + {
-        "cat": "monoidal", "linear.cat": "linear.monoidal"}.get(name, name))
+        "cat": "monoidal", "linear.cat": "linear.monoidal",
+        "feedback.cat": "feedback"}.get(name, name))
     x = m.Ty("x")
     f = m.Box("f", x, x)
     if name == "cat":
@@ -48,12 +48,13 @@ def picture(name):
     if name == "monoidal":
         return f @ m.Box("g", x, x)
     if name == "spacial":
-        return m.Box("s", m.Ty(), m.Ty()) @ f
+        s = m.Box("s", m.Ty(), m.Ty())
+        return m.Equation(s @ x, x @ s)
     if name in ("braided", "linear.symmetric"):
         return m.Diagram.braid(x, x) if name == "braided"\
             else m.Diagram.exchange(x, x)
     if name == "balanced":
-        return m.Twist(x)
+        return m.Twist(x).to_braided()
     if name == "symmetric":
         return m.Swap(x, x)
     if name == "markov":
@@ -64,6 +65,8 @@ def picture(name):
         return m.Dereliction(x)
     if name in ("linear.monoidal", "linear.markov"):
         return m.Diagram.contraction(x)
+    if name == "feedback.cat":
+        return (f >> m.Box("g", x, x)).delay()
     if name == "feedback":
         return m.Box("f", x @ x.delay(), x @ x).feedback()
     if name == "feedback.balanced":
@@ -91,9 +94,12 @@ def picture(name):
     if name == "rigid":
         return x @ m.Cap(x.r, x) >> m.Cup(x, x.r) @ x
     if name == "pivotal":
-        return m.Cap(x, x.r) >> m.Cup(x, x.r)
+        g = m.Box("f", x, m.Ty("y"))
+        transpose = m.Cap(x.r, x) @ g.cod.r >> x.r @ g @ g.cod.r\
+            >> x.r @ m.Cup(g.cod, g.cod.r)
+        return m.Equation(transpose, g.r)
     if name == "ribbon":
-        return m.Cap(x, x.r) >> m.Braid(x, x.r)
+        return (m.Cap(x, x.r) >> m.Braid(x, x.r)).to_ribbons()
     if name == "compact":
         return m.Cap(x, x.r) >> m.Swap(x, x.r)
     if name == "frobenius":
@@ -117,15 +123,11 @@ def link(name, text=None):
     return f'<a href="../_api/discopy.{name}.html">{text or name}</a>'
 
 
-def cell(names, up):
+def cell(names):
     """ The modules of a cell, each with its picture. """
-    items, stacked = [], names[0] == "closed.monoidal"
-    for k, name in enumerate(names):
-        bar = '<span class="up">│</span>' if up or stacked and k else ""
-        note = f"<small>{NOTE[name]}</small>" if name in NOTE else ""
-        items.append(f'{bar}{link(name)}<br><img src="../_static/'
-                     f'architecture/{name}.svg" alt="{name}"/>{note}')
-    if len(names) == 2 and not stacked:
+    items = [f'{link(name)}<br><img src="../_static/architecture/{name}.svg"'
+             f' alt="{name}"/>' for name in names]
+    if len(names) == 2:
         return "".join(f'<span class="pair">{item}</span>' for item in items)
     return "<br>".join(items)
 
@@ -141,22 +143,13 @@ def table():
         lines.append(f"        <th>{title}<br><small>{sub or '&nbsp;'}"
                      "</small></th>")
     lines += ["    </tr>", "    </thead>", "    <tbody>"]
-    for i, row in enumerate(GRID):
+    for row in GRID:
         lines.append("    <tr>")
-        for j, names in enumerate(row):
-            up = any(GRID[k][j] for k in range(i)) or (i > 1 and j == 0)
-            lines.append(f"        <td>{cell(names, up) if names else ''}"
+        for names in row:
+            lines.append(f"        <td>{cell(names) if names else ''}"
                          "</td>")
         lines.append("    </tr>")
-    lines += [
-        "    </tbody>", "    <tfoot>", "    <tr>",
-        f'        <td colspan="3" class="meet">{link("interaction")}: '
-        "where the packages meet<br><small>Int, from balanced traced down; "
-        "GoISituation, linear + feedback.symmetric</small></td>",
-        f'        <td colspan="3" class="meet">{link("cmap")} and '
-        f'{link("hypergraph")}<br><small>CMap up to compact, Hypergraph up '
-        "to frobenius</small></td>",
-        "    </tr>", "    </tfoot>", "</table>", ""]
+    lines += ["    </tbody>", "</table>", ""]
     return "\n".join(lines)
 
 

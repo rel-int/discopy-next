@@ -18,6 +18,10 @@ pivotal with time steps?", and the identity delay moved to the semantics.
 
 - `abc.BiclosedCategory` is `abc.ClosedMonoidalCategory` and `abc.ClosedCategory` is
   `abc.ClosedSymmetricCategory`.
+- `feedback.cat` is the free `abc.DelayCategory`, a category with a delay endofunctor and no
+  tensor, as `linear.cat` is the free `abc.ComonadCategory`; `abc.FeedbackCategory` extends
+  it, with the delay laws stated there. Its classes stand beside those of `feedback` rather
+  than under them: the time steps of the monoidal level live on its wires.
 - `feedback.closed` has `monoidal`, `balanced`, `symmetric` and `markov`, each the free feedback
   category over the closed level of its name, `balanced` over `closed.monoidal` with the braids
   and twists of `feedback.balanced`: there is no `closed.balanced`.
