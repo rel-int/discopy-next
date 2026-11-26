@@ -901,6 +901,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- Every remaining box of `optyx.photonic` writes and reads its own tree:
+  `Swap` from `left` and `right`, `Create` and `Select` from `photons`,
+  `Create` and `DualRail` with their `internal_states`, `Gate` from its
+  `array`, `Scalar`, `PhaseShiftDR` and `PhotonLoss` from their `data`,
+  `PhotonThresholdMeasurement` from its domain, and `NumOp` and `HadamardBS`
+  with no argument, so `loads(dumps(...))` round-trips across `optyx.photonic`
+  ([next#731]).
+
 - The dagger, transpose and conjugate of a box with args keep its
   `drawing_name`, and when its args are drawn in another direction its box has
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
@@ -2761,6 +2769,7 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#703]: https://github.com/rel-int/discopy-next/issues/703
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#731]: https://github.com/rel-int/discopy-next/issues/731
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735

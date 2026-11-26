@@ -1341,8 +1341,8 @@ class Swap(channel.Permutation):
         return len(self.left), len(self.right)
 
     def to_tree(self) -> dict:
-        return dict(factory=factory_name(type(self)),
-                    left=len(self.left), right=len(self.right))
+        return {'factory': factory_name(type(self)),
+                'left': len(self.left), 'right': len(self.right)}
 
     @classmethod
     def from_tree(cls, tree: dict):
