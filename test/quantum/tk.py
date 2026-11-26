@@ -269,4 +269,3 @@ def test_override_bits_measure_qubits_to_tk():
     ]
     for c in circuits:
         assert np.allclose(from_tk(to_tk(c)).measure(), c.measure())
-

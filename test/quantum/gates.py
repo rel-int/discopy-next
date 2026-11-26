@@ -299,6 +299,56 @@ def test_QuantumGate_takes_what_a_circuit_box_takes():
     assert phi in QuantumGate('U', qubit, qubit, [phi, 0, 0, phi]).free_symbols
 
 
+def test_QuantumGate_and_Controlled_keep_torch_grad():
+    torch = importorskip("torch")
+    from discopy.tensor import backend
+
+    for factory in (CRz, CRx, CU1):
+        phi = torch.tensor(0.3, requires_grad=True)
+        gate = factory(phi)
+        assert gate.data is phi
+        with backend('pytorch'):
+            assert not gate.is_deterministic
+            zero = torch.tensor(0., requires_grad=True)
+            assert factory(zero).is_deterministic
+            out = (Ket(1, 0) >> gate).eval().array
+            assert out.requires_grad
+            gate.eval().array.real.sum().backward()
+        assert phi.grad is not None and phi.grad.item() != 0
+
+    eye = torch.eye(2, requires_grad=True)
+    gate = QuantumGate('U', qubit, qubit, eye)
+    with backend('pytorch'):
+        assert gate.is_deterministic
+        out = (Ket(0) >> gate).eval().array
+        assert out.requires_grad
+        out.real.sum().backward()
+    assert numpy.allclose(eye.grad, [[1, 1], [0, 0]])
+
+    alpha = torch.tensor(0.5, requires_grad=True)
+    nested = QuantumGate('V', qubit, qubit, [[alpha, 0], [0, 1]])
+    with backend('pytorch'):
+        (Ket(0) >> nested >> Bra(0)).eval().array.real.backward()
+    assert numpy.isclose(alpha.grad.item(), 1.0)
+
+
+def test_Controlled_and_QuantumGate_jax_grad():
+    jax = importorskip("jax")
+    from discopy.tensor import backend
+
+    with backend('jax'):
+        for factory in (CRz, CRx, CU1):
+            det = []
+            grad = jax.grad(lambda x, f=factory, d=det: (
+                d.append(f(x).is_deterministic),
+                f(x).eval().array.real.sum())[1])(0.3)
+            assert det == [False] and grad != 0
+        grad_u = jax.grad(lambda x: (Ket(0) >> QuantumGate(
+            'U', qubit, qubit, jax.numpy.eye(2) * x
+        )).eval().array.real.sum())(0.5)
+        assert numpy.isclose(grad_u, 1.0)
+
+
 def test_Ket_Bra_Bits_read_booleans_as_bits():
     for bits in [(True, False), tuple(numpy.array([1, 0]) > 0)]:
         for state in (Ket, Bra, Bits):
