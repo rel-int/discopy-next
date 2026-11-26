@@ -460,5 +460,6 @@ def test_a_box_loads_its_own_tree(box):
     """A box whose constructor takes none of the fields of `cat.Box.to_tree`
     reads its own arguments back from its tree (next#731), in a diagram too."""
     from discopy.utils import dumps, loads
-    assert loads(dumps(box)) == box
+    loaded = loads(dumps(box))
+    assert loaded == box and loaded.to_tree() == box.to_tree()
     assert loads(dumps(box @ box)) == box @ box
