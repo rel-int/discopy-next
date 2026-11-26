@@ -901,6 +901,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx` channels and gates load their own tree: `channel.Measure`,
+  `Encode` and `Discard` and their `photonic` and `qubits` subclasses from
+  their domain, and `photonic.Phase`, `BBS`, `TBS` and `MZI` from their data
+  and flags, so `loads(dumps(...))` no longer raises on them ([next#739]).
+
 - A frame drawn left to right keeps its name inside it, in its top left
   corner, rather than lifted above its top side like a wire label, and a
   bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
@@ -2730,6 +2735,7 @@ for the changelog of `1.2.1` and earlier.
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
+[next#739]: https://github.com/rel-int/discopy-next/pull/739
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
