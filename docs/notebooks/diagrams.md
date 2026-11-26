@@ -289,7 +289,7 @@ In the free monoid-enriched category, arrows are formal sums of parallel arrows.
 This is implemented by a class `Sum` with an attribute `terms: tuple[Arrow, ...]` and optional attributes `dom` and `cod`.
 
 ```python {.marimo}
-from discopy.sum import Sum
+from discopy.cat import Sum
 
 assert f + f + f == Sum(terms=(f, f, f))
 assert Arrow.zero(x, y) == Sum((), dom=x, cod=y)

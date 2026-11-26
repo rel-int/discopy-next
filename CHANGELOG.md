@@ -102,7 +102,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `C` the Python functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
   along the classmethod `D.algebra(M, dom, cod)`, given for the new list monad
   `kleisli.monad.List` by `cat.Arrow`, which sends a list of arrows to their
-  `sum.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
+  `cat.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
@@ -870,13 +870,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - Every `Ob` but `cat.Ob` is `Wire` ([#566]), and `PRO` is `Nat` ([#727]):
   the old names still work, with a `DeprecationWarning`.
-- `cat.Sum` and `monoidal.Sum` are `sum.Sum` and `sum.Sum[monoidal.Diagram]`:
-  the formal sums of the arrows of a category are one module, `discopy.sum`,
-  and `Sum[C]` is a box of `C`. The old names still work, with a
-  `DeprecationWarning`; the other levels follow ([next#10]).
 
 ### Removed
 
+- `discopy.sum` goes, and `Sum` lives in each module again: `cat.Sum` is a box
+  of formal sums with their composition, `monoidal.Sum` adds the tensor and
+  each level's `Sum` subclasses its parent's: import `Sum` from the module of
+  its category, e.g. `monoidal.Sum` for `sum.Sum[monoidal.Diagram]`.
+  `Sum[C]` and the `subscript_bases` hook of `NamedGeneric` go with it
+  ([next#736]).
 - The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
   does not apply, now that a class with no tensor does not state it
   ([next#485]).
@@ -2456,7 +2458,6 @@ for the changelog of `1.2.1` and earlier.
 [#830]: https://github.com/discopy/discopy/pull/830
 [next#1]: https://github.com/rel-int/discopy-next/pull/1
 [next#9]: https://github.com/rel-int/discopy-next/issues/9
-[next#10]: https://github.com/rel-int/discopy-next/issues/10
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
@@ -2727,6 +2728,7 @@ for the changelog of `1.2.1` and earlier.
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
+[next#736]: https://github.com/rel-int/discopy-next/pull/736
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

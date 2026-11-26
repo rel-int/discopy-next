@@ -8,7 +8,6 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
-from discopy.sum import Sum
 from discopy.utils import AxiomError
 
 
@@ -578,10 +577,10 @@ def test_Sum():
         Sum((f, g))
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
-        == "sum.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+        == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
     lazy = Sum((f, f))
     assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
-        == f"sum.Sum(terms=({f!r}, {f!r}))"
+        == f"cat.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
@@ -675,7 +674,7 @@ def box_classes():
 
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
-    "{sum,markov}.Sum": "c((box(c, x, y, v), ))",
+    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
     "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
