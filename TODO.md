@@ -2,4 +2,4 @@
 
 - [x] Fix photonic.Swap to_tree/from_tree and perm attribute
 - [x] Add to_tree and from_tree round-trips for all remaining optyx.photonic Box subclasses
-- [ ] Add CHANGELOG.md entry
+- [WIP] @agy-photonic-731-2026-11-26 13:02 Add CHANGELOG.md entry
