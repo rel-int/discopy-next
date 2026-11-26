@@ -16,8 +16,8 @@
 - [x] 10.5 sampled check of strict homomorphisms: `strictness`
 - [x] 10.6 `Para` over an actegory: `actegory`
 - [x] 10.7 message passing as one diagram: `neural.diagram`, `stack`
-- [ ] land the fix of `Legs.forward` on an unbatched input into one point
-- [ ] land the fix of `stream.Ty` powers and `Stream.copy(Y, 0)` (branch `tommaso/stream-ty-power`)
+- [x] land the fix of `Legs.forward` on an unbatched input into one point
+- [x] land the fix of `stream.Ty` powers and `Stream.copy(Y, 0)` (branch `tommaso/stream-ty-power`)
 - [ ] re-measure `fft_from` with cuDNN on
 - [ ] merge `origin/main` and get CI green
 - [ ] split into one PR per slice (< 1000 lines each), in the order of the description, and close this one
