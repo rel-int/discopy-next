@@ -19,43 +19,25 @@ parameters it is the unique one out of the terms, by functoriality: see
     :toctree:
 
     Datatype
+    Interpretation
     Algebra
     LaxHomomorphism
-    Machine
-    Coalgebra
-    ToStream
 
 .. autosummary::
 
     chain
     plug
 
-The parameter of an algebra is copied into every constructor, which makes
-the fold of a term a lax algebra of the free monad of the datatype, in the
-2-category of parametric maps (*Categorical Deep Learning*, Appendix F and J).
-The free monad is the free category of the terms with holes, so every
-coherence law is a :class:`discopy.para.Reparam` between maps of a given shape,
-checked by the equation of its category: :meth:`Algebra.lift` is the free
-monad on maps, :meth:`Algebra.lift_reparam` on reparametrisations,
-:meth:`Algebra.unitality` and :meth:`Algebra.associativity` are the
-reparametrisations of the lax algebra, copies of the parameter, and
-:class:`LaxHomomorphism` the folds of a datatype that are lax and not tied.
-The base is the free copy-discard category: no box is copyable or
-discardable, so a reparametrisation by a box is rejected by every law
-where the parameter is copied twice or discarded.
-
-Dually, a coalgebra :math:`S \\to F(S)` of :math:`F(S) = (I \\to O \\times S)`
-(Mealy), :math:`O \\times (I \\to S)` (Moore) or :math:`O \\times S` (unfold)
-is a cell from an input and the delayed state to an output and the state, a
-:class:`Machine`. Its unfold is the feedback of the cell, the unique map into
-the final coalgebra without parameters. With parameters, the tied map is the
-homomorphism whose 2-cell is the copy of the parameters (App. J), a choice and
-not forced. The semantics are the monoidal
-streams of :mod:`discopy.stream`: the first steps are a finite diagram with
-one box for each time step and one initial state as input. A
-:class:`Coalgebra` is a functor out of them, sending every time step of a box
-to one cell and the initial state to one ``start``, sampled once and copied by
-the cell, and the unrolled image ties the cells by a copy of the parameter.
+The parameter of an algebra is copied into every constructor, a choice and
+not forced (Appendix J), which makes the fold of a term a lax algebra of the
+free monad of the datatype (*Categorical Deep Learning*, Appendix F). Every
+coherence law is a :class:`discopy.para.Reparam`, checked by the equation of
+its category: :meth:`Algebra.lift`, :meth:`Algebra.lift_reparam`,
+:meth:`Algebra.unitality` and :meth:`Algebra.associativity`, and
+:class:`LaxHomomorphism` for the folds that are lax and not tied. No box is
+copyable or discardable, so a reparametrisation by a box is rejected by every
+law that copies the parameter twice or discards it. The dual, the machines of
+:mod:`discopy.neural.machine`, builds on :class:`Interpretation`.
 
 Note
 ----
@@ -65,14 +47,12 @@ only, never swaps, copies or discards.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import reduce
 from typing import Any
 
-from discopy import feedback, markov, para, stream
+from discopy import markov, para
 from discopy.utils import assert_isinstance
-
-DIGITS = "0123456789"
 
 
 class Datatype:
@@ -168,16 +148,28 @@ class Datatype:
         Parameters:
             value : A nested tuple, the constructor name and its subterms.
         """
-        check_term(value)
-        name, *children = value
-        box = self.constructor(name)
+        box, children = self.unpack(value)
+        return markov.Diagram.id(self.data(box)).tensor(
+            *map(self.term, children)) >> box
+
+    def unpack(self, value: tuple) -> tuple:
+        """
+        The constructor and the children of a term ``(name, *children)``.
+
+        Parameters:
+            value : A nested tuple, the constructor name and its subterms.
+
+        Raises:
+            ValueError : If the value is not a tuple, the constructor is
+                unknown or the children are not as many as its arity.
+        """
+        if not isinstance(value, tuple) or not value:
+            raise ValueError(f"Expected (name, *children), got {value!r}.")
+        box, children = self.constructor(value[0]), value[1:]
         if len(children) != self.arity(box):
-            raise ValueError(f"{name} expects {self.arity(box)} children, "
-                             f"got {len(children)}")
-        inputs = reduce(lambda left, right: left @ right,
-                        map(self.term, children),
-                        markov.Diagram.id(self.data(box)))
-        return inputs >> box
+            raise ValueError(f"{box.name} expects {self.arity(box)} "
+                             f"children, got {len(children)}")
+        return box, children
 
     def substitute(self, term: markov.Diagram, *children: markov.Diagram
                    ) -> markov.Diagram:
@@ -264,17 +256,6 @@ def chain(n: int) -> tuple:
     return reduce(lambda term, _: ("Cons", term), range(n), ("Nil", ))
 
 
-def check_term(value: tuple):
-    """
-    Raise ``ValueError`` unless a value is a tuple ``(name, *children)``.
-
-    Parameters:
-        value : The candidate term.
-    """
-    if not isinstance(value, tuple) or not value:
-        raise ValueError(f"Expected (name, *children), got {value!r}.")
-
-
 def plug(dom, carrier, maps, identity) -> Any:
     """
     The tensor of ``maps`` on the wires of ``dom`` that are the carrier, in
@@ -308,9 +289,7 @@ def plug(dom, carrier, maps, identity) -> Any:
     atoms = [dom[i:i + 1] for i in range(len(dom))]
     parts = [next(queue) if atom == carrier else identity(atom)
              for atom in atoms]
-    if not parts:
-        return identity(dom)
-    return reduce(lambda left, right: left @ right, parts[1:], parts[0])
+    return parts[0].tensor(*parts[1:]) if parts else identity(dom)
 
 
 def require_parametric(algebra):
@@ -322,22 +301,6 @@ def require_parametric(algebra):
     """
     if not algebra.parametric:
         raise ValueError(f"{algebra.cod} is not a parametric category.")
-
-
-def is_parametric(cod) -> bool:
-    """
-    Whether a codomain is a category of parametric maps.
-
-    Parameters:
-        cod : The codomain of an algebra or a coalgebra.
-
-    Example
-    -------
-    >>> from discopy import python
-    >>> assert is_parametric(para.Markov[python.Function])
-    >>> assert not is_parametric(python.Function)
-    """
-    return isinstance(cod, type) and issubclass(cod, para.Symmetric)
 
 
 def check_param(images: dict, cod: type):
@@ -369,15 +332,51 @@ def check_param(images: dict, cod: type):
         raise ValueError(f"Expected one parameter, got {params}.")
 
 
+class Interpretation:
+    """
+    A functor into a category ``cod``, whose images share one parameter,
+    tied by one copy, when ``cod`` is a category of parametric maps. It
+    reads the fields ``cod`` and ``param`` of the dataclass it is mixed in.
+
+    Example
+    -------
+    >>> from discopy import python
+    >>> class Plain(Interpretation):
+    ...     cod = python.Function
+    >>> class Net(Interpretation):
+    ...     cod = para.Markov[python.Function]
+    >>> assert Net().parametric and not Plain().parametric
+    """
+    cod: type
+    param: Any
+
+    @property
+    def parametric(self) -> bool:
+        """ Whether the codomain is a category of parametric maps. """
+        return isinstance(self.cod, type)\
+            and issubclass(self.cod, para.Symmetric)
+
+    def tie(self, image, uses: int):
+        """
+        The image with its parameter copied ``uses`` times, if parametric.
+
+        Parameters:
+            image : The image of a term.
+            uses : The number of parameters it uses.
+        """
+        if not self.parametric:
+            return image
+        return image.reparam(self.cod.category.copy(self.param, uses))
+
+
 @dataclass
-class Algebra:
+class Algebra(Interpretation):
     """
     An algebra of a datatype: one image for each constructor in a category
     ``cod``, i.e. a functor out of the free category on the constructors.
     Its fold sends a term to its image. Without parameters it is the unique
     functor out of the terms. With parameters, the tied fold is the
-    homomorphism whose 2-cell is the copy of the parameters (App. J), a choice
-    and not forced: there is one for each choice of :math:`\\kappa`.
+    homomorphism whose 2-cell is the copy of the parameters (App. J).
 
     When ``cod`` is a category of parametric maps, the algebra has one
     parameter :math:`P` for all its constructors, each of which uses it as
@@ -439,18 +438,13 @@ class Algebra:
                 raise ValueError(f"No image for the constructor {box.name}.")
         types = (self.datatype.carrier, ) + tuple(
             self.datatype.data(box) for box in boxes)
-        for ty in types:
-            for i in range(len(ty)):
-                if ty[i:i + 1] not in self.ob_map:
-                    raise ValueError(f"No image for the atom {ty[i:i + 1]}.")
+        missing = [ty[i:i + 1] for ty in types for i in range(len(ty))
+                   if ty[i:i + 1] not in self.ob_map]
+        if missing:
+            raise ValueError(f"No image for the atom {missing[0]}.")
         if self.parametric:
             check_param({box.name: self.ar_map[box] for box in boxes},
                         self.cod)
-
-    @property
-    def parametric(self) -> bool:
-        """ Whether the codomain is a category of parametric maps. """
-        return is_parametric(self.cod)
 
     @property
     def param(self):
@@ -471,11 +465,7 @@ class Algebra:
         Parameters:
             term : The diagram of :meth:`Datatype.term`.
         """
-        image = self.functor(term)
-        if not self.parametric:
-            return image
-        return image.reparam(self.cod.category.copy(
-            self.param, len(term.boxes)))
+        return self.tie(self.functor(term), len(term.boxes))
 
     def lift(self, term: markov.Diagram, *maps, param=None
              ) -> para.Symmetric:
@@ -706,9 +696,8 @@ class LaxHomomorphism:
         Parameters:
             value : A nested tuple, see :meth:`Datatype.term`.
         """
-        check_term(value)
-        box = self.algebra.datatype.constructor(value[0])
-        folds = [self(child) for child in value[1:]]
+        box, children = self.algebra.datatype.unpack(value)
+        folds = [self(child) for child in children]
         return self.algebra.lift(box, *folds, param=self.param)\
             >> self.algebra.ar_map[box]
 
@@ -751,426 +740,3 @@ class LaxHomomorphism:
         return category.equation_factory(
             self.kappa >> self.param @ category.copy(param),
             self.kappa >> self.kappa @ param)
-
-
-class ToStream(markov.Functor):
-    """
-    The functor from diagrams to monoidal streams, sending an atom :math:`x`
-    to the sequence of types ``x0, x1, ...`` and every box to the sequence of
-    boxes of the same name and time step. A delayed atom is sent to the delay
-    of the sequence, preceded by the singleton of the atom itself: at the
-    first time step, where the delay is empty, this is the initial state.
-
-    Example
-    -------
-    >>> x = markov.Ty("x")
-    >>> image = ToStream()(x @ x.delay())
-    >>> print(image.now, "|", image.later.now)
-    x0 @ x | x1 @ x0
-    """
-    def __init__(self):
-        super().__init__(
-            ob_map=self.atom, ar_map=self.box,
-            cod=stream.Stream[markov.Diagram])
-
-    @staticmethod
-    def atom(atom: markov.Ty) -> stream.Ty:
-        """ The sequence ``x0, x1, ...`` of an atom ``x``. """
-        return stream.Ty.sequence(stream.Ty.base(str(atom)))
-
-    def box(self, box: markov.Box) -> stream.Stream:
-        """ The sequence of boxes ``f0, f1, ...`` of a box ``f``. """
-        return stream.Stream[markov.Diagram].sequence(
-            box.name, self(box.dom), self(box.cod))
-
-    def __call__(self, other):
-        if isinstance(other, feedback.Wire) and other.time_step:
-            state = str(other.reset())
-            initial = stream.Ty.singleton(stream.Ty.base(state))
-            return initial @ super().__call__(other)
-        return super().__call__(other)
-
-
-@dataclass
-class Machine:
-    """
-    A cell :math:`I \\otimes S^d \\to O \\otimes S` from an input and the
-    delayed state to an output and the next state, the uncurried coalgebra of
-    a Mealy, Moore or unfolding recurrent network. Its feedback is the
-    recurrent network, the unfold into the final coalgebra, see
-    `Categorical Deep Learning <https://arxiv.org/abs/2402.15332>`_, Figure 1.
-    Without parameters it is the unique map into it; with parameters, the tied
-    map has the copy of the parameters as 2-cell (App. J), a choice.
-
-    The unrolled network takes the initial state :math:`S` once, as its first
-    input, and the cell copies it where it needs to.
-
-    The names of the boxes and of the atoms of the cell must not end with a
-    digit: the atoms and boxes of the unrolling are named after their time
-    step, and the functor to streams keeps no other record of it than that
-    suffix, which :class:`Coalgebra` strips. A box reads the state only
-    through its last wires, as many delayed copies of ``mem`` as it needs, and
-    two boxes of the same name must have the same domain and codomain.
-
-    Parameters:
-        cell : The diagram from ``dom @ mem.delay()`` to ``cod @ mem``.
-        dom : The input :math:`I`, empty for an unfold.
-        cod : The output :math:`O`.
-        mem : The state :math:`S`, not delayed.
-
-    Raises:
-        ValueError : If the cell is not of this shape.
-
-    Example
-    -------
-    >>> from discopy.markov import Ty
-    >>> I, O, S = Ty("I"), Ty("O"), Ty("S")
-    >>> mealy = Machine.mealy(I, O, S)
-    >>> assert mealy.cell.dom == I @ S.delay() and mealy.cell.cod == O @ S
-    >>> unrolled = mealy.unroll(2)
-    >>> print(unrolled.dom, "->", unrolled.cod)
-    S @ I0 @ I1 @ I2 -> O0 @ O1 @ O2 @ S2
-    >>> [box.name for box in unrolled.boxes if box.name.startswith("mealy")]
-    ['mealy0', 'mealy1', 'mealy2']
-    >>> moore = Machine.moore(I, O, S)
-    >>> [box.name for box in moore.boxes]
-    ['output', 'update']
-    >>> assert moore.unroll(1).dom == Ty("S", "I0", "I1")
-    >>> assert Machine.unfold(O, S).unroll(1).dom == S
-    """
-    cell: markov.Diagram
-    dom: markov.Ty
-    cod: markov.Ty
-    mem: markov.Ty
-    boxes: tuple = field(init=False, repr=False, compare=False)
-
-    def __post_init__(self):
-        assert_isinstance(self.cell, markov.Diagram)
-        if any(wire.time_step for wire in self.mem.inside):
-            raise ValueError(f"The state {self.mem} must not be delayed.")
-        shape = (self.dom @ self.mem.delay(), self.cod @ self.mem)
-        if (self.cell.dom, self.cell.cod) != shape:
-            raise ValueError(
-                f"Expected a cell {shape[0]} -> {shape[1]}, got "
-                f"{self.cell.dom} -> {self.cell.cod}.")
-        self.boxes = self.generators()
-        for box in self.boxes:
-            self.reads(box)
-        names = [box.name for box in self.boxes]
-        names += [str(atom) for atom in self.atoms]
-        for name in names:
-            if name.endswith(tuple(DIGITS)):
-                raise ValueError(f"The name {name} ends with a digit.")
-
-    def generators(self) -> tuple:
-        """
-        The distinct generating boxes of the cell, i.e. without its copies,
-        discards and permutations, by name: the attribute :attr:`boxes`.
-
-        Raises:
-            ValueError : If two boxes of the same name differ in their domain
-                or codomain.
-        """
-        boxes = {}
-        for box in self.cell.boxes:
-            if isinstance(box, markov.Function):
-                continue
-            first = boxes.setdefault(box.name, box)
-            if (first.dom, first.cod) != (box.dom, box.cod):
-                raise ValueError(
-                    f"The boxes named {box.name} have different types: "
-                    f"{first.dom} -> {first.cod} and {box.dom} -> {box.cod}.")
-        return tuple(boxes.values())
-
-    @property
-    def atoms(self) -> tuple:
-        """ The distinct atoms of the types of the cell, never delayed. """
-        types = (self.dom, self.cod, self.mem) + tuple(
-            ty for box in self.boxes for ty in (box.dom, box.cod))
-        return tuple(dict.fromkeys(
-            markov.Ty(wire.name) for ty in types for wire in ty.inside))
-
-    def box(self, name: str) -> markov.Box:
-        """
-        The generating box of a given name.
-
-        Parameters:
-            name : The name of the box.
-        """
-        for box in self.boxes:
-            if box.name == name:
-                return box
-        names = [box.name for box in self.boxes]
-        raise ValueError(f"Unknown box {name!r}, expected {names}.")
-
-    def reads(self, box: markov.Box) -> int:
-        """
-        The number of times a box reads the delayed state, i.e. of copies of
-        ``mem.delay()`` that end its domain.
-
-        Parameters:
-            box : A generating box of the cell.
-
-        Raises:
-            ValueError : If the box reads another delayed wire.
-        """
-        delayed = sum(1 for wire in box.dom.inside if wire.time_step)
-        reads = delayed // len(self.mem) if self.mem else 0
-        state = self.mem.delay() ** reads
-        last = box.dom[len(box.dom) - len(state):]
-        if delayed != len(state) or last != state:
-            raise ValueError(
-                f"The domain {box.dom} of {box.name} must end with "
-                f"{reads} copies of {self.mem.delay()} and no other delayed "
-                "wire.")
-        return reads
-
-    @classmethod
-    def mealy(cls, dom: markov.Ty, cod: markov.Ty, mem: markov.Ty) -> Machine:
-        """
-        The Mealy machine :math:`S \\to (I \\to O \\times S)`: one box
-        ``mealy`` from ``dom @ mem.delay()`` to ``cod @ mem``.
-
-        Parameters:
-            dom : The input :math:`I`.
-            cod : The output :math:`O`.
-            mem : The state :math:`S`.
-        """
-        cell = markov.Box("mealy", dom @ mem.delay(), cod @ mem)
-        return cls(cell, dom, cod, mem)
-
-    @classmethod
-    def moore(cls, dom: markov.Ty, cod: markov.Ty, mem: markov.Ty) -> Machine:
-        """
-        The Moore machine :math:`S \\to O \\times (I \\to S)`: the box
-        ``output`` from ``mem.delay()`` to ``cod`` and the box ``update`` from
-        ``dom @ mem.delay()`` to ``mem`` read copies of the delayed state, so
-        that the output at a time step does not depend on its input.
-
-        Parameters:
-            dom : The input :math:`I`.
-            cod : The output :math:`O`.
-            mem : The state :math:`S`.
-        """
-        state = mem.delay()
-        output = markov.Box("output", state, cod)
-        update = markov.Box("update", dom @ state, mem)
-        cell = (dom @ markov.Diagram.copy(state) >> dom @ output @ state
-                >> markov.Diagram.swap(dom, cod) @ state >> cod @ update)
-        return cls(cell, dom, cod, mem)
-
-    @classmethod
-    def unfold(cls, cod: markov.Ty, mem: markov.Ty) -> Machine:
-        """
-        The unfolding machine :math:`S \\to O \\times S`: one box ``unfold``
-        from ``mem.delay()`` to ``cod @ mem`` and no input.
-
-        Parameters:
-            cod : The output :math:`O`.
-            mem : The state :math:`S`.
-        """
-        cell = markov.Box("unfold", mem.delay(), cod @ mem)
-        return cls(cell, markov.Ty(), cod, mem)
-
-    def feedback(self) -> markov.Diagram:
-        """ The recurrent network: the delayed feedback of the cell. """
-        return self.cell.feedback(dom=self.dom, cod=self.cod, mem=self.mem)
-
-    def to_stream(self) -> ToStream:
-        """ The functor to monoidal streams, see :class:`ToStream`. """
-        return ToStream()
-
-    def unroll(self, steps: int) -> markov.Diagram:
-        """
-        The first ``steps + 1`` time steps of the recurrent network, a finite
-        diagram whose boxes carry their time step in their name. Its first
-        input is the initial state, the state before the first step, which the
-        boxes of the first step read through the copies of the cell.
-
-        Parameters:
-            steps : The number of steps after the first one.
-        """
-        functor = self.to_stream()
-        initial = stream.Ty.singleton(
-            stream.Ty.base(*(str(wire) for wire in self.mem.inside)))
-        looped = functor(self.cell).feedback(
-            dom=functor(self.dom) @ initial, cod=functor(self.cod),
-            mem=functor(self.mem))
-        unrolled = looped.unroll(steps).now
-        size, state = len(self.dom), len(self.mem)
-        if not size:
-            return unrolled
-        inputs = unrolled.dom
-        swap = markov.Diagram.swap(inputs[size:size + state], inputs[:size])
-        return swap @ inputs[size + state:] >> unrolled
-
-
-@dataclass
-class Coalgebra:
-    """
-    A coalgebra of a machine: one image for each box of its cell, sending
-    every time step of a box to the same image, and the initial state
-    ``start`` which a box reads at the first time step instead of the
-    delayed state, a functor out of the unrolled machines.
-
-    When ``cod`` is a category of parametric maps, the images and the start
-    have the same parameter :math:`P`, which the unrolled image ties by one
-    copy :math:`P \\to P^{\\otimes k}`, :math:`k` being the number of boxes of
-    the unrolled diagram plus one for the start: the same cell with the same
-    weights at every time step. The start is placed once, before the first
-    step, and the copies of the cell, mapped to the copies of ``cod``, share
-    it: for a stochastic start, one sample is read by every box that reads the
-    state. The ``start`` is a field of its own, not an image of a box: a box
-    may be named ``start``.
-
-    The repr of a coalgebra is transparent only up to the maps it holds, as
-    that of an :class:`Algebra`.
-
-    Parameters:
-        machine : The machine.
-        ar_map : A map from the name of each box of the cell to its image,
-            from the image of its domain to that of its codomain.
-        ob_map : A map from the atoms of the cell to ``cod.ob``.
-        cod : The codomain category, a Markov category.
-        start : The arrow from the unit to the image of the state.
-
-    Raises:
-        ValueError : If a box or an atom has no image, if ``ar_map`` has a key
-            that is not a box, if an image or the start has another boundary
-            than expected or, in a parametric category, is not an arrow of
-            ``cod``, if the parameters differ or if the parameter is empty.
-
-    Example
-    -------
-    >>> from discopy import python
-    >>> from discopy.markov import Ty
-    >>> I, O, S = Ty("I"), Ty("O"), Ty("S")
-    >>> Int = python.Ty(int)
-    >>> F = Coalgebra(
-    ...     Machine.mealy(I, O, S),
-    ...     {"mealy": python.Function(
-    ...         lambda a, s: (a + s, 2 * s + a), Int @ Int, Int @ Int)},
-    ...     {I: Int, O: Int, S: Int}, python.Function,
-    ...     python.Function(lambda: 1, python.Ty(), Int))
-    >>> F(2)(1, 2, 3)
-    (2, 5, 11, 19)
-    """
-    machine: Machine
-    ar_map: dict
-    ob_map: dict
-    cod: type
-    start: Any
-
-    def __post_init__(self):
-        self.check()
-
-    def check(self):
-        """
-        Raise ``ValueError`` unless the boxes of the machine are exactly the
-        keys of ``ar_map``, every atom of the machine has an image, in a
-        parametric category the images and the start are arrows of ``cod``
-        with the same non-empty parameter, and the boundaries of the images
-        and of the start are the images of those of the boxes and of the
-        state.
-        """
-        boxes = self.machine.boxes
-        names = {box.name for box in boxes}
-        for box in boxes:
-            if box.name not in self.ar_map:
-                raise ValueError(f"No image for the box {box.name}.")
-        for name in self.ar_map:
-            if name not in names:
-                raise ValueError(f"No box {name} in the machine.")
-        for atom in self.machine.atoms:
-            if atom not in self.ob_map:
-                raise ValueError(f"No image for the atom {atom}.")
-        if self.parametric:
-            images = {box: self.ar_map[box.name] for box in boxes}
-            check_param(images | {"start": self.start}, self.cod)
-            if not self.param:
-                raise ValueError("Expected a non-empty parameter.")
-        for box in boxes:
-            self.check_boundary(box.name, self.ar_map[box.name], box.dom,
-                                box.cod)
-        self.check_boundary("start", self.start, markov.Ty(),
-                            self.machine.mem)
-
-    def ob(self, ty: markov.Ty):
-        """
-        The image of a type of the cell, delayed or not.
-
-        Parameters:
-            ty : A type of the machine.
-        """
-        return self.functor(markov.Ty(*(wire.name for wire in ty.inside)))
-
-    def check_boundary(self, name: str, image, dom: markov.Ty, cod: markov.Ty):
-        """
-        Raise ``ValueError`` unless an image goes from the image of ``dom`` to
-        the image of ``cod``.
-
-        Parameters:
-            name : The name of the box, for the error.
-            image : The image of the box.
-            dom : The domain of the box.
-            cod : The codomain of the box.
-        """
-        if (image.dom, image.cod) != (self.ob(dom), self.ob(cod)):
-            raise ValueError(
-                f"The image of {name} goes from {image.dom} to {image.cod}, "
-                f"expected {self.ob(dom)} -> {self.ob(cod)}.")
-
-    @property
-    def parametric(self) -> bool:
-        """ Whether the codomain is a category of parametric maps. """
-        return is_parametric(self.cod)
-
-    @property
-    def param(self):
-        """ The common parameter of the images, ``None`` if not parametric. """
-        return self.start.param if self.parametric else None
-
-    def atom(self, atom: markov.Ty):
-        """
-        The image of an atom of an unrolled machine, i.e. of an atom of the
-        cell at some time step.
-
-        Parameters:
-            atom : An atom of the cell followed by its time step.
-        """
-        return self.ob_map[markov.Ty(str(atom).rstrip(DIGITS))]
-
-    def image(self, box: markov.Box):
-        """
-        The image of a box of an unrolled machine: that of the box of the cell
-        of the same name, whatever its time step.
-
-        Parameters:
-            box : A box ``name + str(time_step)``.
-        """
-        return self.ar_map[box.name.rstrip(DIGITS)]
-
-    @property
-    def functor(self) -> markov.Functor:
-        """ The functor from the unrolled machines. """
-        return markov.Functor(
-            ob_map=self.atom, ar_map=self.image, cod=self.cod)
-
-    def __call__(self, steps: int):
-        """
-        The image of the unrolling of the machine to ``steps + 1`` time steps,
-        with the ``start`` before the first step: one sample, which the cell
-        copies. In a parametric category the copy of the parameter ties the
-        images of the boxes of the unrolled diagram and the start.
-
-        Parameters:
-            steps : The number of steps after the first one.
-        """
-        unrolled = self.machine.unroll(steps)
-        rest = self.cod.id(self.functor(unrolled.dom[len(self.machine.mem):]))
-        image = self.start @ rest >> self.functor(unrolled)
-        if not self.parametric:
-            return image
-        uses = sum(1 for box in unrolled.boxes
-                   if not isinstance(box, markov.Function)) + 1
-        return image.reparam(self.cod.category.copy(self.param, uses))
