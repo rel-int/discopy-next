@@ -7,7 +7,7 @@ drawing
     :template: module.rst
     :toctree: ../_api
 
-    drawing
+    planegraph
     backend
     typst_ast
     widget

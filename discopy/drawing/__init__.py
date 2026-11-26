@@ -1,9 +1,9 @@
 """
-DisCoPy's drawing modules: :mod:`~discopy.drawing.drawing` is the category of
-drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
-is sent by a functor; :mod:`~discopy.drawing.backend` renders them with
-matplotlib, TikZ or Typst; :mod:`~discopy.drawing.widget` shows them as
-interactive anywidget widgets in notebooks.
+DisCoPy's drawing modules: :mod:`~discopy.drawing.planegraph` is the
+category of drawings, i.e. labeled graphs embedded in the plane, onto which
+every diagram is sent by a functor; :mod:`~discopy.drawing.backend` renders
+them with matplotlib, TikZ or Typst; :mod:`~discopy.drawing.widget` shows
+them as interactive anywidget widgets in notebooks.
 """
 
 import os
@@ -12,7 +12,7 @@ from PIL import Image
 from tempfile import TemporaryDirectory
 
 from discopy.utils import Node, Point
-from discopy.drawing import backend, drawing
+from discopy.drawing import backend, planegraph
 from discopy.drawing.backend import (
     Backend,
     TikZ,
@@ -23,7 +23,7 @@ from discopy.drawing.backend import (
     COLORS,
     SHAPES,
 )
-from discopy.drawing.drawing import (
+from discopy.drawing.planegraph import (
     Point,
     PlaneGraph,
     Drawing,

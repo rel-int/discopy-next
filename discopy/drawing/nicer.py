@@ -59,7 +59,7 @@ from math import hypot, log
 from typing import TYPE_CHECKING, Callable, Sequence
 
 from discopy.drawing.backend import Backend
-from discopy.drawing.drawing import Drawing, Node, Point
+from discopy.drawing.planegraph import Drawing, Node, Point
 from discopy import messages
 from discopy.utils import text_width
 
