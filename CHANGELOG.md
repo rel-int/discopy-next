@@ -872,6 +872,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Deprecated
 
+- `discopy.drawing.drawing` is `discopy.drawing.planegraph`: the old module
+  still works, each of its names with a `DeprecationWarning` ([next#746]).
+
 - Every `Ob` but `cat.Ob` is `Wire` ([#566]), and `PRO` is `Nat` ([#727]):
   the old names still work, with a `DeprecationWarning`.
 
