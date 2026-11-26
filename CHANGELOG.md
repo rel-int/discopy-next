@@ -988,6 +988,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The power of a `stream.Ty` is that of the free monoid, `monoidal.List`'s,
+  rather than that of a coloured `monoidal.Ty`, which read a colour a stream
+  of types does not have: `x ** 0` is the empty stream rather than an
+  `AttributeError`, and `Stream.copy(x, 0)` the discard ([next#TBD]).
+
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
   `dagger` lambda set on the instance, so it pickles and so does every
