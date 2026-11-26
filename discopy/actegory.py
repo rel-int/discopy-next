@@ -23,8 +23,9 @@ Weights tie by copying them, which only a *deterministic* map can do: a random
 weight sampled once and copied is not one sampled twice. So the weights live in
 the cartesian category of Python functions and the data in the stochastic
 channels of the subdistribution monad, and the copy of ``M`` is natural
-whatever the data are: this is the weight tying of a lax algebra over a
-cartesian ``M``. The tensor of parametric maps is left out, since it needs a
+whatever the data are: this is the copy of the parameters of App. J. Thm G.10
+makes it canonical for lax algebras over a cartesian base, which is not built
+here. The tensor of parametric maps is left out, since it needs a
 monoidal structure on ``C`` compatible with the action.
 
 For the self-action ``X ◁ P = X @ P`` of a symmetric category, :class:`Para` is
