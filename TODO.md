@@ -4,4 +4,4 @@
 
 - [x] Rename docs/_ext/bases-fullname.py to bases.py
 - [x] Rename discopy.drawing.drawing to discopy.drawing.planegraph, the old module a deprecated alias
-- [ ] Changelog entry
+- [WIP] @T-dc6d2cec-2026-11-26 13:04 Changelog entry
