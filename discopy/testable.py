@@ -1305,6 +1305,39 @@ class Slot[**P, T](Declaration[P, T]):
             name, bases, exec_body=lambda body: body.update(namespace))
 
 
+@dataclass(repr=False)
+class Generator[**P, T](Slot[P, T]):
+    """
+    A :class:`Slot` whose class is the conclusion of an inference rule with
+    no morphism among its premises, e.g. the braid of two atoms is
+    :meth:`discopy.abc.BraidedCategory.braiding`. Every box it builds reads
+    the rule as its ``rule`` and the objects the rule takes as its
+    ``premises``, so that a functor sends it to the rule of its codomain on
+    the image of its premises, see :meth:`discopy.cat.Functor.__call__`,
+    rather than each level matching the class of its boxes.
+
+    Parameters:
+        rule : The rule the generator concludes.
+
+    Example
+    -------
+    >>> from discopy.abc import BraidedCategory
+    >>> from discopy.braided import Braid, Ty
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Braid.rule.function is BraidedCategory.braiding.function
+    >>> assert Braid(x, y).premises == {"x": x, "y": y}
+    >>> assert Braid(x, y).rule(**Braid(x, y).premises) == Braid(x, y)
+    """
+    rule: Rule = None  # ty: ignore[invalid-assignment]
+
+    __hash__ = Declaration.__hash__
+
+    def __set_name__(self, owner: type, name: str):
+        super().__set_name__(owner, name)
+        self.function.rule = classproperty(
+            lambda cls, rule=self.rule: rule.bind(cls.factory))
+
+
 def slots(category: type) -> dict[str, Slot]:
     """
     The slots of a ``category``, by name, those of its subclasses overriding
@@ -1401,16 +1434,25 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
                 if isinstance(value, kind)}
 
     @classmethod
-    def slot[S: type](cls, root: S) -> S:
+    def slot[S: type](cls, root: S | Rule) -> S | Callable[[S], S]:
         """
         Declare a class as a :class:`Slot` of ``cls`` named after it, e.g.
         ``@Diagram.slot`` above ``class Swap`` binds ``Diagram.Swap``, which
-        every level below builds a subclass of.
+        every level below builds a subclass of, or, given a rule, as the
+        :class:`Generator` concluding it, e.g.
+        ``@Diagram.slot(BraidedCategory.braiding)`` above ``class Braid``,
+        which defines the ``premises`` of its boxes.
         """
-        slot = Slot(root)
-        slot.__set_name__(cls, root.__name__)
-        setattr(cls, root.__name__, slot)
-        return root
+        if isinstance(root, Rule):
+            return lambda klass: cls.declare(Generator(klass, rule=root))
+        return cls.declare(Slot(root))
+
+    @classmethod
+    def declare[S: type](cls, slot: Slot[..., S]) -> S:
+        """ Bind a :class:`Slot` to ``cls`` under the name of its class. """
+        slot.__set_name__(cls, slot.function.__name__)
+        setattr(cls, slot.function.__name__, slot)
+        return slot.function
 
     @classmethod
     def extend[S: type](cls, extension: S) -> S:

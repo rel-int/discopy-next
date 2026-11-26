@@ -1487,6 +1487,13 @@ which JSON cannot hold.
                 and issubclass(self.cod, DaggerCategory)\
                 and self.cod.has_dagger():
             return self(other.dagger()).dagger()
+        if isinstance(other, Box) and not other.is_dagger\
+                and (rule := getattr(other, "rule", None)) is not None\
+                and isinstance(image := getattr(
+                    self.cod, rule.name, None), type(rule)):
+            return image(**{
+                key: self(value) if isinstance(value, Ob) else value
+                for key, value in other.premises.items()})
         if isinstance(other, Box):
             result = self.ar_map[other]
             # This allows some nice syntactic sugar for the ar mapping.

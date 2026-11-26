@@ -202,7 +202,7 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         return match.substitute(target)  # ty: ignore[invalid-return-type]
 
 
-@Diagram.slot
+@Diagram.slot(BraidedCategory.braiding)
 class Braid(BinaryBoxConstructor, Diagram.Box):
     """
     The braiding of atomic types :code:`left` and :code:`right`.
@@ -233,6 +233,11 @@ class Braid(BinaryBoxConstructor, Diagram.Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.left, self.right, self.is_dagger
+
+    @property
+    def premises(self) -> dict[str, monoidal.Ty]:
+        """ The atoms the braid is the :meth:`rule` of. """
+        return {"x": self.left, "y": self.right}
 
     def __repr__(self):
         str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
@@ -313,12 +318,6 @@ class Functor(monoidal.Functor):
             The codomain, :code:`Diagram` by default.
     """
     dom = cod = Diagram
-
-    def __call__(self, other):
-        if isinstance(other, Braid) and not other.is_dagger\
-                and hasattr(self.cod, "braid"):
-            return self.cod.braid(self(other.dom[0]), self(other.dom[1]))
-        return super().__call__(other)
 
 
 Id = Diagram.id
