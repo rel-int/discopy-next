@@ -1249,9 +1249,10 @@ class Backend(ABC):
         centred in the box, and return the centre of the box's label, in the
         given ``corner``: the one opposite its cut corner, i.e. its top left
         but for its variants. Their wires plug into the edges of their slots,
-        with a margin of the box's colour between one and the next. A reflected
-        drawing reflects them, the last on top, and a transposed box or a
-        conjugate turns them half way round, as it is turned itself.
+        with a margin of the box's colour between one and the next. They are
+        reflected, turned and reordered as the box is: a dagger reflects them
+        along the horizontal axis, the last on top, a conjugate along the
+        vertical one, and a transpose turns them half way round.
         """
         nested, margin = box.nested, DEFAULT["nested_margin"]
         width = sum(drawing.width for drawing in nested)\
@@ -1260,8 +1261,11 @@ class Backend(ABC):
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
         bottom, top = min(y for _, y in corners), max(y for _, y in corners)
         x, y = (left + right - height) / 2, (bottom + top - width) / 2
-        turn = bool(box.is_transpose or box.is_conjugate)
-        flip, offset = box.mirror_nested != turn, 0
+        # The reflection along the horizontal axis of a dagger, along the
+        # vertical one of a conjugate and along both, a half turn, of a
+        # transpose.
+        flip = not box.is_conjugate and bool(box.is_dagger or box.is_transpose)
+        turn, offset = bool(box.is_conjugate or box.is_transpose), 0
         for drawing in nested:
             low = y + offset if flip else y + width - offset - drawing.width
             self.draw_polygon(

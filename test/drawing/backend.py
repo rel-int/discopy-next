@@ -1201,9 +1201,11 @@ def test_left_to_right_args_in_the_variants_of_a_box():
         assert abs((min(slot_xs) - min(xs)) - (max(xs) - max(slot_xs))) < 1e-9
         (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
         turned = name in ("transpose", "conjugate", "reflected")
-        assert (f_at.y < g_at.y) == (name in ("transpose", "conjugate"))
-        f_input = min(  # The label of the wire into f, its x or its y.
-            recorder.texts["y" if name in ("dagger", "conjugate") else "x"],
+        # The args are reflected or turned with the box: a reflection along
+        # the horizontal axis, alone or in a half turn, puts the last on top.
+        assert (f_at.y < g_at.y) == (name in ("dagger", "transpose"))
+        f_input = min(  # The label of the wire into f, as it was drawn in W.
+            recorder.texts["x"],
             key=lambda p: abs(p.y - f_at.y))
         assert (f_input.x > f_at.x) == turned
         # A label hangs along its wire: from its end on the right if turned.

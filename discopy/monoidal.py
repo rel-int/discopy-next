@@ -2690,7 +2690,10 @@ class Box(cat.Box, Diagram):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
-            framed = [arg.framed() for arg in args]
+            # The dagger of a box daggers its args, which its drawing does as
+            # it reflects them with the box: draw them as they were.
+            framed = [(arg[::-1] if self.is_dagger else arg).to_drawing()
+                      .framed() for arg in self.args]
             height = max(arg.height for arg in framed)
             nested = tuple(
                 arg.stretch(height - arg.height) for arg in framed)

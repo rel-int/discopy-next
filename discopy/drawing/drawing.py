@@ -1390,7 +1390,6 @@ which to_drawing recomputes.
             if getattr(box, "nested", None):
                 # The reflection of a transpose is a conjugate, and back.
                 vars(result).update(
-                    mirror_nested=not box.mirror_nested,
                     is_transpose=box.is_conjugate,
                     is_conjugate=box.is_transpose)
             return result
