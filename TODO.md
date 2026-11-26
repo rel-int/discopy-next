@@ -9,7 +9,7 @@
 - [x] cat and monoidal on slots, equation_factory becomes Equation
 - [x] The symmetric spine on slots: braided, balanced, traced, symmetric, markov, comarkov, spacial
 - [ ] Dualities on slots: rigid, pivotal, ribbon, compact, frobenius, tensor (dtype fix), hypergraph, cmap
-- [ ] Exponentials and time on slots: biclosed, closed, feedback, stream, bang, interaction
+- [x] Exponentials and time on slots: biclosed, closed, feedback, stream, bang, interaction
 - [ ] Terms on slots, on Ty and TermBase
 - [ ] Applications on slots: lambek, quantum, optyx, neural, peirce, egraph and the rest
 - [ ] Generator(Slot, Rule): rule and premises on root classes, one functor dispatch through box.rule, Rule.admissible
