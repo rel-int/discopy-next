@@ -306,7 +306,7 @@ def test_types_without_wires_are_their_own_delay():
               frobenius.Dim(2, 3), Dims(2, 3)):
         assert x.delay() == x.delay(2) == x.head == x.tail == x
     f = frobenius.Box('f', frobenius.Nat(1), frobenius.Nat(1))
-    assert f.delay() == f
+    assert f.delay().dom == f.dom and f.delay().time_step == 1
 
 
 def test_split_memory_bounds():
@@ -340,29 +340,42 @@ def test_traced_wildcard_import():
     assert namespace['Box'] is Box and namespace['Trace'] is Trace
 
 
-def test_traced_levels_with_duals_delay_trivially():
+def test_delayed_pivotal_diagrams():
+    from discopy import pivotal
+    x = pivotal.Ty('x')
+    cup, cap = pivotal.Cup(x, x.r), pivotal.Cap(x.r, x)
+    snake = x @ cap >> cup @ x
+    assert snake.delay() == x.d @ pivotal.Cap(x.r.d, x.d)\
+        >> pivotal.Cup(x.d, x.r.d) @ x.d
+    assert cup.delay().dagger() == cup.dagger().delay()
+    f = pivotal.Box('f', x, x @ x)
+    for g in (f.delay().dagger(), f.delay().r, f.delay().l):
+        assert g.time_step == 1
+    assert f.delay().dagger() == f.dagger().delay()
+    assert f.delay().r == f.r.delay()
+    for box in (f.delay().dagger(), f.delay().r.dagger()):
+        assert eval(repr(box), {'pivotal': pivotal}) == box
+
+
+def test_traced_levels_with_duals():
     from discopy import compact, frobenius, pivotal, ribbon
-    from discopy.quantum.circuit import Box as Gate, qubit
     for module in (pivotal, ribbon, compact, frobenius):
         x = module.Ty('x')
         f = module.Box('f', x @ x, x @ x)
-        assert x.delay() == x and f.delay() == f == f.delay(2)
-        assert f.feedback() == f.trace() == module.Trace(f)
-        assert f.feedback(left=True) == module.Trace(f, left=True)
+        assert x.delay() != x and x.delay().r == x.r.delay()
+        assert f.trace() == f.feedback() == module.Trace(f)
+        assert f.trace(left=True) == module.Trace(f, left=True)
         assert f.trace().open_traces() == x @ module.Diagram.caps(x, x.r)\
             >> f @ x.r >> x @ module.Diagram.cups(x, x.r)
         assert module.Trace(f, mem=x @ x).open_traces()\
             == f.trace(2).open_traces()
-        stream = module.FollowedBy(x)
-        assert stream.delay() == stream
-        assert (stream >> stream.dagger()).delay()\
-            == stream.delay() >> stream.dagger().delay()
-        for timed in (lambda: pivotal.Wire('x', time_step=1),
-                      lambda: module.Box('f', x, x, time_step=1)):
-            with raises(AxiomError):
-                timed()
-    g = Gate('g', qubit, qubit)
-    assert qubit.delay() != qubit and g.delay().time_step == 1
+        assert f.delay().trace() == f.trace().delay()
+        g = module.Box('g', x @ x.delay(), x @ x)
+        assert isinstance(g.feedback(), module.Feedback)
+        assert not isinstance(g.feedback(), module.Trace)
+        assert g.feedback().open_traces() == g.feedback()
+    spider = frobenius.Spider(1, 2, frobenius.Ty('x'))
+    assert spider.delay() == frobenius.Spider(1, 2, frobenius.Ty('x').d)
 
 
 def test_stream_boxes_raise_into_a_codomain_without_streams():
@@ -380,13 +393,19 @@ def test_stream_boxes_raise_into_a_codomain_without_streams():
 
 
 def test_time_stepped_wires_below_feedback():
-    from discopy import compact
+    from discopy import compact, frobenius, pivotal
     from discopy.feedback import closed, markov
     x = markov.Ty('x')
     assert x.delay() != x and x.delay().inside[0].time_step == 1
     f = markov.Box('f', x @ x.delay(), x @ x)
     assert isinstance(f.feedback(), markov.Feedback)
     assert isinstance(markov.Box('g', x @ x, x @ x).trace(), markov.Trace)
+    y = pivotal.Ty('y')
+    assert y.delay().l == y.l.delay() and y.delay().l.l == y.delay()
+    g = pivotal.Box('g', y @ y.delay(), y @ y)
+    assert isinstance(g.feedback(), pivotal.Feedback)
+    assert g.delay().time_step == 1
+    assert frobenius.Ty('z').delay().r == frobenius.Ty('z').r.delay()
     y = closed.monoidal.Ty('y')
     g = closed.monoidal.Box('g', y @ y.delay(), y @ y)
     assert isinstance(g.feedback(), closed.monoidal.Feedback)
@@ -401,7 +420,7 @@ def test_time_stepped_wires_below_feedback():
     for level in (closed.monoidal, closed.markov):
         z = level.Ty('z')
         F = level.Functor({z: compact.Ty('z')}, {}, cod=compact.Diagram)
-        assert F(level.Eval(z << z).delay()) == F(level.Eval(z << z))
+        assert F(level.Eval(z << z).delay()) == F(level.Eval(z << z)).delay()
 
 
 def test_FollowedBy_delay():
@@ -535,12 +554,12 @@ def test_structural_boxes():
 
 def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
     import pickle
-    from discopy import feedback
+    from discopy import compact, feedback, frobenius, pivotal, ribbon
     from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.utils import dumps, loads
-    modules = (feedback, balanced, symmetric, markov, comarkov,
-               closed.monoidal, closed.balanced, closed.symmetric,
-               closed.markov)
+    modules = (feedback, balanced, symmetric, markov, comarkov, pivotal,
+               ribbon, compact, frobenius, closed.monoidal, closed.balanced,
+               closed.symmetric, closed.markov)
     namespace = {module.__name__.split('.')[-1]: module for module in modules}
     for module in modules:
         x, y = module.Ty('x'), module.Ty('y')

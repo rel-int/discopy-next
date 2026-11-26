@@ -101,7 +101,7 @@ class Layer(feedback.symmetric.Layer, pivotal.Layer):
 class Diagram(ribbon.Diagram, traced.Diagram, CompactCategory):
     """
     A compact diagram is a ribbon diagram and a symmetric closed feedback
-    diagram, whose delay is the identity by default.
+    diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.

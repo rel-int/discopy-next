@@ -106,7 +106,7 @@ from discopy.utils import from_tree
 class Diagram(pivotal.Diagram, traced.Diagram, RibbonCategory):
     """
     A ribbon diagram is a pivotal diagram and a balanced closed feedback
-    diagram, whose delay is the identity by default.
+    diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.

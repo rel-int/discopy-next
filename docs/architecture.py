@@ -17,7 +17,7 @@ HEAD = [
     ("feedback", "feedback", "a delay and a trace"),
     ("closed", "closed", "exponentials"),
     ("feedback.closed", "feedback.closed", "both"),
-    ("duals", None, "delay = identity")]
+    ("duals", None, "trace = cups at delay 0")]
 NOTE = {"feedback.closed.monoidal": "no Int here"}
 GRID = [
     [["cat"], ["linear.cat"], [], [], [], []],

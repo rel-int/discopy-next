@@ -146,9 +146,6 @@ RIGID_HAS_NO_DAGGER = (
     "Rigid cups and caps have no dagger, use pivotal instead.")
 TRACE_HAS_NO_ROTATION = (
     "A trace rotates only in a pivotal category, {} has no rotation.")
-TIME_STEP_WITHOUT_DELAY = (
-    "Got time step {}, but the delay of this category is the identity: "
-    "use a category with a delay of its own, e.g. discopy.feedback.")
 FEEDBACK_HAS_NO_ROTATION = (
     "Feedback and feedforward have no rotation, only a trace does: the "
     "half-turn of a delayed feedback would feed its memory forward in time.")

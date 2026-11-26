@@ -10,7 +10,9 @@ think we finally got round to a convincing hierarchy, write it that way", with
 "ha yes ofc rigid sits under closed.monoidal which replaces the current biclosed, never liked
 that word anyway" and "rename it in the abc too, ClosedMonoidalCategory vs
 ClosedSymmetricCategory". His analogy for the delay of a level with duals: "every symmetric
-category is balanced (with the trivial twist)".
+category is balanced (with the trivial twist)". A first draft took it for the free levels too,
+with an identity delay and a time step that raised; on review he asked "why can't we have
+pivotal with time steps?", and the identity delay moved to the semantics.
 
 ## Decision
 
@@ -23,12 +25,17 @@ category is balanced (with the trivial twist)".
   `feedback.closed` level, free modules included: `pivotal` under `feedback.closed.monoidal`,
   `ribbon` under `feedback.closed.balanced`, `compact` under `feedback.closed.symmetric`,
   `frobenius` under `feedback.closed.markov` and `compact`.
-- On them the delay is the identity by default, as `CompactCategory.twist` is, so
-  `Feedback(f)` is `Trace(f)`, and a wire or a box built with a time step raises rather than
-  being reset in silence. `Trace` stays a box of its own, as `Spider(0, 2)` stays distinct
-  from `Cup`, and `PivotalCategory.trace_duals` equates it with a cap, `f` and a cup. A semantic
-  category may choose another delay, a strong monoidal endofunctor, which preserves duals; in a
-  `HypergraphCategory` it preserves the spiders too, `spider_delay`.
+- On them the delay is the free one: `x.delay() != x`, and it is strong monoidal, so it
+  commutes with the duals, `x.delay().r == x.r.delay()`, and cups, caps and snakes go through
+  it; in a `HypergraphCategory` it preserves the spiders too, `spider_delay`. At delay zero the
+  feedback is `Trace(f)`, a box of its own, as `Spider(0, 2)` stays distinct from `Cup`, and
+  `PivotalCategory.trace_duals` equates it with a cap, `f` and a cup, which
+  `Diagram.open_traces` computes. The feedback of a delayed memory stays a primitive
+  `Feedback` box, not reduced through cups.
+- The identity delay is a property of semantics, as the identity twist is: `Tensor`, `Matrix`
+  and the like keep it, and a functor into them sends a time step to the identity, mapping a
+  delayed box that its `ar_map` does not map as the box itself. A functor into a codomain with
+  a delay of its own keeps the time steps.
 - `Head`, `Tail` and `FollowedBy` are carried down; a functor into a codomain without streams
   raises on them, as it did on a trace.
 - The planar level has no Int construction. It starts at `balanced`, and so does the theorem of
@@ -51,7 +58,9 @@ category is balanced (with the trivial twist)".
   `int/simplify.svg` also draws its nested traces as nested loops.
 - `compact.Swap` is not a `ribbon.Braid`, since the two `Box` chains cannot both be ordered by
   C3; `ribbon.DualRail` dispatches on `balanced.Braid` to keep sending it to dual rail braids.
-- The rotation and adjunction of pivotal diagrams hold, the feedback there being a trace.
+- A trace rotates, a delayed feedback does not: the rotation and adjunction of pivotal
+  diagrams fail on a `Feedback` box, as they did before.
+- Delay zero and no delay are not told apart yet: a time step is an `int`, zero by default.
 - No `letrec`: a cycle in a term is the push-before-pop of the relational machine calculus,
   [#734](https://github.com/rel-int/discopy-next/pull/734).
 

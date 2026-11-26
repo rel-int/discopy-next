@@ -2673,7 +2673,8 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
     ) -> Equation[Hom[C1, Delay[C1, Repeat[X, M]], Delay[C1, Repeat[X, N]]]]:
         """
         The delay preserves the spiders, i.e. it is a hypergraph functor:
-        the identity delay does, and so must one a semantic category chooses.
+        the free delay does, so does the identity delay of a semantic
+        category, and so must any other delay it chooses.
         """
         return cls.equation_factory(
             cls.spiders(m, n, x).delay(),

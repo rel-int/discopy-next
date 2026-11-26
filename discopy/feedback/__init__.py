@@ -1310,7 +1310,9 @@ class Sum(monoidal.Sum, Box):
 class Functor(monoidal.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
-    and traces.
+    and traces. Into a codomain whose delay is the identity, e.g.
+    :class:`discopy.tensor.Tensor`, a delayed box that :code:`ar_map` does
+    not map goes to the image of the box itself, as its delay does.
 
     Parameters:
         ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
@@ -1392,6 +1394,11 @@ class Functor(monoidal.Functor):
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),
                 mem=self(other.mem), **left)
+        if isinstance(other, Box) and other.time_step:
+            try:
+                return super().__call__(other)
+            except KeyError:
+                return self(other.reset())
         return super().__call__(other)
 
 
@@ -1458,8 +1465,6 @@ def structural_boxes(
             if isinstance(vars(base).get(attr), type))]
         bases += own
         result[name] = subclass(name, bases, module, doc.format(level))
-        if box.delay is FeedbackCategory.delay:
-            result[name].delay = FeedbackCategory.delay
     for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])

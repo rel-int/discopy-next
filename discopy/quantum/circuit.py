@@ -96,8 +96,6 @@ class Wire(frobenius.Wire):
     with its dimension, but feel free to open a pull-request if you discover
     a third kind of information unit.
     """
-    delay = feedback.Wire.delay
-
     def __init__(self, name: str, dim=2, z=0, **params):
         assert_isinstance(self, (Digit, Qudit, HeadOb, TailOb))
         if isinstance(self, (HeadOb, TailOb)):
@@ -232,7 +230,6 @@ class Circuit(tensor.Diagram[complex]):
     sum_factory: ClassVar[type["Sum"]]
     permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
-    delay = feedback.Diagram.delay
 
     @classmethod
     def id(cls, dom: int | Ty | None = None):
@@ -958,7 +955,6 @@ class Box(tensor.Box[complex], Circuit):
         data : The array inside the box.
         is_mixed : Whether the box is mixed.
     """
-    delay = feedback.Box.delay
     serialised_attrs = tensor.Box.serialised_attrs + ("is_mixed", )
     eval = Circuit.eval
 

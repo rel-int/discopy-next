@@ -71,21 +71,10 @@ from typing import ClassVar
 
 from discopy import cat, cmap, messages, rigid, feedback
 from discopy.abc import (
-    DaggerCategory, DaggerMonoidalCategory, FeedbackCategory,
-    PivotalCategory, RigidCategory)
+    DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
 from discopy.feedback.closed import monoidal as planar
 from discopy.cat import factory
-from discopy.utils import AxiomError, deprecated_alias
-
-
-def assert_untimed(identity_delay: bool, time_step: int):
-    """
-    Raise :class:`AxiomError` for a time step at a level whose delay is the
-    identity, where it would mean nothing: a category with a delay of its
-    own, e.g. one whose wires are streams, keeps its time steps.
-    """
-    if identity_delay and time_step:
-        raise AxiomError(messages.TIME_STEP_WITHOUT_DELAY.format(time_step))
+from discopy.utils import deprecated_alias
 
 
 class Wire(feedback.Wire, rigid.Wire):
@@ -102,16 +91,14 @@ class Wire(feedback.Wire, rigid.Wire):
     Example
     -------
     >>> from discopy import pivotal
-    >>> x = Wire('x')
-    >>> assert x.l == x.r == Wire('x', 1) and x.l.l == x
-    >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r'
+    >>> x = Wire('x', time_step=2)
+    >>> assert x.l == x.r == Wire('x', 1, time_step=2) and x.l.l == x
+    >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r.d.d'
 
-    Its delay is the identity, so a time step means nothing and raises.
+    The delay is strong monoidal, so it commutes with the adjoints.
 
-    >>> Wire('x', time_step=2)
-    Traceback (most recent call last):
-    ...
-    discopy.utils.AxiomError: Got time step 2, but the delay of this ...
+    >>> y = Wire('y')
+    >>> assert y.delay().r == y.r.delay() and y.delay() != y
     """
     @property
     def l(self) -> Wire:
@@ -125,23 +112,6 @@ class Wire(feedback.Wire, rigid.Wire):
     def __repr__(self):
         return rigid.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
     windings = (0, 1)
-
-    def delay(self, n_steps=1) -> Wire:
-        """
-        The delay of a pivotal object is itself by default, as the twist of
-        a compact category is the identity: a category with another delay,
-        e.g. one whose wires are streams, overrides it with
-        :meth:`discopy.feedback.Wire.delay`.
-
-        >>> x = Wire('x')
-        >>> assert x.delay() == x == x.delay(2)
-        """
-        del n_steps
-        return self
-
-    def __init__(self, *args, time_step: int = 0, **params):
-        assert_untimed(type(self).delay is Wire.delay, time_step)
-        super().__init__(*args, time_step=time_step, **params)
 
     def dagger(self) -> Wire:
         """
@@ -159,7 +129,7 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 class Ty(rigid.Ty, planar.Ty):
     """
     A pivotal type is a rigid type with pivotal objects inside, and a
-    closed feedback type, whose delay is itself by default.
+    closed feedback type that can be delayed.
 
     Parameters:
         inside (Wire) : The objects inside the type.
@@ -190,9 +160,12 @@ class Layer(rigid.Layer, feedback.Layer):
 class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
     """
     A pivotal diagram is a rigid diagram and a closed feedback diagram
-    with pivotal types as domain and codomain. Its delay is the identity by
-    default, so that its feedback is its :class:`Trace`, a box of its own
-    which :meth:`open_traces` sends to a cap, the diagram and a cup.
+    with pivotal types as domain and codomain. Its delay is the free one,
+    strong monoidal so that it commutes with cups and caps. At delay zero,
+    its feedback is its :class:`Trace`, a box of its own which
+    :meth:`open_traces` sends to a cap, the diagram and a cup; the
+    feedback of a delayed memory stays a :class:`Feedback`, which is not
+    reduced through cups.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -201,7 +174,6 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
     """
     pivotality = PivotalCategory.pivotality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    delay = FeedbackCategory.delay
 
     def to_drawing(self):
         return rigid.Diagram.to_drawing(
@@ -323,8 +295,12 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
         .weaken(within=RigidCategory)
     dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
+    rotate_contravariance = PivotalCategory.rotate_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_ROTATION)
     rotate_contravariance_rigid = PivotalCategory.rotate_contravariance\
         .weaken(within=RigidCategory)
+    adjunction = PivotalCategory.adjunction.failing(
+        messages.FEEDBACK_HAS_NO_ROTATION)
     adjunction_rigid = PivotalCategory.adjunction.weaken(within=RigidCategory)
     dagger_involution_monoidal = None
     dagger_contravariance_monoidal = None
@@ -343,10 +319,8 @@ class Box(rigid.Box, planar.Box, Diagram):
         time_step (int) : The number of times the box has been delayed.
     """
     serialised_attrs = rigid.Box.serialised_attrs + ("time_step", )
-    delay = Diagram.delay
 
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
-        assert_untimed(type(self).delay is Diagram.delay, time_step)
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
         self._time_step = time_step
 

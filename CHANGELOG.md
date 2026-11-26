@@ -603,12 +603,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `feedback.closed.symmetric` are new, beside `feedback.closed.markov`: the
   free feedback categories over `closed.monoidal`, `feedback.balanced`,
   `closed.symmetric` and `closed.markov`, traced once the delay is the
-  identity, and `pivotal`, `ribbon`, `compact` and `frobenius` sit under them:
-  their delay is the identity by default, a time step there raises, so
-  their feedback is their
-  `Trace`, a box of its own that `Diagram.open_traces` sends to a cap, the
-  diagram and a cup, as `abc.PivotalCategory.trace_duals` says, and
-  `abc.HypergraphCategory.spider_delay` says the delay preserves spiders. A
+  identity, and `pivotal`, `ribbon`, `compact` and `frobenius` sit under them,
+  with the free delay, which commutes with cups and caps: at delay zero their
+  feedback is their `Trace`, a box of its own that `Diagram.open_traces`
+  sends to a cap, the diagram and a cup, as
+  `abc.PivotalCategory.trace_duals` says, the feedback of a delayed memory
+  stays a `Feedback` box, and `abc.HypergraphCategory.spider_delay` says the
+  delay preserves spiders. A functor into a codomain whose delay is the
+  identity, e.g. `Tensor`, sends a delayed box its `ar_map` does not map to
+  the image of the box. A
   category whose trace is not a box, e.g. tensors, circuits or optyx
   channels, takes `Diagram.dual_trace` as its `trace_factory`.
   `linear.symmetric` takes the swap for the exchange and `linear.markov` the
