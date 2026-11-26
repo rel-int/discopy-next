@@ -167,7 +167,7 @@ def test_cyclic_selection():
     torch, equivariant, factorised = modules()
     Kronecker = factorised.Kronecker
     action = Product[C3, C4].action()
-    assert Kronecker.fft_from == 64 and Kronecker(action, action).fft is None
+    assert Kronecker.fft_from == 96 and Kronecker(action, action).fft is None
     always = type("Always", (Kronecker, ), {"fft_from": 1})
     never = type("Never", (Kronecker, ), {"fft_from": 10 ** 6})
     for kind in (always, never):
@@ -444,9 +444,9 @@ def test_cases_slow():
 
 
 def test_cyclic_default():
-    """ The default path of a cyclic group is Dense on both sides of 64. """
+    """ A cyclic group is Dense on both sides of :attr:`fft_from`. """
     torch, equivariant, factorised = modules()
-    for n in (60, 63, 64, 96):
+    for n in (64, 95, 96, 128):
         action = Cyclic[n].action()
         fast = factorised.Kronecker(action, action)
         assert fast.fft is None
