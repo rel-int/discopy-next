@@ -6,6 +6,6 @@
 >
 > > docs/notebooks/strict_sloppy.md:93 — `gate` crashes for a valid all-zero state with no inputs: `tuples` is empty, so this call evaluates `Wn(0)`, which recurses forever.
 
-- [ ] assert the closed readings have an empty domain
+- [WIP] @T-01a1fa54-2026-11-26 12:10 assert the closed readings have an empty domain
 - [ ] make amplitudes refuse an imaginary part instead of dropping it
 - [ ] give Wn a base case with no outputs, the selection of the vacuum
