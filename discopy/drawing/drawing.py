@@ -963,8 +963,8 @@ which to_drawing recomputes.
             if target.kind != "cod":
                 return  # Otherwise we would have to reposition everything.
             x, _ = self.positions[dom_node]
-            _, y = self.positions[cod_node]
-            self.positions[cod_node] = Point(x, y)
+            for n in (cod_node, target):
+                self.positions[n] = Point(x, self.positions[n].y)
 
     @property
     def is_identity(self):
