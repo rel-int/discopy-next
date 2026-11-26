@@ -652,6 +652,8 @@ INAPPLICABLE = {
     "peirce.beta.{Head,FollowedBy}":
         "a head is a frobenius.HeadOb, not a wire of a beta graph",
     "peirce.alpha.Layer": "an alpha graph has no type of its own",
+    "quantum.{circuit,zx}.{Cup,Cap}":
+        "a circuit or a zx diagram makes its cups and caps of other boxes",
 }
 """
 The classes of box a level builds for a structure its objects do not have,

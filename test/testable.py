@@ -1,6 +1,7 @@
 """ DisCoPy's property-testing module in action. """
 
 import pickle
+import sys
 from typing import Self, TypeVar
 
 from hypothesis import Phase, find, settings
@@ -324,8 +325,10 @@ def test_canonical_instances():
     statement fails here before the property matrix ever searches for a
     counterexample. """
     for category in Testable.enrolled():
-        if not category.__module__.startswith("discopy."):
-            continue  # a category another test defines, e.g. the README's
+        if not category.__module__.startswith("discopy.") or getattr(
+                sys.modules[category.__module__], category.__qualname__,
+                None) is not category:
+            continue  # a category a test or a doctest defines
         box = getattr(category, "Box", None)
         if box is None or not (issubclass(box, category)
                                or issubclass(category, ColouredMonoid)):

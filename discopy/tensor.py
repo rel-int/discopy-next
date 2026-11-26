@@ -1100,7 +1100,7 @@ CMap = cmap.CMap[Diagram]
 
 
 @Diagram.extend
-class Box[dtype](frobenius.Box, Diagram[dtype]):
+class Box[dtype](frobenius.Diagram.Box, Diagram[dtype]):
     """
     A tensor box is a frobenius box with an array as data.
 
