@@ -2,4 +2,4 @@
 
 - [x] find the root cause of the wires bending into the boxes of the sloppy reading of #691
 - [x] fix it in the drawing code, with a regression test and a changelog entry
-- [ ] compare before and after renders of the sloppy reading and of a plain symmetric diagram
+- [x] compare before and after renders of the sloppy reading and of a plain symmetric diagram
