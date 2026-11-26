@@ -563,6 +563,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
+  alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -871,9 +874,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   contravariant on maps with loops ([next#445]).
 
 ### Deprecated
-
-- `discopy.drawing.drawing` is `discopy.drawing.planegraph`: the old module
-  still works, each of its names with a `DeprecationWarning` ([next#746]).
 
 - Every `Ob` but `cat.Ob` is `Wire` ([#566]), and `PRO` is `Nat` ([#727]):
   the old names still work, with a `DeprecationWarning`.
