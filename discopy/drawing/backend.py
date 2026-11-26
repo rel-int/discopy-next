@@ -1232,12 +1232,13 @@ class Backend(ABC):
         offset = 0
         for drawing in nested:
             offset += drawing.width
-            origin = Point(x, y + offset - drawing.width if box.is_dagger
+            origin = Point(x, y + offset - drawing.width if box.mirror_nested
                            else y + width - offset)
-            Transposed(self, origin, drawing, flip=box.is_dagger)\
+            Transposed(self, origin, drawing, flip=box.mirror_nested)\
                 .draw_drawing(drawing, **params)
             if offset < width:
-                edge = y + offset if box.is_dagger else y + width - offset
+                edge = y + offset if box.mirror_nested\
+                    else y + width - offset
                 self.draw_bezier([Point(x + t * height / 3, edge)
                                   for t in range(4)], adaptive=False)
         return Point((left + start) / 2, centre[1])

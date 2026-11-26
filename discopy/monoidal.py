@@ -2633,7 +2633,7 @@ class Box(cat.Box, Diagram):
         """
         box = super().rebuild(**changes)
         for attr in BOX_DRAWING_ATTRIBUTES:
-            if attr in vars(self) and attr not in vars(box):
+            if attr in vars(self) and attr not in changes:
                 setattr(box, attr, getattr(self, attr))
         if self.args and box.args:
             Box.bubble_drawing(
@@ -2693,14 +2693,18 @@ class Box(cat.Box, Diagram):
             width = sum(arg.width for arg in nested)
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
-            return Box(
+            box = Box(
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
                 min_width=max(label + height + .5,
                               getattr(self, "min_width", 0)),
-                height=max(width + 1,
-                           getattr(self, "height", 0))).to_drawing()
+                height=max(width + 1, getattr(self, "height", 0)))
+            # The box is drawn slanted as its own variant, its args as theirs.
+            box.is_dagger = self.is_dagger
+            for attr in ("is_transpose", "is_conjugate"):
+                setattr(box, attr, bool(getattr(self, attr, False)))
+            return box.to_drawing()
         method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),

@@ -1387,6 +1387,8 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "nested", None):
+                vars(result).update(mirror_nested=not box.mirror_nested)
             return result
 
         if self.is_box:

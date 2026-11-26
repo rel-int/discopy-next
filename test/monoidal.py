@@ -1559,3 +1559,10 @@ def test_Functor_reads_a_higher_level_type_as_itself():
     G = rigid.Functor({rigid.Ty('y'): rigid.Ty('z')}, {})
     F = Functor(lambda _: G(rigid.Wire('y')), {})  # G reads its own level
     assert F(Ty('x')) == rigid.Ty('z')
+
+
+def test_box_with_args_keeps_its_drawing_name():
+    f = Box('f', Ty('x'), Ty('x'))
+    bubble = f.bubble(drawing_name="g")
+    assert bubble[::-1].drawing_name == "g"
+    assert bubble[::-1][::-1].drawing_name == "g"

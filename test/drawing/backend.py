@@ -1136,3 +1136,45 @@ def test_frame_sides_have_an_edge_between_two_colours():
     Box('f', coloured, coloured).to_drawing().slot(None).draw(
         backend=coloured_slot)
     assert 0 not in coloured_slot.widths
+
+
+def test_left_to_right_args_in_a_dagger_box():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.polygons, self.texts = [], {}
+
+        def draw_polygon(self, *points, **params):
+            self.polygons.append(points)
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = j
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x, y = Ty('x'), Ty('y')
+    f, g = Primitive('f', x, y), Primitive('g', y, x)
+    W = Box('W', x, y, args=(f, g), drawing_name="W")
+    corners = {}
+    for name, diagram in [("W", W), ("dagger", W[::-1])]:
+        recorder = Recorder()
+        diagram.draw(backend=recorder, asymmetry=.25)
+        outline, = (  # The one shape with a corner shifted: the box.
+            p for p in recorder.polygons if len({x for x, _ in p}) == 3)
+        right = max(x for x, _ in outline)
+        corners[name] = next(y for x, y in outline if x == right)
+        assert recorder.texts["W"] is not None
+        assert recorder.texts["f"] > recorder.texts["g"]
+    assert corners["W"] < corners["dagger"]
