@@ -246,7 +246,7 @@ def test_traced_category_feedback_is_its_trace():
 def test_every_trace_takes_the_keyword_form():
     from inspect import signature
     from discopy import ribbon
-    from discopy.abc import keyword_form
+    from discopy.abc import FeedbackCategory
     from discopy.matrix import Matrix
     from discopy.python import Function
 
@@ -258,7 +258,7 @@ def test_every_trace_takes_the_keyword_form():
                   ribbon.Diagram.trace, Diagram.trace):
         assert list(signature(trace).parameters)\
             == ["self", "n", "left", "dom", "cod", "mem"]
-        assert keyword_form(trace) is trace
+        assert FeedbackCategory.keyword_form(trace) is trace
     f = Sub([[1, 1], [0, 0]], 2, 2)
     assert f.trace(mem=1) == f.trace() == Sub([[1]], 1, 1)
     assert f.trace(mem=1, left=True) == f.trace(left=True) == Sub([[0]], 1, 1)
@@ -520,7 +520,7 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
         assert delayed.args == (f, ) and (delayed.dom, delayed.cod) == (
             x.d, y.d)
         assert delayed.reset() == bubble and delayed != f.delay().bubble()
-        assert delayed == module.Bubble(f, time_step=1)
+        assert delayed == module.Bubble(f, time_step=1) == f.bubble(time_step=1)
         assert bubble.delay(2) == delayed.delay()
         assert delayed.dagger() == bubble.dagger().delay()
         assert (bubble >> h).delay() == delayed >> h.delay()

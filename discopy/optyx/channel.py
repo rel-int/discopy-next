@@ -235,7 +235,7 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError, factory_name
+from discopy.utils import AxiomError, factory_name, from_tree
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -1458,7 +1458,8 @@ class Diagram(frobenius.Diagram):
 
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
-        of a :class:`Diagram`.
+        of a :class:`Diagram`, or a formal
+        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
         assert self.is_pure, "Diagram must be pure to convert to path."
@@ -2006,7 +2007,7 @@ class Swap(Permutation, frobenius.Swap, Channel):
     dagger = frobenius.Swap.dagger
 
 
-class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
+class Feedback(Diagram, frobenius.Box):
     """
     A feedback loop connecting the last `mem` outputs of a channel diagram
     back to its last `mem` inputs, one time step later.
@@ -2062,14 +2063,16 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
         if self.effect.dom != mem:
             raise AxiomError(
                 f"{self.effect} is not an effect on the memory {mem}")
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, method="feedback_operator")
-        frobenius.Box.__init__(self, str(self), dom, cod)
+        self.args = (arg, )
+        frobenius.Box.__init__(self, str(self), dom, cod, args=(arg, ),
+                               method="feedback_operator")
 
     __str__ = diagram.Feedback.__str__
     __repr__ = diagram.Feedback.__repr__
     dagger = diagram.Feedback.dagger
     to_drawing = diagram.Feedback.to_drawing
+    to_tree = diagram.Feedback.to_tree
+    from_tree = classmethod(diagram.Feedback.from_tree.__func__)
     grad = Channel.grad
 
     def double(self):
@@ -2108,6 +2111,11 @@ class Measure(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dom!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of its domain, the one argument it is built from. """
+        return cls(from_tree(tree['dom']))
 
     def inflate(self, d):
         r""" A specific choice of inflation for the Measure channel.
@@ -2152,6 +2160,26 @@ class Encode(Channel):
         states = "" if self.internal_states is None else \
             f", internal_states={self.internal_states!r}"
         return f"{factory_name(type(self))}({self.dom!r}{states})"
+
+    def to_tree(self) -> dict:
+        """
+        The tree of a box, with the internal states of its modes if any.
+
+        >>> from discopy.utils import dumps, loads
+        >>> box = Encode(mode @ bit, internal_states=([1, 0], ))
+        >>> assert loads(dumps(box)) == box
+        """
+        tree = super().to_tree()
+        if self.internal_states is not None:
+            tree['internal_states'] = [
+                list(state) for state in self.internal_states]
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states', None)
+        return cls(from_tree(tree['dom']), None if states is None
+                   else tuple(map(list, states)))
 
     def inflate(self, d):
         r"""
@@ -2202,6 +2230,11 @@ class Discard(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dom!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of its domain, the one argument it is built from. """
+        return cls(from_tree(tree['dom']))
 
     def inflate(self, d):
         """

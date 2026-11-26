@@ -40,6 +40,10 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * the `Int`-construction, also called the [geometry of interaction](https://ncatlab.org/nlab/show/Geometry+of+Interaction), i.e. the free tortile/compact closed category on a balanced/symmetric traced category
 * constructions on categories: the opposite (`op`), parametric maps (`para`), lenses (`lens`), the Kleisli category of a monad (`kleisli`) with free monads and their algebras (`monad`), and the ribbon category of representations of a Hopf algebra (`hopf`)
 
+## How
+
+DisCoPy began as an implementation of [DisCoCat](https://en.wikipedia.org/wiki/DisCoCat) (distributional compositional categorical) models and [QNLP](https://en.wikipedia.org/wiki/Quantum_natural_language_processing) (quantum natural language processing). This application now lives in [`discopy.lambek`](https://docs.discopy.org/en/main/api/lambek.html).
+
 ## Quickstart
 
 ```shell

@@ -286,14 +286,16 @@ def cosine_similarity(SU, SV):
 ```python {.marimo}
 from cotengra import HyperCompressedOptimizer
 
-# cosine similarity between the result of exact contaction and approximate contraction for different chis
+# cosine similarity between exact and approximate contraction for each chi;
+# chi=1 truncates every bond to rank one and quimb's QR divides by zero,
+# rel-int/discopy-next#442
 errors = []
-for chi in range(1, 6):
+for chi in range(2, 6):
     optimiser = HyperCompressedOptimizer(
         chi=chi
     )
     error_for_chi = []
-    for _ in range(10):
+    for _ in range(3):
          error_for_chi.append(
              cosine_similarity(
                  fusion_teleportation.eval(QuimbBackend(optimiser)).tensor.array,
@@ -303,7 +305,7 @@ for chi in range(1, 6):
     errors.append(np.median(error_for_chi))
 
 import matplotlib.pyplot as plt
-plt.plot(range(1, 6), errors, marker='o')
+plt.plot(range(2, 6), errors, marker="o")
 plt.grid()
 plt.xlabel('Chi')
 plt.ylabel('Average cosine similarity')

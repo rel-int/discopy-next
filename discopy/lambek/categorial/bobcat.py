@@ -372,7 +372,9 @@ class Parser:  # pylint: disable=too-many-instance-attributes
         string, ``None`` if it has no parse: the best parse with a label for
         every span, else the best parse, as Bobcat's command line does. A
         sentence longer than the encoder reads is cut to the words it reads,
-        as the reproduction does.
+        as the reproduction does. Raw text is not tokenised here: split it
+        with :func:`discopy.lambek.tokenise.tokenise` and call the parser on
+        each of its sentences.
         """
         tree = self.derive(sentence)
         return None if tree is None else tree.to_diagram()

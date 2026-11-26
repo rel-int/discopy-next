@@ -599,6 +599,7 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_TYPE.format(factory))
     module = sys.modules.get(".".join(["discopy", *modules]))
     cls = getattr(module, factory, None)
+    cls = getattr(cls, "__self__", cls)  # an alias, e.g. Box.from_args
     if not is_discopy_class(cls):
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls
@@ -1555,6 +1556,8 @@ class RichDisplay:
         """ Draw as a standalone SVG string. """
         from io import StringIO
         buffer = StringIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="svg", show=False, **params)
         return buffer.getvalue()
@@ -1563,6 +1566,8 @@ class RichDisplay:
         """ Draw as PNG bytes. """
         from io import BytesIO
         buffer = BytesIO()
+        params.setdefault("left_to_right", getattr(
+            type(self), "draw_left_to_right", False))
         self.to_drawing().draw(
             path=buffer, format="png", show=False, **params)
         return buffer.getvalue()

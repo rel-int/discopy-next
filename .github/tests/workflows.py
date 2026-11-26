@@ -50,8 +50,8 @@ def pull_request(sha):
             "event": {"pull_request": {"number": 1}}}
 
 
-def schedule(sha, run_id):
-    return {"workflow": "w", "event_name": "schedule", "sha": sha,
+def dispatch(sha, run_id):
+    return {"workflow": "w", "event_name": "workflow_dispatch", "sha": sha,
             "ref": "refs/heads/main", "run_id": run_id, "event": {}}
 
 
@@ -76,20 +76,36 @@ def test_a_pull_request_supersedes_its_own_runs(concurrency):
         == "True"
 
 
-def test_a_scheduled_proptest_run_never_cancels_a_push():
-    """`proptest` is the only workflow on a schedule and a dispatch, and both
-    fire on the commit a push already ran on."""
+def test_a_dispatched_proptest_run_never_cancels_a_push():
+    """`proptest` is the only workflow on a dispatch, which fires on the
+    commit a push already ran on."""
     with open(GITHUB / "workflows" / "proptest.yml") as file:
         group = yaml.safe_load(file)["concurrency"]["group"]
-    assert evaluate(group, schedule("a", 1)) != evaluate(group, push("a"))
-    assert evaluate(group, schedule("a", 1))\
-        != evaluate(group, schedule("a", 2))
+    assert evaluate(group, dispatch("a", 1)) != evaluate(group, push("a"))
+    assert evaluate(group, dispatch("a", 1))\
+        != evaluate(group, dispatch("a", 2))
 
 
 @pytest.fixture
-def build_test():
+def build_jobs():
     with open(GITHUB / "workflows" / "build.yml") as file:
-        return yaml.safe_load(file)["jobs"]["test"]
+        return yaml.safe_load(file)["jobs"]
+
+
+@pytest.fixture
+def build_test(build_jobs):
+    return build_jobs["test"]
+
+
+def test_a_job_that_installs_graphviz_pins_its_image(build_jobs):
+    """`ubuntu-latest` resolved to two images inside one run, and graphviz is
+    not in the sources the Ubuntu 26.04 one ships, so a job that asks for it
+    passed or failed by the image it landed on (#595)."""
+    asks = [job for job in build_jobs.values() if any(
+        str(step.get("with", {}).get("graphviz")).lower() == "true"
+        for step in job["steps"])]
+    assert len(asks) == 2
+    assert all(job["runs-on"] != "ubuntu-latest" for job in asks)
 
 
 def test_a_push_to_main_measures_every_python_of_its_matrix(build_test):

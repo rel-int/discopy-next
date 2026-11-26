@@ -30,9 +30,9 @@ Summary
     Permutation
     Swap
     Spider
-    Bubble
     Sum
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -90,7 +90,8 @@ from typing import ClassVar, Self
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
     hypergraph, symmetric)
-from discopy.abc import HypergraphCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, HypergraphCategory)
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
@@ -103,14 +104,27 @@ class Wire(pivotal.Wire):
     A frobenius object is a self-dual pivotal object: its adjoints are the
     object itself the other way round, from its codomain to its domain.
 
+    It has one winding, so its winding number is read modulo one, i.e. it is
+    always zero.
+
     Parameters:
         name : The name of the object.
+        z : The winding number, zero up to its one winding.
 
     >>> from discopy.monoidal import Colour
     >>> x = Wire('x', dom=Colour('a'), cod=Colour('b'))
     >>> assert x.l == x.r and (x.l.dom, x.l.cod) == (x.cod, x.dom)
     >>> assert x.l.l == x and Wire('y').l == Wire('y')
+    >>> assert Wire('y', 1) == Wire('y') and Wire('y', 1).l.l == Wire('y')
     """
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.z %= len(self.windings)
+
+    def __init__(self, *args, **params):
+        super().__init__(*args, **params)
+        self.z %= len(self.windings)
+
     @property
     def l(self) -> Self:
         """ The object the other way round, from its codomain to its domain.
@@ -229,10 +243,13 @@ class Diagram(
     cap_factory: ClassVar[type["Cap"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
-    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -869,19 +886,6 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Bubble(compact.Bubble, markov.Bubble, comarkov.Bubble, Box):
-    """
-    A Frobenius bubble is a compact, Markov and comarkov bubble and a
-    frobenius box, which keeps its flags as it rotates.
-
-    >>> x = Ty('x')
-    >>> noisy = Box('f', x, x).bubble(is_deterministic=False)
-    >>> assert noisy.r.l == noisy and not noisy.r.l.is_deterministic
-    """
-    serialised_attrs = compact.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-
 class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
     """
     A Frobenius sum is a sum of Frobenius diagrams.
@@ -918,7 +922,8 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
         if isinstance(other, Cospan)\
                 and not isinstance(other, symmetric.Permutation):
             return self(other.to_spiders())
-        if isinstance(other, (markov.Copy, Bubble)):
+        if isinstance(other, markov.Copy)\
+                or isinstance(other, Box) and other.args:
             return markov.Functor.__call__(self, other)
         if isinstance(other, comarkov.Merge):
             return comarkov.Functor.__call__(self, other)
@@ -1001,8 +1006,8 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
@@ -1010,7 +1015,6 @@ Diagram.swap_factory = Swap
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.permutation_factory = Permutation
 Diagram.cospan_factory = Cospan
-Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
@@ -1026,3 +1030,6 @@ class Equation(compact.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args
