@@ -6,8 +6,8 @@
 no attribute 'dom'`, and so did `x ** 0` on a `stream.Ty`: its `__pow__` was that of a coloured `monoidal.Ty`, which
 returns the identity on the colour `self.dom` for `n <= 0`, and a stream of types has no colour.
 
-- [ ] `stream.Ty.__pow__` is the power of the free monoid, `monoidal.List.__pow__`: `x ** 0` is the unit `Ty()`
-- [ ] `Stream.copy(x, 0)` is the discard; no doctest, since `stream.py` is at pylint's limit of 1000 lines
-- [ ] tests in `test/stream.py`: powers of constant and non-constant streams, copies of 0 to 3 wires
-- [ ] a `Fixed` bullet in `CHANGELOG.md`
-- [ ] the stream cells of the property matrix and the tests of the touched modules
+- [x] `stream.Ty.__pow__` is the power of the free monoid, `monoidal.List.__pow__`: `x ** 0` is the unit `Ty()`
+- [x] `Stream.copy(x, 0)` is the discard; no doctest, since `stream.py` is at pylint's limit of 1000 lines
+- [x] tests in `test/stream.py`: powers of constant and non-constant streams, copies of 0 to 3 wires
+- [x] a `Fixed` bullet in `CHANGELOG.md`
+- [x] the stream cells of the property matrix and the tests of the touched modules
