@@ -344,13 +344,17 @@ class Rewrite[category](cat.Arrow, TestableGeneric):
         """
         Animate the rewrite, its :meth:`frames`, see
         :func:`discopy.drawing.to_gif`, which loops round a rewrite that ends
-        where it starts.
+        where it starts. Every frame is stretched to the height of the
+        tallest, see :meth:`discopy.drawing.Drawing.stretch`, so that its
+        boundary wires reach the top and the bottom of the gif.
 
         Parameters:
             tween : The number of frames for each layer and each laxator.
             params : Passed to :func:`discopy.drawing.to_gif`.
         """
         frames = self.frames(tween)
+        height = max(frame.height for frame in frames)
+        frames = [frame.stretch(height - frame.height) for frame in frames]
         params.setdefault("smooth_wires", tween > 1)
         params.setdefault("xlim", (0, max(frame.width for frame in frames)))
         params.setdefault("ylim", (0, max(frame.height for frame in frames)))
