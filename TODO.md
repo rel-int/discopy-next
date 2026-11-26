@@ -2,4 +2,4 @@
 
 - [x] Drop destructively measured qubits in to_tk when Measure(override_bits=True)
 - [x] Handle 0-d and requires_grad backend tensors in QuantumGate.__init__ without numpy.ravel, plus B904 in pennylane.py
-- [WIP] @agy-445-2026-11-26 12:53 Add CHANGELOG.md entry
+- [x] Add CHANGELOG.md entry
