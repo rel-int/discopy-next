@@ -336,9 +336,8 @@ def canonical(group: type) -> tuple[tuple[int, Callable], ...]:
     if issubclass(group, (Symmetric, Cyclic)) and group.n >= 2:
         factor = Factor((group.n, ), cyclic=issubclass(group, Cyclic)
                         and group.n >= 3)
-        return ((group.n, lambda: (
-            group.action(), Structure.of((factor, ), range(factor.orbits)))),
-        )
+        return ((group.n, lambda: (group.action(), Structure.of(
+            (factor, ), range(factor.orbits)))), )
     return ()
 
 

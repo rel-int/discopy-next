@@ -60,9 +60,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `neural.factorised` layers make fewer kernel launches per call: `Kronecker`
   gathers its weights only when its `tie` is not the identity, plans the axes
   of its terms once and sums them with `unbind`, and `Partitions` has a float
-  `mobius`, plans its
-  einsums once and sums the partitions that share an output pattern before
-  spreading them, with outputs and gradients unchanged ([next#740]).
+  `mobius`, plans its einsums once and sums the partitions that share an
+  output pattern before spreading them, with outputs and gradients unchanged
+  ([next#740]).
 
 - `neural.augment` uses a finite group on the data rather than on the
   weights: `augment` applies one random element to an input and its label as
@@ -80,6 +80,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#740]).
+
 - `neural.datatype` has `Datatype`, the constructors of a polynomial
   endofunctor, with the diagrams of its terms (lists, trees), and `Algebra`,
   one image for each constructor whose fold of a term is a functor, tied by
@@ -93,14 +94,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#740]).
 
-- `neural.datatype` has `Algebra.lift`, `Algebra.lift_reparam`, `Algebra.unitality`
-  and `Algebra.associativity`, the free monad on parametric maps and the
-  2-cells of the lax algebra of an algebra with a parameter, `Datatype.substitute` and
-  `plug`, the multiplication of the free monad, and `LaxHomomorphism`, the
-  folds of a datatype given by a map from the parameter to itself and the
-  parameter of the algebra, whose axioms are checked as equations: the
-  squares of Categorical Deep Learning, Appendix F and J, the copy being the
-  tied fold ([next#740]).
+- `neural.datatype` has `Algebra.lift`, `Algebra.lift_reparam`,
+  `Algebra.unitality` and `Algebra.associativity`, the free monad on
+  parametric maps and the 2-cells of the lax algebra of an algebra with a
+  parameter, `Datatype.substitute` and `plug`, the multiplication of the free
+  monad, and `LaxHomomorphism`, the folds of a datatype given by a map from
+  the parameter to itself and the parameter of the algebra, whose axioms are
+  checked as equations: the squares of Categorical Deep Learning, Appendix F
+  and J, the copy being the tied fold ([next#740]).
 
 - `para.Reparam` is a 2-cell of parametric maps as data, a reparametrisation
   between parallel maps, with `Reparam.of(f, r)` the 2-cell of `f.reparam(r)`,
@@ -108,8 +109,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `@`, and `is_invertible`; `para.UpToPermutation` compares maps up to the
   permutations of their parameters and of their coparameters, decided by
   `para.isomorphic`, an isomorphism of hypergraphs that keeps the boundary in
-  order, so that the laws of every para category that failed for want of a
-  reparametrisation now hold modulo it ([next#740]).
+  order ([next#740]).
 
 - `neural.network.Unroll(rounds, sequence=True)`, and the `sequence` option of
   `Network.unroll`, `to_function` and `to_lens`, read a trace as a stream: the

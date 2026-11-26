@@ -78,7 +78,7 @@ class Datatype:
     >>> L.term(("Cons", ("Nil", ), ("Nil", )))
     Traceback (most recent call last):
     ...
-    ValueError: Cons expects 1 children, got 2
+    ValueError: Cons expects 1 children, got 2.
     """
 
     def __init__(self, *constructors: markov.Box):
@@ -168,7 +168,7 @@ class Datatype:
         box, children = self.constructor(value[0]), value[1:]
         if len(children) != self.arity(box):
             raise ValueError(f"{box.name} expects {self.arity(box)} "
-                             f"children, got {len(children)}")
+                             f"children, got {len(children)}.")
         return box, children
 
     def substitute(self, term: markov.Diagram, *children: markov.Diagram
@@ -374,9 +374,7 @@ class Algebra(Interpretation):
     """
     An algebra of a datatype: one image for each constructor in a category
     ``cod``, i.e. a functor out of the free category on the constructors.
-    Its fold sends a term to its image. Without parameters it is the unique
-    functor out of the terms. With parameters, the tied fold is the
-    homomorphism whose 2-cell is the copy of the parameters (App. J).
+    Its fold sends a term to its image.
 
     When ``cod`` is a category of parametric maps, the algebra has one
     parameter :math:`P` for all its constructors, each of which uses it as

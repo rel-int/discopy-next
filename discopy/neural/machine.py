@@ -13,10 +13,7 @@ the final coalgebra without parameters. With parameters, the tied map is the
 homomorphism whose 2-cell is the copy of the parameters (App. J), a choice and
 not forced. The semantics are the monoidal streams of :mod:`discopy.stream`:
 the first steps are a finite diagram with one box for each time step and one
-initial state as input. A :class:`Coalgebra` is a functor out of them, sending
-every time step of a box to one cell and the initial state to one ``start``,
-sampled once and copied by the cell, and the unrolled image ties the cells by
-a copy of the parameter.
+initial state as input. A :class:`Coalgebra` is a functor out of them.
 
 .. autosummary::
     :template: class.rst
@@ -425,10 +422,7 @@ class Coalgebra(Interpretation):
 
     def __call__(self, steps: int):
         """
-        The image of the unrolling of the machine to ``steps + 1`` time steps,
-        with the ``start`` before the first step: one sample, which the cell
-        copies. In a parametric category the copy of the parameter ties the
-        images of the boxes of the unrolled diagram and the start.
+        The image of the unrolling of the machine to ``steps + 1`` time steps.
 
         Parameters:
             steps : The number of steps after the first one.

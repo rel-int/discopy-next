@@ -409,9 +409,8 @@ def reads(cmap: frobenius.CMap, rows: tuple, slots: list, dims: list
 
 def routes(layer: list[Box]) -> list[int]:
     """
-    The leg each input of a layer of boxes reads, in the domain the legs they
-    read from the boundary then those of the memory, in the order of their
-    outputs.
+    The input legs of a layer of boxes, as legs of the domain: the boundary
+    legs each box reads, then its own legs of the memory.
 
     Parameters:
         layer : The boxes, each reading the legs it writes after those it

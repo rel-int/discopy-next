@@ -18,4 +18,5 @@ def check_grads(module, reference):
     """ The weights of ``module`` have the gradients of ``reference``. """
     import torch
     for weight, expected in zip(module.weights, reference):
+        assert (weight.grad is None) == (expected.grad is None)
         assert torch.allclose(grad(weight), grad(expected), atol=1e-6)
