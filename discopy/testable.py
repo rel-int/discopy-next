@@ -1775,19 +1775,25 @@ class Equivalence(Testable):
         return bool(cls.Equation(*terms))
 
     @axiom
-    def reflexivity(cls, term: Self) -> "Equation":
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
+    def reflexivity(cls, term: Self) -> Equation:
         """ A term is related to itself. """
         return cls.Equation(term, term)
 
     @axiom
-    def symmetry(cls, terms: Related[Self]) -> "Equation":
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
+    def symmetry(cls, terms: Related[Self]) -> Equation:
         """ A term is related to another exactly when the other is to it. """
         first, _, third = terms
         return Equation(
             cls.equivalent(first, third), cls.equivalent(third, first))
 
     @axiom
-    def transitivity(cls, terms: Related[Self]) -> "Equation":
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
+    def transitivity(cls, terms: Related[Self]) -> Equation:
         """
         Terms related to each other are related to the same terms: a third
         term is related to the first exactly when it is to the second,
