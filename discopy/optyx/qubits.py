@@ -568,6 +568,18 @@ class Circuit(Diagram):
 class QubitChannel(Channel):
     """Qubit channel."""
 
+    def to_tree(self) -> dict:
+        tree = {**super().to_tree(), 'kraus': self.kraus.to_tree()}
+        if self.env:
+            tree['env'] = self.env.to_tree()
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        env = from_tree(tree['env']) if 'env' in tree else diagram.Ty()
+        return cls(tree['name'], from_tree(tree['kraus']), dom, cod, env)
+
     # def decomp(self):
     #     """Decompose into elementary gates."""
     #     from discopy.optyx.utils.misc import decomp_ar
@@ -793,6 +805,14 @@ class Z(Channel):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(
+            len(from_tree(tree['dom'])),
+            len(from_tree(tree['cod'])),
+            tree.get('data', 0),
+        )
+
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
             len(self.dom),
@@ -898,6 +918,8 @@ class X(Channel):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
 
+    from_tree = classmethod(Z.from_tree.__func__)
+
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
             len(self.dom),
@@ -972,6 +994,11 @@ class H(Channel):
     def __repr__(self):
         return f"{factory_name(type(self))}()"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
+
     def decomp(self):
         """Hadamard is already an elementary generator."""
         return H()
@@ -1001,6 +1028,10 @@ class Scalar(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.data!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
@@ -1040,6 +1071,13 @@ class BitFlipError(Channel):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.prob!r})"
 
+    def to_tree(self) -> dict:
+        return {**Channel.to_tree(self), 'prob': self.prob}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['prob'])
+
     def dagger(self):
         return self
 
@@ -1067,6 +1105,9 @@ class DephasingError(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.prob!r})"
+
+    to_tree = BitFlipError.to_tree
+    from_tree = classmethod(BitFlipError.from_tree.__func__)
 
     def dagger(self):
         return self
@@ -1107,6 +1148,13 @@ class Ket(Channel):
         cod = "" if self.cod == qubit else f", {self.cod!r}"
         return f"{factory_name(type(self))}({self.value!r}{cod})"
 
+    def to_tree(self) -> dict:
+        return {**Channel.to_tree(self), 'value': self.value}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['value'], from_tree(tree['cod']))
+
 
 class Bra(Channel):
     """Post-selected measurement for qubits"""
@@ -1124,6 +1172,12 @@ class Bra(Channel):
     def __repr__(self):
         dom = "" if self.dom == qubit else f", {self.dom!r}"
         return f"{factory_name(type(self))}({self.value!r}{dom})"
+
+    to_tree = Ket.to_tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['value'], from_tree(tree['dom']))
 
 
 def Id(n):

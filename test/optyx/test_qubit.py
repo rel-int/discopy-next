@@ -3,10 +3,11 @@ import pyzx
 from discopy.optyx import qubits
 from pytket import Circuit
 from discopy.optyx import channel
-from discopy.optyx.core import zx
+from discopy.optyx.core import diagram, zx
 from discopy.quantum.gates import (
     CRx, CRz, CU1, CX, CY, CZ, S, SWAP, T, U1, Controlled, Rx, Ry, Rz)
 import numpy as np
+
 
 def _extract(graph):
     graph = graph.copy()
@@ -26,6 +27,7 @@ def test_pyzx():
     c2 = _extract(channel.Diagram.from_pyzx(g).to_pyzx())
     assert c1.verify_equality(c2)
 
+
 def test_graphix():
     import graphix
     from graphix.simulator import PatternSimulator
@@ -43,7 +45,9 @@ def test_graphix():
         circuit.cnot(1, 0)
         circuit.rz(0, theta[3])
         pattern = circuit.transpile().pattern
-        optyx_res = (qubits.Ket("+")**2 >> qubits.Circuit(pattern)).eval().amplitudes()
+        optyx_res = (
+            qubits.Ket("+")**2 >> qubits.Circuit(pattern)
+        ).eval().amplitudes()
 
         simulator = PatternSimulator(pattern, backend="statevector")
         simulator.run()
@@ -144,9 +148,18 @@ def test_from_tket_unsupported():
     with pytest.raises(NotImplementedError, match="CCX"):
         channel.Diagram.from_tket(Circuit(3).CCX(0, 1, 2))
 
+    from sympy.abc import x
+    sym = channel.Diagram.from_tket(Circuit(1).Rz(x, 0))
+    assert np.allclose(
+        sym.lambdify(x)(0.5).to_pyzx().to_matrix(),
+        Circuit(1).Rz(0.5, 0).get_unitary(),
+    )
+
+
 def test_zx():
     circuit = qubits.Z(1, 2) >> qubits.H() @ qubits.H()
     assert qubits.Circuit(circuit) == circuit
+
 
 def test_pure_double_kraus():
     c = pyzx.Circuit(3)
@@ -158,37 +171,35 @@ def test_pure_double_kraus():
 
     assert qubits.Circuit(g).get_kraus() == qubits.Circuit(g).get_kraus()
 
-# def test_to_dual_rail():
-#     circuit = qubits.Z(1, 2) >> qubits.H() @ qubits.H()
-#     dr_1 = qubits.Circuit(circuit).to_dual_rail().get_kraus()
-#     dr_2 = zx.zx2path(circuit.get_kraus())
-#     assert dr_1 == dr_2
 
 def test_discard_qubits():
     a = (qubits.Discard(2).double().to_tensor().to_quimb() ^ ...).data
-    b = ((qubits.Z(1, 1)**2 >> qubits.Discard(2)).double().to_tensor().to_quimb() ^ ...).data
+    b = ((qubits.Z(1, 1)**2 >> qubits.Discard(2))
+         .double().to_tensor().to_quimb() ^ ...).data
     assert np.allclose(a, b)
+
 
 def test_bit_flip_error():
     prob = 0.43
     a = (qubits.Z(0, 1) >> qubits.BitFlipError(prob)).eval().tensor.array
     assert np.allclose(a, np.array([[-.14, -0.14], [-0.14, -0.14]]))
 
+
 def test_dephasingerror():
     prob = 0.43
     a = (qubits.Z(0, 1) >> qubits.DephasingError(prob)).eval().tensor.array
-    assert np.allclose(a,  np.array([[-.14, 1.], [1, -0.14]]))
+    assert np.allclose(a, np.array([[-.14, 1.], [1, -0.14]]))
+
 
 def test_ket():
-    from discopy.optyx.core import diagram
     a = (qubits.Ket(1).get_kraus().to_tensor().to_quimb() ^ ...).data
     b = zx.X(0, 1, 0.5) @ diagram.Scalar(1 / np.sqrt(2))
 
     b = (b.to_tensor().to_quimb() ^ ...).data
     assert np.allclose(a, b)
 
+
 def test_bra():
-    from discopy.optyx.core import diagram
     a = (qubits.Bra(1).get_kraus().to_tensor().to_quimb() ^ ...).data
     b = zx.X(1, 0, 0.5) @ diagram.Scalar(1 / np.sqrt(2))
     b = (b.to_tensor().to_quimb() ^ ...).data
@@ -374,23 +385,47 @@ def test_pauli_errors_are_self_adjoint(error):
     assert np.allclose(superoperator, superoperator.conjugate().T)
     assert error(.1).dagger() == error(.1)
 
-# def test_to_tket():
-#     circ = qubits.X(1, 2) @ channel.qubit >> channel.qubit @ qubits.Z(2, 1) @ qubits.Scalar(2**0.5)
 
-#     tket_circ = circ.to_tket()
-#     tket_circ.measure_all()
-#     backend = AerBackend()
-#     compiled_circ = backend.get_compiled_circuit(tket_circ)
-#     handle = backend.process_circuit(compiled_circ, n_shots=200000)
-#     counts = backend.get_result(handle).get_counts()
-#     tket_probs = probs_from_counts({key: np.round(v, 2) for key, v in probs_from_counts(counts).items()})
-
-#     circ_meas_prep = qubits.Ket(0) @ qubits.Ket(0) >> circ >> qubits.Measure(2)
-
-#     res = ((circ_meas_prep.double().to_tensor().to_quimb()^...).data)
-
-#     rounded_result = np.round(res, 6)
-
-#     non_zero_dict = {idx: val for idx, val in np.ndenumerate(rounded_result) if val != 0}
-
-#     assert tket_probs == non_zero_dict
+@pytest.mark.parametrize("box", [
+    qubits.Measure(2),
+    qubits.Discard(2),
+    qubits.Encode(2),
+    qubits.Z(1, 2),
+    qubits.Z(1, 2, 0.25),
+    qubits.X(2, 1, 0.5),
+    qubits.H(),
+    qubits.Scalar(0.5),
+    qubits.Scalar(0.5j),
+    qubits.BitFlipError(0.1),
+    qubits.DephasingError(0.2),
+    qubits.Ket(0),
+    qubits.Ket(1),
+    qubits.Ket("+"),
+    qubits.Ket("-"),
+    qubits.Ket(0, channel.bit),
+    qubits.Bra(0),
+    qubits.Bra(1),
+    qubits.Bra("+"),
+    qubits.Bra("-"),
+    qubits.Bra(1, channel.bit),
+    qubits.QubitChannel(
+        "custom", diagram.Swap(diagram.bit, diagram.bit),
+        channel.qubit ** 2, channel.qubit ** 2),
+    qubits.QubitChannel(
+        "env_ch", diagram.Swap(diagram.bit, diagram.bit),
+        channel.qubit ** 2, channel.qubit,
+        env=diagram.Ty(diagram.Ob("bit"))),
+    pytest.param(
+        qubits.QubitChannel(
+            "custom", zx.Z(1, 1, 0.25), channel.qubit, channel.qubit),
+        marks=pytest.mark.skipif(
+            "from_tree" not in zx.Spider.__dict__,
+            reason="waits on zx.Spider.from_tree (#731)")),
+])
+def test_qubits_boxes_load_their_own_tree(box):
+    from discopy.utils import dumps, loads
+    loaded = loads(dumps(box))
+    assert loaded == box
+    assert loaded.to_tree() == box.to_tree()
+    assert loaded.double() == box.double()
+    assert loads(dumps(box @ box)) == box @ box
