@@ -46,5 +46,5 @@ a subsubpackage feedback.closed.symmetric and feedback.closed.markov".
 
 ## Status
 
-Accepted, 2026-11-25. [#742](https://github.com/rel-int/discopy-next/pull/742), which carries it
+Accepted, 2026-11-25. [#743](https://github.com/rel-int/discopy-next/pull/743), which carries it
 out, is open.

@@ -593,7 +593,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   stay cups and caps. `feedback.closed` is a package too, its
   `feedback.closed.markov` the `feedback.closed` module before, over
   `closed.markov`. The old names keep no alias, and a tree or pickle saved
-  under them does not load ([next#742]).
+  under them does not load ([next#743]).
 
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
@@ -2785,7 +2785,7 @@ for the changelog of `1.2.1` and earlier.
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
 [next#737]: https://github.com/rel-int/discopy-next/pull/737
-[next#742]: https://github.com/rel-int/discopy-next/pull/742
+[next#743]: https://github.com/rel-int/discopy-next/pull/743
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
