@@ -4,4 +4,4 @@
 > > also there's the distinction between arguments drawn side by side or on top of one another, in general we want to keep the internal representation the same but the drawing should be such that the dagger really is the vertical reflection (except for labels ofc) and similarly for rotation
 
 - [x] Draw the args of a box's dagger, transpose and conjugate left to right as the reflection, half turn and reflection of those of the box: slots in reverse order, contents reflected or turned
-- [WIP] @T-48aec84b-2026-11-26 17:34 Draw the transposes of a box with args top to bottom as the half turn of the box: args turned, side by side in reverse order
+- [x] Draw the transposes of a box with args top to bottom as the half turn of the box: args turned, side by side in reverse order
