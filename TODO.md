@@ -19,7 +19,7 @@
 >
 > Not in this PR: `feedback.closed.symmetric`, the traced symmetric closed category without copying. It is the next PR, after this one. Leave a one-line mention of it in the package docstring and nothing else.
 
-- [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `discopy.closed` is a package: `closed.monoidal` (was `biclosed`), a new `closed.symmetric`, `closed.markov` (was `closed`)
+- [x] `discopy.closed` is a package: `closed.monoidal` (was `biclosed`), a new `closed.symmetric`, `closed.markov` (was `closed`)
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `compact` subclasses `closed.symmetric`, eval and curry from cups and caps
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 `feedback.closed` is a package, `feedback.closed.markov` over `closed.markov`
 - [WIP] @T-01a21749-9871-73a9-9e3f-e31cfdd7435a-2026-11-26 10:24 no alias for `discopy.biclosed` or the flat `discopy.closed` names, as ADR 1 rules
