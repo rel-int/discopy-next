@@ -6,7 +6,7 @@ from pytest import raises
 
 from discopy import closed, comarkov, compact, frobenius, markov
 from discopy.para import (
-    BOUND, Cell, Closed, Comarkov, Compact, Feedback, Hypergraph, Markov,
+    BOUND, Closed, Comarkov, Compact, Feedback, Hypergraph, Markov, Reparam,
     Symmetric, Traced, UpToPermutation, permutations, same)
 from discopy import python
 from discopy.python import Function
@@ -214,64 +214,65 @@ r1, r2, s1, s2 = (
     Box("r1", p1, p), Box("r2", p2, p1), Box("s1", q1, q), Box("s2", q2, q1))
 
 
-def test_cell_errors():
+def test_reparam_errors():
     with raises(AxiomError):
-        Cell(f, f.reparam(r1), Box("r1'", p1, p))
+        Reparam(f, Box("r1'", p1, p), f.reparam(r1))
     with raises(AxiomError):
-        Cell(f, Symmetric(x, z, Box('f', x @ p, z), p), Diagram.id(p))
+        Reparam(f, Diagram.id(p), Symmetric(x, z, Box('f', x @ p, z), p))
     with raises(AxiomError):
-        Cell.reparam(f, Box('r', q, q))
+        Reparam.of(f, Box('r', q, q))
     with raises(AxiomError):
-        Cell.reparam(f, r1).then(Cell.id(f))
+        Reparam.of(f, r1).then(Reparam.id(f))
 
 
-def test_cell_wrong_order():
+def test_reparam_wrong_order():
     assert (f >> g).param == f.param @ g.param
     cod = f.reparam(r1) >> g.reparam(s1)
-    assert Cell(f >> g, cod, r1 @ s1).cod == cod
+    assert Reparam(f >> g, r1 @ s1, cod).cod == cod
     with raises(AxiomError):
-        Cell(f >> g, cod, s1 @ r1)
+        Reparam(f >> g, s1 @ r1, cod)
     with raises(AxiomError):
-        Cell(f @ g, f.reparam(r1) @ g.reparam(s1), s1 @ r1)
+        Reparam(f @ g, s1 @ r1, f.reparam(r1) @ g.reparam(s1))
     with raises(AxiomError, match="does not compose"):
-        Cell.id(g) >> Cell.id(f)
+        Reparam.id(g) >> Reparam.id(f)
 
 
-def test_cell_then_up_to_the_quotient():
+def test_reparam_then_up_to_the_quotient():
     def looped(para):
         dom, param = para.dom, para.param
         inside = Diagram.swap(dom, param) >> Diagram.swap(param, dom)
         return Symmetric(dom, para.cod, inside >> para.inside, param)
 
     assert looped(f) != f and same(looped(f), f)
-    alpha = Cell.reparam(f, r1)
+    alpha = Reparam.of(f, r1)
     other = looped(alpha.cod)
     assert other != alpha.cod and same(other, alpha.cod)
-    beta = Cell.reparam(other, r2)
+    beta = Reparam.of(other, r2)
     assert alpha.then(beta).cod == other.reparam(r2)
     assert alpha.then(beta).inside == r2 >> r1
 
 
-def test_cell_round_trip():
+def test_reparam_round_trip():
     import discopy
     from discopy import para
-    cell = Cell.reparam(f, r1)
-    assert eval(repr(cell), {**vars(discopy), **vars(para)}) == cell
+    alpha = Reparam.of(f, r1)
+    assert eval(repr(alpha), {**vars(discopy), **vars(para)}) == alpha
 
 
-def test_cell_vertical():
-    alpha = Cell.reparam(f, r1)
-    beta = Cell.reparam(alpha.cod, r2)
-    gamma = Cell.reparam(beta.cod, Box("r3", Ty("p3"), p2))
+def test_reparam_vertical():
+    alpha = Reparam.of(f, r1)
+    beta = Reparam.of(alpha.cod, r2)
+    gamma = Reparam.of(beta.cod, Box("r3", Ty("p3"), p2))
     assert alpha.then(beta).inside == r2 >> r1
     assert alpha.then(beta).cod == f.reparam(r1).reparam(r2)
     assert alpha.then(beta).then(gamma) == alpha.then(beta.then(gamma))
-    assert Cell.id(f).then(alpha) == alpha == alpha.then(Cell.id(alpha.cod))
+    assert Reparam.id(f).then(alpha) == alpha\
+        == alpha.then(Reparam.id(alpha.cod))
 
 
-def test_cell_horizontal_and_interchange():
-    a1, a2 = Cell.reparam(f, r1), Cell.reparam(f.reparam(r1), r2)
-    b1, b2 = Cell.reparam(g, s1), Cell.reparam(g.reparam(s1), s2)
+def test_reparam_horizontal_and_interchange():
+    a1, a2 = Reparam.of(f, r1), Reparam.of(f.reparam(r1), r2)
+    b1, b2 = Reparam.of(g, s1), Reparam.of(g.reparam(s1), s2)
     assert (a1 >> b1).inside == r1 @ s1
     assert (a1 >> b1).cod == f.reparam(r1) >> g.reparam(s1)
     assert (a1 @ b1).cod == f.reparam(r1) @ g.reparam(s1)
@@ -282,15 +283,15 @@ def test_cell_horizontal_and_interchange():
     assert left.inside.to_hypergraph() == right.inside.to_hypergraph()
 
 
-def test_cell_invertible():
+def test_reparam_invertible():
     two = Symmetric(x, y, Box('t', x @ p @ q, y), p @ q)
-    swap = Cell.reparam(two, Diagram.swap(q, p))
-    assert swap.is_invertible and Cell.id(two).is_invertible
-    assert not Cell.reparam(two, Box('r', p @ q, p @ q)).is_invertible
-    assert not Cell.reparam(f, r1).is_invertible
+    swap = Reparam.of(two, Diagram.swap(q, p))
+    assert swap.is_invertible and Reparam.id(two).is_invertible
+    assert not Reparam.of(two, Box('r', p @ q, p @ q)).is_invertible
+    assert not Reparam.of(f, r1).is_invertible
     h = Symmetric(x, y, Box('h', x, y), Ty())
-    assert not Cell.reparam(h, Box('discard', p, Ty())).is_invertible
-    assert Cell.id(h).is_invertible
+    assert not Reparam.of(h, Box('discard', p, Ty())).is_invertible
+    assert Reparam.id(h).is_invertible
     assert list(permutations(Diagram, p @ q, q @ p))
     assert not list(permutations(Diagram, p @ q, p @ p))
     assert not list(permutations(Diagram, p, Ty()))
@@ -299,11 +300,11 @@ def test_cell_invertible():
 
 
 def shifted(n):
-    """ A cell reparametrising by the cyclic shift of n wires. """
+    """ The reparametrisation by the cyclic shift of n wires. """
     wires = Ty(*"abcdefghij"[:n])
     shift = Diagram.permutation([*range(1, n), 0], wires)
     box = Symmetric(x, y, Box('t', x @ shift.cod, y), shift.cod)
-    return Cell.reparam(box, shift)
+    return Reparam.of(box, shift)
 
 
 def test_bound():
@@ -313,7 +314,7 @@ def test_bound():
     wide = Ty(*"abcdefg")
     assert len(list(permutations(Diagram, wide, wide))) == 1
     assert not list(permutations(Diagram, wide, wide[1:] @ wide[:1]))
-    assert Cell.id(shifted(BOUND + 1).dom).is_invertible
+    assert Reparam.id(shifted(BOUND + 1).dom).is_invertible
 
 
 def test_permutations_are_lazy():
@@ -400,17 +401,17 @@ def test_copy_is_not_a_permutation():
     X, P = markov.Ty('X'), markov.Ty('P')
     box = Markov(X, X, markov.Box('c', X @ P @ P, X), P @ P)
     forget = markov.Diagram.discard(P) @ P >> markov.Diagram.copy(P)
-    cell = Cell.reparam(box, forget)
-    assert cell.cod.param == box.param and not cell.is_invertible
-    assert UpToPermutation(cell.cod) != UpToPermutation(box)
+    alpha = Reparam.of(box, forget)
+    assert alpha.cod.param == box.param and not alpha.is_invertible
+    assert UpToPermutation(alpha.cod) != UpToPermutation(box)
     assert UpToPermutation(box) == UpToPermutation(box)
 
 
-def test_weight_tying_is_a_cell():
+def test_weight_tying_is_a_reparam():
     X, P = markov.Ty('X'), markov.Ty('P')
     layer = Markov(X, X, markov.Box('c', X @ P, X), P)
     network = layer >> layer
-    tying = Cell.reparam(network, markov.Diagram.copy(P))
+    tying = Reparam.of(network, markov.Diagram.copy(P))
     assert tying.cod.param == P and network.param == P @ P
     assert not tying.is_invertible
 

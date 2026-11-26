@@ -17,7 +17,7 @@ Summary
     :toctree:
 
     Symmetric
-    Cell
+    Reparam
     UpToPermutation
     isomorphic
     labelled
@@ -66,16 +66,16 @@ Reparametrisation precomposes the parameters, contravariantly:
 >>> assert f.reparam(r).param == p_
 >>> assert f.reparam(s >> r) == f.reparam(r).reparam(s)
 
-A reparametrisation is a 2-cell, a :class:`Cell` between parallel maps, and
+A reparametrisation is a 2-cell, a :class:`Reparam` between parallel maps, and
 the laws that fail on the nose hold up to the invertible ones, i.e. the
 permutations of the parameters and of the coparameters, see
 :class:`UpToPermutation`, decided by an isomorphism of hypergraphs, see
-:func:`isomorphic`; the search of :class:`Cell` for them is bounded by
+:func:`isomorphic`; the search of :class:`Reparam` for them is bounded by
 ``BOUND = 6`` parameter wires, see :func:`permutations`:
 
->>> alpha = Cell.reparam(f, r)
+>>> alpha = Reparam.of(f, r)
 >>> assert alpha.cod == f.reparam(r) and not alpha.is_invertible
->>> assert (alpha >> Cell.id(g)).cod == f.reparam(r) >> g
+>>> assert (alpha >> Reparam.id(g)).cod == f.reparam(r) >> g
 
 The identity and swap of :class:`Symmetric` are those of the underlying
 category, with the empty parameter space:
@@ -374,7 +374,7 @@ class UpToPermutation:
     """
     A parametric map compared up to the permutations of its parameter wires
     and of its coparameter wires, i.e. up to an invertible 2-cell, see
-    :class:`Cell`: a 2-cell acts on the parameters by precomposition, as
+    :class:`Reparam`: a 2-cell acts on the parameters by precomposition, as
     :meth:`Symmetric.reparam`, and on the coparameters by postcomposition,
     as :meth:`Symmetric.recopar`. Two maps are equal when they have the same
     domain and codomain, the same parameter wires and the same coparameter
@@ -640,7 +640,7 @@ class Symmetric[category](
     def reparam(self, other: category) -> Symmetric:
         """
         Precompose the parameters with `other : q -> param`; this is the
-        1-cell part of the 2-cell :meth:`Cell.reparam`.
+        1-cell part of the 2-cell :class:`Reparam`.
 
         Parameters:
             other : The reparametrisation, a morphism into ``param``.
@@ -676,53 +676,53 @@ class Symmetric[category](
 
 
 @dataclass(frozen=True)
-class Cell:
+class Reparam:
     """
-    A 2-cell `dom => cod` between parallel parametric maps, i.e. a
-    reparametrisation, a morphism `inside : cod.param -> dom.param` of the
+    A reparametrisation, i.e. a 2-cell `dom => cod` between parallel
+    parametric maps: a morphism `inside : cod.param -> dom.param` of the
     underlying category such that ``cod == dom.reparam(inside)`` up to its
-    equation, see :meth:`Symmetric.reparam`. Cells compose vertically with
-    :meth:`then`, horizontally with ``>>`` and in parallel with ``@``, and
-    the cells of :class:`Symmetric` with an invertible `inside` are the
-    isomorphisms, up to which :class:`UpToPermutation` compares maps. Cells
-    compose when their maps are equal up to the equation of the category,
-    see :func:`same`, not only on the nose: the check is in the free
-    category, so no cell relates two maps that agree only on the values of a
-    model, e.g. two compiled networks. A cell covers the parameters
-    only and needs parallel maps with the same coparameter: the invertible
-    2-cells of maps with coparameters, which also permute those, are only
-    searched by :class:`UpToPermutation`. The invertible cells are searched
-    among the permutations of at most ``BOUND`` (6) parameter wires, see
-    :meth:`is_invertible`.
+    equation, see :meth:`Symmetric.reparam`. Reparametrisations compose
+    vertically with :meth:`then`, horizontally with ``>>`` and in parallel
+    with ``@``, and those of :class:`Symmetric` with an invertible `inside`
+    are the isomorphisms, up to which :class:`UpToPermutation` compares maps.
+    They compose when their maps are equal up to the equation of the
+    category, see :func:`same`, not only on the nose: the check is in the
+    free category, so none relates two maps that agree only on the values of
+    a model, e.g. two compiled networks. A reparametrisation covers the
+    parameters only and needs parallel maps with the same coparameter: the
+    invertible 2-cells of maps with coparameters, which also permute those,
+    are only searched by :class:`UpToPermutation`. The invertible ones are
+    searched among the permutations of at most ``BOUND`` (6) parameter wires,
+    see :meth:`is_invertible`.
 
-    Cells are frozen dataclasses, so that ``eval(repr(cell)) == cell`` holds
-    whenever the names in the repr of the maps are in scope, e.g. in the
-    test of this module, where they are imported from
-    :mod:`discopy.symmetric`.
+    Reparametrisations are frozen dataclasses, so that
+    ``eval(repr(alpha)) == alpha`` holds whenever the names in the repr of
+    the maps are in scope, e.g. in the test of this module, where they are
+    imported from :mod:`discopy.symmetric`.
 
     Parameters:
         dom (Symmetric) : The parametric map to reparametrise.
-        cod (Symmetric) : The reparametrised map, parallel to ``dom``.
         inside (category) : The morphism ``cod.param -> dom.param``.
+        cod (Symmetric) : The reparametrised map, parallel to ``dom``.
 
     Example
     -------
     >>> from discopy.symmetric import Ty, Box
     >>> x, y, p, q = map(Ty, "xypq")
     >>> f = Symmetric(x, y, Box('f', x @ p, y), p)
-    >>> alpha = Cell.reparam(f, Box('r', q, p))
+    >>> alpha = Reparam.of(f, Box('r', q, p))
     >>> assert alpha.cod == f.reparam(Box('r', q, p))
-    >>> assert Cell.id(f).is_invertible and not alpha.is_invertible
-    >>> assert Cell.id(f).then(alpha) == alpha
-    >>> assert alpha == alpha.then(Cell.id(alpha.cod))
-    >>> Cell(f, f, Box('r', q, p))  # doctest: +IGNORE_EXCEPTION_DETAIL
+    >>> assert Reparam.id(f).is_invertible and not alpha.is_invertible
+    >>> assert Reparam.id(f).then(alpha) == alpha
+    >>> assert alpha == alpha.then(Reparam.id(alpha.cod))
+    >>> Reparam(f, Box('r', q, p), f)  # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
     AxiomError
     """
     dom: Symmetric
-    cod: Symmetric
     inside: symmetric.Diagram
+    cod: Symmetric
 
     def __post_init__(self):
         left, right = self.dom, self.cod
@@ -737,60 +737,62 @@ class Cell:
             raise AxiomError(f"{right} is not {left} reparametrised.")
 
     @classmethod
-    def id(cls, para: Symmetric) -> Cell:
+    def of(cls, para: Symmetric, other) -> Reparam:
         """
-        The identity 2-cell of a parametric map, i.e. the identity
-        reparametrisation.
-
-        Parameters:
-            para : The parametric map.
-        """
-        return cls(para, para, type(para).category.id(para.param))
-
-    @classmethod
-    def reparam(cls, para: Symmetric, other) -> Cell:
-        """
-        The 2-cell from a parametric map to its reparametrisation.
+        The reparametrisation of a parametric map, from the map to
+        ``para.reparam(other)``.
 
         Parameters:
             para : The parametric map.
             other : The reparametrisation, a morphism into ``para.param``.
         """
-        return cls(para, para.reparam(other), other)
+        return cls(para, other, para.reparam(other))
 
-    def then(self, other: Cell) -> Cell:
+    @classmethod
+    def id(cls, para: Symmetric) -> Reparam:
+        """
+        The identity reparametrisation of a parametric map.
+
+        Parameters:
+            para : The parametric map.
+        """
+        return cls.of(para, type(para).category.id(para.param))
+
+    def then(self, other: Reparam) -> Reparam:
         """
         Vertical composition: reparametrisations compose contravariantly,
         i.e. `alpha.then(beta).inside == beta.inside >> alpha.inside`. The
-        codomain of this cell and the domain of `other` need only be equal up
+        codomain of this one and the domain of `other` need only be equal up
         to the equation of the underlying category, see :func:`same`, e.g.
         two maps with the same hypergraph.
 
         Parameters:
-            other : The 2-cell starting from the codomain of this one.
+            other : The reparametrisation starting from the codomain of this
+                one.
 
         Example
         -------
         >>> from discopy.symmetric import Ty, Box
         >>> x, y, p, q, r = map(Ty, "xypqr")
         >>> f = Symmetric(x, y, Box('f', x @ p, y), p)
-        >>> alpha = Cell.reparam(f, Box('a', q, p))
-        >>> beta = Cell.reparam(alpha.cod, Box('b', r, q))
+        >>> alpha = Reparam.of(f, Box('a', q, p))
+        >>> beta = Reparam.of(alpha.cod, Box('b', r, q))
         >>> assert alpha.then(beta).inside == Box('b', r, q) >> Box('a', q, p)
         >>> assert alpha.then(beta).cod == beta.cod
         """
         if not same(self.cod, other.dom):
             raise AxiomError(f"{self.cod} does not compose with {other.dom}.")
-        return type(self)(self.dom, other.cod, other.inside >> self.inside)
+        return type(self)(self.dom, other.inside >> self.inside, other.cod)
 
-    def __rshift__(self, other: Cell) -> Cell:
+    def __rshift__(self, other: Reparam) -> Reparam:
         """
         Horizontal composition along the composition of parametric maps, which
         tensors their parameters, i.e. ``inside @ inside``. The maps have to
         be composable, otherwise an :class:`AxiomError` is raised.
 
         Parameters:
-            other : The 2-cell between maps composable after those of this one.
+            other : The reparametrisation of maps composable after those of
+                this one.
 
         Example
         -------
@@ -798,21 +800,21 @@ class Cell:
         >>> x, y, z, p, q, r = map(Ty, "xyzpqr")
         >>> f = Symmetric(x, y, Box('f', x @ p, y), p)
         >>> g = Symmetric(y, z, Box('g', y @ q, z), q)
-        >>> alpha, beta = Cell.reparam(f, Box('a', r, p)), Cell.id(g)
+        >>> alpha, beta = Reparam.of(f, Box('a', r, p)), Reparam.id(g)
         >>> assert (alpha >> beta).cod == f.reparam(Box('a', r, p)) >> g
         >>> assert (alpha >> beta).inside == Box('a', r, p) @ q
         """
         if self.dom.cod != other.dom.dom:
             raise AxiomError(f"{self.dom} does not compose with {other.dom}.")
-        return type(self)(self.dom >> other.dom, self.cod >> other.cod,
-                          self.inside @ other.inside)
+        return type(self)(self.dom >> other.dom, self.inside @ other.inside,
+                          self.cod >> other.cod)
 
-    def __matmul__(self, other: Cell) -> Cell:
+    def __matmul__(self, other: Reparam) -> Reparam:
         """
         Horizontal composition along the tensor of parametric maps.
 
         Parameters:
-            other : The 2-cell to tensor with.
+            other : The reparametrisation to tensor with.
 
         Example
         -------
@@ -820,12 +822,12 @@ class Cell:
         >>> x, y, z, p, q, r = map(Ty, "xyzpqr")
         >>> f = Symmetric(x, y, Box('f', x @ p, y), p)
         >>> g = Symmetric(y, z, Box('g', y @ q, z), q)
-        >>> alpha = Cell.reparam(f, Box('a', r, p))
-        >>> assert (alpha @ Cell.id(g)).cod == f.reparam(Box('a', r, p)) @ g
-        >>> assert (alpha @ Cell.id(g)).inside == Box('a', r, p) @ q
+        >>> alpha = Reparam.of(f, Box('a', r, p))
+        >>> assert (alpha @ Reparam.id(g)).cod == f.reparam(Box('a', r, p)) @ g
+        >>> assert (alpha @ Reparam.id(g)).inside == Box('a', r, p) @ q
         """
-        return type(self)(self.dom @ other.dom, self.cod @ other.cod,
-                          self.inside @ other.inside)
+        return type(self)(self.dom @ other.dom, self.inside @ other.inside,
+                          self.cod @ other.cod)
 
     @property
     def is_invertible(self) -> bool:
