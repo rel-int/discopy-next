@@ -84,7 +84,7 @@ def test_Functor():
 def test_to_hypergraph_keeps_colour_and_phase():
     assert Z(1, 1, 0).to_hypergraph() != X(1, 1, 0).to_hypergraph()
     assert Z(1, 1, 0).to_hypergraph() != Z(1, 1, .5).to_hypergraph()
-    assert Z(1, 2, .5).to_hypergraph().to_diagram() == Z(1, 2, .5)
+    assert Z(1, 2, .5).to_hypergraph().to_diagram() == Z(1, 2, Fraction(1, 2))
     assert tensor.Equation(
         Z(1, 1, .25) @ X(1, 1, .5) >> SWAP, SWAP >> X(1, 1, .5) @ Z(1, 1, .25))
 
@@ -290,8 +290,9 @@ def test_repr_and_rotate():
 
 
 @pytest.mark.parametrize("box", [
-    Scalar(2), Scalar(.5j), Scalar(Fraction(1, 3)), scalar(2 ** 0.5),
-    SWAP, Swap(Nat(1), Nat(1)), Z(1, 2), Z(1, 1, .5), X(0, 1, .25),
+    Scalar(2), Scalar(.5j), Scalar(2j), Scalar(Fraction(1, 3)),
+    scalar(2 ** 0.5), SWAP, Swap(Nat(1), Nat(1)), Z(1, 2), Z(1, 1, .5),
+    Z(1, 1, Fraction(1, 4)), Z(1, 1, Fraction(1, 3)), X(0, 1, .25),
     Y(2, 1, .3), H, Box("f", Nat(1), Nat(1)),
     Z(1, 2) @ Nat(1) >> Nat(1) @ X(2, 1),
     SWAP >> Z(1, 1) @ Z(1, 1) >> scalar(2) @ Nat(2)],
@@ -428,7 +429,7 @@ def test_circuit2zx_backend():
 def test_to_hypergraph():
     diagram = Z(1, 2, .25) >> X(2, 1)
     graph = diagram.to_hypergraph()
-    assert str(graph.to_diagram()) == "Z(1, 2, 0.25) >> H @ H >> Z(2, 1) >> H"
+    assert str(graph.to_diagram()) == "Z(1, 2, 1/4) >> H @ H >> Z(2, 1) >> H"
     assert graph.to_diagram().to_hypergraph() == graph
     assert graph.to_diagram().eval().is_close(diagram.eval())
     left = Z(1, 1, .25) @ X(1, 1, .5)
@@ -616,6 +617,24 @@ def test_Hypergraph_phases():
     assert Y(1, 1, .5).to_hypergraph() == Y(1, 1, .5).to_x().to_hypergraph()
     assert X(1, 1, .5).to_hypergraph().boxes == (H, H)
     assert Hypergraph.reduce_phase(1.25) == .25
+
+
+def test_Hypergraph_exact_phases_and_clifford_scalars():
+    """#718: str_transparency on non-dyadic Fractions and root-2 scalars,
+    dagger_involution on decimal float phases, and hypergraph_roundtrip on
+    Clifford scalars."""
+    third = Hypergraph.from_diagram(Z(1, 1, Fraction(1, 3)))
+    assert str(third) == "Z(1, 1, Fraction(1, 3))"
+    assert Hypergraph.str_transparency(third)
+    assert str(Hypergraph.from_diagram(Z(1, 1, Fraction(1, 4))))\
+        == "Z(1, 1, 1/4)"
+    tenth = Hypergraph.from_diagram(Z(1, 1, 0.1))
+    assert tenth.phases == (Fraction(1, 10), )
+    assert Hypergraph.dagger_involution(tenth)
+    for box in (Scalar(2j), Scalar(-2), scalar(2 ** 0.5), Scalar(0)):
+        graph = Hypergraph.from_diagram(box)
+        assert Hypergraph.hypergraph_roundtrip(graph)
+        assert Hypergraph.str_transparency(graph)
 
 
 def test_Hypergraph_phases_symbolic():

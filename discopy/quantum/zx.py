@@ -53,7 +53,7 @@ from fractions import Fraction
 from functools import reduce
 from heapq import heappop, heappush
 from itertools import combinations
-from math import pi
+from math import isfinite, pi
 from operator import index
 from typing import ClassVar, NamedTuple
 
@@ -445,13 +445,28 @@ class Spider(tensor.Spider[complex], Box):
     """
     basis = ((1, 0), (0, 1))
 
+    @staticmethod
+    def format_phase(phase) -> str:
+        """
+        Format a phase for :meth:`__str__`: a dyadic :class:`Fraction` as its
+        ratio ``p/q``, which evaluates to the float it equals, and any other
+        :class:`Fraction` as ``Fraction(p, q)``, so that it reads back.
+        """
+        if isinstance(phase, Fraction):
+            try:
+                exact = float(phase) == phase
+            except OverflowError:
+                exact = phase.denominator == 1
+            return str(phase) if exact else repr(phase)
+        return str(phase)
+
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         super().__init__(
             n_legs_in, n_legs_out,
             Nat(1), phase)  # ty: ignore[invalid-argument-type]
         factory_str = type(self).__name__
-        phase_str = f", {self.phase}" if self.phase else ""
+        phase_str = f", {self.format_phase(self.phase)}" if self.phase else ""
         self.name = f"{factory_str}({n_legs_in}, {n_legs_out}{phase_str})"
         if not isinstance(self, Z):
             self.deterministic = self.affine = False
@@ -462,7 +477,7 @@ class Spider(tensor.Spider[complex], Box):
     def __setstate__(self, state):
         if "_name" in state and state["_name"] == type(self).__name__:
             phase = state.get("_data", None)
-            phase_str = f', {phase}' if phase else ''
+            phase_str = f', {self.format_phase(phase)}' if phase else ''
             state["_name"] = (
                 type(self).__name__ +
                 f"({state['_dom'].n}, {state['_cod'].n}{phase_str})"
@@ -472,7 +487,10 @@ class Spider(tensor.Spider[complex], Box):
             self.deterministic = self.affine = False
 
     def __repr__(self):
-        return str(self).replace(type(self).__name__, factory_name(type(self)))
+        phase_str = (f", {format_number(self.phase, exact=True)}"
+                     if self.phase else "")
+        return f"{factory_name(type(self))}("\
+            f"{len(self.dom)}, {len(self.cod)}{phase_str})"
 
     @classmethod
     def from_tree(cls, tree: dict) -> "Spider":
@@ -582,7 +600,7 @@ class Scalar(Box):
         self.drawing_name = format_number(data)
 
     def __str__(self):
-        return f"scalar({format_number(self.data)})"
+        return f"scalar({format_number(self.data, exact=True)})"
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\
@@ -680,7 +698,13 @@ Id = Diagram.id
 
 
 def turn(phase) -> complex:
-    """ The root of unity ``exp(2j * pi * phase)`` of a phase in turns. """
+    """
+    The root of unity ``exp(2j * pi * phase)`` of a phase in turns, exact on
+    the quarter-turns.
+    """
+    turns = (phase % 1) * 4
+    if turns in (0, 1, 2, 3):
+        return complex((1, 1j, -1, -1j)[int(turns)])
     return cmath.exp(2j * pi * phase)
 
 
@@ -919,7 +943,7 @@ class Hypergraph(hypergraph.Hypergraph):
     The phases of the hypergraph go back to spiders:
 
     >>> print((Z(1, 2, .25) >> Z(2, 1, .25)).to_hypergraph())
-    Z(1, 1, 0.5)
+    Z(1, 1, 1/2)
 
     The :class:`Scalar` boxes of a diagram are its scalar:
 
@@ -1065,13 +1089,23 @@ class Hypergraph(hypergraph.Hypergraph):
         H >> H >> Nat(1) @ scalar(2)
         """
         result, number = super().to_diagram(), complex(self.scalar)
+        real = int(number.real) if number.real.is_integer() else number.real
         return result if self.scalar == ONE\
-            else result @ Scalar(number.real if not number.imag else number)
+            else result @ Scalar(real if not number.imag else number)
 
     @staticmethod
     def reduce_phase(phase):
-        """ A phase modulo a turn, unless it is symbolic. """
-        return phase if getattr(phase, "free_symbols", None) else phase % 1
+        """
+        A phase modulo a turn as an exact :class:`Fraction`, unless it is
+        symbolic or non-finite.
+        """
+        if getattr(phase, "free_symbols", None):
+            return phase
+        if isinstance(phase, (int, Fraction)):
+            return Fraction(phase) % 1 or 0
+        if isinstance(phase, float) and isfinite(phase):
+            return Fraction(str(phase)) % 1 or 0
+        return phase % 1
 
     @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
