@@ -6,6 +6,6 @@
 > >
 > > the first example looks awesome but the others look weird: why are the diagrams inside squished? why is the chopped corner missing?
 
-- [ ] Cut the variant's corner off a frame drawn top to bottom around its args, with its label in the corner opposite, as for a box (draft in the commit after this one)
+- [x] Cut the variant's corner off a frame drawn top to bottom around its args, with its label in the corner opposite, as for a box (draft in the commit after this one)
 - [ ] Regenerate the baselines the frame corners and labels change, and test the cut corner of each variant of a frame and its reflection by Drawing.dagger
 - [ ] Show toumix W, W[::-1], W.r and W[::-1].r in a 2x2 square for args on top of one another and side by side, each drawn at its own size
