@@ -873,6 +873,7 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         """ None, a tensor diagram drawing no arrays. """
         return ()
 
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
     sum_factory: ClassVar[type["Sum"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]

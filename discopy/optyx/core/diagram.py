@@ -249,7 +249,11 @@ class PhotonNumberPreservation(Enum):
 
 
 class Ob(frobenius.Wire):
-    """Basic object in an optyx Diagram: bit or mode"""
+    """
+    Basic object in an optyx Diagram: bit or mode, delayed as a stream is,
+    with a time step.
+    """
+    delay = feedback.Wire.delay
 
 
 HeadOb, TailOb = feedback.structural_wires(Ob)
@@ -304,6 +308,8 @@ class Diagram(frobenius.Diagram):
 
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
+    delay = feedback.Diagram.delay
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
 
     @classmethod
     def cup_factory(cls, left: Ty, right: Ty) -> Spider:
@@ -699,6 +705,7 @@ class Box(frobenius.Box, Diagram):
     fixed dom and cod, and the tensor fixed dimensions. Usually used for
     zx boxes (Bit) with tensors with dims of 2.
     """
+    delay = feedback.Box.delay
 
     array = None
 

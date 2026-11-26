@@ -855,21 +855,20 @@ BROKEN = {
         "closed.markov.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
         "{closed.markov,markov,lambek.abstract,feedback.closed.markov,"
-        "feedback.markov}"
+        "feedback.markov,linear.markov}"
         ".{Copy,Discard,Function} "
         "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
         "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy}":
+        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Feedforward,Trace}":
+        "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace":
         "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },

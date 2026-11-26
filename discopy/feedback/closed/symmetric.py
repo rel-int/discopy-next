@@ -129,6 +129,7 @@ class Diagram(
     trace_superposing_right = TracedCategory.trace_superposing_right
     currying_symmetry = closed.symmetric.Diagram.currying_symmetry
     twist_factory = vars(symmetric.Diagram)["twist_factory"]
+    braid_factory = vars(symmetric.Diagram)["braid_factory"]
 
     to_compact = planar.Diagram.to_compact
     to_drawing = planar.Diagram.to_drawing
@@ -199,7 +200,7 @@ Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
-Diagram.swap_factory = Diagram.braid_factory = Swap
+Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)

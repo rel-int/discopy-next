@@ -2676,7 +2676,8 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         the identity delay does, and so must one a semantic category chooses.
         """
         return cls.equation_factory(
-            cls.spiders(m, n, x).delay(), cls.spiders(m, n, x.delay()))
+            cls.spiders(m, n, x).delay(),
+            cls.spiders(m, n, cls.id(x).delay().dom))
 
     @rule
     def spider[X: Atom[C0], M: Nat, N: Nat](

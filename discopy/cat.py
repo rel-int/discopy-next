@@ -1043,13 +1043,14 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         """
         The atoms of a box: itself undaggered, and its boundary's. A box
         built from its arguments, e.g. a swap or a spider, names no
-        generator of its own: its string is a call on those arguments. A box
+        generator of its own: its string is a call on those arguments, which
+        name the atoms of the objects and arrows among them. A box
         with args has the atoms of its boundary and its args.
         """
         arguments = getattr(self, "__getnewargs__", None)
         if callable(arguments):
             return [atom for arg in arguments()
-                    if isinstance(arg, Ob) for atom in arg.atoms()]
+                    if isinstance(arg, (Ob, Arrow)) for atom in arg.atoms()]
         if self.args:
             return self.dom.atoms() + self.cod.atoms() + [
                 atom for arg in self.args for atom in arg.atoms()]

@@ -243,6 +243,7 @@ from discopy.optyx.sampling import Interferometer, Unravelling
 
 class Ob(frobenius.Wire):
     """Basic object: bit, mode, qubit or qmode"""
+    delay = feedback.Wire.delay
 
     classical = {
         "bit": "bit",
@@ -421,6 +422,8 @@ class Diagram(frobenius.Diagram):
 
     ob = Ty
     grad = tensor.Diagram.grad
+    delay = feedback.Diagram.delay
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
     boundary = diagram.Diagram.boundary
     unroll = diagram.Diagram.unroll
     one_step = diagram.Diagram.one_step
@@ -437,6 +440,28 @@ class Diagram(frobenius.Diagram):
         """
         left.assert_isadjoint(right)
         return cls.spider_factory(2, 0, left)
+
+    @classmethod
+    def cap_factory(cls, left: Ty, right: Ty) -> Spider:
+        """ The cap of a channel type, the dagger of its cup. """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(0, 2, left)
+
+    def trace(self, n=1, left=False) -> Diagram:
+        """
+        The trace of the last ``n`` wires, the first when ``left``, bent with
+        the cups and caps of the channel category, see
+        :meth:`discopy.pivotal.Diagram.dual_trace`: a channel's
+        :meth:`feedback` is a delayed loop of its own.
+
+        Parameters:
+            n : The number of wires to trace.
+            left : Whether to trace on the left rather than the right.
+        """
+        result = self
+        for _ in range(n):
+            result = self.trace_factory(result, left)
+        return result
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
@@ -1667,6 +1692,7 @@ class Channel(Diagram, frobenius.Box):
     """
     Channel initialised by its Kraus map.
     """
+    delay = feedback.Box.delay
 
     def __init__(
             self,
@@ -1900,6 +1926,7 @@ class CQMap(Diagram, frobenius.Box):
     """
     Channel initialised by its Density matrix.
     """
+    delay = feedback.Box.delay
 
     def __init__(self, name, density_matrix, dom, cod):
         assert isinstance(density_matrix, diagram.Diagram)
@@ -2034,6 +2061,7 @@ class Feedback(Diagram, frobenius.Box):
     >>> assert ladder.unroll(1).double().merge_layers()\\
     ...     == ladder.double().unroll(1).merge_layers()
     """
+    delay = feedback.Box.delay
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod

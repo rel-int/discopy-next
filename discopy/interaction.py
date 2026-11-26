@@ -985,6 +985,6 @@ for name in (
         "currying_naturality_left", "currying_naturality_right",
         "joining", "tightening", "sliding",
         "strength", "feedback_right", "trace_left",
-        "trace_right", "curry_left", "curry_right"):
+        "trace_right", "curry_left", "curry_right", "trace_duals"):
     setattr(Diagram, name, getattr(RibbonCategory, name).inapplicable(
         messages.PAIR_LENGTH))
