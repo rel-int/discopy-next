@@ -2633,7 +2633,10 @@ class Box(cat.Box, Diagram):
         """
         box = super().rebuild(**changes)
         for attr in BOX_DRAWING_ATTRIBUTES:
-            if attr in vars(self) and attr not in changes:
+            # A box with args is given an empty name unless told otherwise.
+            given = attr not in vars(box) or (
+                attr == "drawing_name" and box.args and not box.drawing_name)
+            if attr in vars(self) and given:
                 setattr(box, attr, getattr(self, attr))
         if self.args and box.args:
             Box.bubble_drawing(

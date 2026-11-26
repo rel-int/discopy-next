@@ -1566,3 +1566,10 @@ def test_box_with_args_keeps_its_drawing_name():
     bubble = f.bubble(drawing_name="g")
     assert bubble[::-1].drawing_name == "g"
     assert bubble[::-1][::-1].drawing_name == "g"
+
+
+def test_rebuild_keeps_a_name_derived_from_new_data():
+    from pytest import importorskip
+    phi = importorskip("sympy.abc").phi
+    from discopy.quantum.zx import Scalar
+    assert Scalar(phi).lambdify(phi)(2).drawing_name == Scalar(2).drawing_name
