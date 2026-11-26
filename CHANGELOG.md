@@ -901,6 +901,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A functor reads a type of the level of its domain or above as that type,
+  so the identity functor is the identity on types, e.g.
+  `monoidal.Functor.id(monoidal.Diagram)` on a box over `rigid.Ty('x')`, its
+  images compose and a dict `ob_map` keyed on the type finds it
+  ([next#703]).
+
 - A frame drawn left to right keeps its name inside it, in its top left
   corner, rather than lifted above its top side like a wire label, and a
   bubble keeps its name under `wire_labels=False`, e.g. the `d$x$` of the
@@ -2734,6 +2740,7 @@ for the changelog of `1.2.1` and earlier.
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
+[next#703]: https://github.com/rel-int/discopy-next/issues/703
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
