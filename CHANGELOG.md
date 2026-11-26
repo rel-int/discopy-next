@@ -22,7 +22,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#TBD]).
 
-- `neural.datatype` has `Algebra.lift`, `Algebra.unitality` and
+- `neural.datatype` has `Algebra.lift`, `Algebra.lift_cell`, `Algebra.unitality` and
   `Algebra.associativity`, the free monad on parametric maps and the cells of
   the lax algebra of an algebra with a parameter, `Datatype.substitute` and
   `plug`, the multiplication of the free monad, and `LaxHomomorphism`, the

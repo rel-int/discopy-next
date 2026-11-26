@@ -987,7 +987,7 @@ def test_lax_algebra_units(shape, children, make, datatype):
     square = algebra.associativity(shape, *children)
     assert para.same(
         square.cod, algebra(datatype.substitute(shape, *children)))
-    right = algebra.lift(shape, *[algebra.unitality()] * holes)\
+    right = algebra.lift_cell(shape, *[algebra.unitality()] * holes)\
         >> para.Cell.id(algebra(shape))
     right = right.then(algebra.associativity(shape, *[Diagram.id(S)] * holes))
     left = para.Cell.id(algebra(shape)) >> algebra.unitality()
@@ -1009,7 +1009,7 @@ def pastings(algebra, datatype, shape, children, grandchildren):
     left = (para.Cell.id(algebra.lift(shape, *holes))
             >> algebra.associativity(shape, *children)).then(
         algebra.associativity(datatype.substitute(shape, *children), *terms))
-    right = (algebra.lift(shape, *squares) >> para.Cell.id(algebra(shape))
+    right = (algebra.lift_cell(shape, *squares) >> para.Cell.id(algebra(shape))
              ).then(algebra.associativity(shape, *substituted))
     return left, right
 
@@ -1168,12 +1168,12 @@ def test_box_reparametrisation_lifts_into_one_hole_only():
     algebra, trees = diagram_algebra(), tree_diagram_algebra()
     r = Box("r", Ty("R"), P)
     cell = para.Cell.reparam(algebra(LISTS.term(chain(0))), r)
-    lifted = algebra.lift(cons, cell)
+    lifted = algebra.lift_cell(cons, cell)
     assert lifted.inside == r
     assert para.same(lifted.cod, algebra.lift(cons, cell.cod))
     leaf_cell = para.Cell.reparam(trees(TREES.term(LEAF)), r)
     with pytest.raises(AxiomError):
-        trees.lift(node, leaf_cell, leaf_cell)
+        trees.lift_cell(node, leaf_cell, leaf_cell)
 
 
 @pytest.mark.parametrize("deterministic", [False, True])
@@ -1201,12 +1201,16 @@ def test_lax_errors():
     wide = fold.reparam(Diagram.from_function([0], P @ P))
     with pytest.raises(ValueError, match="one parameter"):
         trees.lift(node, fold, wide)
-    with pytest.raises(ValueError, match="maps or cells"):
+    with pytest.raises(ValueError, match="got a cell"):
         trees.lift(node, fold, para.Cell.id(fold))
+    with pytest.raises(ValueError, match="got a map"):
+        trees.lift_cell(node, para.Cell.id(fold), fold)
+    with pytest.raises(ValueError, match="at least one"):
+        trees.lift_cell(node)
     with pytest.raises(ValueError, match="Expected a param"):
         algebra.lift(nil)
     with pytest.raises(ValueError, match="same inside"):
-        trees.lift(node, para.Cell.id(fold), para.Cell.reparam(
+        trees.lift_cell(node, para.Cell.id(fold), para.Cell.reparam(
             fold, Box("r", Ty("R"), P)))
     with pytest.raises(ValueError, match="Expected 1 maps"):
         algebra.lift(cons, fold, fold)
