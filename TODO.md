@@ -6,6 +6,6 @@
 >
 > Prefer whichever keeps the current docs URL and hosting unless that turns out to be unreasonable. Changing where the docs are hosted is toumix's decision, so if (b) looks necessary, explain why rather than switching on your own. Keep `optyx/readme_example` unexecuted as it is now. Follow the repo's AGENTS.md.
 
-- [ ] publish the notebooks the `docs` job renders on `main` to a branch, from a job of its own with write access
+- [WIP] @T-dfc2c559-2026-11-26 16:59 publish the notebooks the `docs` job renders on `main` to a branch, from a job of its own with write access
 - [ ] embed that branch's HTML in the Read the Docs build instead of the link pages, without running any notebook there
 - [ ] docs, tests and changelog
