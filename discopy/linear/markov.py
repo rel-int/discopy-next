@@ -82,6 +82,7 @@ class Diagram(markov.Diagram, swaps.Diagram):
     """
     ob = Ty
     layer_factory = Layer
+    term_factory = swaps.Diagram.term_factory
 
     @classmethod
     def contraction(cls, x: Ty) -> Diagram:

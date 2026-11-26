@@ -231,6 +231,10 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
         ...     == Cap(y.r, y) @ x >> y.r @ f >> Cup(y.r, y) @ x
         """
         def image(box):
+            if isinstance(box, Sum):
+                return self.sum_factory(
+                    tuple(term.open_traces() for term in box.terms),
+                    box.dom, box.cod)
             if not isinstance(box, Trace):
                 return box
             return self.dual_trace(box.arg.open_traces(), box.left)

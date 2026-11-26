@@ -236,7 +236,7 @@ from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_istraceable, factory_name, from_tree)
+    AxiomError, factory_name, from_tree)
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -448,22 +448,7 @@ class Diagram(frobenius.Diagram):
         left.assert_isadjoint(right)
         return cls.spider_factory(0, 2, left)
 
-    def trace(self, n=1, left=False) -> Diagram:
-        """
-        The trace of the last ``n`` wires, the first when ``left``, bent with
-        the cups and caps of the channel category, see
-        :meth:`discopy.pivotal.Diagram.dual_trace`: a channel's
-        :meth:`feedback` is a delayed loop of its own.
-
-        Parameters:
-            n : The number of wires to trace.
-            left : Whether to trace on the left rather than the right.
-        """
-        assert_istraceable(self, n, left)
-        result = self
-        for _ in range(n):
-            result = self.trace_factory(result, left)
-        return result
+    trace = diagram.Diagram.trace
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
