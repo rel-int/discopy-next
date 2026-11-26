@@ -261,4 +261,3 @@ def test_a_diagram_box_loads_its_own_tree(box):
         assert np.array_equal(loaded.array, box.array)
     if isinstance(box, Diagram):
         assert loads(dumps(box @ box)) == box @ box
-

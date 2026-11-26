@@ -336,4 +336,3 @@ def test_a_zx_box_loads_its_own_tree(box):
     if box.array is not None:
         assert np.allclose(loaded.array, box.array)
     assert loads(dumps(box @ box)) == box @ box
-
