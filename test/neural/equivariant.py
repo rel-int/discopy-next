@@ -359,3 +359,19 @@ def test_fast_layer():
         v = torch.randn(5, *slow.dom.inside[0].inside, dtype=torch.float64)
         torch.testing.assert_close(
             module(fast, *weights)(v), module(slow, *weights)(v))
+
+
+def test_unbatched():
+    """
+    An unbatched input gives the batched output without its batch axis,
+    down to a single point with one channel, which has no axis at all.
+    """
+    torch, equivariant = modules()
+    torch.manual_seed(6)
+    action = Symmetric[5].action()
+    for cod, shape in ((Action.trivial(action.group), ()), (action, (5, ))):
+        for bias in (False, True):
+            module = compiled(torch, equivariant.layer(action, cod, bias=bias))
+            v = torch.randn(action.size, dtype=torch.float64)
+            assert module(v).shape == shape
+            torch.testing.assert_close(module(v), module(v[None])[0])
