@@ -901,6 +901,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The API docs show short names: a page is titled with the last part of its
+  name, which it lost when its package did not import it, e.g.
+  `neural.cell`, and module tables and `:mod:` references drop the
+  `discopy.` prefix, which `test/api_names.py` checks. `discopy.drawing` has
+  its own page instead of appearing twice under semantics, and the subpackages
+  follow it in the order lambek, neural, optyx, quantum ([next#746]).
+
 - The sides of a frame and of its slots are drawn with a black edge, as
   those of boxes and bubbles are, wherever the regions on either side have
   different colours, rather than with zero width, e.g. around each term of
@@ -2748,6 +2755,7 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
+[next#746]: https://github.com/rel-int/discopy-next/pull/746
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
