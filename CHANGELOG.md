@@ -79,7 +79,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
   ([next#TBD]).
-
 - `neural.datatype` has `Datatype`, the constructors of a polynomial
   endofunctor, with the diagrams of its terms (lists, trees), and `Algebra`,
   one image for each constructor whose fold of a term is a functor, tied by
@@ -92,6 +91,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   image for each box of the cell whose unrolled image is tied by one copy of
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
   ([next#TBD]).
+
+- `neural.datatype` has `Algebra.lift`, `Algebra.unitality` and
+  `Algebra.associativity`, the free monad on parametric maps and the cells of
+  the lax algebra of an algebra with a parameter, `Datatype.substitute` and
+  `plug`, the multiplication of the free monad, and `LaxHomomorphism`, the
+  folds of a datatype given by a map from the parameter to itself and the
+  parameter of the algebra, whose axioms are checked as equations: the
+  squares of Categorical Deep Learning, Appendix F and J, the copy being the
+  tied fold ([next#TBD]).
+
+- `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
+  between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
+  `then`, horizontal composition `>>` and `@`, and `is_invertible`;
+  `para.UpToPermutation` compares maps up to the permutations of their
+  parameters and of their coparameters, decided by `para.isomorphic`, an
+  isomorphism of hypergraphs that keeps the boundary in order, so that the
+  laws of every para category that failed for want of a reparametrisation
+  now hold modulo it ([next#TBD]).
 
 - `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
   between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
@@ -2795,6 +2812,7 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

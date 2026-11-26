@@ -20,6 +20,7 @@ parameters it is the unique one out of the terms, by functoriality: see
 
     Datatype
     Algebra
+    LaxHomomorphism
     Machine
     Coalgebra
     ToStream
@@ -27,6 +28,20 @@ parameters it is the unique one out of the terms, by functoriality: see
 .. autosummary::
 
     chain
+    plug
+
+The parameter of an algebra is copied into every constructor, which makes
+the fold of a term a lax algebra of the free monad of the datatype, in the
+2-category of parametric maps (*Categorical Deep Learning*, Appendix F and J).
+The free monad is the free category of the terms with holes, so every
+coherence law is a :class:`discopy.para.Cell` between maps of a given shape,
+checked by the equation of its category: :meth:`Algebra.lift` is the free
+monad on maps, :meth:`Algebra.unitality` and :meth:`Algebra.associativity`
+are the cells of the lax algebra, copies of the parameter, and
+:class:`LaxHomomorphism` the folds of a datatype that are lax and not tied.
+The base is the free copy-discard category: no box is copyable or
+discardable, so a reparametrisation by a box is rejected by every cell
+where the parameter is copied twice or discarded.
 
 Dually, a coalgebra :math:`S \\to F(S)` of :math:`F(S) = (I \\to O \\times S)`
 (Mealy), :math:`O \\times (I \\to S)` (Moore) or :math:`O \\times S` (unfold)
@@ -152,8 +167,7 @@ class Datatype:
         Parameters:
             value : A nested tuple, the constructor name and its subterms.
         """
-        if not isinstance(value, tuple) or not value:
-            raise ValueError(f"Expected (name, *children), got {value!r}.")
+        check_term(value)
         name, *children = value
         box = self.constructor(name)
         if len(children) != self.arity(box):
@@ -163,6 +177,36 @@ class Datatype:
                         map(self.term, children),
                         markov.Diagram.id(self.data(box)))
         return inputs >> box
+
+    def substitute(self, term: markov.Diagram, *children: markov.Diagram
+                   ) -> markov.Diagram:
+        """
+        The multiplication of the free monad of the datatype: a term with
+        holes, i.e. a diagram with the carrier in its domain, with a diagram
+        plugged into each hole.
+
+        Parameters:
+            term : A diagram of constructors.
+            children : One diagram with the carrier as codomain per hole.
+
+        Raises:
+            ValueError : If there are not as many children as holes.
+
+        Example
+        -------
+        >>> from discopy.markov import Diagram, Ty
+        >>> A, S = Ty("A"), Ty("S")
+        >>> L = Datatype.list(A, S)
+        >>> nil, cons = L.constructors
+        >>> assert L.substitute(cons, L.term(chain(0))) == L.term(chain(1))
+        >>> assert L.substitute(Diagram.id(S), nil) == nil
+        >>> L.substitute(cons)  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ...
+        ValueError: Expected 1 maps ...
+        """
+        holes = plug(term.dom, self.carrier, children, markov.Diagram.id)
+        return holes >> term
 
     @classmethod
     def list(cls, data: markov.Ty, carrier: markov.Ty) -> Datatype:
@@ -217,6 +261,66 @@ def chain(n: int) -> tuple:
     if n < 0:
         raise ValueError(f"Expected a length, got {n}.")
     return reduce(lambda term, _: ("Cons", term), range(n), ("Nil", ))
+
+
+def check_term(value: tuple):
+    """
+    Raise ``ValueError`` unless a value is a tuple ``(name, *children)``.
+
+    Parameters:
+        value : The candidate term.
+    """
+    if not isinstance(value, tuple) or not value:
+        raise ValueError(f"Expected (name, *children), got {value!r}.")
+
+
+def plug(dom, carrier, maps, identity) -> Any:
+    """
+    The tensor of ``maps`` on the wires of ``dom`` that are the carrier, in
+    order, and of ``identity(atom)`` on the other atoms: the one place where
+    the holes of a term are filled.
+
+    Parameters:
+        dom : The domain of the term, a type.
+        carrier : The atomic type of the holes.
+        maps : One map per hole.
+        identity : The map to put on an atom that is not a hole.
+
+    Raises:
+        ValueError : If there are not as many maps as holes.
+
+    Example
+    -------
+    >>> from discopy.markov import Box, Diagram, Ty
+    >>> A, S, x = Ty("A"), Ty("S"), Box("x", Ty(), Ty("S"))
+    >>> assert plug(A @ S, S, [x], Diagram.id) == A @ x
+    >>> plug(A @ S, S, [], Diagram.id)  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError: Expected 1 maps ...
+    """
+    maps = list(maps)
+    if dom.count(carrier) != len(maps):
+        raise ValueError(f"Expected {dom.count(carrier)} maps for the holes "
+                         f"of {dom}, got {len(maps)}.")
+    queue = iter(maps)
+    atoms = [dom[i:i + 1] for i in range(len(dom))]
+    parts = [next(queue) if atom == carrier else identity(atom)
+             for atom in atoms]
+    if not parts:
+        return identity(dom)
+    return reduce(lambda left, right: left @ right, parts[1:], parts[0])
+
+
+def require_parametric(algebra):
+    """
+    Raise ``ValueError`` unless an algebra has a parameter.
+
+    Parameters:
+        algebra : The :class:`Algebra` to check.
+    """
+    if not algebra.parametric:
+        raise ValueError(f"{algebra.cod} is not a parametric category.")
 
 
 def is_parametric(cod) -> bool:
@@ -359,7 +463,7 @@ class Algebra:
         """ The functor from the free category on the constructors. """
         return markov.Functor(self.ob_map, self.ar_map, cod=self.cod)
 
-    def __call__(self, term: markov.Diagram):
+    def __call__(self, term: markov.Diagram) -> Any:
         """
         The fold of a term of the datatype.
 
@@ -371,6 +475,247 @@ class Algebra:
             return image
         return image.reparam(self.cod.category.copy(
             self.param, len(term.boxes)))
+
+    def lift(self, term: markov.Diagram, *maps, param=None
+             ) -> para.Symmetric | para.Cell:
+        """
+        The free monad on a map, i.e. the term with its holes filled by maps
+        of this category: the image of the data is the identity of its image,
+        and the parameter of the maps is copied into every hole, discarded if
+        there are none (*Categorical Deep Learning*, Appendix G.8). If the
+        maps are cells with the same inside, so is the result, which the
+        equation of the cell rejects unless the inside commutes with the
+        copy.
+
+        Parameters:
+            term : A diagram of constructors, with holes.
+            maps : A parametric map or a cell for each hole, with one
+                parameter.
+            param : The parameter of the maps, needed when there are none.
+
+        Raises:
+            ValueError : If the algebra is not parametric, the maps are both
+                maps and cells, there are no maps and no parameter, the
+                parameters differ or the maps are not as many as the holes.
+
+        Example
+        -------
+        >>> from discopy.markov import Box, Diagram, Ty
+        >>> A, S, P = Ty("A"), Ty("S"), Ty("P")
+        >>> L = Datatype.list(A, S)
+        >>> nil, cons = L.constructors
+        >>> Net = para.Markov[Diagram]
+        >>> z = Net(Ty(), S, Box("z", P, S), param=P)
+        >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
+        >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
+        >>> lifted = F.lift(cons, F(nil))
+        >>> assert (lifted.dom, lifted.cod, lifted.param) == (A, A @ S, P)
+        >>> assert F.lift(nil, param=P).param == P
+        """
+        require_parametric(self)
+        cells = [isinstance(m, para.Cell) for m in maps]
+        if any(cells) and not all(cells):
+            raise ValueError("Expected maps or cells.")
+        if maps and all(cells):
+            if any(m.inside != maps[0].inside for m in maps):
+                raise ValueError("Expected cells with the same inside.")
+            return para.Cell(
+                self.lift(term, *(m.dom for m in maps), param=param),
+                self.lift(term, *(m.cod for m in maps)), maps[0].inside)
+        params = [m.param for m in maps] + ([] if param is None else [param])
+        if not params:
+            raise ValueError("Expected a param for a term without holes.")
+        if any(p != params[0] for p in params):
+            raise ValueError(f"Expected one parameter, got {params}.")
+        inside = plug(term.dom, self.datatype.carrier, maps,
+                      lambda atom: self.cod.id(self.functor(atom)))
+        return inside.reparam(self.cod.category.copy(params[0], len(maps)))
+
+    def unitality(self) -> para.Cell:
+        """
+        The unit of the lax algebra: a cell from the identity of the carrier
+        to the fold of the hole, which discards the parameter
+        (*Categorical Deep Learning*, Definition F.2).
+
+        Raises:
+            ValueError : If the algebra is not parametric.
+
+        Example
+        -------
+        >>> from discopy.markov import Box, Diagram, Ty
+        >>> A, S, P = Ty("A"), Ty("S"), Ty("P")
+        >>> L = Datatype.list(A, S)
+        >>> nil, cons = L.constructors
+        >>> Net = para.Markov[Diagram]
+        >>> z = Net(Ty(), S, Box("z", P, S), param=P)
+        >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
+        >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
+        >>> assert F.unitality().inside == Diagram.discard(P)
+        >>> assert para.same(F.unitality().cod, F(Diagram.id(S)))
+        """
+        require_parametric(self)
+        hole = self.cod.id(self.functor(self.datatype.carrier))
+        return para.Cell.reparam(
+            hole, self.cod.category.copy(self.param, 0))
+
+    def associativity(self, term: markov.Diagram, *children: markov.Diagram
+                      ) -> para.Cell:
+        """
+        The multiplication of the lax algebra at a term with holes and a
+        child for each hole: a cell from the fold of the term of the folds of
+        the children to the fold of the substituted term, which copies the
+        parameter (*Categorical Deep Learning*, Definition F.2). At a
+        constructor, it is the square of Appendix J.
+
+        Parameters:
+            term : A diagram of constructors, with holes.
+            children : One diagram with the carrier as codomain per hole.
+
+        Raises:
+            ValueError : If the algebra is not parametric or the children are
+                not as many as the holes.
+
+        Example
+        -------
+        >>> from discopy.markov import Box, Diagram, Ty
+        >>> A, S, P = Ty("A"), Ty("S"), Ty("P")
+        >>> L = Datatype.list(A, S)
+        >>> nil, cons = L.constructors
+        >>> Net = para.Markov[Diagram]
+        >>> z = Net(Ty(), S, Box("z", P, S), param=P)
+        >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
+        >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
+        >>> square = F.associativity(cons, L.term(chain(0)))
+        >>> assert square.inside == Diagram.copy(P, 2)
+        >>> assert square.cod == F(L.term(chain(1)))
+        """
+        require_parametric(self)
+        folds = [self(child) for child in children]
+        dom = self.lift(term, *folds, param=self.param) >> self(term)
+        cod = self(self.datatype.substitute(term, *children))
+        return para.Cell(dom, cod, self.cod.category.copy(self.param, 2))
+
+
+@dataclass
+class LaxHomomorphism:
+    """
+    A lax homomorphism from the initial algebra of a datatype to an algebra
+    with a parameter :math:`P` (*Categorical Deep Learning*, Definition F.3
+    and Appendix J): a parameter :math:`Q`, a fold of each closed term with
+    this parameter, and one map :math:`\\kappa : Q \\to Q \\otimes P` for all
+    constructors, such that the fold of a constructor applied to terms is the
+    fold of its children, then the image of the constructor, reparametrised
+    by :math:`\\kappa`. The map is the copy of the parameter when it is tied,
+    and reads another copy of :math:`Q` at each depth otherwise: the
+    folds are the pairs :math:`(Q, \\kappa)`, so that not even the lax ones
+    are tied. A strict homomorphism needs :math:`Q \\otimes P = Q`.
+
+    The unit and multiplication of :math:`\\kappa` in :meth:`unitality` and
+    :meth:`multiplication` are the axioms of Johnson and Yau, Definition
+    6.5.9, of a lax morphism of algebras of the free monad. In a category
+    where every map is copied, the unit forces :math:`\\kappa` to be a copy
+    of :math:`Q` followed by a reparametrisation :math:`Q \\to P`, and the
+    fold is the tied one. They are meant for the spiders: a box is neither
+    copied nor discarded in the free category with copies and discards.
+    The axioms are checked on diagram codomains: ``python.Function`` compares
+    functions by identity, so they never hold there.
+
+    Parameters:
+        algebra : An algebra with a parameter.
+        kappa : A diagram :math:`Q \\to Q \\otimes P` of the category of
+            ``algebra.cod`` without parameters, e.g. a spider.
+
+    Raises:
+        ValueError : If the algebra is not parametric or the type of
+            ``kappa`` is not :math:`Q \\to Q \\otimes P`.
+
+    Example
+    -------
+    >>> from discopy.markov import Box, Diagram, Ty
+    >>> A, S, P = Ty("A"), Ty("S"), Ty("P")
+    >>> L = Datatype.list(A, S)
+    >>> nil, cons = L.constructors
+    >>> Net = para.Markov[Diagram]
+    >>> z = Net(Ty(), S, Box("z", P, S), param=P)
+    >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
+    >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
+    >>> tied = LaxHomomorphism(F, Diagram.copy(P))
+    >>> assert para.same(tied(chain(2)), F(L.term(chain(2))))
+    >>> assert tied.unitality() and tied.multiplication()
+    >>> pair = LaxHomomorphism(F, Diagram.from_function([1, 0, 0], P @ P))
+    >>> assert not pair.unitality() and pair.param == P @ P
+    >>> assert not para.same(pair(chain(2)), F(L.term(chain(2))))
+    """
+    algebra: Algebra
+    kappa: markov.Diagram
+
+    def __post_init__(self):
+        require_parametric(self.algebra)
+        if not isinstance(self.kappa, self.algebra.cod.category):
+            raise ValueError(f"Expected a {self.algebra.cod.category}, "
+                             f"got {self.kappa!r}.")
+        if self.kappa.cod != self.param @ self.algebra.param:
+            raise ValueError(f"Expected a map into {self.param} @ "
+                             f"{self.algebra.param}, got {self.kappa.cod}.")
+
+    @property
+    def param(self):
+        """ The parameter :math:`Q` of the folds, the domain of kappa. """
+        return self.kappa.dom
+
+    def top(self, value: tuple) -> para.Symmetric:
+        """
+        The map above the square of a closed term ``(name, *children)``: the
+        constructor applied to the folds of the children.
+
+        Parameters:
+            value : A nested tuple, see :meth:`Datatype.term`.
+        """
+        check_term(value)
+        box = self.algebra.datatype.constructor(value[0])
+        folds = [self(child) for child in value[1:]]
+        return self.algebra.lift(box, *folds, param=self.param)\
+            >> self.algebra.ar_map[box]
+
+    def __call__(self, value: tuple) -> para.Symmetric:
+        """
+        The fold of a closed term, by recursion on its constructors.
+
+        Parameters:
+            value : A nested tuple, see :meth:`Datatype.term`.
+        """
+        return self.top(value).reparam(self.kappa)
+
+    def preservation(self, value: tuple) -> para.Cell:
+        """
+        The square of a closed term: a cell from its :meth:`top` to its fold,
+        which holds by construction.
+
+        Parameters:
+            value : A nested tuple, see :meth:`Datatype.term`.
+        """
+        top = self.top(value)
+        return para.Cell(top, self(value), self.kappa)
+
+    def unitality(self) -> markov.Equation:
+        """
+        The unit axiom of :math:`\\kappa`: discarding the parameter it
+        produces gives the identity of :math:`Q`.
+        """
+        category = self.algebra.cod.category
+        return category.equation_factory(
+            self.kappa >> self.param @ category.copy(self.algebra.param, 0),
+            category.id(self.param))
+
+    def multiplication(self) -> markov.Equation:
+        """
+        The multiplication axiom of :math:`\\kappa`: copying the parameter it
+        produces is applying it twice.
+        """
+        category, param = self.algebra.cod.category, self.algebra.param
+        return category.equation_factory(
+            self.kappa >> self.param @ category.copy(param),
+            self.kappa >> self.kappa @ param)
 
 
 class ToStream(markov.Functor):

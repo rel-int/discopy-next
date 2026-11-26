@@ -1,3 +1,4 @@
+from itertools import product
 from random import Random
 
 import pytest
@@ -6,7 +7,8 @@ import discopy
 from discopy import markov, para, python
 from discopy.markov import Box, Diagram, Ty
 from discopy.neural.datatype import (
-    Algebra, Coalgebra, Datatype, Machine, chain)
+    Algebra, Coalgebra, Datatype, LaxHomomorphism, Machine, chain)
+from discopy.utils import AxiomError
 
 A, S, P = Ty("A"), Ty("S"), Ty("P")
 LISTS, TREES = Datatype.list(A, S), Datatype.tree(A, S)
@@ -62,6 +64,9 @@ def test_tree_terms():
     assert term == (leaf @ leaf >> node) @ leaf >> node
     assert (term.dom, term.cod) == (A ** 3, S)
     assert TREES.term(("Leaf", )) == leaf
+    small, big = ("Leaf", ), ("Node", ("Leaf", ), ("Leaf", ))
+    assert TREES.substitute(node, TREES.term(small), TREES.term(big))\
+        == TREES.term(("Node", small, big))
 
 
 def test_data_and_arity():
@@ -872,3 +877,342 @@ def test_unrolled_mealy_is_the_trace(rounds):
     assert all(torch.allclose(o, e, atol=1e-6)
                for o, e in zip(outs, expected))
     assert torch.allclose(outs[rounds], state, atol=1e-6)  # the final state
+
+
+# 11. lax algebras and lax homomorphisms
+
+
+def test_lift_compares_merged_copies():
+    """ The lifts compare up to merging copies: copies of copies are one. """
+    f = Para(Ty(), S, Box("f", P ** 3, S), param=P ** 3)
+    left = f.reparam(Diagram.copy(P, 3))
+    right = f.reparam(Diagram.copy(P) >> Diagram.copy(P) @ P)
+    assert para.same(left, right)
+
+
+def tree_diagram_algebra():
+    return Algebra(
+        TREES, {leaf: Para(A, S, Box("leaf", A @ P, S), param=P),
+                node: Para(S @ S, S, Box("node", S @ S @ P, S), param=P)},
+        {A: A, S: S}, Para)
+
+
+LEAF = ("Leaf", )
+LIST_VALUES = [chain(m) for m in range(5)]
+TREE_VALUES = [LEAF, ("Node", LEAF, LEAF),
+               ("Node", ("Node", LEAF, LEAF), LEAF)]
+CASES = [(diagram_algebra, LISTS, value) for value in LIST_VALUES]\
+    + [(tree_diagram_algebra, TREES, value) for value in TREE_VALUES]
+
+
+def nodes(value):
+    """ Every subterm of a term. """
+    yield value
+    for child in value[1:]:
+        yield from nodes(child)
+
+
+def depths(value, depth=0):
+    """ The depth of each box of a term, in the order of its boxes. """
+    return [d for child in value[1:] for d in depths(child, depth + 1)]\
+        + [depth]
+
+
+def spider(outs, n=2):
+    """ The map P ** n -> P ** len(outs), output i reads input outs[i]. """
+    return Diagram.from_function(list(outs), P ** n)
+
+
+def shift(n):
+    """ The map P ** n -> P ** n @ P that rotates the parameters. """
+    return spider([*range(1, n), 0, 0], n)
+
+
+def untied(algebra, datatype, value, n, read):
+    """ The untied image of a term, box i reading the copy read(depth i). """
+    reads = [read(depth) for depth in depths(value)]
+    return algebra.functor(datatype.term(value)).reparam(
+        spider(reads, n))
+
+
+@pytest.mark.parametrize("make, datatype, value", CASES)
+def test_tied_is_lax_homomorphism(make, datatype, value):
+    algebra = make()
+    fold = LaxHomomorphism(algebra, Diagram.copy(P))(value)
+    assert para.same(fold, algebra(datatype.term(value)))
+    for sub in nodes(value):
+        square = algebra.associativity(
+            datatype.constructor(sub[0]), *map(datatype.term, sub[1:]))
+        assert markov.Equation(square.inside, Diagram.copy(P, 2))
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+@pytest.mark.parametrize("make, datatype, value", CASES)
+def test_lax_homomorphisms_are_not_unique(make, datatype, value, n):
+    algebra = make()
+    fold = LaxHomomorphism(algebra, shift(n))(value)
+    assert fold.param == P ** n
+    assert para.same(
+        fold, untied(algebra, datatype, value, n, lambda d: d % n))
+    tied = algebra(datatype.term(value))
+    assert para.same(tied, fold.reparam(Diagram.copy(P, n)))
+    if n == 1:
+        assert para.same(fold, tied)
+
+
+@pytest.mark.parametrize("m", range(5))
+def test_same_boundary_different_maps(m):
+    algebra = diagram_algebra()
+    alt, first = (LaxHomomorphism(algebra, spider(outs))(chain(m))
+                  for outs in ([1, 0, 0], [0, 1, 0]))
+    assert (alt.dom, alt.cod) == (first.dom, first.cod)
+    assert alt.param == first.param
+    assert (para.UpToPermutation(alt) != para.UpToPermutation(first))\
+        == (m >= 1)
+    tied = algebra(LISTS.term(chain(m)))
+    assert para.same(first, tied.reparam(Diagram.from_function([0], P @ P)))
+
+
+SHAPES = [
+    (cons, [LISTS.term(chain(1))], diagram_algebra, LISTS),
+    (A @ cons >> cons, [LISTS.term(chain(0))], diagram_algebra, LISTS),
+    (Diagram.id(S), [LISTS.term(chain(1))], diagram_algebra, LISTS),
+    (node, [TREES.term(LEAF)] * 2, tree_diagram_algebra, TREES),
+    (leaf @ S >> node, [TREES.term(LEAF)], tree_diagram_algebra, TREES)]
+
+
+@pytest.mark.parametrize("shape, children, make, datatype", SHAPES)
+def test_lax_algebra_units(shape, children, make, datatype):
+    algebra, holes = make(), shape.dom.count(S)
+    square = algebra.associativity(shape, *children)
+    assert para.same(
+        square.cod, algebra(datatype.substitute(shape, *children)))
+    right = algebra.lift(shape, *[algebra.unitality()] * holes)\
+        >> para.Cell.id(algebra(shape))
+    right = right.then(algebra.associativity(shape, *[Diagram.id(S)] * holes))
+    left = para.Cell.id(algebra(shape)) >> algebra.unitality()
+    left = left.then(algebra.associativity(Diagram.id(S), shape))
+    for cell in (left, right):
+        assert para.same(cell.cod, algebra(shape))
+        assert markov.Equation(cell.inside, Diagram.id(P))
+
+
+def pastings(algebra, datatype, shape, children, grandchildren):
+    """ The two pastings of the associativity of the lax algebra. """
+    holes = [algebra.lift(child, *map(algebra, terms), param=algebra.param)
+             for child, terms in zip(children, grandchildren)]
+    squares = [algebra.associativity(child, *terms)
+               for child, terms in zip(children, grandchildren)]
+    terms = [term for group in grandchildren for term in group]
+    substituted = [datatype.substitute(child, *group)
+                   for child, group in zip(children, grandchildren)]
+    left = (para.Cell.id(algebra.lift(shape, *holes))
+            >> algebra.associativity(shape, *children)).then(
+        algebra.associativity(datatype.substitute(shape, *children), *terms))
+    right = (algebra.lift(shape, *squares) >> para.Cell.id(algebra(shape))
+             ).then(algebra.associativity(shape, *substituted))
+    return left, right
+
+
+@pytest.mark.parametrize("make, datatype, shape, children, grandchildren", [
+    (diagram_algebra, LISTS, cons, [cons], [[LISTS.term(chain(0))]]),
+    (tree_diagram_algebra, TREES, node, [leaf, node],
+     [[], [TREES.term(LEAF)] * 2])])
+def test_lax_algebra_associativity(
+        make, datatype, shape, children, grandchildren):
+    left, right = pastings(
+        make(), datatype, shape, children, grandchildren)
+    assert para.same(left.dom, right.dom) and para.same(left.cod, right.cod)
+    assert markov.Equation(left.inside, right.inside)
+    assert markov.Equation(left.inside, Diagram.copy(P, 3))
+
+
+def test_only_the_copy_is_forced():
+    two = Ty("p") @ Ty("p")
+    algebra = Algebra(
+        LISTS, {nil: Para(Ty(), S, Box("initial", two, S), param=two),
+                cons: Para(A @ S, S, Box("cell", A @ S @ two, S), param=two)},
+        {A: A, S: S}, Para)
+    square = algebra.associativity(cons, A @ cons >> cons)
+    built = []
+    for outs in product(range(2), repeat=4):
+        try:
+            para.Cell(square.dom, square.cod, Diagram.from_function(
+                outs, two))
+        except AxiomError:
+            continue
+        built.append(outs)
+    assert built == [(0, 1, 0, 1)]
+
+
+KAPPAS = list(product(range(2), repeat=3))
+SQUARES = {(0, 0, 0), (0, 1, 0), (0, 1, 1), (1, 1, 1)}
+UNIT = {(0, 1, 0), (0, 1, 1)}
+CLOSED = [(A @ nil >> cons, [], ("Cons", ("Nil", ))),
+          (A @ cons >> cons, [("Nil", )], ("Cons", ("Cons", ("Nil", ))))]
+
+
+def holds(algebra, kappa):
+    """ Whether the squares at two closed shapes hold for kappa. """
+    hom = LaxHomomorphism(algebra, kappa)
+    for shape, children, value in CLOSED:
+        folds = [hom(child) for child in children]
+        dom = algebra.lift(shape, *folds, param=hom.param)\
+            >> algebra(shape)
+        try:
+            para.Cell(dom, hom(value), kappa)
+        except AxiomError:
+            return False
+    return True
+
+
+@pytest.mark.parametrize("outs", KAPPAS)
+def test_the_eight_spiders(outs):
+    algebra, kappa = diagram_algebra(), spider(outs)
+    hom = LaxHomomorphism(algebra, kappa)
+    assert holds(algebra, kappa) == (outs in SQUARES)
+    assert bool(hom.unitality()) == (outs in UNIT)
+    assert bool(hom.multiplication()) == (outs in SQUARES)
+    tied = algebra(LISTS.term(chain(2)))
+    projections = [
+        para.same(hom(chain(2)),
+                  tied.reparam(Diagram.from_function([i], P @ P)))
+        for i in range(2)]
+    survivors = {(0, 0, 0): [True, False], (0, 1, 0): [True, False],
+                 (0, 1, 1): [False, True], (1, 1, 1): [False, True]}
+    assert projections == survivors.get(outs, [False, False])
+
+
+def test_copy_and_rotations():
+    algebra = diagram_algebra()
+    assert holds(algebra, Diagram.copy(P))
+    assert not holds(algebra, shift(2))
+    for n in (2, 3):
+        assert not LaxHomomorphism(algebra, shift(n)).unitality()
+    assert LaxHomomorphism(algebra, Diagram.copy(P)).unitality()
+    assert LaxHomomorphism(algebra, Diagram.copy(P)).multiplication()
+
+
+def test_well_typed_negative_and_box_witness():
+    algebra = diagram_algebra()
+    square = algebra.associativity(cons, LISTS.term(chain(0)))
+    with pytest.raises(AxiomError):
+        para.Cell(square.dom, square.cod, Box("k", P, P @ P))
+    hom = LaxHomomorphism(algebra, spider([0, 1, 0]))
+    top, fold = hom.top(chain(1)), hom(chain(1))
+    assert hom.preservation(chain(1)).cod == fold
+    para.Cell(top, fold, hom.kappa)
+    with pytest.raises(AxiomError):
+        para.Cell(top, fold, shift(2))
+
+
+def test_oplax_is_rejected_at_constructors_only():
+    algebra, trees = diagram_algebra(), tree_diagram_algebra()
+    discard = Diagram.discard(P)
+    projections = [Diagram.id(P) @ discard, discard @ Diagram.id(P)]
+    nil_square = algebra.associativity(nil).dom
+    para.Cell(algebra(LISTS.term(chain(0))), nil_square, discard @ P)
+    cons_square = algebra.associativity(cons, LISTS.term(chain(0))).dom
+    node_square = trees.associativity(
+        node, TREES.term(LEAF), TREES.term(LEAF)).dom
+    for projection in projections:
+        with pytest.raises(AxiomError):
+            para.Cell(algebra(LISTS.term(chain(1))), cons_square, projection)
+        with pytest.raises(AxiomError):
+            para.Cell(trees(TREES.term(("Node", LEAF, LEAF))),
+                      node_square, projection)
+
+
+def fits(top, fold):
+    """ The spiders kappa such that fold is the square of top. """
+    found = set()
+    for outs in KAPPAS:
+        try:
+            para.Cell(top, fold, spider(outs))
+        except AxiomError:
+            continue
+        found.add(outs)
+    return found
+
+
+def test_one_kappa_for_all_constructors():
+    algebra, q = diagram_algebra(), P @ P
+    nil_fold = algebra.ar_map[nil].reparam(Diagram.from_function([0], q))
+    nil_top = algebra.lift(nil, param=q) >> algebra.ar_map[nil]
+    cons_top = algebra.lift(cons, nil_fold) >> algebra.ar_map[cons]
+    cons_fold = cons_top.reparam(Diagram.from_function([0, 1, 1], q))
+    fits_nil, fits_cons = fits(nil_top, nil_fold), fits(cons_top, cons_fold)
+    assert fits_nil == {outs for outs in KAPPAS if outs[2] == 0}
+    assert fits_cons == {outs for outs in KAPPAS
+                         if outs[0] == 0 and outs[2] == 1}
+    assert not fits_nil & fits_cons
+
+
+def test_strict_needs_an_empty_parameter_by_types():
+    empty = Algebra(
+        LISTS, {nil: Para(Ty(), S, Box("initial", Ty(), S)),
+                cons: Para(A @ S, S, Box("cell", A @ S, S))},
+        {A: A, S: S}, Para)
+    strict = LaxHomomorphism(empty, Diagram.id(Ty()))
+    for m in range(4):
+        assert strict.preservation(chain(m)).is_invertible
+        assert para.same(strict(chain(m)), empty(LISTS.term(chain(m))))
+    algebra = diagram_algebra()
+    with pytest.raises(ValueError):
+        LaxHomomorphism(algebra, Diagram.id(P))
+    tied = LaxHomomorphism(algebra, Diagram.copy(P))
+    assert not tied.preservation(chain(1)).is_invertible
+
+
+def test_box_reparametrisation_lifts_into_one_hole_only():
+    algebra, trees = diagram_algebra(), tree_diagram_algebra()
+    r = Box("r", Ty("R"), P)
+    cell = para.Cell.reparam(algebra(LISTS.term(chain(0))), r)
+    lifted = algebra.lift(cons, cell)
+    assert lifted.inside == r
+    assert para.same(lifted.cod, algebra.lift(cons, cell.cod))
+    leaf_cell = para.Cell.reparam(trees(TREES.term(LEAF)), r)
+    with pytest.raises(AxiomError):
+        trees.lift(node, leaf_cell, leaf_cell)
+
+
+@pytest.mark.parametrize("deterministic", [False, True])
+def test_a_box_in_kappa_fails_both_axioms(deterministic):
+    """ A box is not discarded (h >> ! != !) nor copied in the free quotient. """
+    box = Box("h", P, P, is_deterministic=deterministic)
+    hom = LaxHomomorphism(diagram_algebra(), Diagram.copy(P) >> P @ box)
+    assert not hom.unitality() and not hom.multiplication()
+
+
+def test_lax_errors():
+    plain, algebra = list_algebra(param=False), diagram_algebra()
+    trees = tree_diagram_algebra()
+    for call in (plain.unitality, lambda: plain.associativity(cons),
+                 lambda: plain.lift(cons)):
+        with pytest.raises(ValueError, match="parametric"):
+            call()
+    with pytest.raises(ValueError, match="parametric"):
+        LaxHomomorphism(plain, Diagram.copy(Ty()))
+    with pytest.raises(ValueError, match="Expected a"):
+        LaxHomomorphism(algebra, "kappa")
+    with pytest.raises(ValueError, match="map into"):
+        LaxHomomorphism(algebra, Box("k", P, P))
+    fold = trees(TREES.term(LEAF))
+    wide = fold.reparam(Diagram.from_function([0], P @ P))
+    with pytest.raises(ValueError, match="one parameter"):
+        trees.lift(node, fold, wide)
+    with pytest.raises(ValueError, match="maps or cells"):
+        trees.lift(node, fold, para.Cell.id(fold))
+    with pytest.raises(ValueError, match="Expected a param"):
+        algebra.lift(nil)
+    with pytest.raises(ValueError, match="same inside"):
+        trees.lift(node, para.Cell.id(fold), para.Cell.reparam(
+            fold, Box("r", Ty("R"), P)))
+    with pytest.raises(ValueError, match="Expected 1 maps"):
+        algebra.lift(cons, fold, fold)
+    with pytest.raises(ValueError, match="Expected 1 maps"):
+        algebra.associativity(cons)
+    hom = LaxHomomorphism(algebra, Diagram.copy(P))
+    for value in (("Foo", ), ("Cons", ), ("Nil", ("Nil", )), "Nil", ()):
+        with pytest.raises(ValueError):
+            hom(value)
