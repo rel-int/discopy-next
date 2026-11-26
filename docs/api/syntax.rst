@@ -15,7 +15,8 @@ plain levels adds a bang. A module imports the ones above it in its column and
 to its left on its row, except that ``linear`` and ``closed`` import nothing
 from ``feedback`` and ``feedback`` nothing from ``linear``; forgetful functors
 between the categories go the other way. Each module is pictured by its
-characteristic generator, drawn by the module itself.
+characteristic generator, drawn by the module itself: ``docs/architecture.py``
+draws the pictures and writes the table.
 
 .. autosummary::
     :template: module.rst
