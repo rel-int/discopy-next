@@ -34,6 +34,7 @@ Summary
         :toctree:
 
         combinators
+        int_port_and_sink
         int_cell
         int_path
 
