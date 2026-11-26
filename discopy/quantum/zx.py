@@ -1089,7 +1089,8 @@ class Hypergraph(hypergraph.Hypergraph):
         H >> H >> Nat(1) @ scalar(2)
         """
         result, number = super().to_diagram(), complex(self.scalar)
-        real = int(number.real) if number.real.is_integer() else number.real
+        real = float(number.real)
+        real = int(real) if isfinite(real) and int(real) == real else real
         return result if self.scalar == ONE\
             else result @ Scalar(real if not number.imag else number)
 
@@ -1113,7 +1114,8 @@ class Hypergraph(hypergraph.Hypergraph):
     """ The spider phases :meth:`strategy` draws from, simplest first. """
 
     @classmethod
-    def strategy(  # pylint: disable=arguments-differ
+    def strategy(  # pylint: disable=arguments-differ,too-many-arguments
+            # a terminal strategy declares exactly its keyword-only bounds
             cls, *, dom=None, cod=None, min_leaves=None, max_leaves=4,
             max_scalars=1):
         """

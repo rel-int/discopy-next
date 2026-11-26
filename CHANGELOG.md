@@ -901,6 +901,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `quantum.zx.Hypergraph` keeps spider phases as exact `Fraction`s modulo a
+  turn (decimal floats included, so `dagger` is an involution on
+  `Z(1, 1, 0.1)`), `turn` is exact on the quarter-turns so Clifford scalars
+  round-trip through `to_diagram`, `zx.Spider` writes non-dyadic `Fraction`
+  phases as `Fraction(p, q)` in `__str__` (keeping `p/q` for dyadic ones) and
+  exact phases in `__repr__`, and `zx.Scalar.__str__` formats its number
+  without rounding; `quantum.zx.Hypergraph.strategy` draws Hadamard boxes,
+  rational phases and Clifford or zero `Number` scalars, with regression cases
+  in `proptest/corpus/zx.py` ([next#43], [next#718]).
+
 - The dagger, transpose and conjugate of a box with args keep its
   `drawing_name`, and when its args are drawn in another direction its box has
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
@@ -2493,6 +2503,7 @@ for the changelog of `1.2.1` and earlier.
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
 [next#42]: https://github.com/rel-int/discopy-next/issues/42
+[next#43]: https://github.com/rel-int/discopy-next/issues/43
 [next#49]: https://github.com/rel-int/discopy-next/issues/49
 [next#52]: https://github.com/rel-int/discopy-next/issues/52
 [next#56]: https://github.com/rel-int/discopy-next/issues/56
@@ -2750,6 +2761,7 @@ for the changelog of `1.2.1` and earlier.
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
+[next#718]: https://github.com/rel-int/discopy-next/issues/718
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
