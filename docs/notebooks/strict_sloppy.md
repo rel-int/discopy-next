@@ -78,7 +78,7 @@ from discopy.optyx.core.zw import W, ZBox, Create, Select, Endo
 ## 1. Words as photons
 
 `Wn(n)` is the W node with `n` outputs, built from binary ones since W is
-coassociative. A word with array `a` from registers of `d₁, …, d_r`
+coassociative; with no outputs it selects the vacuum. A word with array `a` from registers of `d₁, …, d_r`
 modes to a register of `d` modes is the diagram `gate(a, [d₁, …, d_r], d)`:
 each input mode is split into one copy per index tuple that uses it and
 where `a` is nonzero, a mode that no such tuple uses is selected empty, and
@@ -90,6 +90,8 @@ input, it is a linear optical circuit.
 
 ```python {.marimo}
 def Wn(n):
+    if n == 0:
+        return Select(0)
     return Diagram.id(Mode(1)) if n == 1 else W(2) >> Mode(1) @ Wn(n - 1)
 
 
@@ -116,7 +118,7 @@ def gate(array, dims, cod):
     else:
         tuple_modes = Create(1) >> Wn(len(tuples))
     routes = [[k for k in range(cod) if array[t + (k, )]] for t in tuples]
-    route = Diagram.tensor(*(
+    route = Diagram.id(Mode(0)).tensor(*(
         Wn(len(ks)) >> Diagram.tensor(*(
             Diagram.id(Mode(1)) if array[t + (k, )] == 1
             else Endo(array[t + (k, )])
@@ -137,6 +139,7 @@ def amplitudes(diagram, cods):
         contractor=OptEinsum(), optimize=cotengra.HyperOptimizer(
             methods=["greedy"], max_repeats=16, minimize="size",
             progbar=False)).array
+    assert np.allclose(array.imag, 0), "the words are real vectors"
     result = np.zeros(cods)
     for js in itertools.product(*map(range, cods)):
         result[js] = array[sum(
@@ -150,6 +153,7 @@ _rng = np.random.default_rng(1)
 _v, _u = _rng.random(2), _rng.random(3)
 _M, _T = _rng.random((2, 3)), _rng.random((2, 3, 2))
 assert np.allclose(amplitudes(gate(_v, [], 2), [2]), _v)
+assert np.allclose(amplitudes(gate(np.zeros(2), [], 2), [2]), 0)
 assert np.allclose(amplitudes(gate(_v, [], 2) >> gate(_M, [2], 3), [3]),
                    _v @ _M)
 assert np.allclose(amplitudes(

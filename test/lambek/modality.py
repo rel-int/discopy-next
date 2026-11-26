@@ -38,7 +38,8 @@ def test_strict_and_sloppy_contractions():
     readings = {name: term.eval() for name, term in [
         ("strict", strict), ("sloppy", sloppy)]}
     for diagram in readings.values():
-        assert isinstance(diagram, Diagram) and diagram.cod == S @ S
+        assert isinstance(diagram, Diagram)
+        assert diagram.dom == Ty() and diagram.cod == S @ S
     copied = {name: sorted(str(box.x) for box in diagram.boxes
                            if isinstance(box, Contraction))
               for name, diagram in readings.items()}
