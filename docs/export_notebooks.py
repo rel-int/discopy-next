@@ -13,8 +13,8 @@ where ``<name>`` is the path of the notebook in ``docs/notebooks`` without its
 suffix, e.g. ``qnlp`` or ``optyx/bose_hubbard``.
 
 Both artefacts are generated (they are *not* committed): ``conf.py`` calls
-:func:`generate` from a ``builder-inited`` hook, so ``sphinx-build`` renders the
-notebooks as part of a normal docs build. If a notebook cannot be executed
+:func:`generate` from a ``builder-inited`` hook, so ``sphinx-build`` renders
+the notebooks as part of a normal docs build. If a notebook cannot be executed
 (e.g. an optional dependency is missing on Read the Docs) the build still
 succeeds -- the page falls back to a link to the notebook source.
 
@@ -25,9 +25,9 @@ It can also be run as a script::
     python docs/export_notebooks.py --check     # only check they execute
     python docs/export_notebooks.py --check --jobs 4  # four at a time
 
-``--check`` fails when a notebook does not execute, unless it is one of
-:data:`KNOWN_BROKEN`, which fail on a bug that an issue tracks. The notebooks
-of :data:`UNEXECUTED` never run unless named.
+``--check`` fails when a notebook outside :data:`KNOWN_BROKEN` fails to
+execute, or when one in :data:`KNOWN_BROKEN` executes. The notebooks of
+:data:`UNEXECUTED` never run unless named.
 """
 from __future__ import annotations
 
@@ -56,10 +56,9 @@ ISSUES = "https://github.com/rel-int/discopy-next/issues/"
 # rather than run it.
 SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 
-# Notebooks that fail to execute on a bug an open issue tracks, so that
-# ``--check`` does not block on them; ``generate`` already falls back to a link
-# page for any notebook that fails to execute. An entry whose issue is closed
-# has stopped being evidence: re-run the notebook before trusting it.
+# Notebooks that fail to execute on a bug an open issue tracks: ``--check``
+# expects them to fail and fails if one passes, so a stale entry cannot stay;
+# ``generate`` already falls back to a link page for any notebook that fails.
 KNOWN_BROKEN: dict[str, str] = {}
 
 # Notebooks that neither the docs build nor ``--check`` runs, unless named on
@@ -244,18 +243,20 @@ def main() -> int:
     with ThreadPoolExecutor(args.jobs) as pool:
         executed = list(pool.map(
             lambda notebook: render(notebook, check=args.check), selected))
-    failures = []
+    failures, unexpected = [], []
     for notebook, ok in zip(selected, executed):
         name = name_of(notebook)
-        if not ok and args.check and name in KNOWN_BROKEN:
-            print(f"{name}: known failure, see {KNOWN_BROKEN[name]}",
+        if args.check and name in KNOWN_BROKEN:
+            verdict = "unexpectedly passed" if ok else "known failure"
+            print(f"{name}: {verdict}, see {KNOWN_BROKEN[name]}",
                   file=sys.stderr)
+            if ok:
+                unexpected.append(name)
         elif not ok:
             failures.append(name)
     if failures:
         print(f"failed to execute: {', '.join(failures)}", file=sys.stderr)
-        return 1
-    return 0
+    return 1 if failures or unexpected else 0
 
 
 if __name__ == "__main__":

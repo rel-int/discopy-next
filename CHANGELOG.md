@@ -2122,6 +2122,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py --check` fails when a notebook in `KNOWN_BROKEN`
+  executes cleanly, naming the notebook and its issue, so an exemption whose
+  bug has been fixed cannot stay silently ([next#435]).
+
 - `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
   run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
   `--check` and the docs build, which give it a page linking to its source,

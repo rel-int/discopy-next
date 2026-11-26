@@ -91,3 +91,49 @@ def test_the_docs_extra_installs_what_the_optyx_notebooks_need():
     """The docs build installs the optyx extra and joblib, so that it renders
     the notebooks of ``optyx/`` rather than their fallback link pages."""
     assert installs(EXTRAS, "optyx") | {"joblib"} <= installs(EXTRAS, "docs")
+
+
+@pytest.mark.parametrize("ok, code, verdict", [
+    (False, 0, "known failure"),
+    (True, 1, "unexpectedly passed"),
+])
+def test_check_requires_a_known_broken_notebook_to_fail(
+        monkeypatch, capsys, ok, code, verdict):
+    issue = export_notebooks.ISSUES + "435"
+    monkeypatch.setattr(export_notebooks, "KNOWN_BROKEN", {"examples": issue})
+    monkeypatch.setattr(export_notebooks, "render", lambda *_, **__: ok)
+    monkeypatch.setattr("sys.argv", [
+        "export_notebooks.py", "--check", "examples"])
+
+    assert export_notebooks.main() == code
+    err = capsys.readouterr().err
+    assert f"examples: {verdict}, see {issue}" in err
+    assert "failed to execute" not in err
+
+
+@pytest.mark.parametrize("ok, code", [(True, 0), (False, 1)])
+def test_render_without_check_ignores_known_broken(
+        monkeypatch, capsys, ok, code):
+    issue = export_notebooks.ISSUES + "435"
+    monkeypatch.setattr(export_notebooks, "KNOWN_BROKEN", {"examples": issue})
+    monkeypatch.setattr(export_notebooks, "render", lambda *_, **__: ok)
+    monkeypatch.setattr("sys.argv", ["export_notebooks.py", "examples"])
+
+    assert export_notebooks.main() == code
+    err = capsys.readouterr().err
+    assert issue not in err
+    assert ("failed to execute: examples" in err) is (not ok)
+
+
+def test_generate_ignores_known_broken(monkeypatch):
+    pages = {}
+    issue = export_notebooks.ISSUES + "435"
+    monkeypatch.delenv(export_notebooks.SKIP, raising=False)
+    monkeypatch.setattr(export_notebooks, "KNOWN_BROKEN", {"examples": issue})
+    monkeypatch.setattr(export_notebooks, "export", lambda *_, **__: None)
+    monkeypatch.setattr(export_notebooks, "write_page", lambda nb, **kw: (
+        pages.setdefault(export_notebooks.name_of(nb), kw)))
+
+    export_notebooks.generate()
+
+    assert pages["examples"] == {"rendered": True}
