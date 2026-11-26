@@ -186,8 +186,8 @@ class Exp(Wire, biclosed.Exp):
         "The name of an exponential is its print, read when needed."
         return Exp.__str__(self)
 
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -284,6 +284,10 @@ class Unitype(Exp):
 
     def __str__(self):
         return "U"
+
+    @property
+    def drawing_name(self) -> str:
+        return str(self)
 
     def atoms(self) -> list:
         """ The unitype names itself, i.e. its base. """

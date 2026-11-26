@@ -963,8 +963,8 @@ which to_drawing recomputes.
             if target.kind != "cod":
                 return  # Otherwise we would have to reposition everything.
             x, _ = self.positions[dom_node]
-            _, y = self.positions[cod_node]
-            self.positions[cod_node] = Point(x, y)
+            for n in (cod_node, target):
+                self.positions[n] = Point(x, self.positions[n].y)
 
     @property
     def is_identity(self):
@@ -1387,6 +1387,12 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "nested", None):
+                # The reflection of a transpose is a conjugate, and back.
+                vars(result).update(
+                    mirror_nested=not box.mirror_nested,
+                    is_transpose=box.is_conjugate,
+                    is_conjugate=box.is_transpose)
             return result
 
         if self.is_box:

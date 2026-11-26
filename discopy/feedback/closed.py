@@ -89,6 +89,11 @@ class Exp(Wire, closed.Exp):
     def __str__(self):
         return closed.Exp.__str__(self) + feedback.str_delayed(self.time_step)
 
+    @property
+    def drawing_name(self) -> str:
+        return closed.Exp.drawing_name.fget(self)\
+            + feedback.str_delayed(self.time_step)
+
     def __repr__(self):
         return factory_name(type(self))\
             + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
@@ -171,6 +176,10 @@ class Unitype(closed.Unitype, Exp):
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
+
+    @property
+    def drawing_name(self) -> str:
+        return str(self)
 
     def __repr__(self):
         return f"{factory_name(type(self))}("\
