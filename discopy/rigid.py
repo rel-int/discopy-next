@@ -181,6 +181,7 @@ from discopy.utils import (
     BinaryBoxConstructor,
     deprecated_alias,
     factory_name,
+    Point,
 )
 
 
@@ -1205,10 +1206,12 @@ class Unsnake[category](rewrite.Step):
 
     def frame(self, t: float) -> Drawing:
         """
-        The snake straightens: each node of a strand moves in a straight
-        line to where its wire is drawn, the ends of the strand to the ends
-        of the wire and the rest to its middle, so that at ``t = 1`` it is
-        the drawing of the wire. The caps stay above the cups throughout.
+        The snake straightens and shrinks: each node of a strand moves in
+        a straight line to the bottom of its wire, and the height to zero,
+        that of a wire composed with other drawings, see
+        :meth:`discopy.drawing.Drawing.then`, so that the drawing around the
+        snake closes up without a jump at ``t = 1``, where it is the drawing
+        of the wire. The caps stay above the cups throughout.
 
         Parameters:
             t : The fraction of the way, from ``0`` to ``1``.
@@ -1223,6 +1226,8 @@ class Unsnake[category](rewrite.Step):
         >>> sorted(p.x for node, p in middle.positions.items()
         ...        if node.kind in ("dom", "cod"))
         [0.375, 1.375]
+        >>> middle.height
+        1.0
         """
         if self.is_dagger:
             return self.dagger().frame(1 - t)
@@ -1233,17 +1238,14 @@ class Unsnake[category](rewrite.Step):
         target = {}
         for node in snake.nodes:
             if node.kind == "dom":
-                top = wire.positions[node]
-                bottom = wire.positions[next(
-                    n for n in wire.nodes
-                    if n.kind == "cod" and n.data["i"] == node.data["i"])]
+                x = wire.positions[node].x
                 for other in node_connected_component(strands, node):
-                    target[other] = wire.positions[other]\
-                        if other.kind in ("dom", "cod")\
-                        else between(top, bottom, .5)
-        return snake.relabel_nodes(positions={
+                    target[other] = Point(x, 0)
+        result = snake.relabel_nodes(positions={
             node: between(p, target[node], t)
             for node, p in snake.positions.items()}).resized(snake, wire, t)
+        result.height = (1 - t) * snake.height
+        return result
 
     @classmethod
     def at(cls, diagram: Diagram, i: int) -> rewrite.Rewrite:
