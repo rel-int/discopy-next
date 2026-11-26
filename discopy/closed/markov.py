@@ -123,6 +123,7 @@ class Ty(closed.symmetric.Ty):
         :align: center
     """
     generator_factory = Wire
+    __call__ = closed.monoidal.Ty.__call__
     product_factory: ClassVar[type["Product"]]
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]

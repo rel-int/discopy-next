@@ -81,7 +81,8 @@ def test_hypergraph_shape(module, data):
         dom=dom, cod=cod, acyclic=acyclic), label="graph")
     assert (graph.dom, graph.cod) == (dom, cod)
     assert SHAPES[module](graph)
-    if acyclic and module in (symmetric, markov, closed.markov):
+    if acyclic and module in (
+            symmetric, closed.symmetric, markov, closed.markov):
         assert graph.is_acyclic
 
 

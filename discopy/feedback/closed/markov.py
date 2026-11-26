@@ -57,8 +57,8 @@ from typing import ClassVar
 from discopy import closed, cmap, feedback, hypergraph, messages, monoidal
 from discopy.abc import DaggerMonoidalCategory
 from discopy.cat import factory
-from discopy.closed.markov import (  # noqa: F401
-    Equation)  # pylint: disable=unused-import
+# pylint: disable-next=unused-import
+from discopy.closed.markov import Equation  # noqa: F401
 from discopy.drawing import Drawing
 from discopy.feedback import markov
 from discopy.utils import factory_name, from_tree
