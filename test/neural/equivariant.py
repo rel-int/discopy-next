@@ -5,60 +5,25 @@ Equivariant layers as weight tying: the orbits of a group on pairs of
 points, the dense layer they give and the networks built from it.
 """
 
-import itertools
 from functools import partial
 
 import numpy
 from pytest import importorskip, raises
 
-from discopy import para
-from discopy.group import Action, Cyclic, Product, Symmetric, Wreath
-from discopy.neural.network import Box, Dim, Dims, Network
-from discopy.python.finset import Permutation
-
-TORUS = Product[Cyclic[3], Cyclic[3]]
-LINES = Wreath[Symmetric[2], Symmetric[2]]
-ACTIONS = (Cyclic[6].action(), Symmetric[4].action(), TORUS.action(),
-           LINES.action(), Wreath[Cyclic[2], Symmetric[3]].action())
-
-
-def modules():
-    """ The two modules that need PyTorch, or skip the test. """
-    return importorskip("torch"), importorskip("discopy.neural.equivariant")
-
-
-def brute(dom, cod):
-    """
-    The orbit of each pair ``(y, x)`` by flood fill along the generators,
-    numbered in the order the pairs are met, independently of
-    :meth:`Action.orbits`.
-    """
-    label = {}
-    for start in itertools.product(range(cod.size), range(dom.size)):
-        if start in label:
-            continue
-        label[start], stack = len(set(label.values())), [start]
-        while stack:
-            y, x = stack.pop()
-            for g, h in zip(cod.images, dom.images):
-                if (g[y], h[x]) not in label:
-                    label[g[y], h[x]] = label[start]
-                    stack.append((g[y], h[x]))
-    return label
-
-
-def brute_tying(dom, cod):
-    label = brute(dom, cod)
-    return numpy.array([[label[y, x] for x in range(dom.size)]
-                        for y in range(cod.size)])
+torch = importorskip("torch")
+from discopy import para  # noqa: E402
+from discopy.group import Action, Cyclic, Product, Symmetric  # noqa: E402
+from discopy.neural import equivariant  # noqa: E402
+from discopy.neural.equivariant import tying  # noqa: E402
+from discopy.neural.network import Box, Dim, Dims, Network  # noqa: E402
+from discopy.neural.torch import Module  # noqa: E402
+from discopy.python.finset import Permutation  # noqa: E402
+from fixtures.orbits import (  # noqa: E402
+    ACTIONS, LINES, TORUS, brute, brute_tying)
 
 
 def count(dom, cod):
     return int(tying(dom, cod).max()) + 1
-
-
-def tying(dom, cod):
-    return importorskip("discopy.neural.equivariant").tying(dom, cod)
 
 
 def test_counts():
@@ -66,7 +31,6 @@ def test_counts():
     The number of weights, from the known number of orbits: the partitions
     of 3 points and of 4 points for the symmetric group.
     """
-    importorskip("torch")
     sym = Symmetric[5].action()
     assert count(sym, sym) == 2
     assert count(sym.tensor(sym), sym) == 5
@@ -88,7 +52,6 @@ def test_tying():
     The entries are the orbit numbers, as a flood fill finds them, with
     the rows indexed by ``cod`` and the columns by ``dom``.
     """
-    importorskip("torch")
     sym, cyclic = Symmetric[5].action(), Cyclic[6].action()
     assert (tying(sym, sym) == 1 - numpy.eye(5, dtype=int)).all()
     shifts = [[(x - y) % 6 for x in range(6)] for y in range(6)]
@@ -109,7 +72,6 @@ def test_tying_orientation():
     one weight for each of its rows, a fixed output point to one for each of
     its columns.
     """
-    importorskip("torch")
     cyclic = Cyclic[6].action()
     pairs = cyclic.tensor(cyclic)
     assert tying(cyclic, pairs).shape == (36, 6)
@@ -129,7 +91,6 @@ def test_tying_trivial():
     A trivial action tensors with any action of its group: the orbits of the
     pairs are those of the action, once for each point of the trivial one.
     """
-    importorskip("torch")
     action = LINES.action()
     trivial = Action.trivial(LINES, 3)
     orbits = len(action.orbits())
@@ -139,7 +100,6 @@ def test_tying_trivial():
 
 
 def test_act():
-    torch, equivariant = modules()
     p, q = Permutation((1, 2, 0)), Permutation((1, 0, 2))
     v = torch.tensor([[10., 1.], [20., 2.], [30., 3.]])
     assert equivariant.act(p, v).tolist() == [[30., 3.], [10., 1.], [20., 2.]]
@@ -151,10 +111,14 @@ def test_act():
 
 
 def test_equivariant_and_not():
-    """ Tied weights commute with every generator, a dense matrix does not. """
-    torch, equivariant = modules()
+    """
+    Tied weights commute with every generator, a dense matrix does not, on
+    wreath products and their products as on the other groups.
+    """
     torch.manual_seed(0)
-    for action in ACTIONS:
+    lines = LINES.action(), Product[LINES, LINES].action()
+    assert [equivariant.Dense(a, a).orbits for a in lines] == [3, 9]
+    for action in ACTIONS + lines[1:]:
         for cod in (action, action.tensor(action)):
             dense = equivariant.Dense(action, cod)
             w = torch.randn(dense.orbits, 2, 3, dtype=torch.float64)
@@ -171,7 +135,6 @@ def test_equivariant_and_not():
 
 
 def test_equivariance():
-    torch, equivariant = modules()
     rotations = Cyclic[3].action()
     v = torch.tensor([[1.], [2.], [4.]])
     assert equivariant.equivariance(lambda v: v, rotations, rotations) == 0.0
@@ -184,7 +147,7 @@ def test_equivariance():
             lambda v: v, rotations, Cyclic[2].action(), v)
 
 
-def explicit(torch, dom, cod, v, w, b=None):
+def explicit(dom, cod, v, w, b=None):
     """
     The explicit sum over points and channels, with the orbits of a flood
     fill, and the bias if any.
@@ -201,7 +164,6 @@ def explicit(torch, dom, cod, v, w, b=None):
 
 def test_reference():
     """ The layer is the explicit sum over points and channels. """
-    torch, equivariant = modules()
     torch.manual_seed(1)
     for action in (Cyclic[3].action(), Symmetric[3].action()):
         for dom in (action, action.tensor(action)):
@@ -212,9 +174,9 @@ def test_reference():
             actual = dense(v, w, b)
             assert actual.shape == (2, action.size, 2)
             torch.testing.assert_close(
-                actual, explicit(torch, dom, action, v, w, b))
+                actual, explicit(dom, action, v, w, b))
             torch.testing.assert_close(
-                dense(v, w), explicit(torch, dom, action, v, w))
+                dense(v, w), explicit(dom, action, v, w))
             assert dense.orbits == len(set(brute(dom, action).values()))
 
 
@@ -223,7 +185,6 @@ def test_layer():
     The legs drop the unit dimensions, the shapes follow the channels, and
     the weights are 2 on the diagonal and 3 elsewhere.
     """
-    torch, equivariant = modules()
     action = Symmetric[4].action()
     full = equivariant.layer(action, action, (3, 2), bias=True)
     assert full.dom == Dims(Dim(4, 3)) and full.cod == Dims(Dim(4, 2))
@@ -233,8 +194,8 @@ def test_layer():
     assert one.dom == one.cod == Dims(4) and one.param == Dims(2)
     assert one.inside.boxes[0].name == "V"
     w, v = torch.tensor([2., 3.]), torch.tensor([1., 2., 4., 8.])
-    module = importorskip("discopy.neural.torch").Module(one, w)
-    assert module(v).tolist() == [2 * x + 3 * (15 - x) for x in v.tolist()]
+    assert Module(one, w)(v).tolist() == [
+        2 * x + 3 * (15 - x) for x in v.tolist()]
     sums = equivariant.layer(action, Action.trivial(action.group))
     assert sums.cod == Dims(1) and sums.param == Dims(1)
 
@@ -244,7 +205,6 @@ def test_channels():
     A layer to an invariant output with channels and a bias, compiled to a
     module, is the dense layer called directly with the same weights.
     """
-    torch, equivariant = modules()
     torch.manual_seed(4)
     action = Symmetric[4].action()
     invariant = Action.trivial(action.group, 1)
@@ -252,7 +212,7 @@ def test_channels():
         action, invariant, channels=(2, 3), bias=True)
     weights = [torch.randn(dim.inside, dtype=torch.float64)
                for dim in composite.param.inside]
-    module = importorskip("discopy.neural.torch").Module(composite, *weights)
+    module = Module(composite, *weights)
     dense = equivariant.Dense(action, invariant)
     v = torch.randn(5, 4, 2, dtype=torch.float64)
     expected = dense(v, weights[0].reshape(dense.orbits, 3, 2),
@@ -261,7 +221,7 @@ def test_channels():
     torch.testing.assert_close(module(v), expected[:, 0, :])
 
 
-def network(equivariant, torch, action, middle=None, fast=False):
+def network(action, middle=None, fast=False):
     """
     equivariant >> tanh >> equivariant >> tanh >> invariant, the middle
     layer being on the action ``middle`` if given.
@@ -276,14 +236,14 @@ def network(equivariant, torch, action, middle=None, fast=False):
         >> layer(action, invariant)
 
 
-def compiled(torch, composite):
+def compiled(composite):
     """ The module of a network with random weights. """
     weights = [torch.randn(dim.inside, dtype=torch.float64)
                for dim in composite.param.inside]
-    return importorskip("discopy.neural.torch").Module(composite, *weights)
+    return Module(composite, *weights)
 
 
-def equivariance_of(equivariant, module, action, v):
+def equivariance_of(module, action, v):
     """ The invariance of the output: the group acts trivially on it. """
     one = Action.trivial(action.group)
     return equivariant.equivariance(
@@ -292,18 +252,16 @@ def equivariance_of(equivariant, module, action, v):
 
 def test_composite():
     """ The tutorial network: 78, 13 and 5 weights, an invariant output. """
-    torch, equivariant = modules()
     torch.manual_seed(2)
     trivial = Action.trivial(Cyclic[6], 6)
     for fast in (False, True):
         for action, size in ((trivial, 78), (Cyclic[6].action(), 13),
                              (Symmetric[6].action(), 5)):
-            module = compiled(
-                torch, network(equivariant, torch, action, fast=fast))
+            module = compiled(network(action, fast=fast))
             assert sum(p.numel() for p in module.parameters()) == size
             v = torch.randn(5, 6, 1, dtype=torch.float64)
             assert module(v[..., 0]).shape == (5, )
-            assert equivariance_of(equivariant, module, action, v) < 1e-9
+            assert equivariance_of(module, action, v) < 1e-9
             module(v[..., 0]).pow(2).sum().backward()
             assert all(p.grad.abs().sum() > 0 for p in module.parameters())
 
@@ -313,27 +271,11 @@ def test_composite_untied():
     The negative control: the same network on rotations, with its middle
     layer built from a trivial action, i.e. untied, is not invariant.
     """
-    torch, equivariant = modules()
     torch.manual_seed(5)
     action = Cyclic[6].action()
-    untied = network(equivariant, torch, action, Action.trivial(Cyclic[6], 6))
-    module = compiled(torch, untied)
+    module = compiled(network(action, Action.trivial(Cyclic[6], 6)))
     v = torch.randn(5, 6, 1, dtype=torch.float64)
-    assert equivariance_of(equivariant, module, action, v) > 1e-2
-
-
-def test_wreath():
-    """ Wreath products and their products have equivariant layers. """
-    torch, equivariant = modules()
-    torch.manual_seed(3)
-    for group, orbits in ((LINES, 3), (Product[LINES, LINES], 9)):
-        action = group.action()
-        dense = equivariant.Dense(action, action)
-        w = torch.randn(dense.orbits, 1, 1, dtype=torch.float64)
-        v = torch.randn(3, action.size, 1, dtype=torch.float64)
-        assert dense.orbits == orbits
-        assert equivariant.equivariance(
-            partial(dense, w=w), action, action, v) < 1e-9
+    assert equivariance_of(module, action, v) > 1e-2
 
 
 def test_fast_layer():
@@ -341,8 +283,6 @@ def test_fast_layer():
     The fast layer has the parameters and the outputs of the dense one,
     through a module, with a bias, channels and every kind of realisation.
     """
-    torch, equivariant = modules()
-    module = importorskip("discopy.neural.torch").Module
     torch.manual_seed(6)
     symmetric, rotations = Symmetric[4].action(), Cyclic[6].action()
     pairs = Symmetric[3].action().tensor(Symmetric[3].action())
@@ -358,7 +298,7 @@ def test_fast_layer():
                    for dim in slow.param.inside]
         v = torch.randn(5, *slow.dom.inside[0].inside, dtype=torch.float64)
         torch.testing.assert_close(
-            module(fast, *weights)(v), module(slow, *weights)(v))
+            Module(fast, *weights)(v), Module(slow, *weights)(v))
 
 
 def test_unbatched():
@@ -366,12 +306,11 @@ def test_unbatched():
     An unbatched input gives the batched output without its batch axis,
     down to a single point with one channel, which has no axis at all.
     """
-    torch, equivariant = modules()
     torch.manual_seed(6)
     action = Symmetric[5].action()
     for cod, shape in ((Action.trivial(action.group), ()), (action, (5, ))):
         for bias in (False, True):
-            module = compiled(torch, equivariant.layer(action, cod, bias=bias))
+            module = compiled(equivariant.layer(action, cod, bias=bias))
             v = torch.randn(action.size, dtype=torch.float64)
             assert module(v).shape == shape
             torch.testing.assert_close(module(v), module(v[None])[0])
