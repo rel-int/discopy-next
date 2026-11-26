@@ -2719,13 +2719,21 @@ class Box(cat.Box, Diagram):
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
-            name=self.drawing_name)
-        if self.draw_as_frame:
-            kwargs['draw_vertically'] = self.draw_vertically
-            kwargs['frame_colour'] = self.frame_colour
-        else:
+            name="" if self.draw_as_frame else self.drawing_name)
+        if not self.draw_as_frame:
             kwargs['draw_as_square'] = self.draw_as_square
-        return getattr(Drawing, method)(*args, **kwargs)
+            return Drawing.bubble(*args, **kwargs)
+        result = Drawing.frame(
+            *args, draw_vertically=self.draw_vertically,
+            frame_colour=self.frame_colour, **kwargs)
+        # Its top and bottom edges draw the corner cut off as for a box, and
+        # its label in the corner opposite, see Backend.draw_frame_corner.
+        corner = (0 if getattr(self, "is_conjugate", False) else
+                  1 if getattr(self, "is_transpose", False) else
+                  2 if self.is_dagger else 3)
+        for edge in (result.boxes[0], result.boxes[-1]):
+            edge.frame_corner, edge.frame_name = corner, self.drawing_name
+        return result
 
 
 class Sum(cat.Sum, Box):

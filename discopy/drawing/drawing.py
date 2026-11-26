@@ -531,11 +531,13 @@ which to_drawing recomputes.
         The shift of one corner of each box drawn as a polygon when nothing
         else is asked for: :code:`0.125` when some box is a conjugate, a
         transpose or a dagger not drawn as a braid, :code:`0` otherwise,
-        counting the boxes of the drawings nested in its boxes.
+        counting the boxes of the drawings nested in its boxes and the frames
+        drawn around them, see :meth:`Backend.draw_frame_corner`.
         """
         return 0.125 * any(
             box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid) or (
+                box.is_dagger and not box.draw_as_braid) or getattr(
+                box, "frame_corner", 3) not in (None, 3) or (
                 any(nested.asymmetry()
                     for nested in getattr(box, "nested", None) or ()))
             for box in self.boxes)
@@ -1387,6 +1389,10 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "frame_corner", None) is not None:
+                # The edge of a frame is reflected with its corners.
+                vars(result).update(frame_corner=box.frame_corner ^ 1,
+                                    frame_name=box.frame_name)
             if getattr(box, "nested", None):
                 # The reflection of a transpose is a conjugate, and back.
                 vars(result).update(

@@ -1176,6 +1176,8 @@ class Backend(ABC):
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
+            if getattr(node.box, "frame_corner", None) is not None:
+                self.draw_frame_corner(graph.positions, node, **params)
             if node.box.draw_as_spider or node.box.draw_as_wires:
                 continue
             for attribute, method in drawing_methods:
@@ -1214,6 +1216,57 @@ class Backend(ABC):
                                "white" if adaptive else box.color),
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
+
+    def draw_frame_corner(self, positions, node, **params):
+        """
+        Draws the corners of a frame on its top or bottom edge, i.e. the
+        opening or the closing of the bubble its ``box`` draws, as those of a
+        box: the ``frame_corner`` of :meth:`chop_corner` cut off, short of the
+        wires through the edge, and the label ``frame_name`` in the corner
+        opposite. The cut is a line across the corner, with the region
+        outside the frame painted over the corner of the frame.
+        """
+        box, j = node.box, node.j
+        top = self.has_boundary_sides(box.cod)
+        kind, sides = ("box_cod", box.cod) if top else ("box_dom", box.dom)
+        (left, _), (right, _) = (positions[Node(kind, i=k, j=j, x=sides[k])]
+                                 for k in (0, len(sides) - 1))
+        y = positions[node].y
+        through, kind_through = (box.dom, "box_dom") if top\
+            else (box.cod, "box_cod")
+        wires = [positions[Node(kind_through, i=k, j=j, x=x)].x
+                 for k, x in enumerate(through)]
+        corners = {0: (left, y), 1: (left, y), 2: (right, y), 3: (right, y)}
+        on_edge = (1, 2) if top else (0, 3)
+        inward = -1 if top else 1
+        cut, label = box.frame_corner, (box.frame_corner + 2) % 4
+        outside = getattr(sides.inside[0].dom if cut < 2
+                          else sides.inside[-1].cod, "name", None)
+        if cut in on_edge:
+            cx, cy = corners[cut]
+            dx = 1 if cut < 2 else -1
+            size = min([2 * params.get('asymmetry', 0), (right - left) / 2]
+                       + [.75 * abs(x - cx) for x in wires])
+            if size:
+                eps, a, b = .05, Point(cx + dx * size, cy), Point(
+                    cx, cy + inward * size)
+                self.draw_polygon(
+                    a, a.shift(y=-inward * eps),
+                    Point(cx - dx * eps, cy - inward * eps),
+                    b.shift(x=-dx * eps), b,
+                    facecolor=outside or "white", edgecolor=TRANSPARENT)
+                self.draw_polygon(a, b, facecolor=TRANSPARENT)
+        if label in on_edge and box.frame_name\
+                and params.get('draw_box_labels', True):
+            lx, ly = corners[label]
+            dx = text_width(box.frame_name) / 2 + .125
+            inside = getattr(sides.inside[0].cod, "name", None)
+            self.draw_text(
+                box.frame_name, lx + (dx if label < 2 else -dx),
+                ly + inward * .25, ha='center', va='center',
+                color=self.readable_foreground(inside or "white"),
+                fontsize=params.get('fontsize', None),
+                adaptive=inside is None)
 
     @staticmethod
     def chop_corner(points, i, size):
