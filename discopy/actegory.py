@@ -19,20 +19,13 @@ compose by tensoring the parameters, i.e.
 and a reparametrisation is an arrow of ``M``, not of ``C``, acting on the
 parameters of a map ``(P, f)`` by precomposition with ``X ◁ r``.
 
-Weights tie by copying them, which only a *deterministic* map can do: a random
-weight sampled once and copied is not one sampled twice. So the weights live in
-the cartesian category of Python functions and the data in the stochastic
-channels of the subdistribution monad, and the copy of ``M`` is natural
-whatever the data are: this is the copy of the parameters of App. J. Thm G.10
-makes it canonical for lax algebras over a cartesian base, which is not built
-here. The tensor of parametric maps is left out, since it needs a
-monoidal structure on ``C`` compatible with the action.
-
-For the self-action ``X ◁ P = X @ P`` of a symmetric category, :class:`Para` is
-:mod:`discopy.para` with empty coparameters, so that ``para`` could later be
-``Para[Action.right(C)]`` plus coparameters. The action is a field of
-:class:`Para`, a value and not a class, since the same ``M`` and ``C`` carry
-many actions and a ``Para[category]`` subscript could not tell them apart.
+Weights tie by copying, which only deterministic maps can do: a random weight
+sampled once and copied is not one sampled twice. So functions act on channels.
+The tensor of parametric maps is left out, since it needs a monoidal structure
+on ``C`` compatible with the action. For the self-action ``X ◁ P = X @ P`` of a
+symmetric category, :class:`Para` is :mod:`discopy.para` with empty
+coparameters. The action is a field of :class:`Para`, a value and not a class,
+since the same ``M`` and ``C`` carry many actions.
 
 Summary
 -------
