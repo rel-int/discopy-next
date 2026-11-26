@@ -2,4 +2,4 @@
 
 - [x] Implement tket circuit conversion in optyx.qubits.Circuit (#296) and drop self-import in Z._make_spiders (#438)
 - [x] Add to_tree and from_tree round-trips for all optyx.qubits Box subclasses (#731)
-- [ ] Add CHANGELOG.md entries
+- [WIP] @agy-296-2026-11-26 13:16 Add CHANGELOG.md entries
