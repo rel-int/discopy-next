@@ -905,7 +905,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `drawing_name`, and when its args are drawn in another direction its box is
   slanted as its variant is, e.g. on its top right for a dagger, while its args
   are drawn as they are; only a reflection of the drawing mirrors them
-  ([next#743]).
+  ([next#745]).
 
 - The sides of a frame and of its slots are drawn with a black edge, as
   those of boxes and bubbles are, wherever the regions on either side have
@@ -2754,7 +2754,7 @@ for the changelog of `1.2.1` and earlier.
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
-[next#743]: https://github.com/rel-int/discopy-next/pull/743
+[next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
