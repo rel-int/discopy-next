@@ -2,13 +2,16 @@ import numpy as np
 import pytest
 from sympy.abc import x, y
 
+from discopy import cat
 from discopy.matrix import backend
-from discopy.optyx import qubits
+from discopy.optyx import photonic, qubits
 from discopy.optyx.channel import Diagram, Ty, qmode
 from discopy.optyx.core import zw
 from discopy.optyx.photonic import (
-    BBS, BS, MZI, TBS, Create, DualRail, Phase, PhotonLoss, Scalar, Select,
-    Swap, XMeasurementDR, ZMeasurementDR)
+    BBS, BS, MZI, TBS, AbstractGate, Create, Discard, DualRail, Encode, Gate,
+    HadamardBS, Id, NumOp, NumberResolvingMeasurement, Phase, PhaseShiftDR,
+    PhotonLoss, PhotonThresholdMeasurement, Scalar, Select, Swap,
+    XMeasurementDR, ZMeasurementDR, ansatz)
 from discopy.python import finset
 from discopy.utils import dumps, from_tree, loads
 
@@ -183,3 +186,79 @@ def test_torch_gradient_survives_to_path():
         assert array.requires_grad
         array.abs().sum().backward()
     assert t.grad is not None
+
+
+PHOTONIC_BOXES = [
+    Select(),
+    Select(1, 0, 2),
+    Scalar(0.5),
+    Scalar(1j),
+    Scalar(2 * x),
+    Encode(2),
+    Discard(2),
+    PhotonThresholdMeasurement(),
+    PhotonThresholdMeasurement(2),
+    NumberResolvingMeasurement(2),
+    Create(),
+    Create(1, 0, 2),
+    Create(1, 0, 1, internal_states=([1, 0], [0, 1])),
+    Create(1, 1, internal_states=(np.array([1, 0]), [0, 1j])),
+    Gate([[0, 1], [1, 0]], 2, 2, "flip"),
+    Gate([[1j, 0], [0, 1]], 2, 2, "P", data=(0.1, 0.2)),
+    Gate([[1j, 0], [0, 1]], 2, 2, "P", data=(0.1, 0.2)).dagger(),
+    Gate([[1j, 0], [0, 1]], 2, 2, "P").conjugate(),
+    Gate([[x, 0], [0, 1]], 2, 2, "sym", data=x),
+    Phase(0.25),
+    Phase(x),
+    NumOp(),
+    BS,
+    BBS(0.2, is_conj=True),
+    TBS(0.3),
+    TBS(0.3, is_gate_dagger=True, is_conj=True),
+    MZI(0.1, 0.2),
+    MZI(0.1, 0.2, is_gate_dagger=True, is_conj=True),
+    HadamardBS(),
+    HadamardBS().dagger(),
+    HadamardBS().conjugate(),
+    DualRail(2),
+    DualRail(2, internal_states=([1, 0], [0, 1])),
+    DualRail(1, internal_states=(np.array([1, 0]),)),
+    PhaseShiftDR(0.25),
+    PhaseShiftDR(x),
+    Swap(),
+    Swap(2, 1),
+    PhotonLoss(0.8),
+    PhotonLoss(x),
+]
+
+
+def test_every_photonic_box_class_is_covered():
+    defined = {
+        cls for cls in vars(photonic).values()
+        if isinstance(cls, type) and issubclass(cls, cat.Box)
+        and cls.__module__ == photonic.__name__ and cls is not AbstractGate
+    }
+    assert defined == {type(box) for box in PHOTONIC_BOXES}
+
+
+@pytest.mark.parametrize("box", PHOTONIC_BOXES)
+def test_photonic_box_tree_roundtrip(box):
+    loaded = loads(dumps(box))
+    assert type(loaded) is type(box) and loaded == box
+    assert loaded.to_tree() == box.to_tree()
+    assert from_tree(box.to_tree()) == box
+    diagram = box @ Id(1)
+    assert loads(dumps(diagram)) == diagram
+
+
+def test_photonic_diagram_tree_roundtrip():
+    diagram = (
+        Create(1, 0, 1, internal_states=([1, 0], [0, 1]))
+        >> HadamardBS() @ Phase(0.25)
+        >> Swap(2, 1)
+        >> Id(1) @ PhotonLoss(0.8) @ NumOp()
+        >> Select(1, 0) @ PhotonThresholdMeasurement()
+    )
+    assert loads(dumps(diagram)) == diagram
+    assert loads(dumps(diagram)).to_tree() == diagram.to_tree()
+    assert loads(dumps(ansatz(4, 2))) == ansatz(4, 2)

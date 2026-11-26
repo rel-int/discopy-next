@@ -300,6 +300,13 @@ class Select(Channel):
         args = ", ".join(map(repr, self.photons))
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), 'photons': list(self.photons)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['photons'])
+
     def to_path(self, dtype=complex) -> path.Matrix:
         array = np.eye(len(self.photons))
         return path.Matrix[dtype](
@@ -323,6 +330,10 @@ class Scalar(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.scalar!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def subs(self, *args):
         data = rsubs(self.scalar, *args)
@@ -392,6 +403,11 @@ class PhotonThresholdMeasurement(Channel):
         n = "" if len(self.cod) == 1 else repr(len(self.cod))
         return f"{factory_name(type(self))}({n})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class NumberResolvingMeasurement(Measure):
     """
@@ -434,6 +450,19 @@ class Create(Channel):
         if self.internal_states is not None:
             args += f", internal_states={listed(self.internal_states)}"
         return f"{factory_name(type(self))}({args})"
+
+    def to_tree(self) -> dict:
+        tree = {**super().to_tree(), 'photons': list(self.photons)}
+        if self.internal_states is not None:
+            tree['internal_states'] = [
+                np.asarray(state).tolist() for state in self.internal_states]
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states')
+        return cls(*tree['photons'], internal_states=None if states is None
+                   else tuple(states))
 
 
 class AbstractGate(Channel, ABC):
@@ -595,6 +624,19 @@ class Gate(AbstractGate):
         return f"{factory_name(type(self))}({array}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), 'array': self.array.tolist()}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(
+            tree['array'],
+            len(from_tree(tree['dom'])),
+            len(from_tree(tree['cod'])),
+            tree['name'],
+            data=tree.get('data'),
+        )
+
     def lambdify(self, *symbols, **kwargs):
         if not self.free_symbols & set(symbols):
             return lambda *xs: self
@@ -701,6 +743,11 @@ class NumOp(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
 
 
 class BBS(AbstractGate):
@@ -1090,6 +1137,11 @@ class HadamardBS(Gate):
     def __repr__(self):
         return f"{factory_name(type(self))}()"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
+
 
 class DualRail(Channel):
     """
@@ -1111,6 +1163,19 @@ class DualRail(Channel):
             args += f", internal_states={listed(self.internal_states)}"
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.internal_states is not None:
+            tree['internal_states'] = [
+                np.asarray(state).tolist() for state in self.internal_states]
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states')
+        return cls(len(from_tree(tree['dom'])),
+                   None if states is None else tuple(states))
+
 
 class PhaseShiftDR(Channel):
     """
@@ -1127,6 +1192,10 @@ class PhaseShiftDR(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.phase!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
@@ -1337,6 +1406,10 @@ class PhotonLoss(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.p_survive!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
