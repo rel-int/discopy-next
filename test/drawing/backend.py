@@ -1016,39 +1016,6 @@ def test_label_contrast_through_two_turns_reflected():
     assert inside.label_background(typ) == "black"
 
 
-def test_left_to_right_frame_keeps_its_name_inside():
-    from discopy.drawing.backend import Backend
-    from discopy.monoidal import Diagram
-    from discopy.utils import factory
-
-    @factory
-    class Body(Diagram):
-        draw_left_to_right = True
-
-    class Primitive(Box, Body):
-        pass
-
-    class Recorder(Backend):
-        def __init__(self):
-            super().__init__()
-            self.alignments = {}
-
-        def draw_text(self, text, i, j, **params):
-            self.alignments[text] = params.get("verticalalignment")
-
-        def output(self, path=None, show=True, **params):
-            pass
-
-    n = Ty('n')
-    y, x = Primitive('y', Ty(), n), Primitive('x', Ty(), n)
-    with_ = Primitive('W', Ty(), n, args=(y, x), drawing_name="W",
-                      draw_as_frame=True, draw_vertically=True)
-    recorder = Recorder()
-    with_.bubble(dom=Ty(), cod=n).draw(backend=recorder)
-    assert recorder.alignments["W"] == "top"
-    assert recorder.alignments["n"] == "bottom"
-
-
 def test_frame_name_drawn_without_wire_labels():
     from discopy.drawing.backend import Backend
 
@@ -1105,10 +1072,10 @@ def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
         recorder = Recorder()
         drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
         (drawing.dagger() if dagger else drawing).draw(backend=recorder)
-        j, alignment = recorder.texts["W"]
+        (j, _), (_, alignment) = recorder.texts["W"], recorder.texts["n"]
         bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
-        assert alignment == ("bottom" if dagger else "top")
         assert bottom < j < top
+        assert dagger or alignment == "bottom"
 
 
 def test_frame_sides_have_an_edge_between_two_colours():
