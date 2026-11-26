@@ -903,7 +903,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - The sides of a frame and of its slots are drawn with a black edge, as
   those of boxes and bubbles are, wherever the regions on either side have
-  different colours, rather than with zero width ([next#742]).
+  different colours, rather than with zero width, e.g. around each term of
+  an equation between coloured diagrams ([next#742]).
 
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
