@@ -1388,7 +1388,11 @@ which to_drawing recomputes.
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
             if getattr(box, "nested", None):
-                vars(result).update(mirror_nested=not box.mirror_nested)
+                # The reflection of a transpose is a conjugate, and back.
+                vars(result).update(
+                    mirror_nested=not box.mirror_nested,
+                    is_transpose=box.is_conjugate,
+                    is_conjugate=box.is_transpose)
             return result
 
         if self.is_box:

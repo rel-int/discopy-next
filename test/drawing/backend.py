@@ -1169,7 +1169,8 @@ def test_left_to_right_args_in_the_variants_of_a_box():
     W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W")
     chopped = {}
     for name, diagram in [("W", W), ("dagger", W[::-1]),
-                          ("transpose", W.r), ("conjugate", W[::-1].r)]:
+                          ("transpose", W.r), ("conjugate", W[::-1].r),
+                          ("reflected", W.r.to_drawing().dagger())]:
         recorder = Recorder()
         diagram.draw(backend=recorder, asymmetry=.25)
         outline, = (p for p in recorder.polygons if len(p) == 5)
@@ -1179,12 +1180,13 @@ def test_left_to_right_args_in_the_variants_of_a_box():
             for cx in (min(xs), max(xs)) for cy in (min(ys), max(ys))
             if (cx, cy) not in outline)
         (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
-        turned = name in ("transpose", "conjugate")
-        assert (f_at.y < g_at.y) == turned
+        turned = name in ("transpose", "conjugate", "reflected")
+        assert (f_at.y < g_at.y) == (name in ("transpose", "conjugate"))
         f_input = min(  # The label of the wire into f, its x or its y.
-            recorder.texts["x" if name in ("W", "transpose") else "y"],
+            recorder.texts["y" if name in ("dagger", "conjugate") else "x"],
             key=lambda p: abs(p.y - f_at.y))
         assert (f_input.x > f_at.x) == turned
     assert chopped == {  # Whether the corner cut off is right, top.
         "W": (True, False), "dagger": (True, True),
-        "transpose": (False, True), "conjugate": (False, False)}
+        "transpose": (False, True), "conjugate": (False, False),
+        "reflected": (False, False)}
