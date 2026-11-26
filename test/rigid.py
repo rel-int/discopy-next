@@ -316,3 +316,11 @@ def test_normalization_yanks_snakes():
     rewrite = (f @ snake).foliation().normalization()
     assert type(rewrite) is Diagram.rewrite_factory
     assert rewrite.cod == f @ n == (f @ snake).foliation().normal_form()
+
+
+def test_rotations_of_a_box_with_args_keep_its_drawing_name():
+    from discopy import rigid
+    x = rigid.Ty('x')
+    W = rigid.Box('f', x, x).bubble(drawing_name="W")
+    for box in (W.r, W.l, W.r.l, W.l.r, W.r[::-1]):
+        assert box.drawing_name == "W"
