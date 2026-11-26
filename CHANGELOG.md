@@ -571,6 +571,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- Every box tells its dagger, transpose and conjugate apart by a corner cut
+  off rather than one shifted, the drawings nested in a box lie on slots with
+  a margin between them rather than a line, and the wire labels of a drawing
+  turned half way round hang along their wire ([next#764]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -2777,6 +2782,7 @@ for the changelog of `1.2.1` and earlier.
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
 [next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#748]: https://github.com/rel-int/discopy-next/pull/748
+[next#764]: https://github.com/rel-int/discopy-next/pull/764
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
