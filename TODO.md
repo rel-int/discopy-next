@@ -8,4 +8,4 @@
 
 - [x] assert the closed readings have an empty domain
 - [x] make amplitudes refuse an imaginary part instead of dropping it
-- [WIP] @T-01a1fa54-2026-11-26 12:10 give Wn a base case with no outputs, the selection of the vacuum
+- [x] give Wn a base case with no outputs, the selection of the vacuum
