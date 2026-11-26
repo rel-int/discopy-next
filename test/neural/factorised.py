@@ -255,6 +255,19 @@ def test_float32():
         assert (got - want).abs().max() <= 1e-5 * (1 + want.abs().max())
 
 
+def test_buffers():
+    """ The weights are gathered only if the tie is not the identity. """
+    torch, _, factorised = modules()
+    symmetric = Symmetric[3].action()
+    power = Wreath[Symmetric[3], Cyclic[2]].action(power=True)
+    assert factorised.Kronecker(symmetric, symmetric).tie is None
+    assert factorised.Kronecker(power, power).tie.tolist() == [0, 1, 1, 2]
+    assert not hasattr(factorised.Kronecker(symmetric, symmetric), "mobius")
+    assert factorised.Kronecker(symmetric, symmetric).chains == (2, )
+    assert factorised.Partitions(symmetric, symmetric).mobius.dtype\
+        == torch.get_default_dtype()
+
+
 def test_structure():
     """ The structures of the natural actions, and what has none. """
     _, _, factorised = modules()

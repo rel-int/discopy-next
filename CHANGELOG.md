@@ -56,6 +56,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   i.e. Möbius-inverted sums along the diagonals, and `realise` picks it for
   those actions ([next#TBD]).
 
+- `neural.factorised` layers make fewer kernel launches per call: `Kronecker`
+  gathers its weights only when its `tie` is not the identity, plans the axes
+  of its terms once and sums them with `unbind`, and `Partitions` has a float
+  `mobius`, plans its
+  einsums once and sums the partitions that share an output pattern before
+  spreading them, with outputs and gradients unchanged ([next#TBD]).
+
 - `neural.augment` uses a finite group on the data rather than on the
   weights: `augment` applies one random element to an input and its label as
   a Kleisli arrow of the `Seed` monad, `augmentation` as a `neural` box,
