@@ -70,7 +70,7 @@ import re
 from typing import ClassVar
 
 from discopy import closed, cmap, messages
-from discopy.abc import ClosedCategory
+from discopy.abc import ClosedSymmetricCategory
 from discopy.cat import factory
 from discopy.lambek import thue
 from discopy.utils import (
@@ -522,7 +522,7 @@ class FX(BinaryTerm):
         return f @ g >> functor.cod.fx(*map(functor, [X, Y, Z]))
 
     def map(self, functor, context):
-        if not issubclass(get_origin(functor.cod), ClosedCategory):
+        if not issubclass(get_origin(functor.cod), ClosedSymmetricCategory):
             raise AxiomError(
                 "Crossed composition requires a closed codomain.")
         ob = functor.cod.ob
@@ -546,7 +546,7 @@ class BX(BinaryTerm):
         return f @ g >> functor.cod.bx(*map(functor, [X, Y, Z]))
 
     def map(self, functor, context):
-        if not issubclass(get_origin(functor.cod), ClosedCategory):
+        if not issubclass(get_origin(functor.cod), ClosedSymmetricCategory):
             raise AxiomError(
                 "Crossed composition requires a closed codomain.")
         ob = functor.cod.ob

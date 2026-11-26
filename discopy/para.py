@@ -169,7 +169,8 @@ from discopy.feedback import markov as feedback_markov
 from discopy.feedback import symmetric as traced
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
-    ClosedCategory, ClosedMarkovCategory, ComarkovCategory, CompactCategory,
+    ClosedSymmetricCategory, ClosedMarkovCategory, ComarkovCategory,
+    CompactCategory,
     FeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.utils import (
@@ -486,19 +487,23 @@ class Closed(Markov, ClosedMarkovCategory):
     Parametric maps over a closed underlying `category` form a closed
     category, currying with the parameters swapped out of the way.
     """
-    curry_left = ClosedCategory.curry_left.failing(messages.PARA_CURRY)
-    curry_right = ClosedCategory.curry_right.failing(messages.PARA_CURRY)
-    currying_left = ClosedCategory.currying_left.failing(messages.FREE_CURRY)
-    currying_right = ClosedCategory.currying_right.failing(messages.FREE_CURRY)
-    currying_eta_left = ClosedCategory.currying_eta_left.failing(
-        messages.FREE_CURRY)
-    currying_eta_right = ClosedCategory.currying_eta_right.failing(
-        messages.FREE_CURRY)
-    currying_naturality_left = ClosedCategory.currying_naturality_left.failing(
-        messages.FREE_CURRY)
-    currying_naturality_right = ClosedCategory.currying_naturality_right\
-        .failing(messages.FREE_CURRY)
-    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+    curry_left = ClosedSymmetricCategory\
+        .curry_left.failing(messages.PARA_CURRY)
+    curry_right = ClosedSymmetricCategory\
+        .curry_right.failing(messages.PARA_CURRY)
+    currying_left = ClosedSymmetricCategory\
+        .currying_left.failing(messages.FREE_CURRY)
+    currying_right = ClosedSymmetricCategory\
+        .currying_right.failing(messages.FREE_CURRY)
+    currying_eta_left = ClosedSymmetricCategory\
+        .currying_eta_left.failing(messages.FREE_CURRY)
+    currying_eta_right = ClosedSymmetricCategory\
+        .currying_eta_right.failing(messages.FREE_CURRY)
+    currying_naturality_left = ClosedSymmetricCategory\
+        .currying_naturality_left.failing(messages.FREE_CURRY)
+    currying_naturality_right = ClosedSymmetricCategory\
+        .currying_naturality_right.failing(messages.FREE_CURRY)
+    currying_symmetry = ClosedSymmetricCategory.currying_symmetry.failing(
         messages.FREE_CURRY)
     category = closed.markov.Diagram
 

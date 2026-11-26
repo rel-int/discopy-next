@@ -93,7 +93,8 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
+    ClosedMonoidalCategory, DaggerCategory, DaggerMonoidalCategory,
+    MonoidalCategory)
 from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Serialisable,
     Testable, TestableGeneric, axiom)
@@ -379,7 +380,7 @@ class Under(Exp):
 
 
 @factory
-class Diagram(monoidal.Diagram, BiclosedCategory):
+class Diagram(monoidal.Diagram, ClosedMonoidalCategory):
     """
     A biclosed diagram is a monoidal diagram
     with :class:`Curry` and :class:`Eval` boxes.
@@ -464,17 +465,18 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     dagger_monoidality_monoidal = DaggerMonoidalCategory.dagger_monoidality\
         .weaken(within=MonoidalCategory)\
         .failing(messages.NO_PLANAR_NORMAL_FORM)
-    currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
-    currying_right = BiclosedCategory.currying_right.failing(
+    currying_left = ClosedMonoidalCategory.currying_left.failing(
         messages.FREE_CURRY)
-    currying_eta_left = BiclosedCategory.currying_eta_left.failing(
+    currying_right = ClosedMonoidalCategory.currying_right.failing(
         messages.FREE_CURRY)
-    currying_eta_right = BiclosedCategory.currying_eta_right.failing(
+    currying_eta_left = ClosedMonoidalCategory.currying_eta_left.failing(
         messages.FREE_CURRY)
-    currying_naturality_left = BiclosedCategory.currying_naturality_left\
+    currying_eta_right = ClosedMonoidalCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = ClosedMonoidalCategory.currying_naturality_left\
         .failing(messages.FREE_CURRY)
-    currying_naturality_right = BiclosedCategory.currying_naturality_right\
-        .failing(messages.FREE_CURRY)
+    currying_naturality_right = ClosedMonoidalCategory\
+        .currying_naturality_right.failing(messages.FREE_CURRY)
 
 
 class Box(monoidal.Box, Diagram):
@@ -924,7 +926,7 @@ class TermBase(Box, AlphaEquivalence):
     functor: ClassVar[Functor] = Functor.id(Diagram)
 
     @abstractmethod
-    def eval(self, functor: Functor | None = None) -> BiclosedCategory:
+    def eval(self, functor: Functor | None = None) -> ClosedMonoidalCategory:
         """
         The evaluation of a :class:`Functor` on a term gives a morphism in its
         codomain. By default, this is the identity functor on the free biclosed

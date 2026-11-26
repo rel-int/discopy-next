@@ -64,7 +64,7 @@ Axioms
 ------
 
 :meth:`discopy.closed.monoidal.Diagram.curry` and
-:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
+:meth:`discopy.abc.ClosedMonoidalCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)

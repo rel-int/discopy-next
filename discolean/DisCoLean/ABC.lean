@@ -8,21 +8,21 @@ typing law and each axiom a `def`, all of them in its `Laws`. The classes it
 does not compile yet:
 
 - `TracedCategory`: it takes the length of a symbol
-- `BiclosedCategory`: it takes the length of a symbol
+- `ClosedMonoidalCategory`: it takes the length of a symbol
 - `LinearCategory`: it slices a symbol
-- `RigidCategory`: it extends BiclosedCategory
+- `RigidCategory`: it extends ClosedMonoidalCategory
 - `PivotalCategory`: it extends RigidCategory, TracedCategory
 - `SymmetricCategory`: N is not an object
 - `PROP`: it extends SymmetricCategory
 - `MarkovCategory`: it extends SymmetricCategory
 - `ComarkovCategory`: it extends SymmetricCategory
-- `ClosedCategory`: it extends BiclosedCategory, SymmetricCategory
-- `ClosedMarkovCategory`: it extends ClosedCategory, MarkovCategory
+- `ClosedSymmetricCategory`: it extends ClosedMonoidalCategory, SymmetricCategory
+- `ClosedMarkovCategory`: it extends ClosedSymmetricCategory, MarkovCategory
 - `BalancedCategory`: ob is not declared
 - `BalancedTracedCategory`: it extends BalancedCategory, TracedCategory
 - `RibbonCategory`: it extends PivotalCategory, BalancedTracedCategory
 - `GoISituation`: it extends LinearCategory, TracedCategory, SymmetricCategory
-- `CompactCategory`: it extends RibbonCategory, ClosedCategory
+- `CompactCategory`: it extends RibbonCategory, ClosedSymmetricCategory
 - `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
 -/
 

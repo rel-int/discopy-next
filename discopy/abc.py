@@ -41,7 +41,7 @@ Summary
     FeedbackCategory
     TracedCategory
     ResiduatedMonoid
-    BiclosedCategory
+    ClosedMonoidalCategory
     ComonadCategory
     LinearCategory
     Pregroup
@@ -53,7 +53,7 @@ Summary
     PROP
     MarkovCategory
     ComarkovCategory
-    ClosedCategory
+    ClosedSymmetricCategory
     ClosedMarkovCategory
     BalancedCategory
     BalancedTracedCategory
@@ -1091,11 +1091,13 @@ class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
         return other.under(self)
 
 
-class BiclosedCategory[
-        C0: ResiduatedMonoid, C1: BiclosedCategory](MonoidalCategory[C0, C1]):
+class ClosedMonoidalCategory[
+        C0: ResiduatedMonoid, C1: ClosedMonoidalCategory](
+            MonoidalCategory[C0, C1]):
     """
-    A biclosed category is a :class:`MonoidalCategory` with methods :code:`ev`
-    and :code:`curry` for the evaluation and currying of morphisms.
+    A closed monoidal category, also called biclosed, is a
+    :class:`MonoidalCategory` with methods :code:`ev` and :code:`curry` for the
+    evaluation and currying of morphisms.
 
     We also assume the type for objects comes with methods for left and right
     exponentials :code`x << y` and :code`x >> y`.
@@ -1648,10 +1650,12 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
         return other.r @ self
 
 
-class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
+class RigidCategory[C0: Pregroup, C1: RigidCategory](
+        ClosedMonoidalCategory[C0, C1]):
     """
-    A rigid category is a :class:`BiclosedCategory` with a :class:`Pregroup` as
-    object type and methods for :code:`cups` and :code:`caps`.
+    A rigid category is a :class:`ClosedMonoidalCategory` with a
+    :class:`Pregroup` as object type and methods for :code:`cups` and
+    :code:`caps`.
     """
     @classmethod
     @abstractmethod
@@ -1708,9 +1712,10 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
 
     def base_and_exponent(self, n: int, left: bool) -> tuple[C0, C0]:
         """
-        Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup has
-        no exponential object to read the exponent off the codomain: it is the
-        ``n`` objects at the end resp. the start of the codomain, dualised.
+        Contrary to :meth:`ClosedMonoidalCategory.base_and_exponent`, a
+        pregroup has no exponential object to read the exponent off the
+        codomain: it is the ``n`` objects at the end resp. the start of the
+        codomain, dualised.
 
         Parameters:
             n : The number of objects to uncurry.
@@ -2300,13 +2305,13 @@ class ComarkovCategory[
         return cls.merge(x, n)
 
 
-class ClosedCategory[
-        C0: ResiduatedMonoid, C1: ClosedCategory](
-            BiclosedCategory[C0, C1], SymmetricCategory[C0, C1]):
+class ClosedSymmetricCategory[
+        C0: ResiduatedMonoid, C1: ClosedSymmetricCategory](
+            ClosedMonoidalCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
-    A closed category is a symmetric :class:`BiclosedCategory`, i.e. a
-    symmetric monoidal closed category, see :class:`ClosedMarkovCategory`
-    for one with copy and discard.
+    A closed symmetric category is a symmetric :class:`ClosedMonoidalCategory`,
+    i.e. a symmetric monoidal closed category, see
+    :class:`ClosedMarkovCategory` for one with copy and discard.
     """
 
     @axiom
@@ -2322,10 +2327,10 @@ class ClosedCategory[
 
 class ClosedMarkovCategory[
         C0: ResiduatedMonoid, C1: ClosedMarkovCategory](
-            ClosedCategory[C0, C1], MarkovCategory[C0, C1]):
+            ClosedSymmetricCategory[C0, C1], MarkovCategory[C0, C1]):
     """
-    A closed Markov category is a :class:`ClosedCategory` with copy and
-    discard, i.e. which is also a :class:`MarkovCategory`.
+    A closed Markov category is a :class:`ClosedSymmetricCategory` with copy
+    and discard, i.e. which is also a :class:`MarkovCategory`.
     """
 
 
@@ -2565,10 +2570,10 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](
-        RibbonCategory[C0, C1], ClosedCategory[C0, C1]):
+        RibbonCategory[C0, C1], ClosedSymmetricCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
-    :class:`ClosedCategory`, i.e. with cups, caps and swaps and where
+    :class:`ClosedSymmetricCategory`, i.e. with cups, caps and swaps and where
     the twist is the identity. Its internal hom ``x ⊸ y`` is ``x* @ y``,
     so that evaluation and currying are cups and caps, as in a
     :class:`RigidCategory`.
@@ -2577,7 +2582,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
     def twist(cls, dom: C0) -> C1:
         return cls.id(dom)
 
-    currying_symmetry = ClosedCategory.currying_symmetry.inapplicable(
+    currying_symmetry = ClosedSymmetricCategory.currying_symmetry.inapplicable(
         messages.COMPACT_EXPONENTIALS)
 
     @axiom
