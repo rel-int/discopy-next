@@ -8,7 +8,6 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
-from discopy.sum import Sum
 from discopy.utils import AxiomError
 
 
@@ -433,11 +432,12 @@ def test_total_ordering():
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
     assert repr((f).bubble())\
-        == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
+        == "cat.Box('', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),))"
     assert str(f.bubble()) == "(f).bubble()"
     named = f.bubble(name="N", method="m")
-    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
-        " name='N', method='m')"
+    assert repr(named) == "cat.Box('N', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),), method='m')"
     assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
     assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
     image = Functor.id()(f.bubble(data=42, is_dagger=True))
@@ -577,10 +577,10 @@ def test_Sum():
         Sum((f, g))
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
-        == "sum.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+        == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
     lazy = Sum((f, f))
     assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
-        == f"sum.Sum(terms=({f!r}, {f!r}))"
+        == f"cat.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
@@ -674,12 +674,8 @@ def box_classes():
 
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
-    "{sum,markov}.Sum": "c((box(c, x, y, v), ))",
-    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
+    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
-    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
-    "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
-    "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
     "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
     "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
@@ -694,10 +690,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
     "feedback.Box": 'c("f", x, y, data=v).delay()',
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
-    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
@@ -741,7 +737,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "lambek.cfg.Rule": 'c(x @ y, x, "r")',
     "lambek.cfg.Word": 'c("w", x, y)',
     "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
-    "tensor.Bubble":
+    "{tensor,quantum.circuit,quantum.zx}.Elementwise":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
     "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
@@ -846,7 +842,6 @@ BROKEN = {
         "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
@@ -856,10 +851,10 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "*.{Feedback,Feedforward,Trace}":
+        "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
     "subs": {
@@ -868,8 +863,9 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "a module has none",
+        "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",
     },
 }
@@ -1117,3 +1113,21 @@ def test_term_laws():
     assert first.alpha_eq(second)
     assert Renamed[TermBase].checked_params() == ()
     assert Canonical[TermBase].checked_params() == ()
+
+
+def test_legacy_Bubble_tree():
+    """ A tree dumped before #560 fused bubbles into boxes still loads. """
+    from discopy import monoidal, rigid
+    from discopy.utils import from_tree
+    ob = {'factory': 'cat.Ob', 'name': 'x'}
+    f = {'factory': 'cat.Box', 'name': 'f', 'dom': ob, 'cod': ob}
+    tree = {'factory': 'cat.Bubble', 'arg': f, 'dom': ob, 'cod': ob}
+    assert from_tree(tree) == Box('f', Ob('x'), Ob('x')).bubble()
+    x = rigid.Ty('x')
+    g = rigid.Box('g', x, x).bubble(name="b").r
+    tree = g.to_tree() | {'factory': 'rigid.Bubble'}
+    assert from_tree(tree) == g
+    h = monoidal.Box('h', monoidal.Ty('x'), monoidal.Ty('y'))
+    tree = h.bubble().to_tree() | {'factory': 'monoidal.Bubble'}
+    del tree['name']
+    assert from_tree(tree) == h.bubble()

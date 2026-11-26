@@ -90,7 +90,12 @@ def draw(diagram, **params):
         transpose and its conjugate are told apart, default is :code:`0.125`
         when some box is a conjugate, a transpose or a dagger not drawn as a
         braid, :code:`0` otherwise.
+    left_to_right : bool, optional
+        Whether to draw left to right, by default the
+        ``draw_left_to_right`` of the class of the diagram.
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().draw(**params)
 
 
@@ -133,6 +138,8 @@ def to_typst(diagram, **params):
     >>> assert 'import "@preview/cetz' in source
     >>> assert 'bezier' in source or 'line' in source
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().to_typst(**params)
 
 
@@ -162,10 +169,13 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     if 'figsize' not in params:
+        attrs = ("width", "height")
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
-            for attr in ("width", "height"))
+            for attr in (attrs[::-1] if params["left_to_right"] else attrs))
     with TemporaryDirectory() as directory:
         for i, _diagram in enumerate(steps):
             tmp_path = os.path.join(directory, f'{i}.png')

@@ -143,7 +143,8 @@ def to_map(term):
         if isinstance(term, Application):
             index = node("@", x @ x, x)
             wires.append(((index, 2), target))
-            return wire(term.func, (index, 0)) + wire(term.args, (index, 1))
+            return wire(term.function, (index, 0))\
+                + wire(term.argument, (index, 1))
         if isinstance(term, Abstraction):
             index = node("λ", x, x @ x)
             wires.append(((index, 1), target))

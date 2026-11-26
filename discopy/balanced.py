@@ -19,12 +19,12 @@ Summary
     DualRailBraid
     DualRailTwist
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
     TermBase
     Variable
@@ -416,12 +416,6 @@ class Sum(braided.Sum, feedback.Sum, Box):
     """
 
 
-class Bubble(braided.Bubble, feedback.Bubble, Box):
-    """
-    A balanced bubble is a braided and feedback bubble and a balanced box.
-    """
-
-
 class Functor(braided.Functor, feedback.Functor):
     """
     A balanced functor is a braided functor that twists.
@@ -502,8 +496,8 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
@@ -511,7 +505,6 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.braid_factory = Braid
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 Id = Diagram.id
 
@@ -523,3 +516,6 @@ class Equation(braided.Equation):
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

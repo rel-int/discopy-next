@@ -1,4 +1,5 @@
 import doctest
+import textwrap
 from pathlib import Path
 from random import Random
 
@@ -349,3 +350,34 @@ def test_english_to_lean():
     _, statement = text.split("[DecidableEq S.Ob] :\n")
     statement, _ = statement.split("\n    := ")
     assert printed.split() == statement.split()
+
+
+def test_lean_to_english():
+    "The theorem of English.lean reads back to the sentence it documents."
+    from discopy.lambek import abstract
+    namespace = vars(abstract).copy()
+    for example in doctest.DocTestParser().get_examples(abstract.__doc__):
+        exec(example.source, namespace)  # pylint: disable=exec-used
+    lean = Path(__file__).parents[2] / "discolean" / "DisCoLean"\
+        / "Statements" / "English.lean"
+    text = lean.read_text(encoding="utf-8")
+    sentence = text.split("/-- ")[1].split(".")[0]
+    _, statement = text.split("[DecidableEq S.Ob] :\n")
+    statement, _ = statement.split("\n    := ")
+    english, to_lean, printer, words, s = (namespace[name] for name in (
+        "english", "to_lean", "lean", "words", "s"))
+    readings = to_lean.parse(textwrap.dedent(statement), s, 6, printer)
+    treebank = [namespace["sentence"](namespace["MONOIDAL"])]
+    best = max(readings, key=lambda r: to_lean.likelihood(r, treebank))
+    assert " ".join(words(english(best))()([])) == sentence
+
+
+def test_parse_unpacks_wires():
+    "An argument of two wires is passed as two values, as evaluation does."
+    n, s = Ty("n"), Ty("s")
+    a, f = n("a"), (n >> s)("f")
+    lexicon = Lexicon({n: n, s: s}, {a: a, f: f})
+    functor = Functor({n: (int, int), s: int}, {
+        a: lambda: (1, 2), f: lambda: lambda x, y: x - y}, cod=Function)
+    assert functor(f(a))() == -1
+    assert lexicon.parse(-1, s, 2, functor) == [f(a)]

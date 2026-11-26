@@ -53,7 +53,7 @@ from discopy.matrix import Matrix
 from discopy.monoidal import Colour
 from discopy.tensor import Dim, Tensor
 from discopy.testable import no_strategy
-from discopy.utils import AxiomError, factory, factory_name
+from discopy.utils import AxiomError, factory, factory_name, from_tree
 
 white, black = Colour("white"), Colour("black")
 """ The colours of the two regions, the page and the inside of a cut. """
@@ -130,6 +130,10 @@ class Diagram(monoidal.Diagram):
         """
         return self.negative_functor()(self)
 
+    def bubble(self, *args, **params) -> Cut:
+        """ The :class:`Cut` of a diagram, the bubble of this category. """
+        return Cut(self, *args, **params)
+
     def __invert__(self):
         """
         The complement ``~d``, the cut of the :meth:`negative` of ``d`` with
@@ -138,7 +142,7 @@ class Diagram(monoidal.Diagram):
         >>> p = Box('p')
         >>> assert ~p == Cut(p.negative()) and (~p).colour == white
         """
-        return self.bubble_factory(self.negative(), dom=self.dom, cod=self.cod)
+        return self.negative().bubble(dom=self.dom, cod=self.cod)
 
     def conjunction(self, other: Diagram) -> Diagram:
         """ The conjunction of two white propositions, their tensor. """
@@ -196,7 +200,7 @@ class Box(monoidal.Box, Diagram):
         super().__init__(name, dom, cod, **params)
 
 
-class Cut(monoidal.Bubble, Box):
+class Cut(Box):
     """
     A cut is a bubble around a diagram of the other colour, its boundary the
     :meth:`Diagram.negative` of that of the diagram by default.
@@ -209,7 +213,11 @@ class Cut(monoidal.Bubble, Box):
     discopy.utils.AxiomError: A cut changes the colour of its region, \
 got white inside white.
     """
-    def __init__(self, arg: Diagram, dom=None, cod=None, **params):
+    serialised_attrs = ("*args", ) + tuple(
+        attr for attr in Box.serialised_attrs
+        if attr not in ("*", "args", "method"))
+
+    def __init__(self, arg: Diagram, dom=None, cod=None, name="", **params):
         negative = arg.negative_functor()
         dom = negative(arg.dom) if dom is None else dom
         cod = negative(arg.cod) if cod is None else cod
@@ -217,7 +225,32 @@ got white inside white.
             raise AxiomError(
                 "A cut changes the colour of its region, "
                 f"got {arg.colour.name} inside {dom.dom.name}.")
-        super().__init__(arg, dom=dom, cod=cod, **params)
+        if params.pop("method", "bubble") != "bubble":
+            raise ValueError("A cut is a bubble, its method is 'bubble'.")
+        super().__init__(name, dom, cod, args=(arg, ), **params)
+
+    def __repr__(self):
+        kwargs = "" if self.is_id_on_objects else (
+            f", dom={self.dom!r}, cod={self.cod!r}")
+        kwargs += f", name={self.name!r}" if self.name else ""
+        kwargs += "" if self.data is None else f", data={self.data!r}"
+        kwargs += ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.arg!r}{kwargs})"
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Cut:
+        """
+        Decode a serialised cut from its arg and boundary.
+
+        >>> from discopy.utils import dumps, loads
+        >>> assert loads(dumps(~Box('p'))) == ~Box('p')
+        """
+        kwargs = {
+            k: tree[k] for k in ("name", "data", "is_dagger") if k in tree}
+        arg, dom, cod = map(
+            from_tree, (tree.get('args', [tree.get('arg')])[0], tree['dom'],
+                        tree['cod']))
+        return cls(arg, dom=dom, cod=cod, **kwargs)
 
 
 class Sum(monoidal.Sum, Box):
@@ -327,7 +360,6 @@ class Model:
 
 
 Diagram.box_factory = Box
-Diagram.bubble_factory = Cut
 Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Model.diagram = Diagram

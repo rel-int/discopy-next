@@ -4,8 +4,7 @@
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
 :class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure,
-so it sits right above :mod:`discopy.monoidal`, the way :mod:`discopy.para`
-and :mod:`discopy.monad` sit beside the hierarchy.
+so it branches off :mod:`discopy.monoidal` in the hierarchy.
 
 Summary
 -------
@@ -20,7 +19,6 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
     Bang
     Structural
     Dereliction
@@ -64,7 +62,7 @@ from functools import cached_property
 from typing import Callable, ClassVar, Self
 
 from discopy import monoidal, messages
-from discopy.abc import LinearCategory, MonoidalCategory
+from discopy.abc import DaggerCategory, LinearCategory, MonoidalCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -211,6 +209,10 @@ class Diagram(monoidal.Diagram, LinearCategory):
     laxator_factory: ClassVar[type["Laxator"]]
 
     ob = Ty
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.STRUCTURAL_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.STRUCTURAL_HAS_NO_DAGGER)
 
     def bang(self) -> Diagram:
         """
@@ -393,13 +395,7 @@ class Sum(monoidal.Sum, Box):
     """
 
 
-class Bubble(monoidal.Bubble, Box):
-    """
-    A bubble in the free linear category, i.e. a monoidal bubble and its box.
-    """
-
-
-class Bang(monoidal.Bubble, Box):
+class Bang(Box):
     """
     The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
     a :class:`Curry` is.
@@ -428,9 +424,8 @@ class Bang(monoidal.Bubble, Box):
 
     def __init__(self, arg: Diagram):
         dom, cod = arg.dom.bang(), arg.cod.bang()
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, drawing_name="!")
-        Box.__init__(self, f"({arg}).bang()", dom, cod)
+        Box.__init__(self, f"({arg}).bang()", dom, cod, args=(arg, ),
+                     drawing_name="!")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r})"
@@ -688,7 +683,6 @@ class Laxator(Structural):
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.bang_factory = Bang
 Diagram.dereliction_factory = Dereliction
 Diagram.digging_factory = Digging
@@ -959,3 +953,6 @@ TermBase.functor = Functor.id(Diagram)
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory = Ty.term_factory = TermBase
+
+
+Bubble = Box.from_args

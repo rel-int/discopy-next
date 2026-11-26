@@ -137,7 +137,6 @@ notebooks = [
     "ipykernel == 6.23.*",
     "marimo",
     # imported by the notebooks in docs/notebooks/optyx
-    "pandas",
     "seaborn",
     "tqdm",
     # cotengra pools over joblib when it can: its concurrent.futures fallback

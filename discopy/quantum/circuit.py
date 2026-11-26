@@ -20,7 +20,7 @@ Summary
     Circuit
     Box
     Sum
-    Bubble
+    Elementwise
     Swap
     Functor
 
@@ -1048,11 +1048,11 @@ class Sum(tensor.Sum[complex], Box):
         return [circuit.to_tk() for circuit in self.terms]
 
 
-class Bubble(tensor.Bubble[complex], Box):
+class Elementwise(tensor.Elementwise[complex], Box):
     """
-    A circuit bubble is a tensor bubble in a circuit, mixed when its boundary
-    has both bits and qubits or its args are mixed. It differentiates as a
-    circuit box does.
+    A circuit elementwise box is a tensor one in a circuit, mixed when its
+    boundary has both bits and qubits or its args are mixed. It
+    differentiates as a circuit box does.
 
     >>> from discopy.quantum.gates import X, H, Measure
     >>> assert (X.bubble() >> X).eval() == X.bubble().eval() >> X.eval()
@@ -1120,10 +1120,13 @@ def bitstring2index(bitstring):
 
 Circuit.box_factory = Box
 Circuit.swap_factory, Circuit.sum_factory = Swap, Sum
-Circuit.bubble_factory = Bubble
+Circuit.elementwise_factory = Elementwise
 Circuit.permutation_factory = Permutation
 bit, qubit = Ty(Digit(2)), Ty(Qudit(2))
 Id = Circuit.id
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+
+
+Bubble = Elementwise.from_args

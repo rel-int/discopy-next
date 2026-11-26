@@ -24,12 +24,12 @@ Summary
     Copy
     Discard
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
     Equation
     TermBase
@@ -101,7 +101,9 @@ from typing import ClassVar, Self
 
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
 from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
@@ -187,6 +189,13 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     discard_factory: ClassVar[type["Discard"]]
     function_factory: ClassVar[type["Function"]]
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
 
     @classmethod
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
@@ -837,54 +846,6 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
-class Bubble(symmetric.Bubble, Box):
-    """
-    A markov bubble is a symmetric bubble and a markov box: a total function
-    unless it says otherwise, whatever its args, and it keeps what it says
-    through dagger, substitution, rotation and markov functors.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        is_deterministic : Whether copying commutes with the bubble.
-        is_affine : Whether discarding commutes with the bubble.
-        kwargs : Passed to :class:`symmetric.Bubble`.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> sample = Box('sample', x, x, is_deterministic=False)
-    >>> noisy = sample.bubble(is_deterministic=False)
-    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
-    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
-    >>> assert Functor.id(Diagram)(noisy) == noisy
-    """
-    serialised_attrs = symmetric.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.deterministic, self.affine = is_deterministic, is_affine
-
-    def __repr__(self):
-        flags = "".join(f", {name}=False" for name in self.flags())
-        return super().__repr__()[:-1] + flags + ")" if flags\
-            else super().__repr__()
-
-    def setoid(self):
-        return super().setoid() + (self.deterministic, self.affine)
-
-    def to_tree(self) -> dict:
-        return {**super().to_tree(), **self.flags()}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        result = super().from_tree(tree)
-        result.deterministic = tree.get("is_deterministic", True)
-        result.affine = tree.get("is_affine", True)
-        return result
-
-
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -934,7 +895,8 @@ class Functor(symmetric.Functor):
             return function(  # ty: ignore[invalid-argument-type]
                 other.func, list(map(self, other.dom)))
         result = super().__call__(other)
-        if isinstance(other, Bubble) and isinstance(result, Bubble):
+        if isinstance(other, Box) and other.args\
+                and isinstance(result, Box) and result.args:
             return other.flagged(result)
         return result
 
@@ -948,8 +910,8 @@ Box.__init__.__signature__ = Signature([
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -959,7 +921,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -1164,3 +1125,6 @@ TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+
+
+Bubble = Box.from_args

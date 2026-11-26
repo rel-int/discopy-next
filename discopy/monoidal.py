@@ -20,7 +20,7 @@ Summary
     Layer
     Diagram
     Box
-    Bubble
+    Sum
     Functor
     Match
     Equation
@@ -157,6 +157,8 @@ and a :class:`discopy.markov.Application` may use one twice.
 from __future__ import annotations
 
 import itertools
+from contextvars import ContextVar
+from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -168,7 +170,6 @@ from typing import (
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
-from discopy import sum as formal_sum
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
 # pylint: disable-next=unused-import  # the redex a term prints as
@@ -192,6 +193,7 @@ from discopy.utils import (
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
+    text_width,
     unbiased,
 )
 
@@ -335,7 +337,8 @@ class Wire(cat.Ob):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
 
-    __str__ = cat.Box.__str__
+    def __str__(self):
+        return str(self.name) + ("[::-1]" if self.is_dagger else '')
 
     def to_tree(self):
         tree = super().to_tree()
@@ -821,8 +824,9 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
                  getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
-            if getattr(old, "frame_boundary", False):
-                new.frame_boundary = True
+            for flag in ("frame_boundary", "always_draw_label"):
+                if getattr(old, flag, False):
+                    setattr(new, flag, True)
             for attr, default in (
                     WIRE_DRAWING_ATTRIBUTES | COLOUR_DRAWING_ATTRIBUTES
             ).items():
@@ -1427,6 +1431,12 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
 
+    Attributes:
+        draw_left_to_right : Whether the diagrams of the class are drawn left
+            to right rather than top to bottom, a property of the category
+            rather than of any diagram: see :class:`Box` for diagrams of
+            one direction drawn as the args of a box of another.
+
     .. admonition:: Summary
 
         .. autosummary::
@@ -1445,9 +1455,9 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         messages.NO_PLANAR_NORMAL_FORM)
 
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type[formal_sum.Sum]]
-    bubble_factory: ClassVar[type["Bubble"]]
+    sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
+    draw_left_to_right: ClassVar[bool] = False
     ob = Ty
     layer_factory = Layer
 
@@ -1579,7 +1589,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         if not others:
             return self
         for other in others:
-            if isinstance(other, formal_sum.Sum):
+            if isinstance(other, Sum):
                 return self.sum_factory((self, )).tensor(*others)
             assert_isinstance(other, self.ar)
             assert_isinstance(self, other.ar)
@@ -2461,21 +2471,155 @@ class Box(cat.Box, Diagram):
 
     .. image:: /_static/monoidal/coloured-box.svg
         :align: center
+
+    A box with args, i.e. a bubble, is drawn around its arg, as a square
+    when their boundaries differ in length, or as a frame with a slot for
+    each of its args, side by side or vertically.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
+    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
+    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
+
+    .. image:: /_static/monoidal/bubble-example.svg
+        :align: center
+
+    >>> b = f.bubble(g, h >> h[::-1], dom=x, cod=y @ y)
+    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
+
+    .. image:: /_static/monoidal/bubble-multiple-args.svg
+        :align: center
+
+    >>> b = f.bubble(g, h, dom=x, cod=y @ y, draw_vertically=True)
+    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
+
+    .. image:: /_static/monoidal/frame-vertical-args.svg
+        :align: center
+
+    Coloured frames distinguish their outside, frame and slot regions.
+
+    >>> red, blue = map(Colour, ("red", "blue"))
+    >>> x = Ty(Wire("x", red, blue))
+    >>> f = Box("f", x, x)
+    >>> frame = f.bubble(
+    ...     dom=Ty(Wire("boundary", blue, red)),
+    ...     cod=Ty(Wire("boundary", blue, red)),
+    ...     draw_as_frame=True)
+    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
+
+    .. image:: /_static/monoidal/coloured-frame.svg
+        :align: center
+
+    The diagrams of a category with ``draw_left_to_right`` are drawn left to
+    right, and a box whose args are drawn in another direction than its
+    own category is drawn as one box with its args across it, on a
+    background of its ``frame_colour``. This is how to draw "Very big car" in
+    higher-order DisCoCat :cite:p:`ToumiDeFelice25`: each word is a lambda
+    term, drawn top to bottom, whose body is a diagram, drawn left to right:
+
+    >>> @factory
+    ... class Body(Diagram):
+    ...     draw_left_to_right = True
+    >>> class Primitive(Box, Body):
+    ...     pass
+    >>> n, n_n = Ty('n'), Ty('n ← n')
+    >>> x, B = Primitive('x', Ty(), n), Primitive('B', n, n)
+    >>> C = Primitive('C', Ty(), n)
+    >>> style = dict(color="green", frame_colour="red")
+    >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
+    ...            color="green", height=2)
+    >>> big = (x >> B).bubble(
+    ...     dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
+    >>> car = C.bubble(dom=Ty(), cod=n, **style)
+    >>> very_big = (x >> B >> B).bubble(
+    ...     dom=very.cod @ n_n, cod=n_n, drawing_name="λx ·", **style)
+    >>> very_big_car = (C >> B >> B).bubble(dom=n_n @ n, cod=n, **style)
+    >>> diagram = (very @ big @ car).foliation()\\
+    ...     >> very_big @ n >> very_big_car
+    >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
+
+    .. image:: /_static/monoidal/very-big-car.svg
+        :align: center
+
+    A box with args drawn in its own direction is a box with holes, e.g.
+    "with" as a frame with a hole on either side, named in its top left:
+
+    >>> A, y = Primitive('A', Ty(), n), Primitive('y', Ty(), n)
+    >>> W = lambda *args: Primitive(
+    ...     'W', Ty(), n, args=args, drawing_name="W",
+    ...     draw_as_frame=True, draw_vertically=True)
+    >>> with_ = W(y, x).bubble(
+    ...     dom=Ty(), cod=Ty('(n → n) ← n'), drawing_name="λxy ·", **style)
+    >>> with_attitude = W(y, A).bubble(
+    ...     dom=with_.cod @ n, cod=Ty('n → n'), drawing_name="λy ·", **style)
+    >>> diagram = (C.bubble(dom=Ty(), cod=n, **style) @ with_
+    ...            @ A.bubble(dom=Ty(), cod=n, **style)).foliation()\\
+    ...     >> n @ with_attitude\\
+    ...     >> W(C, A).bubble(dom=n @ with_attitude.cod, cod=n, **style)
+    >>> diagram.draw(
+    ...     doctest='docs/_static/monoidal/concepts-with-attitude.svg')
+
+    .. image:: /_static/monoidal/concepts-with-attitude.svg
+        :align: center
     """
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
+        draw_as_frame, draw_as_square, draw_vertically = (
+            params.pop("draw_as_frame", None),
+            params.pop("draw_as_square", None),
+            params.pop("draw_vertically", False))
         dom = dom if isinstance(dom, self.ob) else self.ob(dom)
         cod = cod if isinstance(cod, self.ob) else self.ob(cod)
         if (dom.dom, dom.cod) != (cod.dom, cod.cod):
             raise AxiomError(messages.NOT_GLOBULAR.format(
                 dom.dom, dom.cod, cod.dom, cod.cod))
+        if params.get("args") and params.get("drawing_name") is None\
+                and "drawing_name" not in vars(self):
+            params["drawing_name"] = ""
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in params:
                 setattr(self, attr, params.pop(attr))
         cat.Box.__init__(self, name, dom, cod, **params)
+        if self.args:
+            self.bubble_drawing(draw_as_frame, draw_as_square, draw_vertically)
         inside = () if self.is_identity\
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
+
+    def bubble_drawing(
+            self, draw_as_frame: bool | None, draw_as_square: bool | None,
+            draw_vertically: bool):
+        """
+        Set how a box with args is drawn: as a bubble around its one arg
+        when their boundaries have as many wires, else as a square, or as a
+        frame with a slot for each arg, side by side or vertically.
+
+        Parameters:
+            draw_as_frame : Whether to draw the box as a frame.
+            draw_as_square : Whether to draw the box as a square.
+            draw_vertically : Whether to draw the frame slots vertically.
+        """
+        self.draw_vertically = draw_vertically
+        if len(self.args) == 1:
+            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
+                len(self.arg.dom), len(self.arg.cod))
+            self.draw_as_square = draw_as_square or not can_draw_as_bubble
+            self.draw_as_frame = draw_as_frame or (
+                not can_draw_as_bubble and not self.draw_as_square)
+        else:
+            self.draw_as_frame = True
+            self.draw_as_square = False
+
+    @property
+    def frame_colour(self):
+        """ The colour of the frame, the default of
+        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        return vars(self).get(
+            "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
+
+    @frame_colour.setter
+    def frame_colour(self, colour):
+        vars(self)["frame_colour"] = colour
 
     def rebuild(self, **changes):
         """
@@ -2491,6 +2635,10 @@ class Box(cat.Box, Diagram):
         for attr in BOX_DRAWING_ATTRIBUTES:
             if attr in vars(self) and attr not in vars(box):
                 setattr(box, attr, getattr(self, attr))
+        if self.args and box.args:
+            Box.bubble_drawing(
+                box, self.draw_as_frame, self.draw_as_square,
+                self.draw_vertically)
         return box
 
     is_identity = False
@@ -2517,103 +2665,43 @@ class Box(cat.Box, Diagram):
 
     @property
     def size(self):
-        return 1
-
-    def to_drawing(self):
-        return Drawing.from_box(self)
-
-
-class Bubble(cat.Bubble, Box):
-    """
-    A bubble is a box with diagrams :code:`args` inside and an optional pair of
-    types :code:`dom` and :code:`cod`.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        drawing_name (str) : The label to use when drawing, empty by default.
-        draw_as_square (bool) : Whether to draw the bubble as a square.
-        draw_as_frame (bool) : Whether to draw the bubble as a frame.
-        draw_vertically (bool) : Whether to draw the frame slots vertically.
-        kwargs : Passed to :class:`cat.Bubble`.
-
-    Raises:
-        ValueError : When dom (resp. cod) is None and the args do not all
-            have the same dom (resp. cod).
-
-    Examples
-    --------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
-    >>> d = (f.bubble(dom=x ** 3, cod=y, draw_as_square=True) >> g).bubble()
-    >>> d.draw(doctest='docs/_static/monoidal/bubble-example.svg')
-
-    .. image:: /_static/monoidal/bubble-example.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h >> h[::-1], dom=x, cod=y @ y)
-    >>> b.draw(doctest='docs/_static/monoidal/bubble-multiple-args.svg')
-
-    .. image:: /_static/monoidal/bubble-multiple-args.svg
-        :align: center
-
-    >>> b = Bubble(f, g, h, dom=x, cod=y @ y, draw_vertically=True)
-    >>> b.draw(doctest='docs/_static/monoidal/frame-vertical-args.svg')
-
-    .. image:: /_static/monoidal/frame-vertical-args.svg
-        :align: center
-
-    Coloured frames distinguish their outside, frame and slot regions.
-
-    >>> red, blue = map(Colour, ("red", "blue"))
-    >>> x = Ty(Wire("x", red, blue))
-    >>> f = Box("f", x, x)
-    >>> frame = f.bubble(
-    ...     dom=Ty(Wire("boundary", blue, red)),
-    ...     cod=Ty(Wire("boundary", blue, red)),
-    ...     draw_as_frame=True)
-    >>> frame.draw(doctest='docs/_static/monoidal/coloured-frame.svg')
-
-    .. image:: /_static/monoidal/coloured-frame.svg
-        :align: center
-
-    """
-    serialised_attrs = cat.Bubble.serialised_attrs + (
-        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
-
-    def __init__(
-            self, *args: Diagram,
-            drawing_name: str | None = None,
-            draw_as_frame: bool | None = None,
-            draw_as_square: bool | None = None,
-            draw_vertically=False, **kwargs):
-        cat.Bubble.__init__(self, *args, **kwargs)
-        Box.__init__(self, self.name, self.dom, self.cod,
-                     data=self.data, is_dagger=self.is_dagger)
-        self.drawing_name = "" if drawing_name is None else drawing_name
-        self.draw_vertically = draw_vertically
-        self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
-        can_draw_as_square = len(args) == 1
-        can_draw_as_bubble = (can_draw_as_square
-                              and len(self.dom) == len(self.arg.dom)
-                              and len(self.cod) == len(self.arg.cod))
-        if len(args) == 1:
-            can_draw_as_bubble = (len(self.dom), len(self.cod)) == (
-                len(self.arg.dom), len(self.arg.cod))
-            self.draw_as_square = draw_as_square or not can_draw_as_bubble
-            self.draw_as_frame = draw_as_frame or (
-                not can_draw_as_bubble and not self.draw_as_square)
-        else:
-            self.draw_as_frame = True
-            self.draw_as_square = False
-
-    @property
-    def size(self):
-        """ The number of boxes in a bubble, counting its arguments. """
+        """ The number of boxes in a box, counting its arguments. """
         return 1 + sum(arg.size for arg in self.args)
 
     def to_drawing(self):
-        method = "frame" if self.draw_as_frame else "bubble"
+        if not self.args:
+            result = Drawing.from_box(self)
+            if not type(self).draw_left_to_right or "height" in vars(self)\
+                    or result.box.no_label:
+                return result
+            # The height of a box drawn left to right is its width on the page.
+            box = copy(self)
+            box.height = max(1, text_width(
+                getattr(self, "drawing_name", self.name)) + 1)
+            if "min_width" not in vars(self):
+                box.min_width = 0
+            return Drawing.from_box(box)
         args = [arg.to_drawing() for arg in self.args]
+        directions = {type(arg).draw_left_to_right for arg in self.args}
+        if len(directions) > 1:
+            raise ValueError(messages.MIXED_DIRECTIONS.format(self))
+        if directions != {self.draw_left_to_right}:
+            framed = [arg.framed() for arg in args]
+            height = max(arg.height for arg in framed)
+            nested = tuple(
+                arg.stretch(height - arg.height) for arg in framed)
+            width = sum(arg.width for arg in nested)
+            label = text_width(self.drawing_name) + .25\
+                if self.drawing_name else 0
+            return Box(
+                self.drawing_name, self.dom, self.cod, nested=nested,
+                color=getattr(self, "color", "white"),
+                frame_colour=self.frame_colour,
+                min_width=max(label + height + .5,
+                              getattr(self, "min_width", 0)),
+                height=max(width + 1,
+                           getattr(self, "height", 0))).to_drawing()
+        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
@@ -2624,6 +2712,56 @@ class Bubble(cat.Bubble, Box):
         else:
             kwargs['draw_as_square'] = self.draw_as_square
         return getattr(Drawing, method)(*args, **kwargs)
+
+
+class Sum(cat.Sum, Box):
+    """
+    A sum is a tuple of diagrams :code:`terms`
+    with the same domain and codomain.
+
+    Parameters:
+        terms (tuple[Diagram, ...]) : The terms of the formal sum.
+        dom (Ty) : The domain of the formal sum.
+        cod (Ty) : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> f = Box('f', 'x', 'x')
+    >>> print(f @ (f + f))
+    (f @ x >> x @ f) + (f @ x >> x @ f)
+    """
+    def tensor(self, *others):
+        """
+        The tensor of sums distributes over the sum, i.e. its terms are the
+        ``n``-ary tensors of one term from each factor.
+
+        >>> f = Box('f', 'x', 'x')
+        >>> assert (f + f) @ (f + f) == sum(4 * [f @ f])
+        """
+        if not others:
+            return self
+        sums = [
+            other if isinstance(other, Sum) else self.sum_factory((other, ))
+            for other in others]
+        dom = self.dom.tensor(*(other.dom for other in sums))
+        cod = self.cod.tensor(*(other.cod for other in sums))
+        terms = tuple(
+            term.tensor(*rest) for term in self.terms
+            for rest in itertools.product(
+                *(other.terms for other in sums)))
+        return self.sum_factory(terms, dom, cod)
+
+    to_drawing = Diagram.to_drawing
+
+
+# The type a wire is read in while its type is mapped: the type itself when
+# it is of the level of the domain or above, so that a functor reads a type
+# of a higher level as that type (next#703). A context variable, not an
+# attribute of the functor, so that concurrent calls do not share it, and
+# paired with the functor that set it, so that another functor called from
+# an object map reads its own domain's level.
+_WIRE_LEVEL: ContextVar[tuple[object, type] | None] = ContextVar(
+    "WIRE_LEVEL", default=None)
 
 
 class Functor(cat.Functor):
@@ -2751,14 +2889,22 @@ class Functor(cat.Functor):
                 if not issubclass(self.cod.ob, abc.Category):
                     return self.cod.ob()
                 return self.cod.ob.id(self(other.dom))
-            head, *tail = map(self, other.inside)
+            level = other.factory if isinstance(other, self.dom.ob)\
+                else self.dom.ob
+            token = _WIRE_LEVEL.set((self, level))
+            try:
+                head, *tail = map(self, other.inside)
+            finally:
+                _WIRE_LEVEL.reset(token)
             return head.tensor(*tail)
         if isinstance(other, self.dom.ob.generator_factory):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
                 return self(other.dagger()).dagger()
-            result = super().__call__(self.dom.ob(other))
+            owner, level = _WIRE_LEVEL.get() or (self, self.dom.ob)
+            level = level if owner is self else self.dom.ob
+            result = super().__call__(level(other))
             if isinstance(other, Wire) and isinstance(result, Ty):
                 expected = self(other.dom), self(other.cod)
                 if (result.dom, result.cod) != expected:
@@ -2776,17 +2922,22 @@ class Functor(cat.Functor):
             for box_or_typ in tail:
                 result = result @ self(box_or_typ)
             return result
-        if isinstance(other, Bubble) and self.cod is Drawing:
+        if isinstance(other, Box) and other.args and self.cod is Drawing:
             return other.to_drawing()
-        if isinstance(other, Bubble) and other.method == "bubble"\
-                and issubclass(self.cod, Diagram):
-            factory = self.cod.bubble_factory
+        if isinstance(other, Box) and other.args\
+                and other.method == "bubble" and issubclass(self.cod, Diagram):
             kept = {
                 attr: getattr(other, attr) for attr in other.serialised_attrs
-                if attr in factory.serialised_attrs
-                and attr not in ("*args", "dom", "cod", "method")}
-            return factory(*map(self, other.args), dom=self(other.dom),
-                           cod=self(other.cod), **kept)
+                if attr in getattr(
+                    self.cod, "elementwise_factory", self.cod.box_factory
+                ).serialised_attrs
+                and attr not in (
+                    "*", "*args", "args", "dom", "cod", "method")} | {
+                attr: getattr(other, attr) for attr in (
+                    "drawing_name", "draw_as_frame", "draw_as_square",
+                    "draw_vertically")}
+            return self.cod.bubble(*map(self, other.args), dom=self(other.dom),
+                                   cod=self(other.cod), **kept)
         return super().__call__(other)
 
 
@@ -2920,8 +3071,7 @@ Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
 Diagram.box_factory = Box
-Diagram.sum_factory = formal_sum.Sum[Diagram]
-Diagram.bubble_factory = Bubble
+Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
@@ -3520,5 +3670,7 @@ Diagram.term_factory = TermBase
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
-__getattr__ = deprecated_alias(
-    __name__, {"PRO": "Nat", "Sum": Diagram.sum_factory})
+__getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
+
+
+Bubble = Box.from_args

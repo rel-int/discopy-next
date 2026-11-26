@@ -5,7 +5,7 @@ from pytest import raises
 from discopy import biclosed
 from discopy.closed import *
 from discopy.biclosed import Constraints, Sampler
-from discopy.utils import dumps, loads
+from discopy.utils import dumps, from_tree, loads
 
 
 U = Ty(Unitype())
@@ -97,6 +97,10 @@ def test_term_to_tree():
     assert loads(dumps(Projection(nested, 0))) == Projection(nested, 0)
     let_term = Let(Tuple(), (), Tuple())
     assert loads(dumps(let_term)) == let_term
+    legacy = f(v).to_tree()
+    legacy['func'] = legacy.pop('function')
+    legacy['args'] = legacy.pop('argument')
+    assert from_tree(legacy) == f(v)
 
 
 def test_strictification():

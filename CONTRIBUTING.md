@@ -87,14 +87,16 @@ an example `# doctest: +EXTRA`, usually its import line, e.g.
 docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 `test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
 
-CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`, not on a
-pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
+CI also runs every marimo notebook in `docs/notebooks/` but those of `UNEXECUTED` below on
+each commit of `main`, not on a pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
 instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
 (e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
 fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. Each notebook runs from its own directory on the `discopy`
+and `--check` does not fail on it. A notebook listed in `UNEXECUTED`, e.g. the old optyx
+README `optyx/readme_example`, runs only when named: neither `--check` nor the docs build runs
+it, and its page links to its source. Each notebook runs from its own directory on the `discopy`
 of the script's own tree, so a git worktree checks its own code, not the main checkout's
 editable install.
 
