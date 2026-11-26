@@ -14,8 +14,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   each a diagram of the `category` with a hole for each `Step` that happens at
   once, each level having its own, e.g. `monoidal.Rewrite`, with
   `monoidal.Interchange` (`bifunctoriality` with identities, the side it winds
-  an argument) and `braided.Slide` (`braid_naturality`, a box through a braid)
-  as steps, whiskering and
+  an argument), `braided.Slide` (`braid_naturality`, a box through a braid) and
+  `rigid.Unsnake` (`snake_equations`, a snake straightened into a wire) as
+  steps, `Diagram.rewrite_to` the step from a diagram to one a move away, whiskering and
   tensor. `Diagram.normalization` is the rewrite to the normal form, and
   `braided.Diagram.naturality` is the codomain of `Slide.at`.
   `Rewrite.to_gif(tween=n)` animates a rewrite as an isotopy: an interchanger

@@ -762,13 +762,14 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "rewrite.Layer": 'c(M.Box("f", x, y))',
     "rewrite.Step": 'c("s", M.Box("f", x, y), M.Box("g", x, y), data=v)',
     "monoidal.Interchange": 'c(M.Box("f", x, y), M.Box("g", y, x), True)',
+    "rigid.Unsnake": "c(R.Ty(\"x\"), left=True)",
     "braided.Slide": 'c(B.Box("f", B.Ty("x"), B.Ty("y")), B.Ty("z"))',
 }
 
 
 def example(cls, value):
     """ The box of a class that :data:`EXAMPLES` builds, with some data. """
-    from discopy import braided, closed, monoidal, rewrite, tensor
+    from discopy import braided, closed, monoidal, rewrite, rigid, tensor
     from discopy.lambek import categorial as cg
     from discopy.neural.network import Dims
     from discopy.quantum import circuit, gates
@@ -795,7 +796,7 @@ def example(cls, value):
     f, a, u = terms or (None, None, None)
     return eval(templates[factory_name(base)], dict(
         c=cls, x=x, y=y, v=value, f=f, a=a, u=u, sys=sys, closed=closed,
-        M=monoidal, B=braided,
+        M=monoidal, B=braided, R=rigid,
         cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.box_factory(
             "f", x, y, data=v)))
 
@@ -874,7 +875,7 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
-        "rewrite.Layer monoidal.Interchange braided.Slide":
+        "rewrite.Layer monoidal.Interchange braided.Slide rigid.Unsnake":
         "a rewrite has no tree of its own yet, only that of a box",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",

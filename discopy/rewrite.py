@@ -165,7 +165,9 @@ class Layer[category](cat.Box, TestableGeneric):
         Parameters:
             t : The fraction of the way, from ``0`` to ``1``.
         """
-        return self.context.functor_factory(
+        # pylint: disable-next=import-outside-toplevel  # it imports this
+        from discopy.monoidal import Functor
+        return Functor(
             ob_map=lambda x: x.to_drawing(),
             ar_map=lambda box: box.data.frame(t)
             if isinstance(box.data, Step) else box.to_drawing(),

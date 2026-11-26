@@ -48,8 +48,9 @@ theory does not give.
   single blend of both coordinates does not; that is not a proof for curved wires.
 - The property matrix does not check rewrites: a step goes between parallel diagrams only, and
   the matrix draws each object of a law with its own boundary, not from one hom.
-- The compact steps (snakes, Reidemeister moves) are not yet `Step` subclasses: a snake removal
-  is a plain `Step` named after `normalize`, drawn by `Drawing.interpolate`.
+- `rigid.Unsnake` is the step of `snake_equations`; the braided Reidemeister moves are not yet
+  `Step` subclasses, and a normalisation step that no `Diagram.rewrite_to` recognises is a plain
+  `Step` named after `normalize`, drawn by `Drawing.interpolate`.
 
 ## Status
 

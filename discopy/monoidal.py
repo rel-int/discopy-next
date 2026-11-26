@@ -2442,16 +2442,45 @@ let(e(x2), lambda: h(x1), offset=1)))
         self.normal_form(normalize=recorded, **params)
         result = self.rewrite_factory.id(self)
         for diagram in steps:
-            before = result.cod
-            if len(before) != len(diagram):
-                result = result >> self.rewrite_factory.box_factory(
-                    normalize.__name__, before, diagram)
-                continue
-            i = next(i for i, (layer, other) in enumerate(
-                zip(before.inside, diagram.inside)) if layer != other)
-            result = result >> Interchange.at(
-                before, i, params.get("left", False))
+            try:
+                step = result.cod.rewrite_to(
+                    diagram, params.get("left", False))
+            except AxiomError:
+                step = self.rewrite_factory.box_factory(
+                    normalize.__name__, result.cod, diagram)
+            result = result >> step
         return result
+
+    def rewrite_to(self, other: Diagram, left=False) -> rewrite.Rewrite:
+        """
+        The rewrite of one step from the diagram to ``other``, one move
+        apart: here an interchanger, see :meth:`Interchange.at`, and from
+        :mod:`discopy.rigid` up an unsnake too, see
+        :meth:`discopy.rigid.Diagram.rewrite_to`.
+
+        Parameters:
+            other : The diagram to rewrite into.
+            left : Whether the box above passes on the left when it can go
+                either side, as for two scalars.
+
+        Raises:
+            AxiomError : When the diagrams are not one move apart.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> print((f @ x >> x @ g).rewrite_to(x @ g >> f @ x))
+        Interchange(f, g, left=True)
+        """
+        if len(self) == len(other) and self != other:
+            i = next(i for i, (layer, that) in enumerate(
+                zip(self.inside, other.inside)) if layer != that)
+            if i + 1 < len(self):
+                step = Interchange.at(self, i, left)
+                if step.cod == other:
+                    return step
+        raise AxiomError(messages.NOT_ONE_MOVE.format(self, other))
 
     @classmethod
     def from_tree(cls, tree):
