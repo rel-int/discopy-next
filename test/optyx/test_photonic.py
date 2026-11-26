@@ -9,6 +9,8 @@ from discopy.optyx.core import zw
 from discopy.optyx.photonic import (
     BBS, BS, MZI, TBS, Create, DualRail, Phase, PhotonLoss, Scalar, Select,
     Swap, XMeasurementDR, ZMeasurementDR)
+from discopy.python import finset
+from discopy.utils import dumps, from_tree, loads
 
 
 def outcomes(diagram):
@@ -44,6 +46,25 @@ def test_swap():
     assert outcomes(Create(1, 2, 3) >> Swap(1, 2)) == {(2, 3, 1): 1}
     assert outcomes(Create(1, 2, 3) >> Swap(2, 1) >> Swap(2, 1).dagger()) \
         == {(1, 2, 3): 1}
+
+
+@pytest.mark.parametrize("swap, perm", [
+    (Swap(), [1, 0]),
+    (Swap(2, 1), [2, 0, 1]),
+    (Swap(0, 2), [0, 1]),
+])
+def test_swap_tree_and_transparency(swap, perm):
+    import pickle
+    assert swap.perm == finset.Permutation(perm, len(perm))
+    loaded = loads(dumps(swap))
+    assert type(loaded) is Swap and loaded == swap
+    assert loaded.perm == swap.perm
+    assert loaded.to_tree() == swap.to_tree()
+    assert from_tree(swap.to_tree()) == swap
+    assert loaded.double() == swap.double()
+    assert eval(repr(swap), Swap.environment()) == swap
+    pickled = pickle.loads(pickle.dumps(swap))
+    assert type(pickled) is Swap and pickled == swap
 
 
 def test_prob_dist_closed():

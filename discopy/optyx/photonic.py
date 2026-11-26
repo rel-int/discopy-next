@@ -1268,6 +1268,17 @@ class Swap(channel.Permutation):
         super().__init__(self.left @ self.right, [
             *range(left, left + right), *range(left)])
 
+    def __getnewargs__(self):
+        return len(self.left), len(self.right)
+
+    def to_tree(self) -> dict:
+        return dict(factory=factory_name(type(self)),
+                    left=len(self.left), right=len(self.right))
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['left'], tree['right'])
+
     def dagger(self):
         return type(self)(len(self.right), len(self.left))
 
