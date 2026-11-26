@@ -598,9 +598,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `argument`, in its trees too, and a tree with the old keys still loads
   ([next#729]).
 
-- In a left-to-right drawing, wire labels sit above their wires, and a line
-  separates each of the args nested in a box from the next, so that no two
-  regions meet without one ([next#733]).
+- In a left-to-right drawing, wire labels sit above their wires
+  ([next#733]).
 
 - The architecture diagram of the syntax moves from the docstring of
   `discopy.abc` to the syntax page of the docs, with the sentence that

@@ -1075,7 +1075,7 @@ def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
         (j, _), (_, alignment) = recorder.texts["W"], recorder.texts["n"]
         bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
         assert bottom < j < top
-        assert dagger or alignment == "bottom"
+        assert alignment == "bottom"  # Above its wire, reflected or not.
 
 
 def test_frame_sides_have_an_edge_between_two_colours():

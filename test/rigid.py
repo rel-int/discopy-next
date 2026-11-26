@@ -333,4 +333,6 @@ def test_rotations_of_a_box_with_args_turn_its_args():
             .to_drawing()
     # An arg that cannot turn, e.g. a monoidal box, is drawn as it is.
     from discopy import monoidal
-    W(x, x, monoidal.Box('f', 'x', 'x')).r.to_drawing()
+    arg = monoidal.Box('f', 'x', 'x')
+    turned = W(x, x, arg).r
+    assert turned.to_drawing() == W(turned.dom, turned.cod, arg).to_drawing()
