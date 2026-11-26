@@ -11,13 +11,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `neural.diagram` reads a closed map as a network with a trace: `interpret`
   for any map, `of` for a `PeerNet` or `FactorNet` whose round it reproduces,
-  `legs` for its state, and `wiring.ports` numbers the ports ([next#TBD]).
+  `legs` for its state, and `wiring.ports` numbers the ports ([next#740]).
 
 - `neural.diagram.stack` sends the layer of boxes that share a module to one
   box on a leading node axis, and the wiring between layers to an index
   gather, one box per degree: the stacked image of a `FactorNet` is its
   round, with a number of boxes that does not grow with the graph
-  ([next#TBD]).
+  ([next#740]).
 
 - `actegory.Action` is a strict right action of a monoidal category of
   parameters on a category of data, with its unit, multiplication and
@@ -25,43 +25,43 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   over it, whose reparametrisations are arrows of the parameters: the
   self-action gives back `para.Markov`, and `Action.deterministic` lets
   Python functions act on Kleisli channels, so that weights tie by copying
-  in a cartesian category whatever the data ([next#TBD]).
+  in a cartesian category whatever the data ([next#740]).
 
 - `neural.equivariant` computes the linear layers between permutation
   representations of a finite group that commute with it, with one weight per
   orbit of the group on pairs of points: `tying` is the orbit of each pair,
   `Dense` the layer on tensors with channels, `layer` the layer as a
   parametric map of `neural` networks and `equivariance` the distance of a
-  function to commuting with the group ([next#TBD]).
+  function to commuting with the group ([next#740]).
 
 - `neural.factorised` computes equivariant layers along the construction of
   the group instead of on a dense matrix, checked equal to `Dense` in outputs
   and gradients: `realise` picks `Pooling` for a side of one point, else
-  `Dense`, and `layer(..., fast=True)` uses it ([next#TBD]).
+  `Dense`, and `layer(..., fast=True)` uses it ([next#740]).
 
 - `neural.factorised.Kronecker` computes the equivariant layers of the natural
   action of a product of chains, i.e. of symmetric groups, of the cyclic group
   of order two and of their imprimitive wreath products and powers, along the
   axes of the points, recognised by `structure` and picked by `realise`
-  ([next#TBD]).
+  ([next#740]).
 
 - `neural.factorised.Factor` has cyclic factors, so that `Kronecker` computes
   the layers of the cyclic groups and of their products with chains as a
   correlation along the cyclic axes, directly or by the fast Fourier transform
-  from `Kronecker.fft_from` points ([next#TBD]).
+  from `Kronecker.fft_from` points ([next#740]).
 
 - `neural.factorised.Partitions` computes the equivariant layers of a
   symmetric group between its natural action and its tensor square, in either
   direction or both, with one weight per set partition of the coordinates,
   i.e. Möbius-inverted sums along the diagonals, and `realise` picks it for
-  those actions ([next#TBD]).
+  those actions ([next#740]).
 
 - `neural.factorised` layers make fewer kernel launches per call: `Kronecker`
   gathers its weights only when its `tie` is not the identity, plans the axes
   of its terms once and sums them with `unbind`, and `Partitions` has a float
   `mobius`, plans its
   einsums once and sums the partitions that share an output pattern before
-  spreading them, with outputs and gradients unchanged ([next#TBD]).
+  spreading them, with outputs and gradients unchanged ([next#740]).
 
 - `neural.augment` uses a finite group on the data rather than on the
   weights: `augment` applies one random element to an input and its label as
@@ -69,28 +69,28 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `symmetrise` is the Reynolds average of a function over the group, exact or
   over samples, and `homomorphism` and `is_homomorphism` check that a function
   of points commutes with an action as a homomorphism of `Writer` algebras
-  ([next#TBD]).
+  ([next#740]).
 
 - `neural.augment.strictness` is the largest distance to commuting with the
   group of a parametric `neural` network over random draws of its weights, a
   parametric map being a strict homomorphism exactly when it commutes for
-  every value of its weights ([next#TBD]).
+  every value of its weights ([next#740]).
 
 - `group.Action.trivial` is the action of a group on a number of points that
   fixes each of them, which tensors with any action of the group
-  ([next#TBD]).
+  ([next#740]).
 - `neural.datatype` has `Datatype`, the constructors of a polynomial
   endofunctor, with the diagrams of its terms (lists, trees), and `Algebra`,
   one image for each constructor whose fold of a term is a functor, tied by
   one copy of the parameter per constructor in parametric categories: the
   recursive networks of Categorical Deep Learning, Appendix J
-  ([next#TBD]).
+  ([next#740]).
 
 - `neural.datatype` has `Machine`, a Mealy, Moore or unfolding cell with its
   feedback and its unrolling through `discopy.stream`, and `Coalgebra`, one
   image for each box of the cell whose unrolled image is tied by one copy of
   the parameter: the recurrent networks of Categorical Deep Learning, Figure 1
-  ([next#TBD]).
+  ([next#740]).
 
 - `neural.datatype` has `Algebra.lift`, `Algebra.lift_cell`, `Algebra.unitality` and
   `Algebra.associativity`, the free monad on parametric maps and the cells of
@@ -99,7 +99,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   folds of a datatype given by a map from the parameter to itself and the
   parameter of the algebra, whose axioms are checked as equations: the
   squares of Categorical Deep Learning, Appendix F and J, the copy being the
-  tied fold ([next#TBD]).
+  tied fold ([next#740]).
 
 - `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
   between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
@@ -108,7 +108,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   parameters and of their coparameters, decided by `para.isomorphic`, an
   isomorphism of hypergraphs that keeps the boundary in order, so that the
   laws of every para category that failed for want of a reparametrisation
-  now hold modulo it ([next#TBD]).
+  now hold modulo it ([next#740]).
 
 - `para.Cell` is a 2-cell of parametric maps as data, a reparametrisation
   between parallel maps, with `Cell.id`, `Cell.reparam`, vertical composition
@@ -117,12 +117,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   parameters and of their coparameters, decided by `para.isomorphic`, an
   isomorphism of hypergraphs that keeps the boundary in order, so that the
   laws of every para category that failed for want of a reparametrisation
-  now hold modulo it ([next#TBD]).
+  now hold modulo it ([next#740]).
 
 - `neural.network.Unroll(rounds, sequence=True)`, and the `sequence` option of
   `Network.unroll`, `to_function` and `to_lens`, read a trace as a stream: the
   network from one input per round to one output per round, the state threaded
-  from zeros ([next#TBD]). The default is unchanged.
+  from zeros ([next#740]). The default is unchanged.
 - `feedback.Feedforward` is the dual of `feedback.Feedback`, a bubble whose
   memory goes from `mem` to `mem.delay()`: the dagger of a feedback is the
   feedforward of the dagger of its argument and back, and `Trace` subclasses
@@ -673,7 +673,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `scalar_sliding`, `braid_naturality`, `trace_dinaturality_left`,
   `trace_dinaturality_right`, `sliding` and `transpose_contravariance`, now
   hold modulo invertible 2-cells, i.e. permutations of the parameters, and
-  `messages.PARA_REPARAM` is removed ([next#TBD]).
+  `messages.PARA_REPARAM` is removed ([next#740]).
 
 - `split_memory` and `memory_size` move from `abc.MonoidalCategory` to
   `abc.FeedbackCategory`, so a monoidal category that is not a feedback
@@ -2794,9 +2794,9 @@ for the changelog of `1.2.1` and earlier.
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
-[next#TBD]: https://github.com/rel-int/discopy-next/pulls
+[next#740]: https://github.com/rel-int/discopy-next/pull/740
 [next#722]: https://github.com/rel-int/discopy-next/issues/722
-[next#TBD]: https://github.com/rel-int/discopy-next/pull/TBD
+[next#740]: https://github.com/rel-int/discopy-next/pull/TBD
 [next#701]: https://github.com/rel-int/discopy-next/issues/701
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#723]: https://github.com/rel-int/discopy-next/pull/723
@@ -2812,7 +2812,6 @@ for the changelog of `1.2.1` and earlier.
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
-[next#TBD]: https://github.com/rel-int/discopy-next/pulls
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
