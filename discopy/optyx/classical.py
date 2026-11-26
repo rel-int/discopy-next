@@ -230,11 +230,9 @@ class BitControlledGate(Channel):
                 | self.default_gate.free_symbols
 
         def to_tree(self) -> dict:
-            tree = {
-                'factory': factory_name(BitControlledGate),
-                'control_gate': self.control_gate.to_tree(),
-                'default_gate': self.default_gate.to_tree(),
-            }
+            tree = {'factory': factory_name(BitControlledGate),
+                    'control_gate': self.control_gate.to_tree(),
+                    'default_gate': self.default_gate.to_tree()}
             if self.is_dagger:
                 tree['is_dagger'] = True
             if self.classical:
@@ -243,12 +241,10 @@ class BitControlledGate(Channel):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        return cls(
-            from_tree(tree['control_gate']),
-            from_tree(tree['default_gate']),
-            is_dagger=tree.get('is_dagger', False),
-            classical=tree.get('classical', False),
-        )
+        return cls(from_tree(tree['control_gate']),
+                   from_tree(tree['default_gate']),
+                   is_dagger=tree.get('is_dagger', False),
+                   classical=tree.get('classical', False))
 
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
@@ -330,22 +326,14 @@ class ClassicalBox(CQMap):
     Base class for classical boxes.
     """
     def to_tree(self) -> dict:
-        return {
-            'factory': factory_name(type(self)),
-            'name': self.name,
-            'density_matrix': self.density_matrix.to_tree(),
-            'dom': self.dom.to_tree(),
-            'cod': self.cod.to_tree(),
-        }
+        return {'factory': factory_name(type(self)), 'name': self.name,
+                'density_matrix': self.density_matrix.to_tree(),
+                'dom': self.dom.to_tree(), 'cod': self.cod.to_tree()}
 
     @classmethod
     def from_tree(cls, tree: dict):
-        return cls(
-            tree['name'],
-            from_tree(tree['density_matrix']),
-            from_tree(tree['dom']),
-            from_tree(tree['cod']),
-        )
+        return cls(tree['name'], from_tree(tree['density_matrix']),
+                   from_tree(tree['dom']), from_tree(tree['cod']))
 
 
 class Scalar(ClassicalBox):
@@ -782,12 +770,9 @@ class Z(ClassicalBox):
             f"{len(self.cod)}, {self.phase!r})"
 
     def to_tree(self) -> dict:
-        return {
-            'factory': factory_name(type(self)),
-            'n_legs_in': len(self.dom),
-            'n_legs_out': len(self.cod),
-            'phase': self.phase,
-        }
+        return {'factory': factory_name(type(self)),
+                'n_legs_in': len(self.dom), 'n_legs_out': len(self.cod),
+                'phase': self.phase}
 
     @classmethod
     def from_tree(cls, tree: dict):
@@ -936,10 +921,8 @@ class BinaryMatrix(ControlChannel):
         return f"{factory_name(type(self))}({matrix})"
 
     def to_tree(self) -> dict:
-        return {
-            'factory': factory_name(type(self)),
-            'matrix': self.density_matrix.matrix.tolist(),
-        }
+        return {'factory': factory_name(type(self)),
+                'matrix': self.density_matrix.matrix.tolist()}
 
     @classmethod
     def from_tree(cls, tree: dict):
