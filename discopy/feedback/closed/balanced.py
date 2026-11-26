@@ -8,11 +8,15 @@ with braids, twists and feedback, whose wires carry a time step, see
 With the delay the identity, it is a balanced traced closed category, the
 setting of :cite:t:`Hasegawa09`: a balanced traced category is closed if and
 only if its embedding into :class:`discopy.interaction.Int` has a right
-adjoint. It is the braided, and not merely braided, notion of trace,
-:cite:t:`Selinger10` (Section 5.3), and the categorical model of the braided
-lambda calculus of :cite:t:`Hasegawa21`. A :mod:`discopy.ribbon` category is
-one where the exponential of ``x`` is its dual, and the ribbon combinatory
-algebras of :cite:t:`HasegawaEtAl24` are the reflexive objects of one.
+adjoint (his Theorem 4.1). It is the balanced, and not merely braided,
+notion of trace: :cite:t:`Selinger10` (Section 5.5) calls braided traced
+categories somewhat unnatural, coherent only up to regular isotopy, and
+balanced ones (Section 5.6) those coherent up to framed isotopy. A
+:mod:`discopy.ribbon` category is one where the exponential of ``x`` is its
+dual: the braided linear lambda calculus of :cite:t:`Hasegawa21` and the
+framed tangles are both interpreted in the ribbon combinatory algebras of
+:cite:t:`HasegawaLechenne24`, which are the reflexive objects of a ribbon
+category, and balanced combinatory algebras with a trace combinator.
 There is no plain ``closed.balanced`` level: its braids and twists come from
 :mod:`discopy.feedback.balanced`.
 

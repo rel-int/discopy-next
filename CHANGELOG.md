@@ -595,6 +595,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `closed.markov`. The old names keep no alias, and a tree or pickle saved
   under them does not load ([next#743]).
 
+- The hierarchy of `docs/adr/0014-traced-levels-with-duals.md`, drawn in
+  the architecture diagram of the docs by `docs/architecture.py`:
+  `abc.BiclosedCategory` is `abc.ClosedMonoidalCategory` and
+  `abc.ClosedCategory` is `abc.ClosedSymmetricCategory`, with no alias.
+  `feedback.closed.monoidal`, `feedback.closed.balanced` and
+  `feedback.closed.symmetric` are the free traced categories over the closed
+  levels, and `pivotal`, `ribbon`, `compact` and `frobenius` sit under them:
+  their delay is the identity by default, so their feedback is their
+  `Trace`, a box of its own that `Diagram.open_traces` sends to a cap, the
+  diagram and a cup, as `abc.PivotalCategory.trace_duals` says, and
+  `abc.HypergraphCategory.spider_delay` says the delay preserves spiders. A
+  category whose trace is not a box, e.g. tensors, circuits or optyx
+  channels, takes `Diagram.dual_trace` as its `trace_factory`.
+  `linear.symmetric` takes the swap for the exchange and `linear.markov` the
+  copy and discard of a banged object for its contraction and weakening,
+  with no default bang ([next#744]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -2786,6 +2803,7 @@ for the changelog of `1.2.1` and earlier.
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
 [next#737]: https://github.com/rel-int/discopy-next/pull/737
 [next#743]: https://github.com/rel-int/discopy-next/pull/743
+[next#744]: https://github.com/rel-int/discopy-next/pull/744
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
