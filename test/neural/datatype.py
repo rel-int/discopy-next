@@ -987,14 +987,14 @@ def test_lax_algebra_units(shape, children, make, datatype):
     square = algebra.associativity(shape, *children)
     assert para.same(
         square.cod, algebra(datatype.substitute(shape, *children)))
-    right = algebra.lift_cell(shape, *[algebra.unitality()] * holes)\
-        >> para.Cell.id(algebra(shape))
+    right = algebra.lift_reparam(shape, *[algebra.unitality()] * holes)\
+        >> para.Reparam.id(algebra(shape))
     right = right.then(algebra.associativity(shape, *[Diagram.id(S)] * holes))
-    left = para.Cell.id(algebra(shape)) >> algebra.unitality()
+    left = para.Reparam.id(algebra(shape)) >> algebra.unitality()
     left = left.then(algebra.associativity(Diagram.id(S), shape))
-    for cell in (left, right):
-        assert para.same(cell.cod, algebra(shape))
-        assert markov.Equation(cell.inside, Diagram.id(P))
+    for alpha in (left, right):
+        assert para.same(alpha.cod, algebra(shape))
+        assert markov.Equation(alpha.inside, Diagram.id(P))
 
 
 def pastings(algebra, datatype, shape, children, grandchildren):
@@ -1006,10 +1006,11 @@ def pastings(algebra, datatype, shape, children, grandchildren):
     terms = [term for group in grandchildren for term in group]
     substituted = [datatype.substitute(child, *group)
                    for child, group in zip(children, grandchildren)]
-    left = (para.Cell.id(algebra.lift(shape, *holes))
+    left = (para.Reparam.id(algebra.lift(shape, *holes))
             >> algebra.associativity(shape, *children)).then(
         algebra.associativity(datatype.substitute(shape, *children), *terms))
-    right = (algebra.lift_cell(shape, *squares) >> para.Cell.id(algebra(shape))
+    right = (algebra.lift_reparam(shape, *squares)
+             >> para.Reparam.id(algebra(shape))
              ).then(algebra.associativity(shape, *substituted))
     return left, right
 
@@ -1037,8 +1038,8 @@ def test_only_the_copy_is_forced():
     built = []
     for outs in product(range(2), repeat=4):
         try:
-            para.Cell(square.dom, square.cod, Diagram.from_function(
-                outs, two))
+            para.Reparam(square.dom, Diagram.from_function(outs, two),
+                         square.cod)
         except AxiomError:
             continue
         built.append(outs)
@@ -1060,7 +1061,7 @@ def holds(algebra, kappa):
         dom = algebra.lift(shape, *folds, param=hom.param)\
             >> algebra(shape)
         try:
-            para.Cell(dom, hom(value), kappa)
+            para.Reparam(dom, kappa, hom(value))
         except AxiomError:
             return False
     return True
@@ -1097,13 +1098,13 @@ def test_well_typed_negative_and_box_witness():
     algebra = diagram_algebra()
     square = algebra.associativity(cons, LISTS.term(chain(0)))
     with pytest.raises(AxiomError):
-        para.Cell(square.dom, square.cod, Box("k", P, P @ P))
+        para.Reparam(square.dom, Box("k", P, P @ P), square.cod)
     hom = LaxHomomorphism(algebra, spider([0, 1, 0]))
     top, fold = hom.top(chain(1)), hom(chain(1))
     assert hom.preservation(chain(1)).cod == fold
-    para.Cell(top, fold, hom.kappa)
+    para.Reparam(top, hom.kappa, fold)
     with pytest.raises(AxiomError):
-        para.Cell(top, fold, shift(2))
+        para.Reparam(top, shift(2), fold)
 
 
 def test_oplax_is_rejected_at_constructors_only():
@@ -1111,16 +1112,17 @@ def test_oplax_is_rejected_at_constructors_only():
     discard = Diagram.discard(P)
     projections = [Diagram.id(P) @ discard, discard @ Diagram.id(P)]
     nil_square = algebra.associativity(nil).dom
-    para.Cell(algebra(LISTS.term(chain(0))), nil_square, discard @ P)
+    para.Reparam(algebra(LISTS.term(chain(0))), discard @ P, nil_square)
     cons_square = algebra.associativity(cons, LISTS.term(chain(0))).dom
     node_square = trees.associativity(
         node, TREES.term(LEAF), TREES.term(LEAF)).dom
     for projection in projections:
         with pytest.raises(AxiomError):
-            para.Cell(algebra(LISTS.term(chain(1))), cons_square, projection)
+            para.Reparam(
+                algebra(LISTS.term(chain(1))), projection, cons_square)
         with pytest.raises(AxiomError):
-            para.Cell(trees(TREES.term(("Node", LEAF, LEAF))),
-                      node_square, projection)
+            para.Reparam(trees(TREES.term(("Node", LEAF, LEAF))),
+                         projection, node_square)
 
 
 def fits(top, fold):
@@ -1128,7 +1130,7 @@ def fits(top, fold):
     found = set()
     for outs in KAPPAS:
         try:
-            para.Cell(top, fold, spider(outs))
+            para.Reparam(top, spider(outs), fold)
         except AxiomError:
             continue
         found.add(outs)
@@ -1167,18 +1169,18 @@ def test_strict_needs_an_empty_parameter_by_types():
 def test_box_reparametrisation_lifts_into_one_hole_only():
     algebra, trees = diagram_algebra(), tree_diagram_algebra()
     r = Box("r", Ty("R"), P)
-    cell = para.Cell.reparam(algebra(LISTS.term(chain(0))), r)
-    lifted = algebra.lift_cell(cons, cell)
+    alpha = para.Reparam.of(algebra(LISTS.term(chain(0))), r)
+    lifted = algebra.lift_reparam(cons, alpha)
     assert lifted.inside == r
-    assert para.same(lifted.cod, algebra.lift(cons, cell.cod))
-    leaf_cell = para.Cell.reparam(trees(TREES.term(LEAF)), r)
+    assert para.same(lifted.cod, algebra.lift(cons, alpha.cod))
+    leaf = para.Reparam.of(trees(TREES.term(LEAF)), r)
     with pytest.raises(AxiomError):
-        trees.lift_cell(node, leaf_cell, leaf_cell)
+        trees.lift_reparam(node, leaf, leaf)
 
 
 @pytest.mark.parametrize("deterministic", [False, True])
 def test_a_box_in_kappa_fails_both_axioms(deterministic):
-    """ A box is not discarded (h >> ! != !) nor copied in the free quotient. """
+    """ A box is neither discarded (h >> ! != !) nor copied. """
     box = Box("h", P, P, is_deterministic=deterministic)
     hom = LaxHomomorphism(diagram_algebra(), Diagram.copy(P) >> P @ box)
     assert not hom.unitality() and not hom.multiplication()
@@ -1201,16 +1203,16 @@ def test_lax_errors():
     wide = fold.reparam(Diagram.from_function([0], P @ P))
     with pytest.raises(ValueError, match="one parameter"):
         trees.lift(node, fold, wide)
-    with pytest.raises(ValueError, match="got a cell"):
-        trees.lift(node, fold, para.Cell.id(fold))
+    with pytest.raises(ValueError, match="got a reparametrisation"):
+        trees.lift(node, fold, para.Reparam.id(fold))
     with pytest.raises(ValueError, match="got a map"):
-        trees.lift_cell(node, para.Cell.id(fold), fold)
+        trees.lift_reparam(node, para.Reparam.id(fold), fold)
     with pytest.raises(ValueError, match="at least one"):
-        trees.lift_cell(node)
+        trees.lift_reparam(node)
     with pytest.raises(ValueError, match="Expected a param"):
         algebra.lift(nil)
     with pytest.raises(ValueError, match="same inside"):
-        trees.lift_cell(node, para.Cell.id(fold), para.Cell.reparam(
+        trees.lift_reparam(node, para.Reparam.id(fold), para.Reparam.of(
             fold, Box("r", Ty("R"), P)))
     with pytest.raises(ValueError, match="Expected 1 maps"):
         algebra.lift(cons, fold, fold)

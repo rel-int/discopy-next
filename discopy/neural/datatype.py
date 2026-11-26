@@ -34,14 +34,14 @@ The parameter of an algebra is copied into every constructor, which makes
 the fold of a term a lax algebra of the free monad of the datatype, in the
 2-category of parametric maps (*Categorical Deep Learning*, Appendix F and J).
 The free monad is the free category of the terms with holes, so every
-coherence law is a :class:`discopy.para.Cell` between maps of a given shape,
+coherence law is a :class:`discopy.para.Reparam` between maps of a given shape,
 checked by the equation of its category: :meth:`Algebra.lift` is the free
-monad on maps, :meth:`Algebra.lift_cell` on cells, :meth:`Algebra.unitality`
-and :meth:`Algebra.associativity` are the cells of the lax algebra, copies of
-the parameter, and :class:`LaxHomomorphism` the folds of a datatype that are
-lax and not tied.
+monad on maps, :meth:`Algebra.lift_reparam` on reparametrisations,
+:meth:`Algebra.unitality` and :meth:`Algebra.associativity` are the
+reparametrisations of the lax algebra, copies of the parameter, and
+:class:`LaxHomomorphism` the folds of a datatype that are lax and not tied.
 The base is the free copy-discard category: no box is copyable or
-discardable, so a reparametrisation by a box is rejected by every cell
+discardable, so a reparametrisation by a box is rejected by every law
 where the parameter is copied twice or discarded.
 
 Dually, a coalgebra :math:`S \\to F(S)` of :math:`F(S) = (I \\to O \\times S)`
@@ -491,9 +491,9 @@ class Algebra:
             param : The parameter of the maps, needed when there are none.
 
         Raises:
-            ValueError : If the algebra is not parametric, a map is a cell,
-                there are no maps and no parameter, the parameters differ or
-                the maps are not as many as the holes.
+            ValueError : If the algebra is not parametric, a map is a
+                reparametrisation, there are no maps and no parameter, the
+                parameters differ or the maps are not as many as the holes.
 
         Example
         -------
@@ -510,8 +510,8 @@ class Algebra:
         >>> assert F.lift(nil, param=P).param == P
         """
         require_parametric(self)
-        if any(isinstance(m, para.Cell) for m in maps):
-            raise ValueError("Expected maps, got a cell.")
+        if any(isinstance(m, para.Reparam) for m in maps):
+            raise ValueError("Expected maps, got a reparametrisation.")
         params = [m.param for m in maps] + ([] if param is None else [param])
         if not params:
             raise ValueError("Expected a param for a term without holes.")
@@ -521,24 +521,25 @@ class Algebra:
                       lambda atom: self.cod.id(self.functor(atom)))
         return inside.reparam(self.cod.category.copy(params[0], len(maps)))
 
-    def lift_cell(self, term: markov.Diagram, *cells, param=None
-                  ) -> para.Cell:
+    def lift_reparam(self, term: markov.Diagram, *reparams, param=None
+                     ) -> para.Reparam:
         """
-        The free monad on a cell: the cells have the same inside, so has the
-        result, which is a cell from the lift of their domains to the lift of
-        their codomains. The equation of the cell rejects it unless the
-        inside commutes with the copy.
+        The free monad on a reparametrisation: they have the same inside, so
+        has the result, which goes from the lift of their domains to the lift
+        of their codomains. Its equation rejects it unless the inside
+        commutes with the copy.
 
         Parameters:
             term : A diagram of constructors, with holes.
-            cells : A cell for each hole, with one inside, at least one.
+            reparams : A reparametrisation for each hole, with one inside, at
+                least one.
             param : The parameter of the domains, as in :meth:`lift`. The
-                codomains have their own, that of the cells.
+                codomains have their own, that of the reparametrisations.
 
         Raises:
-            ValueError : If the algebra is not parametric, there are no cells,
-                a cell is a map, the insides differ or the cells are not as
-                many as the holes.
+            ValueError : If the algebra is not parametric, there are no
+                reparametrisations, one is a map, the insides differ or they
+                are not as many as the holes.
 
         Example
         -------
@@ -550,24 +551,26 @@ class Algebra:
         >>> z = Net(Ty(), S, Box("z", P, S), param=P)
         >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
         >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
-        >>> cell = para.Cell.id(F(nil))
-        >>> assert F.lift_cell(cons, cell).inside == Diagram.id(P)
+        >>> alpha = para.Reparam.id(F(nil))
+        >>> assert F.lift_reparam(cons, alpha).inside == Diagram.id(P)
         """
         require_parametric(self)
-        if not cells:
-            raise ValueError("Expected at least one cell.")
-        if not all(isinstance(c, para.Cell) for c in cells):
-            raise ValueError("Expected cells, got a map.")
-        if any(c.inside != cells[0].inside for c in cells):
-            raise ValueError("Expected cells with the same inside.")
-        return para.Cell(
-            self.lift(term, *(c.dom for c in cells), param=param),
-            self.lift(term, *(c.cod for c in cells)), cells[0].inside)
+        if not reparams:
+            raise ValueError("Expected at least one reparametrisation.")
+        if not all(isinstance(r, para.Reparam) for r in reparams):
+            raise ValueError("Expected reparametrisations, got a map.")
+        if any(r.inside != reparams[0].inside for r in reparams):
+            raise ValueError(
+                "Expected reparametrisations with the same inside.")
+        return para.Reparam(
+            self.lift(term, *(r.dom for r in reparams), param=param),
+            reparams[0].inside,
+            self.lift(term, *(r.cod for r in reparams)))
 
-    def unitality(self) -> para.Cell:
+    def unitality(self) -> para.Reparam:
         """
-        The unit of the lax algebra: a cell from the identity of the carrier
-        to the fold of the hole, which discards the parameter
+        The unit of the lax algebra: a reparametrisation from the identity of
+        the carrier to the fold of the hole, which discards the parameter
         (*Categorical Deep Learning*, Definition F.2).
 
         Raises:
@@ -588,17 +591,16 @@ class Algebra:
         """
         require_parametric(self)
         hole = self.cod.id(self.functor(self.datatype.carrier))
-        return para.Cell.reparam(
-            hole, self.cod.category.copy(self.param, 0))
+        return para.Reparam.of(hole, self.cod.category.copy(self.param, 0))
 
     def associativity(self, term: markov.Diagram, *children: markov.Diagram
-                      ) -> para.Cell:
+                      ) -> para.Reparam:
         """
         The multiplication of the lax algebra at a term with holes and a
-        child for each hole: a cell from the fold of the term of the folds of
-        the children to the fold of the substituted term, which copies the
-        parameter (*Categorical Deep Learning*, Definition F.2). At a
-        constructor, it is the square of Appendix J.
+        child for each hole: a reparametrisation from the fold of the term of
+        the folds of the children to the fold of the substituted term, which
+        copies the parameter (*Categorical Deep Learning*, Definition F.2). At
+        a constructor, it is the square of Appendix J.
 
         Parameters:
             term : A diagram of constructors, with holes.
@@ -626,7 +628,7 @@ class Algebra:
         folds = [self(child) for child in children]
         dom = self.lift(term, *folds, param=self.param) >> self(term)
         cod = self(self.datatype.substitute(term, *children))
-        return para.Cell(dom, cod, self.cod.category.copy(self.param, 2))
+        return para.Reparam(dom, self.cod.category.copy(self.param, 2), cod)
 
 
 @dataclass
@@ -719,16 +721,16 @@ class LaxHomomorphism:
         """
         return self.top(value).reparam(self.kappa)
 
-    def preservation(self, value: tuple) -> para.Cell:
+    def preservation(self, value: tuple) -> para.Reparam:
         """
-        The square of a closed term: a cell from its :meth:`top` to its fold,
-        which holds by construction.
+        The square of a closed term: a reparametrisation from its :meth:`top`
+        to its fold, which holds by construction.
 
         Parameters:
             value : A nested tuple, see :meth:`Datatype.term`.
         """
         top = self.top(value)
-        return para.Cell(top, self(value), self.kappa)
+        return para.Reparam(top, self.kappa, self(value))
 
     def unitality(self) -> markov.Equation:
         """
