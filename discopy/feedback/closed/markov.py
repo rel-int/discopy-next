@@ -434,7 +434,7 @@ for law in (
         messages.CURRY_HAS_NO_DAGGER))
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function
-Diagram.swap_factory = Swap
+Diagram.swap_factory = Diagram.braid_factory = Swap
 Diagram.permutation_factory = Permutation
 Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
     feedback.structural_boxes(Diagram, Box)

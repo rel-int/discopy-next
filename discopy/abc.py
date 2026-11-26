@@ -1821,7 +1821,10 @@ class PivotalCategory[
     """
     A pivotal category is a :class:`RigidCategory` where the left and right
     adjoints coincide, hence it is also a :class:`TracedCategory`, a planar
-    one with no swap to yank.
+    one with no swap to yank: a feedback category whose delay is the
+    identity by default, as the twist of a :class:`CompactCategory` is. A
+    category may choose another delay, a strong monoidal endofunctor, which
+    preserves duals.
     """
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
@@ -1837,6 +1840,22 @@ class PivotalCategory[
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, L[B], L[A]]]:
         """ The left and right transposes are equal. """
         return cls.equation_factory(f.transpose(left=True), f.transpose())
+
+    @axiom
+    def trace_duals[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, Γ, Δ]]:
+        """
+        The trace is a cap, then the morphism, then a cup: the trace stays a
+        primitive, as a spider stays distinct from a cup, and this law says
+        what it is.
+        """
+        n = len(mem)
+        dom, cod = f.dom[:len(f.dom) - n], f.cod[:len(f.cod) - n]
+        return cls.equation_factory(
+            f.trace(n),
+            dom @ cls.caps(mem, mem.r) >> f @ mem.r
+            >> cod @ cls.cups(mem, mem.r))
 
 
 class BraidedCategory[
@@ -2647,6 +2666,17 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """ Spiders do not see the order of their legs. """
         merge = cls.spiders(2, 1, x)
         return cls.equation_factory(cls.swap(x, x) >> merge, merge)
+
+    @axiom
+    def spider_delay[X: Atom[C0], M: Nat, N: Nat](
+            cls, x: Var[C0, X], m: Var[int, M], n: Var[int, N]
+    ) -> Equation[Hom[C1, Delay[C1, Repeat[X, M]], Delay[C1, Repeat[X, N]]]]:
+        """
+        The delay preserves the spiders, i.e. it is a hypergraph functor:
+        the identity delay does, and so must one a semantic category chooses.
+        """
+        return cls.equation_factory(
+            cls.spiders(m, n, x).delay(), cls.spiders(m, n, x.delay()))
 
     @rule
     def spider[X: Atom[C0], M: Nat, N: Nat](

@@ -717,10 +717,11 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "linear.monoidal.Laxator": "c(x, y)",
     "closed.monoidal.{Eval,Coeval}": "c(x << y)",
     "closed.symmetric.{Eval,Coeval} closed.markov.{Eval,Coeval}": "c(x << y)",
-    "feedback.closed.markov.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "feedback.closed.{monoidal,balanced,symmetric,markov}.{Eval,Coeval}":
+    "c(x << y, time_step=1)",
     "closed.{monoidal,symmetric,markov}.Curry":
     "c(box(c, x @ y, x, v), 1, False)",
-    "feedback.closed.markov.Curry":
+    "feedback.closed.{monoidal,balanced,symmetric,markov}.Curry":
     "c(box(c, x @ y, x, v), 1, False, time_step=1)",
     "closed.monoidal.Constant": 'c("c", x, data=v)',
     "{closed.markov,lambek.categorial}.Constant "

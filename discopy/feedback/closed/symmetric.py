@@ -56,13 +56,14 @@ from discopy import closed, cmap, feedback, hypergraph, messages, symmetric
 from discopy.abc import (
     BalancedTracedCategory, DaggerMonoidalCategory, TracedCategory)
 from discopy.cat import factory
-from discopy.feedback.closed import balanced, monoidal
+from discopy.feedback.closed import balanced
+from discopy.feedback.closed import monoidal as planar
 # pylint: disable-next=unused-import
 from discopy.symmetric import Equation  # noqa: F401
 from discopy.utils import factory_name
 
 
-class Wire(monoidal.Wire, closed.symmetric.Wire):
+class Wire(planar.Wire, closed.symmetric.Wire):
     """ A symmetric closed feedback object, with a time step. """
 
 
@@ -70,7 +71,7 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(closed.symmetric.Ty, monoidal.Ty):
+class Ty(closed.symmetric.Ty, planar.Ty):
     """
     A symmetric closed feedback type is a symmetric closed type and a
     feedback type.
@@ -127,9 +128,10 @@ class Diagram(
     trace_superposing_left = TracedCategory.trace_superposing_left
     trace_superposing_right = TracedCategory.trace_superposing_right
     currying_symmetry = closed.symmetric.Diagram.currying_symmetry
+    twist_factory = vars(symmetric.Diagram)["twist_factory"]
 
-    to_compact = monoidal.Diagram.to_compact
-    to_drawing = monoidal.Diagram.to_drawing
+    to_compact = planar.Diagram.to_compact
+    to_drawing = planar.Diagram.to_drawing
 
 
 class Box(balanced.Box, closed.symmetric.Box, feedback.symmetric.Box,
@@ -181,7 +183,7 @@ class Functor(closed.symmetric.Functor, balanced.Functor,
         cod (Category) : The codomain of the functor.
     """
     dom = cod = Diagram
-    __call__ = monoidal.Functor.__call__
+    __call__ = planar.Functor.__call__
 
 
 Diagram.functor_factory = Functor

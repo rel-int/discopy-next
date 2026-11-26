@@ -229,7 +229,8 @@ class Eval(Timed, closed.monoidal.Eval):
     >>> print(Eval(y >> x, left=False).delay())
     Eval(y >> x).d
     """
-    serialised_attrs = closed.monoidal.Eval.serialised_attrs + ("time_step", )
+    serialised_attrs = closed.monoidal.Eval.serialised_attrs\
+        + ("*", "time_step")
 
     def __getnewargs__(self):
         """ The arguments of the constructor, which a delay reads. """
@@ -239,7 +240,7 @@ class Eval(Timed, closed.monoidal.Eval):
 class Coeval(Timed, closed.monoidal.Coeval):
     """ The coevaluation of an exponential type, with a time step. """
     serialised_attrs = closed.monoidal.Coeval.serialised_attrs\
-        + ("time_step", )
+        + ("*", "time_step")
     __getnewargs__ = Eval.__getnewargs__
 
 

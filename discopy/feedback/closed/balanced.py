@@ -53,7 +53,7 @@ from discopy import cmap, feedback, hypergraph, messages
 from discopy.abc import BalancedTracedCategory, DaggerMonoidalCategory
 from discopy.cat import factory
 from discopy.feedback import balanced
-from discopy.feedback.closed import monoidal
+from discopy.feedback.closed import monoidal as planar
 # pylint: disable-next=unused-import
 from discopy.feedback.closed.monoidal import (  # noqa: F401
     Wire, HeadOb, TailOb, Ty, Exp, Over, Under, Equation)
@@ -61,7 +61,7 @@ from discopy.feedback.closed.monoidal import (  # noqa: F401
 
 @factory
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
-class Diagram(monoidal.Diagram, balanced.Diagram, BalancedTracedCategory):
+class Diagram(planar.Diagram, balanced.Diagram, BalancedTracedCategory):
     """
     A balanced closed feedback diagram is a closed feedback diagram and a
     balanced feedback diagram.
@@ -75,19 +75,19 @@ class Diagram(monoidal.Diagram, balanced.Diagram, BalancedTracedCategory):
     yanking = BalancedTracedCategory.yanking.failing(messages.FREE_YANKING)
 
 
-class Box(monoidal.Box, balanced.Box, Diagram):
+class Box(planar.Box, balanced.Box, Diagram):
     """ A balanced closed feedback box is a closed and a balanced box. """
 
 
-class Eval(monoidal.Eval, Box):
+class Eval(planar.Eval, Box):
     """ The evaluation of an exponential type, with a time step. """
 
 
-class Coeval(monoidal.Coeval, Box):
+class Coeval(planar.Coeval, Box):
     """ The coevaluation of an exponential type, with a time step. """
 
 
-class Curry(monoidal.Curry, Box):
+class Curry(planar.Curry, Box):
     """ The currying of a balanced closed feedback diagram. """
 
 
@@ -99,11 +99,11 @@ class Twist(balanced.Twist, Box):
     """ A twist in a balanced closed feedback diagram. """
 
 
-class Sum(monoidal.Sum, balanced.Sum, Box):
+class Sum(planar.Sum, balanced.Sum, Box):
     """ A balanced closed feedback sum. """
 
 
-class Functor(monoidal.Functor, balanced.Functor):
+class Functor(planar.Functor, balanced.Functor):
     """
     A balanced closed feedback functor is a closed feedback functor and a
     balanced feedback functor.
