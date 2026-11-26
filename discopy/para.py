@@ -19,11 +19,6 @@ Summary
     Symmetric
     Reparam
     UpToPermutation
-    isomorphic
-    labelled
-    profile
-    permutations
-    BOUND
     Traced
     Markov
     Comarkov
@@ -31,6 +26,18 @@ Summary
     Feedback
     Compact
     Hypergraph
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        isomorphic
+        labelled
+        profile
+        same
 
 Axioms
 ------
@@ -66,12 +73,8 @@ Reparametrisation precomposes the parameters, contravariantly:
 >>> assert f.reparam(r).param == p_
 >>> assert f.reparam(s >> r) == f.reparam(r).reparam(s)
 
-A reparametrisation is a 2-cell, a :class:`Reparam` between parallel maps, and
-the laws that fail on the nose hold up to the invertible ones, i.e. the
-permutations of the parameters and of the coparameters, see
-:class:`UpToPermutation`, decided by an isomorphism of hypergraphs, see
-:func:`isomorphic`; the search of :class:`Reparam` for them is bounded by
-``BOUND = 6`` parameter wires, see :func:`permutations`:
+A reparametrisation is a 2-cell, a :class:`Reparam`, and the laws that fail
+on the nose hold up to the invertible ones, see :class:`UpToPermutation`:
 
 >>> alpha = Reparam.of(f, r)
 >>> assert alpha.cod == f.reparam(r) and not alpha.is_invertible
@@ -144,12 +147,9 @@ free category with feedback of :cite:t:`KatisEtAl02`.
 >>> w = Symmetric(y, z, Box('w', y @ s, z @ s), s, s)
 >>> assert (v >> w).param == (v >> w).copar == s @ s
 
-This is not the state monad: para(copara(C)) is *not* the same as
-State(C, S): in the first case the composition of two maps tensors their
-co/parameters while in the second it chains them through. Each map above
-brings its own hidden space and `v >> w` carries `s @ s`, where the state
-category of maps `x @ s -> y @ s` in the underlying category chains one
-fixed `s` through, `w` reading the state `v` wrote:
+This is not the state monad: `v >> w` carries `s @ s`, one hidden space for
+each map, where the state category chains one fixed `s` through, `w` reading
+the state `v` wrote:
 
 >>> state = v.inside >> w.inside
 >>> assert state.dom == x @ s and state.cod == z @ s
@@ -177,7 +177,6 @@ Parametric maps compose like layers of a neural network, e.g. over
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Self
 
@@ -193,74 +192,11 @@ from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, from_tree, get_origin, resolve_factory, unbiased)
 
-BOUND = 6
-""" The most parameter wires :func:`permutations` searches. """
-
-
-def indices(dom: tuple, cod: tuple, free: tuple | None = None) -> Iterator:
-    """
-    The orderings `xs` of the positions of `dom` with ``dom[xs[i]] == cod[i]``,
-    yielded lazily in lexicographic order, so the identity first if any.
-
-    Parameters:
-        dom : The wires to reorder.
-        cod : The wires they have to land on.
-        free : The positions of `dom` not yet used, all by default.
-
-    Example
-    -------
-    >>> assert list(indices("aab", "aba")) == [(0, 2, 1), (1, 2, 0)]
-    >>> assert not list(indices("ab", "aa")) and not list(indices("ab", "a"))
-    """
-    free = tuple(range(len(dom))) if free is None else free
-    if not cod:
-        if not free:
-            yield ()
-        return
-    for i in free:
-        rest = tuple(j for j in free if j != i)
-        if dom[i] == cod[0]:
-            yield from ((i, *xs) for xs in indices(dom, cod[1:], rest))
-
-
-def permutations(category, dom, cod) -> Iterator:
-    """
-    The permutations `dom -> cod` of the wires of `dom` in a `category`, i.e.
-    the invertible reparametrisations, yielded lazily and the identity first.
-    At most ``BOUND`` (6) wires are searched: over longer types only the
-    identity of ``dom == cod`` is yielded, so a permutation of 7 wires is not
-    recognised, a documented limitation. The orderings that do not land on
-    `cod` are discarded before any diagram is built; those of repeated wires
-    are all kept, since they route the wires to different places.
-
-    Parameters:
-        category : The underlying category, with its swaps.
-        dom : The type to permute.
-        cod : The type the permutation has to land on.
-
-    Example
-    -------
-    >>> from discopy.symmetric import Diagram, Ty
-    >>> x, y = Ty('x'), Ty('y')
-    >>> (perm, ) = permutations(Diagram, x @ y, y @ x)
-    >>> assert perm.to_hypergraph() == Diagram.swap(x, y).to_hypergraph()
-    >>> assert list(permutations(Diagram, x @ y, x @ x)) == []
-    >>> assert next(permutations(Diagram, x @ x, x @ x)) == Diagram.id(x @ x)
-    >>> assert len(list(permutations(Diagram, x @ x, x @ x))) == 2
-    """
-    if len(dom) > BOUND:
-        if dom == cod:
-            yield category.id(dom)
-        return
-    for xs in indices(tuple(dom), tuple(cod)):
-        yield category.permutation(xs, dom)
-
 
 def same(left: Symmetric, right: Symmetric) -> bool:
     """
-    Whether two parametric maps are equal up to the equation of their
-    underlying category, i.e. they have the same boundary, parameters and
-    coparameters, and their insides have the same image in the quotient.
+    Whether two parametric maps are equal by the
+    :meth:`Symmetric.equation_factory` of their category.
 
     Parameters:
         left : A parametric map.
@@ -274,19 +210,15 @@ def same(left: Symmetric, right: Symmetric) -> bool:
     >>> assert same(f, f >> Symmetric.id(y))
     >>> assert not same(f, f.reparam(Box('r', y, p)))
     """
-    category = type(left).category
-    return (left.dom, left.cod, left.param, left.copar)\
-        == (right.dom, right.cod, right.param, right.copar)\
-        and quotient(category, left.inside) == quotient(category, right.inside)
+    return bool(type(left).equation_factory(left, right))
 
 
 def isomorphic(left, right, n_dom: int, n_cod: int) -> bool:
     """
     Whether two hypergraphs are isomorphic by an isomorphism that fixes the
-    first `n_dom` ports of the domain and the first `n_cod` ports of the
-    codomain in order, and is free on the others: these are the parameter and
-    coparameter ports, which it may permute among those of the same type,
-    since a port is typed by the spider it is attached to.
+    first `n_dom` domain ports and the first `n_cod` codomain ports and may
+    permute the others, i.e. the parameters and coparameters, among those of
+    the same type.
 
     Parameters:
         left : A hypergraph.
@@ -312,9 +244,8 @@ def isomorphic(left, right, n_dom: int, n_cod: int) -> bool:
 def labelled(hypergraph, n_dom: int, n_cod: int):
     """
     The graph of a hypergraph, see :meth:`Hypergraph.to_graph`, where only
-    the first `n_dom` ports of the domain and the first `n_cod` ports of the
-    codomain keep their position, with the attributes of each node also
-    written as one string, its ``label``.
+    the first `n_dom` domain ports and `n_cod` codomain ports keep their
+    position, with the attributes of each node written as its ``label``.
 
     Parameters:
         hypergraph : A hypergraph.
@@ -346,9 +277,7 @@ def profile(graph) -> list:
     """
     An invariant of labelled directed graphs under isomorphism: the sorted
     list of the label of each node with the sorted labels of its predecessors
-    and of its successors, one round of colour refinement. Graphs with
-    different profiles are not isomorphic, so it rejects most pairs before
-    any search, e.g. those with a box that differs by name or data.
+    and of its successors, which rejects most pairs before any search.
 
     Parameters:
         graph : A ``networkx.DiGraph`` with a ``label`` on each node.
@@ -374,24 +303,14 @@ class UpToPermutation:
     """
     A parametric map compared up to the permutations of its parameter wires
     and of its coparameter wires, i.e. up to an invertible 2-cell, see
-    :class:`Reparam`: a 2-cell acts on the parameters by precomposition, as
-    :meth:`Symmetric.reparam`, and on the coparameters by postcomposition,
-    as :meth:`Symmetric.recopar`. Two maps are equal when they have the same
-    domain and codomain, the same parameter wires and the same coparameter
-    wires as multisets, and the inside of one is, up to the equation of the
-    underlying category, that of the other reparametrised by a permutation
-    `sigma` and recoparametrised by a permutation `tau`, chosen independently.
-    This is decided with no bound and no enumeration of the permutations, by
-    an isomorphism of the hypergraphs of the insides (networkx's VF2, itself
-    a backtracking search on the graphs) that fixes the boundary and may
-    permute the parameter and coparameter ports of the same type, see
-    :func:`isomorphic`;
-    wires of different types, e.g. adjoint ones, are never exchanged.
-
-    The underlying category has to be one of diagrams, e.g. ``Symmetric``,
-    ``Markov`` or ``Compact``, where `permutation` and `quotient` make sense.
-    Over a category of functions, equal maps are equal and comparing others
-    may raise a ``TypeError``, since their parameters cannot be rerouted.
+    :class:`Reparam`. Two maps are equal when they have the same domain and
+    codomain, the same parameter and coparameter wires as multisets, and
+    their insides, up to the equation of the underlying category, differ by
+    a permutation of the parameter ports and one of the coparameter ports.
+    This is decided by an isomorphism of hypergraphs fixing the boundary, see
+    :func:`isomorphic`; wires of different types, e.g. adjoint ones, are never
+    exchanged. The underlying category has to be one of diagrams, e.g.
+    ``Symmetric``, ``Markov`` or ``Compact``.
 
     Parameters:
         para : The parametric map to compare.
@@ -681,24 +600,14 @@ class Reparam:
     A reparametrisation, i.e. a 2-cell `dom => cod` between parallel
     parametric maps: a morphism `inside : cod.param -> dom.param` of the
     underlying category such that ``cod == dom.reparam(inside)`` up to its
-    equation, see :meth:`Symmetric.reparam`. Reparametrisations compose
-    vertically with :meth:`then`, horizontally with ``>>`` and in parallel
-    with ``@``, and those of :class:`Symmetric` with an invertible `inside`
-    are the isomorphisms, up to which :class:`UpToPermutation` compares maps.
-    They compose when their maps are equal up to the equation of the
-    category, see :func:`same`, not only on the nose: the check is in the
-    free category, so none relates two maps that agree only on the values of
-    a model, e.g. two compiled networks. A reparametrisation covers the
-    parameters only and needs parallel maps with the same coparameter: the
-    invertible 2-cells of maps with coparameters, which also permute those,
-    are only searched by :class:`UpToPermutation`. The invertible ones are
-    searched among the permutations of at most ``BOUND`` (6) parameter wires,
-    see :meth:`is_invertible`.
-
-    Reparametrisations are frozen dataclasses, so that
-    ``eval(repr(alpha)) == alpha`` holds whenever the names in the repr of
-    the maps are in scope, e.g. in the test of this module, where they are
-    imported from :mod:`discopy.symmetric`.
+    equation, see :meth:`Symmetric.reparam`. They compose vertically with
+    :meth:`then`, horizontally with ``>>`` and in parallel with ``@``, and the
+    invertible ones, see :attr:`is_invertible`, are the isomorphisms up to
+    which :class:`UpToPermutation` compares maps. Maps compose when they are
+    equal up to the equation of the category, see :func:`same`, so none
+    relates two maps that agree only on a model, e.g. two compiled networks.
+    A reparametrisation covers the parameters only and needs parallel maps
+    with the same coparameter.
 
     Parameters:
         dom (Symmetric) : The parametric map to reparametrise.
@@ -763,8 +672,7 @@ class Reparam:
         Vertical composition: reparametrisations compose contravariantly,
         i.e. `alpha.then(beta).inside == beta.inside >> alpha.inside`. The
         codomain of this one and the domain of `other` need only be equal up
-        to the equation of the underlying category, see :func:`same`, e.g.
-        two maps with the same hypergraph.
+        to the equation of the underlying category, see :func:`same`.
 
         Parameters:
             other : The reparametrisation starting from the codomain of this
@@ -832,16 +740,12 @@ class Reparam:
     @property
     def is_invertible(self) -> bool:
         """
-        Whether the reparametrisation is a permutation of the parameter wires
-        up to the equation of the category. At most ``BOUND`` (6) wires are
-        searched as :func:`permutations` does, so that a permutation of 7
-        wires is not recognised: a documented limitation.
+        Whether `inside` is the identity with its outputs permuted among the
+        wires of one type, see :func:`isomorphic`.
         """
-        category = type(self.dom).category
-        target = quotient(category, self.inside)
-        return any(
-            quotient(category, perm) == target for perm in permutations(
-                category, self.inside.dom, self.inside.cod))
+        category, inside = type(self.dom).category, self.inside
+        return isomorphic(quotient(category, category.id(inside.dom)),
+                          quotient(category, inside), len(inside.dom), 0)
 
 
 class Traced(Symmetric, TracedCategory):
@@ -985,16 +889,7 @@ class Feedback(Markov, FeedbackCategory):
     """
     Parametric maps over a feedback underlying `category` form a feedback
     category, with :meth:`delay` applied to all five components.
-
-    The laws hold up to :class:`UpToPermutation`, as in every para category,
-    since feedback never connects parameters to coparameters.
     """
-    bifunctoriality = SymmetricCategory.bifunctoriality.modulo(
-        UpToPermutation)
-    scalar_sliding = SymmetricCategory.scalar_sliding.modulo(
-        UpToPermutation)
-    braid_naturality = SymmetricCategory.braid_naturality.modulo(
-        UpToPermutation)
     joining = FeedbackCategory.joining.failing(
         messages.FREE_FEEDBACK)
     sliding = FeedbackCategory.sliding.failing(

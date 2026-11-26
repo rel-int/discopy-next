@@ -6,8 +6,8 @@ from pytest import raises
 
 from discopy import closed, comarkov, compact, frobenius, markov
 from discopy.para import (
-    BOUND, Closed, Comarkov, Compact, Feedback, Hypergraph, Markov, Reparam,
-    Symmetric, Traced, UpToPermutation, permutations, same)
+    Closed, Comarkov, Compact, Feedback, Hypergraph, Markov, Reparam,
+    Symmetric, Traced, UpToPermutation, same)
 from discopy import python
 from discopy.python import Function
 from discopy.symmetric import Box, Diagram, Ty
@@ -292,35 +292,15 @@ def test_reparam_invertible():
     h = Symmetric(x, y, Box('h', x, y), Ty())
     assert not Reparam.of(h, Box('discard', p, Ty())).is_invertible
     assert Reparam.id(h).is_invertible
-    assert list(permutations(Diagram, p @ q, q @ p))
-    assert not list(permutations(Diagram, p @ q, p @ p))
-    assert not list(permutations(Diagram, p, Ty()))
-    assert next(permutations(Diagram, p @ p, p @ p)) == Diagram.id(p @ p)
-    assert len(list(permutations(Diagram, p @ p, p @ p))) == 2
 
 
-def shifted(n):
-    """ The reparametrisation by the cyclic shift of n wires. """
-    wires = Ty(*"abcdefghij"[:n])
-    shift = Diagram.permutation([*range(1, n), 0], wires)
-    box = Symmetric(x, y, Box('t', x @ shift.cod, y), shift.cod)
-    return Reparam.of(box, shift)
-
-
-def test_bound():
-    assert BOUND == 6
-    assert shifted(BOUND).is_invertible
-    assert not shifted(BOUND + 1).is_invertible
-    wide = Ty(*"abcdefg")
-    assert len(list(permutations(Diagram, wide, wide))) == 1
-    assert not list(permutations(Diagram, wide, wide[1:] @ wide[:1]))
-    assert Reparam.id(shifted(BOUND + 1).dom).is_invertible
-
-
-def test_permutations_are_lazy():
-    perms = permutations(Diagram, p @ q @ p, p @ q @ p)
-    assert iter(perms) is perms
-    assert next(perms) == Diagram.id(p @ q @ p)
+def test_invertible_has_no_bound():
+    X, W = markov.Ty('X'), markov.Ty(*"abcdefg")
+    shift = markov.Diagram.permutation([*range(1, 7), 0], W)
+    box = Markov(X, X, markov.Box('t', X @ shift.cod, X), shift.cod)
+    assert Reparam.of(box, shift).is_invertible
+    tied = Markov(X, X, markov.Box('t', X @ W @ W, X), W @ W)
+    assert not Reparam.of(tied, markov.Diagram.copy(W)).is_invertible
 
 
 def test_laws_up_to_permutation():
