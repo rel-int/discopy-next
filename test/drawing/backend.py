@@ -1098,7 +1098,7 @@ def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
         draw_as_frame=True, draw_vertically=True)
     for dagger in (False, True):
         recorder = Recorder()
-        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        drawing = Box.from_args(frame, dom=Ty(), cod=n).to_drawing()
         (drawing.dagger() if dagger else drawing).draw(backend=recorder)
         j, alignment = recorder.texts["W"]
         bottom, top = min(recorder.frames[0]), max(recorder.frames[0])

@@ -72,6 +72,7 @@ from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
+    export,
     assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
     factory_name, from_tree)
 
@@ -103,10 +104,10 @@ class Diagram(monoidal.Diagram, BraidedCategory):
     inverse_then_braid = BraidedCategory.inverse_then_braid.failing(
         messages.NO_BRAID_GROUP)
 
-    box_factory: ClassVar[type["Box"]]
-    braid_factory: ClassVar[type["Braid"]]
-    functor_factory: ClassVar[type["Functor"]]
-    sum_factory: ClassVar[type["Sum"]]
+    Box: ClassVar[type["monoidal.Box"]]
+    Braid: ClassVar[type["Braid"]]
+    Functor: ClassVar[type["Functor"]]
+    Sum: ClassVar[type["monoidal.Sum"]]
     scalar_sliding = SpacialCategory.scalar_sliding.failing(
         messages.FREE_SCALAR)
 
@@ -121,9 +122,9 @@ class Diagram(monoidal.Diagram, BraidedCategory):
 
         Note
         ----
-        This calls :func:`hexagon` and :attr:`braid_factory`.
+        This calls :func:`hexagon` and :attr:`Braid`.
         """
-        return hexagon(cls, cls.braid_factory)(left, right)
+        return hexagon(cls, cls.Braid)(left, right)
 
     def simplify(self) -> Diagram:
         """
@@ -201,18 +202,8 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         return match.substitute(target)  # ty: ignore[invalid-return-type]
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A braided box is a monoidal box in a braided diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Braid(BinaryBoxConstructor, Box):
+@Diagram.slot
+class Braid(BinaryBoxConstructor, Diagram.Box):
     """
     The braiding of atomic types :code:`left` and :code:`right`.
 
@@ -234,7 +225,7 @@ class Braid(BinaryBoxConstructor, Box):
         name = type(self).__name__\
             + (f"({right}, {left})" if is_dagger else f"({left}, {right})")
         dom, cod = left @ right, right @ left
-        Box.__init__(
+        Diagram.Box.__init__(
             self, name, dom, cod, is_dagger=is_dagger, draw_as_braid=True)
         BinaryBoxConstructor.__init__(self, left, right)
 
@@ -309,17 +300,7 @@ def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     return method
 
 
-class Sum(monoidal.Sum, Box):
-    """
-    A braided sum is a monoidal sum and a braided box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Functor(monoidal.Functor):
     """
     A braided functor is a monoidal functor that preserves braids.
@@ -340,9 +321,6 @@ class Functor(monoidal.Functor):
         return super().__call__(other)
 
 
-Diagram.box_factory = Box
-Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
-Diagram.sum_factory = Sum
 Id = Diagram.id
 
 
@@ -357,4 +335,6 @@ TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
 Term = Variable | Constant | Application | Kappa
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

@@ -175,7 +175,7 @@ class Ob(Serialisable["Ob"]):
     >>> x, x_, y = Ob('x'), Ob('x'), Ob('y')
     >>> assert x == x_ and x != y
     """
-    equation_factory: ClassVar[type["Equation"]]
+    Equation: ClassVar[type["Equation"]]
 
     def __setstate__(self, state):
         if "name" not in state and "_name" in state:
@@ -265,7 +265,7 @@ class FreeCategory(Category):
 
     Note
     ----
-    Subclasses are assumed to have a ``generator_factory`` class attribute
+    Subclasses are assumed to have an ``Atom`` class attribute
     for the type of the generators and an arrow factory ``ar`` whose
     constructor accepts ``inside``, ``dom``, ``cod`` and ``_scan`` as
     keyword arguments. New arrows are always built internally through that
@@ -275,14 +275,14 @@ class FreeCategory(Category):
     signature without breaking the machinery below.
     """
 
-    generator_factory: type = None  # ty: ignore[invalid-assignment]
+    Atom: type = None  # ty: ignore[invalid-assignment]
 
     def __init__(self, inside, dom, cod, _scan=True):
         dom, cod = map(self.cast_ob, (dom, cod))
         self.dom, self.cod, self.inside = dom, cod, tuple(inside)
         if _scan:
             for generator in self.inside:
-                assert_isinstance(generator, self.generator_factory)
+                assert_isinstance(generator, self.Atom)
             previous = dom
             for generator in self.inside:
                 if previous != generator.dom:
@@ -373,9 +373,9 @@ class FreeCategory(Category):
     def generator_strategy(cls, *, dom=None, cod=None):
         """
         Generate the generators of the free category as terms of it, from
-        ``dom`` to ``cod`` when given: a path of one :attr:`generator_factory`.
+        ``dom`` to ``cod`` when given: a path of one :attr:`Atom`.
         """
-        return cls.generator_factory.strategy(dom=dom, cod=cod).map(
+        return cls.Atom.strategy(dom=dom, cod=cod).map(
             lambda generator: cls.ar(
                 inside=(generator, ), dom=generator.dom, cod=generator.cod))
 
@@ -457,8 +457,9 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     automatically cast. This means one can use e.g. ``int`` instead of ``Ob``,
     see :class:`monoidal.Nat`.
     """
-    box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
+    Box: ClassVar[type["Box"]]
+    Sum: ClassVar[type["Sum"]]
+    Functor: ClassVar[type["Functor"]]
     ob = Ob
 
     @classmethod
@@ -476,7 +477,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate the boxes of the category, see :meth:`Box.strategy`. """
-        return cls.box_factory.strategy(dom=dom, cod=cod)
+        return cls.Box.strategy(dom=dom, cod=cod)
 
     def __setstate__(self, state):
         if '_dom' in state:  # Backward compatibility
@@ -519,10 +520,10 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         x(lambda x0: x0)
         >>> assert (f >> g).to_term().eval() == f >> g
         """
-        return self.term_factory.from_diagram(self)
+        return self.TermBase.from_diagram(self)
 
     def __add__(self, other):
-        return self.sum_factory((self, )) + other
+        return self.Sum((self, )) + other
 
     def __radd__(self, other):
         return self if other == 0 else NotImplemented
@@ -588,7 +589,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> assert Arrow.id('x') == Id('x') == Id(Ob('x'))
         """
         if any(isinstance(other, Sum) for other in others):
-            return self.sum_factory((self, )).then(*others)
+            return self.Sum((self, )).then(*others)
         return super().then(*others)
 
     @classmethod
@@ -600,7 +601,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
             dom : The domain of the empty sum.
             cod : The codomain of the empty sum.
         """
-        return cls.sum_factory((), dom, cod)
+        return cls.Sum((), dom, cod)
 
     @classmethod
     def algebra(cls, monad: Monad, dom: Ob, cod: Ob) -> Algebra:
@@ -646,12 +647,12 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
             f"sum {dom} -> {cod}", cls,
             lambda arrows: sum(arrows, cls.zero(dom, cod)))
 
-    def bubble(self, *args, **kwargs) -> Box:
+    def bubble(self, *args, **kwargs) -> "Box":
         """
         The box with this arrow and some others as ``args``, i.e. an operator
         on homsets, see :meth:`Box.from_args`.
         """
-        return self.box_factory.from_args(self, *args, **kwargs)
+        return self.Box.from_args(self, *args, **kwargs)
 
     @property
     def free_symbols(self) -> "set[sympy.Symbol]":
@@ -769,6 +770,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
 
 
 @total_ordering
+@Arrow.slot
 class Box(Arrow):
     """
     A box is an arrow with a :code:`name` and the tuple of just itself inside.
@@ -1102,6 +1104,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
                    is_dagger=is_dagger, **kwargs)
 
 
+@Arrow.slot
 class Sum(Box):
     """
     A sum is a tuple of arrows :code:`terms` with the same domain and
@@ -1149,7 +1152,7 @@ cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom
         cod = terms[0].cod if cod is None else cod
-        unit = self.sum_factory((), dom, cod) if terms else None
+        unit = self.Sum((), dom, cod) if terms else None
         for arrow in terms:
             assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
         self.terms = terms
@@ -1193,8 +1196,8 @@ cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
     def __add__(self, other):
         assert_isparallel(self, other)
         other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        return self.sum_factory(
+            else self.Sum((other, ))
+        return self.Sum(
             (*self.terms, *other.terms), self.dom, self.cod)
 
     def __iter__(self):
@@ -1207,13 +1210,13 @@ cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
     def then(self, other):
         assert_iscomposable(self, other)
         other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
+            else self.Sum((other, ))
         terms = tuple(f.then(g) for f in self.terms for g in other.terms)
-        return self.sum_factory(terms, self.dom, other.cod)
+        return self.Sum(terms, self.dom, other.cod)
 
     def dagger(self):
         terms = tuple(f.dagger() for f in self.terms)
-        return self.sum_factory(terms, self.cod, self.dom)
+        return self.Sum(terms, self.cod, self.dom)
 
     @property
     def free_symbols(self):
@@ -1221,10 +1224,10 @@ cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
 
     def subs(self, *args):
         terms = tuple(f.subs(*args) for f in self.terms)
-        return self.sum_factory(terms, self.dom, self.cod)
+        return self.Sum(terms, self.dom, self.cod)
 
     def lambdify(self, *symbols, **kwargs):
-        return lambda *xs: self.sum_factory(
+        return lambda *xs: self.Sum(
             tuple(box.lambdify(*symbols, **kwargs)(*xs) for box in self.terms),
             dom=self.dom, cod=self.cod)
 
@@ -1245,6 +1248,7 @@ cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
 Bubble = Box.from_args
 
 
+@Arrow.slot
 @factory
 class Functor(Category[type, "Functor"]):
     """
@@ -1495,7 +1499,7 @@ which JSON cannot hold.
         return result
 
 
-Arrow.generator_factory = Arrow.box_factory = Box
+Arrow.Atom = Box
 
 
 @factory
@@ -1695,10 +1699,8 @@ which JSON cannot hold.
         return cls(*map(from_tree, tree['terms']), symbols=tree['symbols'])
 
 
-Ob.equation_factory = Equation
-Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
-Arrow.sum_factory = Sum
-Arrow.functor_factory = Functor
+Ob.Equation = Equation
+Arrow.Equation = Equation  # ty: ignore[invalid-assignment]
 Id = Arrow.id
 
 
@@ -1971,7 +1973,7 @@ class AlphaEquivalence(Equivalence):
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
         """ A term is alpha-equivalent to its renamings, however many. """
-        return cls.equivalence_factory(*terms)
+        return cls.Equation(*terms)
 
     @axiom
     def alpha_soundness(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -2036,16 +2038,16 @@ class TermBase(Serialisable, AlphaEquivalence):
     >>> statement = let(Constant(f)(a), lambda b: Constant(g)(b))
     >>> assert statement.normal_form() == Constant(g)(Constant(f)(a))
     """
-    freevars: list[Variable]
+    freevars: list["Variable"]
     stack: Any
     offset: int | None
     cod: Any
     serialised_attrs: ClassVar[tuple[str, ...]]
     functor: ClassVar[Functor]
-    variable_factory: ClassVar[type[Variable]]
-    constant_factory: ClassVar[type[Constant]]
-    application_factory: ClassVar[type[Application]]
-    kappa_factory: ClassVar[type[Kappa]]
+    Variable: ClassVar[type[Variable]]
+    Constant: ClassVar[type[Constant]]
+    Application: ClassVar[type[Application]]
+    Kappa: ClassVar[type[Kappa]]
 
     strategy = classmethod(AlphaEquivalence.strategy.__func__)
 
@@ -2150,7 +2152,7 @@ class TermBase(Serialisable, AlphaEquivalence):
 
     def identity(self, functor):
         """ The identity functor of the :attr:`category` by default. """
-        return functor or self.category.functor_factory.id(self.category)
+        return functor or self.category.Functor.id(self.category)
 
     def draw(self, **params):
         """ Draw the diagram of the term, see :meth:`eval`. """
@@ -2180,7 +2182,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         """ The term applied to each of the arguments in turn. """
         return reduce(
             lambda func, arg: self.highest(
-                func.application_factory, arg.application_factory)(func, arg),
+                func.Application, arg.Application)(func, arg),
             arguments, self)
 
     def substitute(
@@ -2240,7 +2242,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         >>> a = Variable('a', x)
         >>> assert TermBase.bind([a], a) == x(lambda a: a)
         """
-        factory, variables = cls.kappa_factory, tuple(variables)
+        factory, variables = cls.Kappa, tuple(variables)
         if factory.place(variables, body) is not None:
             return factory(variables, body)
         rest = set(body.freevars).difference(variables)
@@ -2275,9 +2277,9 @@ class TermBase(Serialisable, AlphaEquivalence):
         """
         variables: list[Variable] = []
         for typ in self.wires(self.stack):
-            variables.append(self.variable_factory.fresh(
+            variables.append(self.Variable.fresh(
                 "x", typ, self, *variables))
-        return self.kappa_factory(
+        return self.Kappa(
             tuple(variables), self(*variables), self.offset)\
             if variables else self
 
@@ -2289,11 +2291,11 @@ class TermBase(Serialisable, AlphaEquivalence):
         Parameters:
             diagram : The arrow to read.
         """
-        variable = cls.variable_factory("x0", diagram.dom)
+        variable = cls.Variable("x0", diagram.dom)
         body = reduce(
-            lambda term, box: cls.constant_factory(box)(term),
+            lambda term, box: cls.Constant(box)(term),
             diagram.inside, variable)
-        return cls.kappa_factory((variable, ), body)
+        return cls.Kappa((variable, ), body)
 
     @classmethod
     def generate(cls, cod: Ob, choices: Sequence[int], types: Sequence[Ob],
@@ -2331,7 +2333,7 @@ class TermBase(Serialisable, AlphaEquivalence):
             return options[next(left, 0) % len(options)]
 
         def constant(dom, cod):
-            return cls.constant_factory(Box(f"c{next(fresh)}", dom, cod))
+            return cls.Constant(Box(f"c{next(fresh)}", dom, cod))
 
         def state(variable, cod, level):
             kind = choose(("leaf", "apply", "let"))
@@ -2341,17 +2343,17 @@ class TermBase(Serialisable, AlphaEquivalence):
             typ = choose(types)
             if kind == "apply":
                 return constant(typ, cod)(state(variable, typ, level))
-            bound = cls.variable_factory(
+            bound = cls.Variable(
                 cls.bound_name(letters, level, variable), typ)
-            return cls.kappa_factory(
+            return cls.Kappa(
                 (bound, ), state(bound, cod, level + 1))(
                     state(variable, typ, level))
 
         dom = choose(types)
         if choose((True, False)):
-            variable = cls.variable_factory(cls.bound_name(letters, 0), dom)
-            return cls.kappa_factory((variable, ), state(variable, cod, 1))
-        return state(cls.variable_factory("v0", dom), cod, 0)
+            variable = cls.Variable(cls.bound_name(letters, 0), dom)
+            return cls.Kappa((variable, ), state(variable, cod, 1))
+        return state(cls.Variable("v0", dom), cod, 0)
 
     @staticmethod
     def bound_name(letters: Sequence[str | None], level: int,
@@ -2431,9 +2433,9 @@ class TermBase(Serialisable, AlphaEquivalence):
         exactly when their arrows are equal.
         """
         long = term.expand()
-        closed = cls.kappa_factory(tuple(long.freevars), long)\
+        closed = cls.Kappa(tuple(long.freevars), long)\
             if long.freevars else long
-        return cls.equivalence_factory(
+        return cls.Equation(
             term.eval().to_term(), closed.normal_form())
 
     @axiom
@@ -2641,7 +2643,7 @@ type y.
             return redex
         rest = tuple(x for x in func.variables if x != func.head)
         body = func.body.substitute({func.head: arg})
-        result = func.kappa_factory(rest, body) if rest else body
+        result = func.Kappa(rest, body) if rest else body
         return result if result.context == redex.context else redex
 
     def alpha_eq_under(self, scopes, others, depth=0):
@@ -2757,7 +2759,7 @@ class Kappa(TermBase):
         variables, body = list(self.variables), self.body
         for i, variable in enumerate(variables):
             if variable in captured:
-                variables[i] = self.variable_factory.fresh(
+                variables[i] = self.Variable.fresh(
                     variable.name, variable.cod, body, *inside.values())
                 body = body.substitute({variable: variables[i]})
         left = dict.fromkeys(
@@ -2810,9 +2812,9 @@ class Kappa(TermBase):
             if len(names) != len(wires):
                 raise ValueError(
                     f"Expected {len(wires)} variables, got {len(names)}")
-            variables = tuple(map(cls.variable_factory, names, wires))
+            variables = tuple(map(cls.Variable, names, wires))
             body = function(*variables)
-            level = cls.highest(cls, body.kappa_factory)
+            level = cls.highest(cls, body.Kappa)
             try:
                 return level(variables, body, offset)
             except ValueError:
@@ -2862,7 +2864,7 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
     >>> assert term == y(lambda b: g(b))(f(Variable('a', x)))
     >>> assert term.eval() == f.box >> g.box
     """
-    kappa = expression.kappa_factory.from_callable(expression.cod, offset)
+    kappa = expression.Kappa.from_callable(expression.cod, offset)
     return kappa(body)(expression)
 
 
@@ -2906,22 +2908,22 @@ def kappa_calculus(
     >>> assert Kappa.__mro__[2].__module__ == "discopy.monoidal"
     """
     parents: list = list(dict.fromkeys(
-        base.term_factory for base in diagram.__bases__
-        if hasattr(base, "term_factory")))
+        base.TermBase for base in diagram.__bases__
+        if hasattr(base, "TermBase")))
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
     base = subclass("TermBase", parents, module, TERMS["TermBase"].format(
         level))
     base.strategy = classmethod(TermBase.strategy.__func__)
-    base.functor = diagram.functor_factory.id(diagram)
+    base.functor = diagram.Functor.id(diagram)
     for name in ("Variable", "Constant", "Application", "Kappa"):
-        attr = f"{name.lower()}_factory"
+        attr = name
         former = subclass(name, [base] + [
             getattr(parent, attr) for parent in parents
         ], module, TERMS[name].format(level))
         setattr(base, attr, former)
-    base.kappa_factory.above, diagram.term_factory = None, base
-    return (base, base.variable_factory, base.constant_factory,
-            base.application_factory, base.kappa_factory)
+    base.Kappa.above, diagram.TermBase = None, base
+    return (base, base.Variable, base.Constant,
+            base.Application, base.Kappa)
 
 
 class AlphaEquation(AbstractEquation):
@@ -2942,7 +2944,7 @@ class AlphaEquation(AbstractEquation):
 
 
 TermBase.functor = Functor.id(Arrow)
-Arrow.term_factory = TermBase
-TermBase.equivalence_factory = AlphaEquation
-TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
-TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+Arrow.TermBase = TermBase
+TermBase.Equation = AlphaEquation
+TermBase.Variable, TermBase.Constant = Variable, Constant
+TermBase.Application, TermBase.Kappa = Application, Kappa

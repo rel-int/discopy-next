@@ -105,6 +105,7 @@ from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
+    export,
     AxiomError, assert_isinstance, factory_key, factory_name, from_tree)
 
 
@@ -143,19 +144,19 @@ class Ty(biclosed.Ty, feedback.Ty):
     .. image:: /_static/closed/diagram.svg
         :align: center
     """
-    generator_factory = Wire
-    product_factory: ClassVar[type["Product"]]
-    variable_factory: ClassVar[type["Variable"]]
-    constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[Callable[..., "Application"]]
-    abstraction_factory: ClassVar[type["Abstraction"]]
+    Atom = Wire
+    Product: ClassVar[type["Product"]]
+    Variable: ClassVar[type["Variable"]]
+    Constant: ClassVar[type["Constant"]]
+    Application: ClassVar[Callable[..., "Application"]]
+    Abstraction: ClassVar[type["Abstraction"]]
 
     def __mul__(self, other: Ty) -> Ty:
         return self.product(other)
 
     def product(self, *others: Ty) -> Ty:
         "The :class:`Product` of a type with a tuple of ``others``."
-        return self.ar(self.product_factory(self, *others))
+        return self.ar(self.Product(self, *others))
 
     @property
     def is_product(self):
@@ -191,7 +192,7 @@ class Ty(biclosed.Ty, feedback.Ty):
         """
         return biclosed.Functor(
             ob_map=lambda x: cls(x.inside[0].name),
-            cod=cls.constant_factory.functor.cod)(old)
+            cod=cls.Constant.functor.cod)(old)
 
 
 class Exp(Wire, biclosed.Exp):
@@ -349,20 +350,20 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     A diagram applied to another post-composes their tensor with an `Eval`.
     """
-    pack_factory: ClassVar[type["Pack"]]
-    unpack_factory: ClassVar[type["Unpack"]]
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    copy_factory: ClassVar[type["Copy"]]
-    function_factory: ClassVar[type["Function"]]
-    swap_factory: ClassVar[type["Swap"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    curry_factory: ClassVar[type["Curry"]]
-    eval_factory: ClassVar[type["Eval"]]
-    coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
-    discard_factory: ClassVar[type["Discard"]]
-    sum_factory: ClassVar[type["Sum"]]
+    Pack: ClassVar[type["Pack"]]
+    Unpack: ClassVar[type["Unpack"]]
+    Box: ClassVar[type["Box"]]
+    Functor: ClassVar[type["Functor"]]
+    Copy: ClassVar[type["markov.Copy"]]
+    Function: ClassVar[type["Function"]]
+    Swap: ClassVar[type["markov.Swap"]]
+    Permutation: ClassVar[type["markov.Permutation"]]
+    Curry: ClassVar[type["Curry"]]
+    Eval: ClassVar[type["Eval"]]
+    Coeval: ClassVar[type["Coeval"]]
+    Trace: ClassVar[type["feedback.Trace"]]  # ty: ignore[invalid-type-form]
+    Discard: ClassVar[type["markov.Discard"]]
+    Sum: ClassVar[type["Sum"]]
     ob = Ty
 
     @property
@@ -373,7 +374,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     def ev(cls, base: Ty, exponent: Ty, left: bool = True):
         if not exponent:
             return cls.id(base)
-        return cls.eval_factory(exponent >> base, left=left)
+        return cls.Eval(exponent >> base, left=left)
 
     def to_compact(self) -> Diagram:
         """
@@ -411,7 +412,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         return result
 
     def to_drawing(self):
-        return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+        return monoidal.Diagram.to_drawing(self, functor=Functor)
 
     dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.CURRY_HAS_NO_DAGGER)
@@ -456,7 +457,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         graph = Hypergraph.from_diagram(self)
         if not graph.is_causal:
             raise ValueError(f"Expected a causal diagram, got {self}")
-        variables = [self.ob.variable_factory(
+        variables = [self.ob.Variable(
             f"x{i}", typ)
                      for i, typ in enumerate(graph.spider_types)]
         outputs = [variables[i] for i in graph.cod_wires]
@@ -486,6 +487,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         return constant(args[0] if len(args) == 1 else Tuple(*args))
 
 
+@Diagram.extend
 class Box(markov.Box, biclosed.Box, Diagram):
     "A closed box is a markov and biclosed box in a closed diagram."
     is_linear = True
@@ -546,6 +548,7 @@ class Timed(Box):
         return super().from_tree(tree).delay(tree.get('time_step', 0))
 
 
+@Diagram.extend
 class Eval(Timed, biclosed.Eval, Box):
     "The evaluation of an exponential type."
     serialised_attrs = biclosed.Eval.serialised_attrs + ("*", "time_step")
@@ -569,6 +572,7 @@ class Eval(Timed, biclosed.Eval, Box):
         return name + feedback.str_delayed(self.time_step)
 
 
+@Diagram.extend
 class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
     serialised_attrs = biclosed.Coeval.serialised_attrs + ("*", "time_step")
@@ -576,6 +580,7 @@ class Coeval(Timed, biclosed.Coeval, Box):
     __str__ = Eval.__str__
 
 
+@Diagram.extend
 class Curry(Timed, biclosed.Curry, Box):
     "The currying of a closed diagram, linear when its argument is."
     serialised_attrs = biclosed.Curry.serialised_attrs + ("time_step", )
@@ -601,11 +606,12 @@ class Curry(Timed, biclosed.Curry, Box):
             return super().to_drawing()
         if not self.n:
             return self.arg.delay(self.time_step).to_drawing()
-        coeval = self.coeval_factory(self.reset().cod, left=self.left)
+        coeval = self.Coeval(self.reset().cod, left=self.left)
         return (self.arg >> coeval).delay(self.time_step).to_drawing()\
             .trace(self.n, left=not self.left)
 
 
+@Diagram.slot
 class Pack(Timed):
     """
     The canonical isomorphism from the tensor of the factors of a
@@ -635,7 +641,7 @@ class Pack(Timed):
         return (product.delay(-self.time_step), )
 
     def dagger(self):
-        return Unpack(*self.__getnewargs__(), time_step=self.time_step)
+        return self.Unpack(*self.__getnewargs__(), time_step=self.time_step)
 
     def __repr__(self):
         product, = self.__getnewargs__()
@@ -655,6 +661,7 @@ class Pack(Timed):
         return cls(from_tree(tree[cls.side]), tree.get('time_step', 0))
 
 
+@Diagram.slot
 class Unpack(Timed):
     """
     The canonical isomorphism from a :class:`Product` type to the tensor of
@@ -679,37 +686,23 @@ class Unpack(Timed):
         super().__init__(f"Unpack({dom})", dom, cod, time_step=time_step)
 
     def dagger(self):
-        return Pack(*self.__getnewargs__(), time_step=self.time_step)
+        return self.Pack(*self.__getnewargs__(), time_step=self.time_step)
 
     __getnewargs__, __repr__ = Pack.__getnewargs__, Pack.__repr__
     to_tree, from_tree = Pack.to_tree, classmethod(Pack.from_tree.__func__)
 
 
+@Diagram.extend
 class Function(markov.Function, Box):
     "A markov function in a closed diagram, which copies or discards."
 
     is_linear = False
 
 
-class Permutation(markov.Permutation, Box):
-    "A permutation in a closed diagram."
+Function.register(Diagram.Permutation)
 
 
-Function.register(Permutation)
-
-
-class Swap(Permutation, markov.Swap, Box):
-    "Symmetric swap in a closed diagram."
-
-
-class Copy(markov.Copy, Function):
-    "A markov copy in a closed category"
-
-
-class Discard(markov.Discard, Copy):
-    "A markov discard in a closed category."
-
-
+@Diagram.extend
 class Sum(markov.Sum, biclosed.Sum, Box):
     """
     A markov sum is a symmetric sum and a markov box,
@@ -725,6 +718,7 @@ class Sum(markov.Sum, biclosed.Sum, Box):
         return all(term.is_linear for term in self.terms)
 
 
+@Diagram.extend
 class Functor(biclosed.Functor, markov.Functor):
     """
     A closed functor is a markov functor that preserves evaluation, currying
@@ -751,16 +745,16 @@ class Functor(biclosed.Functor, markov.Functor):
             return feedback.Functor.__call__(self, other)
         if isinstance(other, Product):
             if hasattr(self.cod.ob, "product"):
-                return self.cod.ob(self.cod.ob.product_factory(
+                return self.cod.ob(self.cod.ob.Product(
                     *map(self, other.factors)))
             return self(self.dom.ob().tensor(*other.factors))
         if isinstance(other, (Pack, Unpack)):
             typ = other.cod if isinstance(other, Pack) else other.dom
             if not hasattr(self.cod.ob, "product"):
                 return self.cod.id(self(typ))
-            if hasattr(self.cod, "pack_factory"):
-                box = self.cod.pack_factory if isinstance(other, Pack)\
-                    else self.cod.unpack_factory
+            if hasattr(self.cod, "Pack"):
+                box = self.cod.Pack if isinstance(other, Pack)\
+                    else self.cod.Unpack
                 return box(self(typ))
         return super().__call__(other)
 
@@ -768,29 +762,15 @@ class Functor(biclosed.Functor, markov.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
     setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
         messages.CURRY_HAS_NO_DAGGER))
-Diagram.copy_factory = Copy
-Diagram.function_factory = Function
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-for cls in (Feedback, Feedforward, Head, Tail):
+for cls in (
+        Diagram.Feedback, Diagram.Feedforward, Diagram.Head, Diagram.Tail):
     cls.is_linear = property(lambda self: self.arg.is_linear)
-Diagram.box_factory = Box
-Diagram.pack_factory = Pack
-Diagram.unpack_factory = Unpack
-Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
-Diagram.coeval_factory = Coeval
-Diagram.discard_factory = Discard
-Diagram.sum_factory = Sum
-Ty.under_factory = Ty.over_factory = staticmethod(Exp)
+Ty.Under = Ty.Over = staticmethod(Exp)
 
 Id = Diagram.id
 
@@ -823,7 +803,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
 
     def __call__(self, other, left=False):
         args = (other, self) if left else (self, other)
-        return self.cod.application_factory(*args)
+        return self.cod.Application(*args)
 
     def compose(self, *others: Term) -> Term:
         """
@@ -853,10 +833,10 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
             if before.cod.base != after.cod.exponent:
                 raise AxiomError(messages.NOT_COMPOSABLE.format(
                     before, after, before.cod.base, after.cod.exponent))
-        var = self.cod.variable_factory.fresh(
+        var = self.cod.Variable.fresh(
             "x", self.cod.exponent, *terms)
         body = reduce(lambda argument, func: func(argument), terms, var)
-        return self.cod.abstraction_factory(var, body)
+        return self.cod.Abstraction(var, body)
 
     def weaken(self, functor: Functor, context=None) -> Diagram:
         """
@@ -971,7 +951,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         """
         functor = biclosed.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda c: cls.ob.constant_factory(
+            ar_map=lambda c: cls.ob.Constant(
                 c.name, functor(c.cod), data=c.data),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
@@ -1044,7 +1024,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         for constant in self.constants:
             if constant not in constants:
                 constants.append(constant)
-        return (strategy or self.strategy_factory)(budget)(
+        return (strategy or self.Strategy)(budget)(
             self, tuple(self.freevars)  # ty: ignore[invalid-argument-type]
             + tuple(constants))
 
@@ -1273,7 +1253,7 @@ class Tuple(Compound):
         dom = self.ob().tensor(*[x.cod for x in self.freevars])
         cod = self.ob()
         if terms:
-            product = self.ob.product_factory(
+            product = self.ob.Product(
                 *[t.cod for t in terms])  # ty: ignore[invalid-argument-type]
             cod = self.ob(product)
         super().__init__(dom, cod)
@@ -1626,7 +1606,7 @@ def let(expression: Term, body: Callable) -> Let:
     if len(varnames) != len(factors):
         raise ValueError(
             f"Expected {len(factors)} variables, got {len(varnames)}")
-    variables = tuple(typ.variable_factory(name, typ)
+    variables = tuple(typ.Variable(name, typ)
                       for name, typ in zip(varnames, factors))
     return Let(expression, variables, body(*variables))
 
@@ -1775,7 +1755,7 @@ class BohmTree:
             result = result(self[i].to_term(len(self.variables)))
         for var in reversed(self.variables[n:]):
             if not isinstance(var, Constant):
-                result = var.cod.abstraction_factory(var, result)
+                result = var.cod.Abstraction(var, result)
         return result  # ty: ignore[invalid-return-type]
 
     def __repr__(self):
@@ -1904,12 +1884,7 @@ class RightmostFirst(LeftmostOutermost):
         return tuple(reversed(range(len(terms))))
 
 
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory = Application
-Ty.abstraction_factory = Abstraction
-Ty.product_factory = Product
-TermBase.strategy_factory = LeftmostOutermost
+TermBase.Strategy = LeftmostOutermost
 TermBase.reduction_strategies = (LeftmostOutermost, RightmostFirst)
 
 for law in sorted(
@@ -1923,3 +1898,11 @@ class Equation(markov.Equation):
 
 
 Bubble = Box.from_args
+
+Ty.Product = Product
+Ty.Constant = Constant
+Ty.Variable = Variable
+Ty.Application = Application
+Ty.Abstraction = Abstraction
+
+export(__name__)

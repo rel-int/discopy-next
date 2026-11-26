@@ -222,7 +222,7 @@ class Symmetric[category](
         messages.PARA_REPARAM)
 
     @classmethod
-    def equation_factory(cls, *terms: Symmetric) -> Equation:
+    def Equation(cls, *terms: Symmetric) -> Equation:
         """
         The equation of a law, compared by the boundary and the hidden spaces
         of its terms and their inside up to the equation of the underlying

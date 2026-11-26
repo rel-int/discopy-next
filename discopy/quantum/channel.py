@@ -51,6 +51,7 @@ from discopy.quantum.circuit import Wire
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import (
+    export,
     assert_isinstance, assert_iscomposable, factory_name, from_tree,
     unbiased)
 
@@ -386,3 +387,6 @@ class Functor(tensor.Functor):
         if isinstance(other, tensor.Box):
             return self.cod(other.array, self(other.dom), self(other.cod))
         return frobenius.Functor.__call__(self, other)
+
+
+export(__name__)

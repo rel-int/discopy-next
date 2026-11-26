@@ -92,7 +92,7 @@ from functools import partial
 from typing import Self
 
 from discopy import (
-    comarkov, feedback, lens, markov, messages, monoidal, para, python,
+    comarkov, lens, markov, messages, monoidal, para, python,
     testable)
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MarkovCategory)
@@ -100,6 +100,7 @@ from discopy.cat import factory
 from discopy.monoidal import Dim
 from discopy.testable import axiom
 from discopy.utils import (
+    export,
     AxiomError, assert_isinstance, factory_name, tuplify, untuplify)
 
 
@@ -130,8 +131,8 @@ class Dims(monoidal.Ty):
     >>> from discopy.utils import dumps, loads
     >>> assert loads(dumps(Dims(2, Dim(2, 3)))) == Dims(2, Dim(2, 3))
     """
-    generator_factory = Dim
-    box_factory = None
+    Atom = Dim
+    Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
@@ -262,7 +263,7 @@ class Network(markov.Diagram, comarkov.Diagram):
     tightening = FeedbackCategory.tightening
 
     @classmethod
-    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+    def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
         """
         The spiders of a network are its copies and merges, with one leg in
         or one leg out: there is no Frobenius law between the two.
@@ -270,8 +271,8 @@ class Network(markov.Diagram, comarkov.Diagram):
         if phase is not None or 1 not in (n_legs_in, n_legs_out):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies and merges"))
-        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
-            else cls.merge_factory(typ, n_legs_in)
+        return cls.Copy(typ, n_legs_out) if n_legs_in == 1\
+            else cls.Merge(typ, n_legs_in)
 
     def to_function(self, tensor: type = object, rounds: int | None = None
                     ) -> python.Function:
@@ -305,9 +306,10 @@ class Network(markov.Diagram, comarkov.Diagram):
         if rounds is not None:
             return self.unroll(rounds).to_function(tensor)
         self.assert_isfeedforward()
-        return Functor(ob_map=lambda leg: (tensor, ),
-                       ar_map=lambda box: box.assert_hasmodule().forward,
-                       cod=python.Function)(self)
+        return Network.Functor(
+            ob_map=lambda leg: (tensor, ),
+            ar_map=lambda box: box.assert_hasmodule().forward,
+            cod=python.Function)(self)
 
     def unroll(self, rounds: int) -> Network:
         """
@@ -347,7 +349,7 @@ class Network(markov.Diagram, comarkov.Diagram):
     def assert_isfeedforward(self) -> None:
         """ Raise ``NotImplementedError`` on a trace or a dagger: neither
         compiles to a function on tensors. """
-        if any(isinstance(box, Trace) for box in self.boxes):
+        if any(isinstance(box, self.Trace) for box in self.boxes):
             raise NotImplementedError(
                 f"{self} has a trace, only feedforward networks compile.")
         for box in self.boxes:
@@ -404,9 +406,11 @@ class Network(markov.Diagram, comarkov.Diagram):
                                 pullback @ cod.negative, dom.negative),
                 pullback)
 
-        return Functor(ob_map=lambda _: leg, ar_map=reverse, cod=Lens)(self)
+        return Network.Functor(
+            ob_map=lambda _: leg, ar_map=reverse, cod=Lens)(self)
 
 
+@Network.extend
 class Box(markov.Box, Network):
     """
     A box is a layer taking one tensor per leg of ``dom`` and returning one
@@ -558,116 +562,11 @@ class Box(markov.Box, Network):
         return tuplify(self.tape(*inputs))[-1](*gradients)
 
 
-class Function(markov.Function, Box):
-    """
-    The copies, discards and permutations of the legs of a network.
-
-    Parameters:
-        dom (Dims) : The legs to copy, discard and permute.
-        func : The leg each output reads.
-    """
+Network.Function.register(Network.Permutation)
+Network.Cofunction.register(Network.Permutation)
 
 
-class Permutation(markov.Permutation, Box):
-    """
-    A permutation of the legs of a network.
-
-    Parameters:
-        dom (Dims) : The legs to permute.
-        perm : The permutation as a :class:`finset.Permutation` or a list.
-    """
-
-
-class Cofunction(comarkov.Cofunction, Box):
-    """
-    The permutations, merges and noise of the legs of a network.
-
-    Parameters:
-        cod (Dims) : The legs to merge into.
-        cofunc : The leg each input goes to.
-    """
-
-
-Function.register(Permutation)
-Cofunction.register(Permutation)
-
-
-class Swap(Permutation, markov.Swap, Box):
-    """
-    The swap of two legs.
-
-    Parameters:
-        left (Dims) : The leg on the top left and bottom right.
-        right (Dims) : The leg on the top right and bottom left.
-    """
-
-
-class Copy(markov.Copy, Function):
-    """
-    The copy of a leg some ``n`` number of times.
-
-    Parameters:
-        x (Dims) : The leg to copy.
-        n : The number of copies.
-    """
-
-
-class Merge(comarkov.Merge, Cofunction):
-    """
-    The merge of ``n`` copies of a leg, the dagger of :class:`Copy`.
-
-    Parameters:
-        x (Dims) : The leg to merge.
-        n : The number of copies.
-    """
-
-
-class Discard(markov.Discard, Copy):
-    """
-    The discard of a leg.
-
-    Parameters:
-        x (Dims) : The leg to discard.
-    """
-
-
-class Noise(comarkov.Noise, Merge):
-    """
-    The noise on a leg, the dagger of :class:`Discard`.
-
-    Parameters:
-        x (Dims) : The leg of the noise.
-    """
-
-
-class Functor(markov.Functor, comarkov.Functor):
-    """
-    A functor from networks to any traced category with the structure the
-    network uses, e.g. an evaluation of the layers as functions.
-
-    Parameters:
-        ob_map (Mapping[Dims, Dims]) :
-            Map from atomic :class:`Dims` to :code:`cod.ob`.
-        ar_map (Mapping[Box, Network]) : Map from :class:`Box` to :code:`cod`.
-        cod (Category) : The codomain, :code:`Network` by default.
-
-    Example
-    -------
-    >>> from discopy import python
-    >>> x = Dims(2)
-    >>> layer, add = Box('layer', x, x), Box('add', x @ x, x)
-    >>> residual = Network.copy(x) >> layer @ x >> add
-    >>> F = Functor(
-    ...     ob_map={x: (list, )},
-    ...     ar_map={layer: lambda v: [2 * i for i in v],
-    ...             add: lambda v, w: [i + j for i, j in zip(v, w)]},
-    ...     cod=python.Function)
-    >>> assert F(residual)([1, 2]) == [3, 6]
-    """
-    dom = cod = Network
-
-
-class Unroll(Functor):
+class Unroll(Network.Functor):
     """
     The functor from networks to feedforward networks running every trace
     for a number of ``rounds``, see :meth:`Network.unroll`.
@@ -682,7 +581,7 @@ class Unroll(Functor):
         super().__init__(ob_map=lambda leg: leg, ar_map=lambda box: box)
 
     def __call__(self, other):
-        if not isinstance(other, Trace):
+        if not isinstance(other, Network.Trace):
             return super().__call__(other)
         mem, x, y, body = other.mem, other.dom, other.cod, self(other.arg)
         if other.left:
@@ -1025,13 +924,4 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Network, Box)
-Network.box_factory = Box
-Network.functor_factory = Functor
-Network.copy_factory, Network.merge_factory = Copy, Merge
-Network.function_factory = Function
-Network.cofunction_factory = Cofunction
-Network.discard_factory, Network.noise_factory = Discard, Noise
-Network.swap_factory = Swap
-Network.permutation_factory = Permutation
+export(__name__)

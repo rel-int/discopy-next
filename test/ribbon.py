@@ -132,15 +132,15 @@ def test_to_hypergraph():
 
 def test_functor_factory():
     x, y = Ty('x'), Ty('y')
-    assert Diagram.functor_factory is Functor
-    assert Diagram.functor_factory({x: y}, {})(Twist(x)) == Twist(y)
-    assert Diagram.functor_factory({x: y}, {})(Braid(x, x)) == Braid(y, y)
+    assert Diagram.Functor is Functor
+    assert Diagram.Functor({x: y}, {})(Twist(x)) == Twist(y)
+    assert Diagram.Functor({x: y}, {})(Braid(x, x)) == Braid(y, y)
 
 
 def test_sum_factory():
     x = Ty('x')
     f = Box('f', x, x)
-    assert Diagram.sum_factory is Sum and type(f + f) is Sum
+    assert Diagram.Sum is Sum and type(f + f) is Sum
 
 
 def test_dual_rail_to_tree():

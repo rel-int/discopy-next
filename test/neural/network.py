@@ -105,7 +105,7 @@ def test_structure():
     with raises(ValueError):
         Copy(x @ y)
     with raises(ValueError, match="only spiders of neural.network.Network"):
-        Network.spider_factory(2, 2, x)
+        Network.Spider(2, 2, x)
     bialgebra = Merge(x) >> Copy(x)
     assert bialgebra.to_hypergraph().to_diagram() == bialgebra
 

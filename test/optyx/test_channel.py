@@ -113,7 +113,7 @@ def test_from_bosonic_op():
             )
             terms.append(term)
 
-    hamiltonian = Diagram.sum_factory(terms)
+    hamiltonian = Diagram.Sum(terms)
 
     sum_1 = np.sign(hamiltonian.get_kraus().to_tensor().eval().array)
     sum_2 = np.sign(hamiltonian.eval().tensor.array) # bug in discopy.tensor.Tensor.eval() for Sums (?)
@@ -175,7 +175,7 @@ def test_sums_double_coherently_and_differentiate_term_by_term():
         (photonic.BS + photonic.BS).double().to_tensor(dims).eval().array,
         4 * photonic.BS.double().to_tensor(dims).eval().array)
     phases = photonic.Phase(x) + photonic.Phase(2 * x)
-    assert phases.grad(y) == Diagram.sum_factory((), qmode, qmode)
+    assert phases.grad(y) == Diagram.Sum((), qmode, qmode)
     one_photon = phases.grad(x).subs((x, .1)).eval().tensor.array[1, 1]
     assert np.isclose(one_photon, 2j * np.pi * (
         np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
@@ -201,7 +201,7 @@ def test_a_box_without_a_gradient_refuses_to_differentiate():
         mem=qmode, state=photonic.Create(0))
     for box in (qubits.Z(1, 1, x), qubits.Scalar(x), photonic.BBS(x),
                 qubits.Ket(0) >> qubits.X(1, 1, x), loop):
-        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        assert box.grad(y) == Diagram.Sum((), box.dom, box.cod)
         with pytest.raises(NotImplementedError, match="does not support"):
             box.grad(x)
 
@@ -211,7 +211,7 @@ def test_a_box_depends_on_the_symbols_of_its_kraus_map():
     cq_map = CQMap("z", channel.double(), qubit, qubit)
     for box in (channel, cq_map, channel >> cq_map):
         assert box.free_symbols == {x}
-        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        assert box.grad(y) == Diagram.Sum((), box.dom, box.cod)
         with pytest.raises(NotImplementedError, match="does not support"):
             box.grad(x)
 
@@ -299,7 +299,7 @@ def test_swap_dagger_swaps_back():
 
 def test_empty_sum_keeps_its_types():
     zero = photonic.Phase(x).grad(y)
-    assert zero == Diagram.sum_factory((), qmode, qmode)
+    assert zero == Diagram.Sum((), qmode, qmode)
     kraus, double = zero.get_kraus(), zero.double()
     assert (kraus.dom, kraus.cod) == (diagram.mode, diagram.mode)
     assert (double.dom, double.cod) == (diagram.mode @ diagram.mode, ) * 2

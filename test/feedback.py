@@ -397,8 +397,8 @@ def test_generated_boxes_at_every_level():
             assert issubclass(cls, globals()[name])
             assert factory_name(cls) == module.__name__.removeprefix(
                 "discopy.") + "." + name
-        assert diagram.feedback_factory is module.Feedback
-        assert diagram.head_factory is module.Head
+        assert diagram.Feedback is module.Feedback
+        assert diagram.Head is module.Head
     for module in (balanced, symmetric, markov, comarkov):
         x = module.Ty('x')
         f = module.Box('f', x @ x.delay(), x @ x)
@@ -410,8 +410,8 @@ def test_generated_boxes_at_every_level():
                                         'discopy.feedback').feedback}) == box
             assert pickle.loads(pickle.dumps(box)) == box
             assert loads(dumps(box)) == box
-    assert pivotal.Diagram.trace_factory.__func__\
-        is pivotal.Diagram.__dict__['trace_factory'].__func__
+    assert pivotal.Diagram.Trace.__func__\
+        is pivotal.Diagram.__dict__['Trace'].__func__
 
 
 def test_Functor_sends_equal_heads_to_equal_images():
@@ -440,7 +440,7 @@ def test_heads_of_pivotal_types():
         assert x.head.l == x.l.head and x.head.r == x.r.head
         assert x.head.delay().tail == x.head
         f = module.Box('f', x, x @ x)
-        assert type(f.head).__module__ == module.Diagram.head_factory.__module__
+        assert type(f.head).__module__ == module.Diagram.Head.__module__
         assert f.head.dom == x.head and f.head.cod == (x @ x).head
         for term in (x.head, x.head.delay(), f.head):
             assert pickle.loads(pickle.dumps(term)) == term
@@ -553,7 +553,7 @@ def test_functor_preserves_the_boundary_of_FollowedBy():
 
 
 def test_Ty_has_canonical_instances():
-    assert Ty.box_factory is Wire
+    assert Ty.Box is Wire
     for law in Ty.axioms.values():
         if law.name != "str_transparency":  # a canonical wire is coloured
             assert law.canonical(), law

@@ -521,7 +521,7 @@ def test_select_a_photon_by_its_internal_state(state, overlap):
 
 def test_endo_gradient_of_a_constant():
     from sympy.abc import x
-    assert Endo(2).grad(x) == Diagram.sum_factory((), Mode(1), Mode(1))
+    assert Endo(2).grad(x) == Diagram.Sum((), Mode(1), Mode(1))
 
 
 def test_arithmetic_boxes_are_real():

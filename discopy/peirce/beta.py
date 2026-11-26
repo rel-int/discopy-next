@@ -96,7 +96,7 @@ from discopy.peirce.alpha import white
 from discopy.tensor import Tensor
 from discopy.testable import (
     Axiom, Equation, Inequation, Testable, axiom, no_strategy)
-from discopy.utils import factory
+from discopy.utils import export, factory
 
 
 class Wire(frobenius.Wire):
@@ -119,9 +119,9 @@ class Ty(frobenius.Ty):
 
     >>> assert Ty('x', 'y') == Ty(Wire('x'), Wire('y'))
     """
-    generator_factory = Wire
+    Atom = Wire
     strategy = no_strategy
-    constant_factory = None
+    Constant = None
 
 
 @factory
@@ -151,6 +151,7 @@ class Diagram(alpha.Diagram, frobenius.Diagram):
             >> self.spiders(2, 1, self.cod)
 
 
+@Diagram.extend
 class Box(frobenius.Box, Diagram):
     """
     A beta box is a relation symbol, globular: its colour its region's. A
@@ -190,27 +191,6 @@ class Box(frobenius.Box, Diagram):
 
 class Spider(frobenius.Spider, Box):
     """ A beta spider is a frobenius spider on a coloured wire. """
-
-
-class Permutation(frobenius.Permutation, Box):
-    """ A beta permutation is a frobenius permutation of coloured wires. """
-
-
-class Cup(frobenius.Cup, Box):
-    """
-    A beta cup is a frobenius cup on wires of one region.
-
-    >>> x = Ty('x')
-    >>> assert isinstance(Diagram.cups(x, x), Diagram)
-    """
-
-
-class Cap(frobenius.Cap, Box):
-    """ A beta cap is a frobenius cap on wires of one region. """
-
-
-class Swap(Permutation, frobenius.Swap, Box):
-    """ A beta swap is a frobenius swap of two wires of one region. """
 
 
 class Cut(alpha.Cut, Box):
@@ -263,22 +243,7 @@ class Cut(alpha.Cut, Box):
         return result
 
 
-class Sum(alpha.Sum, frobenius.Sum, Box):
-    """ A formal sum of beta diagrams with the same boundary. """
-
-
-class Functor(alpha.Functor, frobenius.Functor):
-    """ A beta functor is a frobenius functor that sends cuts as alpha. """
-    dom = cod = Diagram
-
-
-Diagram.box_factory = Box
-Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
-Diagram.swap_factory = Swap
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.permutation_factory = Permutation
-Diagram.sum_factory = Sum
-Diagram.functor_factory = Functor
+Diagram.Spider = Spider  # ty: ignore[invalid-assignment]
 Id = Diagram.id
 
 x = Ty('x')
@@ -292,7 +257,7 @@ a, b, c, d = (Box(name, x, x) for name in "abcd")
 
 copy, discard = Spider(1, 2, x), Spider(1, 0, x)
 merge, start = Spider(2, 1, x), Spider(0, 1, x)
-swap = Swap(x, x)
+swap = Diagram.Swap(x, x)
 
 
 def inclusion(sides: Callable[[], tuple]) -> Axiom:
@@ -495,3 +460,6 @@ class Model(alpha.Model, Testable):
     double_cut = equality(lambda: (~~c, c))
     de_morgan = equality(lambda: (~(a & b), ~a | ~b))
     cut_complement = equality(lambda: (~c, c.negative()))
+
+
+export(__name__)

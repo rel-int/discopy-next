@@ -213,7 +213,7 @@ class Symbolic:
     def __call__(self, *args):
         return apply("unit", args, {}, "Ob")
 
-    def equation_factory(self, *terms):
+    def Equation(self, *terms):
         """ The equation of the terms, unchecked. """
         return Equation(*terms)
 

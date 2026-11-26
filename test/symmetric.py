@@ -201,7 +201,7 @@ def test_Layer_factory_ownership():
     from discopy import compact, markov, symmetric
 
     for module in (compact, markov):
-        assert module.Diagram.permutation_factory is module.Permutation
+        assert module.Diagram.Permutation is module.Permutation
         x, y = module.Ty('x'), module.Ty('y')
         permutation = module.Permutation(x @ y, [1, 0])
         layer = module.Layer(permutation)
@@ -209,7 +209,7 @@ def test_Layer_factory_ownership():
         assert issubclass(module.Swap, module.Permutation)
         assert type(x @ permutation) is module.Permutation
     assert issubclass(markov.Layer, symmetric.Layer)
-    assert not hasattr(symmetric.Layer, 'permutation_factory')
+    assert not hasattr(symmetric.Layer, 'Permutation')
 
 
 def test_Layer_tensor():
@@ -288,7 +288,7 @@ def test_Permutation_box_setoid():
 
 def test_permutation_factory():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
-    assert Diagram.permutation_factory is Permutation
+    assert Diagram.Permutation is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     functor = Functor(ob_map={x: y, y: z, z: x}, ar_map={})
     assert functor(perm) == Permutation(y @ z @ x, [2, 0, 1])

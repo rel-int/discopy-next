@@ -262,7 +262,7 @@ def test_gradient_through_the_memory_wire():
     def to_torch(box):
         """Spiders keep numpy arrays under the pytorch backend, see
         https://github.com/discopy/discopy/issues/582 — materialise them."""
-        array = tensor.Tensor.spider_factory(
+        array = tensor.Tensor.Spider(
             len(box.dom), len(box.cod), box.typ, box.phase).array \
             if isinstance(box, tensor.Spider) else box.array
         return tensor.Box(box.name, box.dom, box.cod, torch.as_tensor(

@@ -67,7 +67,7 @@ Or you can keep scrolling down, skip the theory and go straight to the examples 
 - a `Diagram(inside, dom, cod)` is a sequence of composable layers `inside` with a designated input `dom` and output `cod`: the identity diagram is the empty sequence with `dom == cod`, composition `f >> g` is sequence concatenation
 - the tensor of diagrams is decomposed in terms of composition and whiskering i.e. `f @ g = f @ g.dom >> f.cod @ g`, this is biased in the sense that `f` happens before `g` so that diagrams really live in a [premonoidal category](https://en.wikipedia.org/wiki/Premonoidal_category)
 - *the first gotcha of DisCoPy:* `Box` is a subclass of `Diagram` with a cyclic reference `list(box.inside) == [Layer(box)]`
-- every categorical structure is implemented with the factory method pattern so that e.g. the method `Diagram.swap` computes the symmetry of arbitrary types with `Diagram.swap_factory = Swap` as subroutine for generating subclasses of `Box` for the symmetry of atomic types
+- every categorical structure is implemented with the factory method pattern so that e.g. the method `Diagram.swap` computes the symmetry of arbitrary types with `Diagram.Swap = Swap` as subroutine for generating subclasses of `Box` for the symmetry of atomic types
 - *the second gotcha of DisCoPy:* each `C: Category` decorated with [`@factory`](https://docs.discopy.org/en/main/_api/discopy.cat.factory.html) has `C.factory = C` (also spelled `C.ar`), which lets e.g. the subclass `Box` know that it lives inside a bigger `Diagram` category
 
 ## Example: Cooking
@@ -95,8 +95,8 @@ class CookingPermutation(Permutation, CookingStep):
 class CookingSwap(CookingPermutation, Swap, CookingStep):
   "A cooking swap takes two ingredients `X @ Y` and gives `Y @ X`."
 
-Recipe.swap_factory = CookingSwap  # Recipes need to know how to swap.
-Recipe.permutation_factory = CookingPermutation
+Recipe.Swap = CookingSwap  # Recipes need to know how to swap.
+Recipe.Permutation = CookingPermutation
 
 egg, white, yolk = Ingredient("egg"), Ingredient("white"), Ingredient("yolk")
 crack = CookingStep("crack", egg, white @ yolk)

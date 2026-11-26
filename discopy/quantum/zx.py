@@ -64,9 +64,9 @@ from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
     Bra, Ket, Rz, Rx, U1, CX, CZ, Controlled, Sqrt, format_number)
 from discopy.quantum.gates import Scalar as GatesScalar
-from discopy.rigid import Sum, Nat
+from discopy.rigid import Nat
 from discopy.tensor import Dim, backend
-from discopy.utils import assert_isatomic, factory_name, unbiased
+from discopy.utils import export, assert_isatomic, factory_name, unbiased
 
 
 @factory
@@ -89,9 +89,9 @@ class Diagram(tensor.Diagram[complex]):
 
     >>> assert not H.is_deterministic and not H.is_affine
     """
-    swap_factory: ClassVar[type["Swap"]]
-    sum_factory: ClassVar[type["Sum"]]
-    permutation_factory: ClassVar[type["Permutation"]]
+    Swap: ClassVar[type["Swap"]]
+    Sum: ClassVar[type["tensor.Sum"]]
+    Permutation: ClassVar[type["tensor.Permutation"]]
     ob = Nat
 
     @classmethod
@@ -106,18 +106,18 @@ class Diagram(tensor.Diagram[complex]):
         return tensor.Diagram.swap.__func__(Diagram, left, right)
 
     @staticmethod
-    def cup_factory(left, right):
+    def Cup(left, right):
         del left, right
         return Z(2, 0)
 
     @staticmethod
-    def cap_factory(left, right):
+    def Cap(left, right):
         """ The cap of a ZX diagram, the dagger of its cup. """
         del left, right
         return Z(0, 2)
 
     @staticmethod
-    def spider_factory(n_legs_in, n_legs_out, typ, phase=None):
+    def Spider(n_legs_in, n_legs_out, typ, phase=None):
         """
         The spider of a ZX diagram on one qubit, a :class:`Z` spider, so that
         a functor into ZX diagrams rebuilds a spider as the cups and caps.
@@ -234,7 +234,7 @@ class Diagram(tensor.Diagram[complex]):
                 graph.add_edge_table(edge_table)
                 scan = scan[:offset] + len(box.cod) * [(node, False)]\
                     + scan[offset + len(box.dom):]
-            elif isinstance(box, Permutation):
+            elif isinstance(box, Diagram.Permutation):
                 segment = scan[offset:offset + len(box.dom)]
                 scan[offset:offset + len(box.dom)] = [
                     segment[i] for i in box.perm]
@@ -349,6 +349,7 @@ class Diagram(tensor.Diagram[complex]):
         return diagram if number == 1 else scalar(number) @ diagram
 
 
+@Diagram.extend
 class Box(tensor.Box[complex], Diagram):
     """
     A ZX box is a tensor box in a ZX diagram.
@@ -381,17 +382,7 @@ class Box(tensor.Box[complex], Diagram):
             "is_dagger": None}
 
 
-class Sum(tensor.Sum[complex], Box):
-    """
-    A formal sum of ZX diagrams with the same domain and codomain.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Dim) : The domain of the formal sum.
-        cod (Dim) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Elementwise(tensor.Elementwise[complex], Box):
     """
     A ZX elementwise box is a tensor one in a ZX diagram, which
@@ -403,11 +394,8 @@ class Elementwise(tensor.Elementwise[complex], Box):
     grad = Box.grad
 
 
-class Permutation(tensor.Permutation[complex], Box):
-    "A permutation in a ZX diagram."
-
-
-class Swap(Permutation, tensor.Swap[complex], Box):
+@Diagram.extend
+class Swap(Diagram.Permutation, tensor.Diagram.Swap[complex], Box):
     """
     Swap in a ZX diagram.
 
@@ -499,7 +487,7 @@ class Spider(tensor.Spider[complex], Box):
         shifted by half a turn, which negates that entry and fixes the other.
         """
         if var not in self.free_symbols:
-            return Sum((), self.dom, self.cod)
+            return Diagram.Sum((), self.dom, self.cod)
         gradient = self.phase.diff(var)
         gradient = complex(gradient) if not gradient.free_symbols else gradient
         n_legs_in, n_legs_out = len(self.dom), len(self.cod)
@@ -608,7 +596,7 @@ class Scalar(Box):
 
     def grad(self, var, **params):
         if var not in self.free_symbols:
-            return Sum((), self.dom, self.cod)
+            return Diagram.Sum((), self.dom, self.cod)
         return Scalar(self.data.diff(var))
 
 
@@ -672,10 +660,6 @@ H.drawing_name, H.tikzstyle_name, = '', 'H'
 H.color, H.shape = "yellow", "rectangle"
 
 SWAP = Swap(Nat(1), Nat(1))
-Diagram.box_factory = Box
-Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
-Diagram.elementwise_factory = Elementwise
-Diagram.permutation_factory = Permutation
 Id = Diagram.id
 
 
@@ -890,6 +874,7 @@ class Number:
 ONE = Number()
 
 
+@Diagram.slot
 class Hypergraph(hypergraph.Hypergraph):
     """
     A ZX diagram as a hypergraph, graph-like in the sense of
@@ -939,18 +924,18 @@ class Hypergraph(hypergraph.Hypergraph):
         return (Diagram, )
 
     @classmethod
-    def cup_factory(cls, left, right) -> hypergraph.Hypergraph:
+    def Cup(cls, left, right) -> hypergraph.Hypergraph:
         """
         The cup :code:`Z(2, 0)` as a box rather than a spider, for
         :meth:`to_diagram` to trace a wire it cuts open: as a spider,
         :meth:`from_box` would wire the cut back as it was.
         """
-        return super().from_box(Diagram.cup_factory(left, right))
+        return super().from_box(Diagram.Cup(left, right))
 
     @classmethod
-    def cap_factory(cls, left, right) -> hypergraph.Hypergraph:
-        """ The cap :code:`Z(0, 2)` as a box, see :meth:`cup_factory`. """
-        return super().from_box(Diagram.cap_factory(left, right))
+    def Cap(cls, left, right) -> hypergraph.Hypergraph:
+        """ The cap :code:`Z(0, 2)` as a box, see :meth:`Cup`. """
+        return super().from_box(Diagram.Cap(left, right))
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     # pylint: disable=redefined-outer-name
@@ -2007,7 +1992,6 @@ class Agenda:
         return bool(self.spiders)
 
 
-Diagram.hypergraph_factory = Hypergraph
-
-
 Bubble = Elementwise.from_args
+
+export(__name__)

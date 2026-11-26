@@ -62,7 +62,7 @@ def test_sum_is_linear_on_one_photon_only():
 
 def test_sum_gradient_term_by_term():
     phases = zw.Endo(np.e ** x) + zw.Endo(np.e ** (2 * x))
-    assert phases.grad(y) == Diagram.sum_factory((), mode, mode)
+    assert phases.grad(y) == Diagram.Sum((), mode, mode)
     gradient = phases.grad(x).subs((x, 0))
     assert np.allclose(gradient.eval(1).array, 1 + 2)
 

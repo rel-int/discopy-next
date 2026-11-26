@@ -328,7 +328,7 @@ class NamedGeneric:
         base: ClassVar[Any]
         natural: ClassVar[Any]
         algebra: ClassVar[Any]
-        generator_factory: ClassVar[Any]
+        Atom: ClassVar[Any]
 
     _cache = dict()
 
@@ -463,6 +463,73 @@ def deprecated_alias(module_name: str, aliases: dict[str, str]):
                 f"use {new_module}.{new_name} instead.",
                 DeprecationWarning, stacklevel=2)
             return getattr(import_module(new_module), new_name)
+        return exports(module_name)(name)
+    return __getattr__
+
+
+def export(module_name: str) -> None:
+    """
+    Bind in a module, under its own name, the class each level the module
+    defines builds for each of its slots, e.g. ``markov.Swap`` for
+    ``markov.Diagram.Swap``, see :class:`discopy.testable.Slot`, unless the
+    module binds that name already. A module defining levels calls it once,
+    last, so that its doctests, a star import and the code it runs find
+    each class by name, as :mod:`pickle` and :func:`from_tree` do through
+    :func:`exports`.
+
+    Parameters:
+        module_name : The ``__name__`` of the module.
+    """
+    from discopy.testable import slots
+    module = sys.modules[module_name]
+    for level in list(vars(module).values()):
+        if not isinstance(level, type)\
+                or vars(level).get("factory") is not level\
+                or level.__module__ != module_name:
+            continue
+        for name, slot in slots(level).items():
+            value = getattr(level, name)
+            if not isinstance(value, type):
+                value = slot.__get__(None, level)
+            if name not in vars(module) and isinstance(value, type)\
+                    and value.__name__ == name\
+                    and value.__module__ == module_name:
+                setattr(module, name, value)
+
+
+def exports(module_name: str) -> Callable[[str], type]:
+    """
+    The module-level ``__getattr__`` of a module defining levels of the
+    hierarchy, i.e. classes decorated with :func:`factory`, that finds the
+    class each level builds for a slot named after it, e.g. ``markov.Swap``
+    for ``markov.Diagram.Swap``, see :class:`discopy.testable.Slot`, even
+    when the level shadows the slot with a behaviour, e.g. ``pivotal.Trace``
+    for the trace of a pivotal diagram, made of cups and caps. A module
+    writes none of them out, and :mod:`pickle` and :func:`from_tree` find
+    each one where its :func:`factory_name` says. :func:`factory` installs
+    it, and :func:`deprecated_alias` falls back to it.
+
+    Parameters:
+        module_name : The ``__name__`` of the module.
+
+    Example
+    -------
+    >>> from discopy import markov, pivotal
+    >>> assert markov.Swap is markov.Diagram.Swap
+    >>> assert issubclass(pivotal.Trace, pivotal.Feedback)
+    """
+    def __getattr__(name):
+        from discopy.testable import slots
+        module = sys.modules[module_name]
+        for level in list(vars(module).values()):
+            if isinstance(level, type) and vars(level).get("factory") is level\
+                    and level.__module__ == module_name:
+                value = getattr(level, name, None)
+                if not isinstance(value, type) and name in slots(level):
+                    value = slots(level)[name].__get__(None, level)
+                if isinstance(value, type) and value.__name__ == name\
+                        and value.__module__ == module_name:
+                    return value
         raise AttributeError(
             f"module {module_name!r} has no attribute {name!r}")
     return __getattr__
@@ -1416,6 +1483,9 @@ def factory(cls):
     >>> assert Circuit.factory is Circuit.ar is Circuit
     """
     cls.factory = cls
+    module = sys.modules.get(cls.__module__)
+    if module is not None and "__getattr__" not in vars(module):
+        module.__getattr__ = exports(cls.__module__)
     return cls
 
 

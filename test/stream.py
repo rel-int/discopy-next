@@ -42,10 +42,10 @@ def test_sequence_box_of_its_category():
     for category in (symmetric.Diagram, markov.Diagram):
         x = Ty.sequence(category.ob('x'))
         box = Stream[category].sequence("f", x, x).now
-        assert type(box) is category.box_factory
+        assert type(box) is category.Box
     dim = Ty[tensor.Dim](tensor.Dim(2))  # A constant stream of dimensions.
     box = Stream[tensor.Diagram].sequence("f", dim, dim).now
-    assert type(box) is tensor.Box is tensor.Diagram.box_factory
+    assert type(box) is tensor.Box is tensor.Diagram.Box
 
 
 def test_sequence_of_a_name_is_one_wire():

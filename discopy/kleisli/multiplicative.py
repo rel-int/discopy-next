@@ -206,7 +206,7 @@ class Channel[monad](Category, TestableGeneric):
     monad: Monad
 
     @classmethod
-    def equation_factory(cls, *terms: Channel) -> Equation:
+    def Equation(cls, *terms: Channel) -> Equation:
         """
         The equation of a law, compared by the boundary of its terms and
         what the monad observes of their outputs on the arguments of

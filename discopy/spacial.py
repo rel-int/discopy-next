@@ -55,6 +55,7 @@ from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty
+from discopy.utils import export
 
 
 @factory
@@ -72,49 +73,10 @@ class Diagram(monoidal.Diagram, SpacialCategory):
         messages.FREE_SCALAR)
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A spacial box is a monoidal box in a spacial diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Sum(monoidal.Sum, Box):
-    """
-    A spacial sum is a monoidal sum and a spacial box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
-class Functor(monoidal.Functor):
-    """
-    A spacial functor is a monoidal functor between spacial categories.
-
-    Parameters:
-        ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
-            Map from :class:`monoidal.Ty` to :code:`cod.ob`.
-        ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
-        cod (Category) :
-            The codomain, :code:`Diagram` by default.
-    """
-    dom = cod = Diagram
-
-
 class Equation(monoidal.Equation):
     """ The :class:`monoidal.Equation` of spacial diagrams. """
 
 
-Diagram.box_factory = Box
-Diagram.sum_factory = Sum
-Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
@@ -124,4 +86,6 @@ TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
 Term = Variable | Constant | Application | Kappa
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

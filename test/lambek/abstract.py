@@ -43,7 +43,7 @@ def test_factory_closure():
     assert type(f.to_map()) is CMap and CMap.category is Diagram
     graph = f.to_hypergraph()
     assert type(graph) is Hypergraph and type(graph.to_diagram()) is Diagram
-    assert Diagram.functor_factory is Functor
+    assert Diagram.Functor is Functor
     assert Lexicon.dom is Lexicon.cod is Diagram
 
 
@@ -318,7 +318,7 @@ def test_ambiguity():
 
 
 def test_box_factory():
-    assert Diagram.box_factory is Box
+    assert Diagram.Box is Box
 
 
 def test_normal_form_of_words():

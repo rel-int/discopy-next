@@ -8,8 +8,8 @@ from pytest import mark, raises
 
 def test_Over():
     x, y = Ty('x'), Ty('y')
-    assert isinstance(x.over_factory(x, y), cat.Ob)
-    assert not isinstance(x.over_factory(x, y), Ty)
+    assert isinstance(x.Over(x, y), cat.Ob)
+    assert not isinstance(x.Over(x, y), Ty)
     assert x.over(y) == x << y
     assert isinstance(x ** y, Ty)
     assert not isinstance((x ** y).inside[0], Ty)
@@ -31,8 +31,8 @@ def test_exponential_name_is_lazy():
 
 def test_Under():
     x, y = Ty('x'), Ty('y')
-    assert isinstance(y.under_factory(y, x), cat.Ob)
-    assert not isinstance(y.under_factory(y, x), Ty)
+    assert isinstance(y.Under(y, x), cat.Ob)
+    assert not isinstance(y.Under(y, x), Ty)
     assert y.under(x) == x >> y
     assert isinstance(x >> y, Ty)
     assert not isinstance((x >> y).inside[0], Ty)
@@ -255,7 +255,7 @@ def test_equality_reads_the_data_of_constants():
 def test_constant_of_a_coloured_type():
     white = monoidal.Colour("white")
     x = Ty(Wire("x", dom=white, cod=white))
-    assert x.constant_factory("f", x).dom == Ty.id(white)
+    assert x.Constant("f", x).dom == Ty.id(white)
 
 
 def test_alpha_eq_under_restores_the_scopes():

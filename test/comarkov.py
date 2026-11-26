@@ -10,10 +10,10 @@ from discopy.utils import AxiomError, dumps, loads
 
 def test_spider_factory():
     x = Ty('x')
-    assert Diagram.spider_factory(3, 1, x) == Merge(x, 3)
+    assert Diagram.Spider(3, 1, x) == Merge(x, 3)
     for n_legs_in, n_legs_out, phase in [(2, 2, None), (1, 2, None), (2, 1, .5)]:
         with raises(ValueError, match="only spiders of comarkov.Diagram"):
-            Diagram.spider_factory(n_legs_in, n_legs_out, x, phase)
+            Diagram.Spider(n_legs_in, n_legs_out, x, phase)
 
 
 def test_Merge_dagger():
@@ -91,7 +91,7 @@ def test_serialisation_and_pickle():
 
 def test_Permutation():
     x, y, z = map(Ty, "xyz")
-    assert Diagram.permutation_factory is Permutation
+    assert Diagram.Permutation is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     assert isinstance(perm, Box) and perm.cod == z @ x @ y
     assert isinstance(perm.inside[0], Layer)

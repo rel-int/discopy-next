@@ -370,7 +370,7 @@ class Diagram[natural](
     cod: Ty
 
     @classmethod
-    def equation_factory(cls, *terms: Diagram) -> Equation:
+    def Equation(cls, *terms: Diagram) -> Equation:
         """
         The equation of a law, compared by the boundaries of its terms and
         by the equation of the :attr:`natural` category on their insides.

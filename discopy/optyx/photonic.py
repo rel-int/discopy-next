@@ -332,7 +332,7 @@ class Scalar(Channel):
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         return Scalar(self.scalar.diff(var))
 
     def lambdify(self, *symbols, **kwargs):
@@ -665,7 +665,7 @@ class Phase(AbstractGate):
     def grad(self, var):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         s = 2j * np.pi * self.angle.diff(var)
         d = Scalar(s) @ (self >> NumOp())
         return d
@@ -896,7 +896,7 @@ class TBS(AbstractGate):
     def grad(self, var):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         return self.decomp().grad(var)
 
     def conjugate(self):
@@ -1020,7 +1020,7 @@ class MZI(AbstractGate):
     def grad(self, var):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         return self.decomp().grad(var)
 
     def dagger(self):

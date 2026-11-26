@@ -27,7 +27,7 @@ def single_layer_tensor[D: monoidal.Diagram](box: D, k: int) -> D:
     concatenation in ``Layer``.
     """
     empty = box.dom[:0]
-    layer = box.layer_factory(empty, box, empty, *([box, empty] * (k - 1)))
+    layer = box.Layer(empty, box, empty, *([box, empty] * (k - 1)))
     return box.factory((layer,), layer.dom, layer.cod)
 
 

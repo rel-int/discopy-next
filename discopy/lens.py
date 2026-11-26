@@ -172,7 +172,7 @@ class Symmetric[category](SymmetricCategory, TestableGeneric):
     residual: category.ob = None  # ty: ignore[invalid-assignment]
 
     @classmethod
-    def equation_factory(cls, *terms: Symmetric) -> Equation:
+    def Equation(cls, *terms: Symmetric) -> Equation:
         """
         The equation of a law, compared by the boundary of its terms and the
         inside of their :meth:`to_int` up to the equation of the underlying

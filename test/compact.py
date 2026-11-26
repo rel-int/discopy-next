@@ -30,7 +30,7 @@ def test_cup_chaining():
 
 def test_Permutation():
     x, y, z = map(Ty, "xyz")
-    assert Diagram.permutation_factory is Permutation
+    assert Diagram.Permutation is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     assert isinstance(perm, Box) and perm.cod == z @ x @ y
     assert Equation(perm >> perm.dagger(), Id(x @ y @ z))

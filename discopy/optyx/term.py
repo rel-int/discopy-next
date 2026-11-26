@@ -78,6 +78,7 @@ from discopy.cat import factory, kappa_calculus
 from discopy.optyx import channel, photonic
 from discopy.optyx.core import diagram, zw
 from discopy.optyx.utils.misc import hashable
+from discopy.utils import export
 
 
 @factory
@@ -139,7 +140,8 @@ class Term(bang.Diagram):
             dom=Term, cod=channel.Diagram)(self)
 
 
-class Box(bang.Box, Term):
+@Term.extend
+class Box(bang.Diagram.Box, Term):
     """
     A box on one qubit, whose ``data`` is the unitary of one photon in its
     two modes: its image is that gate on the dual-rail qubit, heralded.
@@ -176,6 +178,7 @@ class Box(bang.Box, Term):
             >> Dereliction(qubit).to_channel()
 
 
+@Term.extend
 class Bang(bang.Bang, Box):
     """
     The bang of a term on one qubit made of boxes, whose image is the
@@ -205,6 +208,7 @@ class Bang(bang.Bang, Box):
         return photonic.Gate(unitary.T, 2, 2, f"!{self.arg}")
 
 
+@Term.extend
 class Dereliction(bang.Dereliction, Box):
     """
     The dereliction of :mod:`discopy.bang`, which heralds one photon in the
@@ -221,12 +225,7 @@ class Dereliction(bang.Dereliction, Box):
             self.dom.to_channel(), self.cod.to_channel())
 
 
-class Digging(bang.Digging, Box):
-    """
-    The digging of :mod:`discopy.bang`, which has no image in optyx.
-    """
-
-
+@Term.extend
 class Contraction(bang.Contraction, Box):
     """
     The contraction of :mod:`discopy.bang`, the W node on each mode.
@@ -241,6 +240,7 @@ class Contraction(bang.Contraction, Box):
             self.dom.to_channel(), self.cod.to_channel())
 
 
+@Term.extend
 class Weakening(bang.Weakening, Box):
     """
     The weakening of :mod:`discopy.bang`, which selects the vacuum.
@@ -255,6 +255,7 @@ class Weakening(bang.Weakening, Box):
             self.dom.to_channel(), self.cod.to_channel())
 
 
+@Term.extend
 class Exchange(bang.Exchange, Box):
     """
     The exchange of :mod:`discopy.bang`, the swap.
@@ -270,21 +271,9 @@ class Exchange(bang.Exchange, Box):
         return swap.dagger() if self.is_dagger else swap
 
 
-class Laxator(bang.Laxator, Box):
-    """
-    The laxator of :mod:`discopy.bang`, which has no image in optyx.
-    """
-
-
 Id = Term.id
-Term.box_factory = Box
-Term.bang_factory = Bang
-Term.dereliction_factory = Dereliction
-Term.digging_factory = Digging
-Term.contraction_factory = Contraction
-Term.weakening_factory = Weakening
-Term.exchange_factory = Exchange
-Term.laxator_factory = Laxator
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Term)
-Ty.term_factory = TermBase
+Ty.TermBase = TermBase
+
+export(__name__)

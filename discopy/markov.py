@@ -112,6 +112,7 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
+    export,
     AxiomError, assert_isatomic, assert_iscomposable, deprecated_alias,
     factory_key, factory_name, from_tree)
 
@@ -185,10 +186,10 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     .. image:: /_static/feedback/feedback-random-walk.svg
         :align: center
     """
-    copy_factory: ClassVar[type["Copy"]]
-    discard_factory: ClassVar[type["Discard"]]
-    function_factory: ClassVar[type["Function"]]
-    layer_factory = Layer
+    Copy: ClassVar[type["Copy"]]
+    Discard: ClassVar[type["Discard"]]
+    Function: ClassVar[type["Function"]]
+    Layer = Layer
 
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.MARKOV_HAS_NO_DAGGER)
@@ -208,26 +209,28 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
         """
         category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+        # a strategy, which pylint infers as a hypergraph
+        # pylint: disable-next=no-member
         return category.strategy(
             dom=dom, cod=cod, max_leaves=fuel + 1).map(
                 lambda graph: graph.to_diagram())
 
     @classmethod
-    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+    def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
         """
         The spiders of a Markov category: the copies, with one leg in, and
         the traces of copies, with none, i.e. what tracing a copy back into
         its own input encodes to as a hypergraph.
 
         >>> x = Ty('x')
-        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        >>> assert Diagram.Spider(0, 1, x) == Copy(x).trace(left=True)
         """
         if phase is not None or n_legs_in not in (0, 1):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
         if not n_legs_in:
             return cls.copy(typ, n_legs_out + 1).trace(left=True)
-        return cls.copy_factory(typ, n_legs_out)
+        return cls.Copy(typ, n_legs_out)
 
     @classmethod
     def copy(cls, x: monoidal.Ty, n=2) -> Diagram:
@@ -246,7 +249,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Diagram.copy(x @ y) == Function(x @ y, [0, 1, 0, 1])
         """
-        if cls.function_factory.ar is cls:
+        if cls.Function.ar is cls:
             return cls.from_function(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
         return frobenius.Diagram.spiders.__func__(
@@ -291,8 +294,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         if sorted(func) == list(range(len(dom))):
             return cls.from_permutation(
                 func, dom)  # ty: ignore[invalid-return-type]
-        if cls.function_factory.ar is cls:
-            return cls.function_factory(dom, func)
+        if cls.Function.ar is cls:
+            return cls.Function(dom, func)
         return super().from_function(func, dom)
 
     @classmethod
@@ -350,7 +353,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         return self.is_deterministic and self.is_affine
 
 
-class Box(symmetric.Box, Diagram):
+@Diagram.extend
+class Box(symmetric.Diagram.Box, Diagram):
     """
     A Markov box is a symmetric box in a Markov diagram, a total function
     unless it says otherwise.
@@ -388,7 +392,7 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
     >>> assert f.is_cartesian and not f.dagger().is_cartesian
     >>> assert f.dagger().dagger() == f and f.dagger().deterministic
     """
-    serialised_attrs = symmetric.Box.serialised_attrs + (
+    serialised_attrs = symmetric.Diagram.Box.serialised_attrs + (
         "is_deterministic", "is_affine")
     deterministic = affine = True
 
@@ -491,6 +495,7 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
         return result
 
 
+@Diagram.slot
 class Function(Box):
     """
     A function between finite sets read backwards as plumbing: output ``i``
@@ -535,13 +540,13 @@ class Function(Box):
     serialised_attrs = ("dom", "func")
 
     def __new__(cls, dom: monoidal.Ty | None = None, func=None):
-        if dom is None or cls is not cls.ar.function_factory:
+        if dom is None or cls is not cls.ar.Function:
             return super().__new__(cls)
         func = list(func)  # ty: ignore[invalid-argument-type]
         if sorted(func) == list(range(len(dom))):
-            return cls.ar.permutation_factory(dom, func)
+            return cls.ar.Permutation(dom, func)
         if len(dom) == 1 and not any(func):
-            return cls.ar.copy_factory(dom, len(func))
+            return cls.ar.Copy(dom, len(func))
         return super().__new__(cls)
 
     def __init__(self, dom: monoidal.Ty, func):
@@ -588,7 +593,7 @@ class Function(Box):
         from discopy.drawing import Drawing
         counts, perm = self.func.factorise()
         copies = Drawing.id().tensor(*(
-            self.copy_factory(self.dom[j:j + 1], n).to_drawing() if n != 1
+            self.Copy(self.dom[j:j + 1], n).to_drawing() if n != 1
             else Drawing.id(self.dom[j:j + 1].to_drawing())
             for j, n in enumerate(counts)))
         return copies >> Drawing.permutation(perm, [
@@ -626,7 +631,7 @@ is not a dagger category.
         if not issubclass(self.ar, ComarkovCategory):
             raise AxiomError(messages.NOT_A_DAGGER.format(
                 self, factory_name(self.ar)))
-        return self.ar.cofunction_factory(self.dom, list(self.func))
+        return self.ar.Cofunction(self.dom, list(self.func))
 
     def fuse(self, other: Function) -> Diagram:
         """
@@ -658,7 +663,7 @@ is not a dagger category.
         while plumbing < len(others) and (
                 isinstance(others[plumbing], monoidal.Ty)
                 or isinstance(others[plumbing], Function)
-                and self.ar.layer_factory.is_plumbing_box(others[plumbing])
+                and self.ar.Layer.is_plumbing_box(others[plumbing])
                 or isinstance(others[plumbing], Diagram)
                 and not others[plumbing].inside):
             other, plumbing = others[plumbing], plumbing + 1
@@ -675,7 +680,7 @@ is not a dagger category.
         if not isinstance(other, monoidal.Ty):
             return super().__rmatmul__(other)
         func = finset.Function.id(len(other)).tensor(self.func)
-        return self.function_factory(other @ self.dom, func)
+        return self.Function(other @ self.dom, func)
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dom!r}, {list(self.func)})"
@@ -687,6 +692,7 @@ is not a dagger category.
 Layer.plumbing = (monoidal.Ty, Function)
 
 
+@Diagram.extend
 class Permutation(symmetric.Permutation, Box):
     """
     A permutation in a Markov category, i.e. a bijective :class:`Function`,
@@ -711,16 +717,7 @@ class Permutation(symmetric.Permutation, Box):
 Function.register(Permutation)
 
 
-class Swap(Permutation, symmetric.Swap, Box):
-    """
-    Symmetric swap in a Markov diagram.
-
-    Parameters:
-        left (monoidal.Ty) : The type on the top left and bottom right.
-        right (monoidal.Ty) : The type on the top right and bottom left.
-    """
-
-
+@Diagram.slot
 class Copy(Function):
     """
     The copy of an atomic type :code:`x` some :code:`n` number of times,
@@ -744,7 +741,7 @@ class Copy(Function):
     def __new__(cls, x: monoidal.Ty, n: int = 2):
         n = len(n) if isinstance(n, Sized) else index(n)
         return super().__new__(cls) if n else\
-            cls.discard_factory.__new__(cls.discard_factory, x)
+            cls.Discard.__new__(cls.Discard, x)
 
     def __getnewargs__(self):
         """
@@ -792,6 +789,7 @@ class Copy(Function):
         return cls(from_tree(tree['dom']), len(from_tree(tree['cod'])))
 
 
+@Diagram.slot
 class Discard(Copy):
     """
     The discard of an atomic type :code:`x`.
@@ -818,7 +816,8 @@ class Discard(Copy):
         return cls.atomic_strategy(types).map(cls)
 
 
-class Sum(symmetric.Sum, Box):
+@Diagram.extend
+class Sum(symmetric.Diagram.Sum, Box):
     """
     A markov sum is a symmetric sum and a markov box.
 
@@ -846,6 +845,7 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
+@Diagram.extend
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -883,7 +883,7 @@ class Functor(symmetric.Functor):
         if isinstance(other, Copy) and hasattr(self.cod, "copy"):
             return self.cod.copy(self(other.dom), len(other.cod))
         if isinstance(other, Function) and hasattr(
-                self.cod.ar, "function_factory")\
+                self.cod.ar, "Function")\
                 and not isinstance(other, symmetric.Permutation):
             sizes = [Nat(len(self(x))) for x in other.dom]
             return self.cod.ar.from_function(finset.Function.function(
@@ -910,17 +910,7 @@ Box.__init__.__signature__ = Signature([
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory = Copy
-Diagram.function_factory = Function
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Diagram.discard_factory = Discard
-Diagram.sum_factory = Sum
 Id = Diagram.id
 
 
@@ -1121,10 +1111,12 @@ class Sampler(symmetric.Sampler):
             else bound[1:] if kind == 2 else bound
 
 
-TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
-TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
-TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+TermBase.functor, TermBase.Sampler = Functor.id(Diagram), Sampler
+TermBase.Variable, TermBase.Constant = Variable, Constant
+TermBase.Application, TermBase.Kappa = Application, Kappa
+Diagram.TermBase, symmetric.Kappa.above = TermBase, Kappa
 
 
 Bubble = Box.from_args
+
+export(__name__)

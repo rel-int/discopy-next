@@ -697,7 +697,7 @@ class Endo(ZWBox):
     def grad(self, var):
         """Compute the gradient of the scalar with respect to a variable."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         s = self.scalar.diff(var) / self.scalar
         num_op = Split(2) >> Id(1) @ (Select() >> Create()) >> Merge(2)
         d = diagram.Scalar(s) @ (self >> num_op)

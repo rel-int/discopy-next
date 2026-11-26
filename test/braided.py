@@ -57,8 +57,8 @@ def test_to_hypergraph():
 
 
 def test_functor_factory():
-    assert Diagram.functor_factory is Functor
-    F = Diagram.functor_factory({x: y, y: x}, {})
+    assert Diagram.Functor is Functor
+    F = Diagram.Functor({x: y, y: x}, {})
     assert F(Braid(x, y)) == Braid(y, x)
     assert F(Braid(x, y).dagger()) == Braid(y, x).dagger()
 

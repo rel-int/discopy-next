@@ -116,9 +116,9 @@ class Cap(ribbon.Cap, Kauffman):
 
 class Sum(ribbon.Sum, Kauffman):
     pass
-Kauffman.cup_factory = Cup
-Kauffman.cap_factory = Cap
-Kauffman.sum_factory = Sum
+Kauffman.Cup = Cup
+Kauffman.Cap = Cap
+Kauffman.Sum = Sum
 
 class Variable(ribbon.Box, Kauffman):
     pass

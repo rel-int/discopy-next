@@ -95,6 +95,7 @@ from discopy.abc import (
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
+    export,
     assert_isatomic, assert_iscomposable, deprecated_alias, factory_key,
     factory_name, from_tree)
 
@@ -148,7 +149,7 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
-    generator_factory = Wire
+    Atom = Wire
 
 
 @factory
@@ -217,11 +218,11 @@ class Layer(compact.Layer):
     def is_plumbing_box(cls, value: Ty | Box) -> bool:
         """
         Whether a component is a permutation, or a cospan of a category that
-        has its own, see :attr:`Diagram.cospan_factory`.
+        has its own, see :attr:`Diagram.Cospan`.
         """
         return isinstance(value, symmetric.Permutation)\
             or getattr(value, "legs", None) is not None\
-            and value.ar.cospan_factory.ar is value.ar
+            and value.ar.Cospan.ar is value.ar
 
 
 @factory
@@ -236,16 +237,16 @@ class Diagram(
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    sum_factory: ClassVar[type["Sum"]]
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    swap_factory: ClassVar[type["Swap"]]
-    permutation_factory: ClassVar[type["Permutation"]]
+    Sum: ClassVar[type["compact.Sum"]]
+    Box: ClassVar[type["Box"]]
+    Functor: ClassVar[type["Functor"]]
+    Cup: ClassVar[type["Cup"]]
+    Cap: ClassVar[type["Cap"]]
+    Swap: ClassVar[type["Swap"]]
+    Permutation: ClassVar[type["Permutation"]]
 
     ob = Ty
-    layer_factory = Layer
+    Layer = Layer
 
     dagger_involution = DaggerCategory.dagger_involution
     dagger_contravariance = DaggerCategory.dagger_contravariance
@@ -276,8 +277,8 @@ class Diagram(
             perm = [left.index(k) for k in right]
             result = cls.from_permutation(perm, dom)
             return result  # ty: ignore[invalid-return-type]
-        if cls.cospan_factory.ar is cls:
-            return cls.cospan_factory(apex, left, right)
+        if cls.Cospan.ar is cls:
+            return cls.Cospan(apex, left, right)
         return super().from_cospan(apex, left, right)
 
     @classmethod
@@ -289,7 +290,7 @@ class Diagram(
         >>> assert Diagram.from_function([1, 0, 0], x @ y)\\
         ...     == Cospan(x @ y, [0, 1], [1, 0, 0])
         """
-        if cls.cospan_factory.ar is not cls:
+        if cls.Cospan.ar is not cls:
             return super().from_function(
                 func, dom)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(dom, range(len(dom)), func)
@@ -303,7 +304,7 @@ class Diagram(
         >>> assert Diagram.from_cofunction([1, 0, 0], x @ y)\\
         ...     == Cospan(x @ y, [1, 0, 0], [0, 1])
         """
-        if cls.cospan_factory.ar is not cls:
+        if cls.Cospan.ar is not cls:
             return super().from_cofunction(
                 cofunc, cod)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(cod, cofunc, range(len(cod)))
@@ -327,11 +328,11 @@ class Diagram(
         """
         n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         if phases is None and len(typ) != 1\
-                and getattr(cls, "cospan_factory", None)\
-                and cls.cospan_factory.ar is cls:
+                and getattr(cls, "Cospan", None)\
+                and cls.Cospan.ar is cls:
             spiders = finset.Cospan.spiders(n_legs_in, n_legs_out, len(typ))
             return cls.from_cospan(typ, spiders.left, spiders.right)
-        return interleaving(cls, cls.spider_factory)(
+        return interleaving(cls, cls.Spider)(
             n_legs_in, n_legs_out, typ, phases)
 
     def unfuse(self) -> Diagram:
@@ -359,7 +360,8 @@ class Diagram(
         return F(self)
 
 
-class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
+@Diagram.extend
+class Box(compact.Box, markov.Box, comarkov.Diagram.Box, Diagram):
     """
     A frobenius box is a compact, Markov and comarkov box in a frobenius
     diagram, its rotations keeping its flags as its dagger does, which hold
@@ -417,6 +419,11 @@ class Cospan(Box):
     bijection constructs a :class:`Permutation`, a cospan with one point a
     :class:`Spider`, see :meth:`Diagram.from_cospan`, and the points are
     numbered as :class:`finset.Cospan <discopy.python.finset.Cospan>` does.
+    It is the plumbing of Frobenius diagrams alone, not a slot, and their
+    functions, copies and discards are those of Markov diagrams, their
+    cofunctions, merges and noise those of comarkov ones: a level below,
+    e.g. :mod:`discopy.quantum.zx`, inherits them all and so composes its
+    own spiders and permutations instead.
 
     Parameters:
         apex : The type of each point of the apex.
@@ -442,19 +449,23 @@ class Cospan(Box):
         :align: center
     """
     def __new__(cls, apex: Ty | None = None, left=None, right=None):
-        if apex is None or cls is not cls.ar.cospan_factory:
+        if apex is None or cls is not cls.ar.Cospan:
+            # the box a slot builds, which pylint misreads
+            # pylint: disable-next=no-value-for-parameter
             return super().__new__(cls)
         left, right = list(
             left), list(right)  # ty: ignore[invalid-argument-type]
         if len(apex) == 1 and not any(left + right)\
                 and not len(left) == len(right) == 1:
-            factory = {(2, 0): cls.ar.cup_factory, (0, 2): cls.ar.cap_factory
+            factory = {(2, 0): cls.ar.Cup, (0, 2): cls.ar.Cap
                        }.get((len(left), len(right)))
             return factory(apex, apex) if factory\
-                else cls.ar.spider_factory(len(left), len(right), apex)
+                else cls.ar.Spider(len(left), len(right), apex)
         if len(left) == len(right) == len(apex)\
                 and sorted(left) == sorted(right) == list(range(len(apex))):
             return cls.ar.from_cospan(apex, left, right)
+        # the box a slot builds, which pylint misreads
+        # pylint: disable-next=no-value-for-parameter
         return super().__new__(cls)
 
     def __init__(self, apex: Ty, left, right):
@@ -527,14 +538,16 @@ class Cospan(Box):
         points = [self.apex[k:k + 1] for k in range(len(self.apex))]
         spiders = []
         for x, m, n in zip(points, ins, outs):
-            spider = x if (m, n) == (1, 1) else Cup(x, x) if (m, n) == (2, 0)\
-                else Cap(x, x) if (m, n) == (0, 2) else Spider(m, n, x)
+            spider = x if (m, n) == (1, 1)\
+                else self.Cup(x, x) if (m, n) == (2, 0)\
+                else self.Cap(x, x) if (m, n) == (0, 2)\
+                else self.Spider(m, n, x)
             if spiders and isinstance(spider, Ty)\
                     and isinstance(spiders[-1], Ty):
                 spiders[-1] = spiders[-1] @ spider
             else:
                 spiders.append(spider)
-        middle = self.layer_factory(*spiders, normalise=False)
+        middle = self.Layer(*spiders, normalise=False)
         return self.ar.from_permutation(gather.dagger(), self.dom)\
             >> self.ar((middle, ), middle.dom, middle.cod)\
             >> self.ar.from_permutation(scatter, middle.cod)
@@ -602,13 +615,13 @@ class Cospan(Box):
         >>> assert Spider(1, 0, x).tensor(y, Cup(x, x))\\
         ...     == Cospan(x @ y @ x, [0, 1, 2, 2], [1])
         """
-        if not self.ar.layer_factory.is_plumbing_box(self):
+        if not self.ar.Layer.is_plumbing_box(self):
             return self.ar.tensor(self, *others)
         left, right, apex = self.legs.left, self.legs.right, self.apex
         plumbing = 0
         while plumbing < len(others) and (
                 isinstance(others[plumbing], Ty)
-                or self.ar.layer_factory.is_plumbing_box(others[plumbing])
+                or self.ar.Layer.is_plumbing_box(others[plumbing])
                 or isinstance(others[plumbing], Diagram)
                 and not others[plumbing].inside):
             other, plumbing = others[plumbing], plumbing + 1
@@ -626,7 +639,7 @@ class Cospan(Box):
 
     def __rmatmul__(self, other):
         if not isinstance(other, Ty)\
-                or not self.ar.layer_factory.is_plumbing_box(self):
+                or not self.ar.Layer.is_plumbing_box(self):
             return super(Box, self).__rmatmul__(other)
         cospan = finset.Cospan.id(len(other)) @ self.legs
         return self.ar.from_cospan(
@@ -640,6 +653,7 @@ class Cospan(Box):
         return f"Cospan({self.apex}, {self.legs.left}, {self.legs.right})"
 
 
+@Diagram.extend
 class Cup(compact.Cup, Box):
     """
     A frobenius cup is a compact cup in a frobenius diagram, i.e. the spider
@@ -674,6 +688,7 @@ class Cup(compact.Cup, Box):
             self.affine = False
 
 
+@Diagram.extend
 class Cap(compact.Cap, Box):
     """
     A frobenius cap is a compact cap in a frobenius diagram, i.e. the spider
@@ -698,6 +713,7 @@ class Cap(compact.Cap, Box):
             self.deterministic = self.affine = False
 
 
+@Diagram.extend
 class Permutation(
         compact.Permutation, markov.Permutation, comarkov.Permutation, Box):
     """
@@ -713,7 +729,8 @@ class Permutation(
     tensor, fuse = Cospan.tensor, Cospan.fuse
 
 
-class Swap(Permutation, compact.Swap, markov.Swap, comarkov.Swap, Box):
+@Diagram.extend
+class Swap(Permutation, compact.Swap, markov.Swap, comarkov.Diagram.Swap, Box):
     """
     A frobenius swap is a compact, Markov and comarkov swap in a frobenius
     diagram.
@@ -886,17 +903,7 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
-    """
-    A Frobenius sum is a sum of Frobenius diagrams.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
@@ -1006,18 +1013,13 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.functor_factory = Functor
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.swap_factory = Swap
-Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
-Diagram.permutation_factory = Permutation
-Diagram.cospan_factory = Cospan
+Diagram.Spider = Spider  # ty: ignore[invalid-assignment]
+Diagram.Cospan = Cospan
+Diagram.Function, Diagram.Cofunction = markov.Function, comarkov.Cofunction
+Diagram.Copy, Diagram.Discard = markov.Copy, markov.Discard
+Diagram.Merge, Diagram.Noise = comarkov.Merge, comarkov.Noise
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
-Diagram.sum_factory = Sum
 Diagram.str_transparency = compact.Diagram.str_transparency.modulo(
     Diagram.to_hypergraph)
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -1033,3 +1035,5 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
 
 
 Bubble = Box.from_args
+
+export(__name__)

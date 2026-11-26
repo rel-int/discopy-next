@@ -22,7 +22,7 @@ def test_select_to_path():
 
 def test_scalar_grad_and_lambdify():
     assert Scalar(2 * x).grad(x).data == 2
-    assert Scalar(2 * x).grad(y) == Diagram.sum_factory((), Ty(), Ty())
+    assert Scalar(2 * x).grad(y) == Diagram.Sum((), Ty(), Ty())
     assert Scalar(2 * x).lambdify(x)(3) == Scalar(6)
     assert Scalar(x ** 2).grad(x).data == 2 * x
 

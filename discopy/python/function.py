@@ -94,7 +94,7 @@ class Function(Category[Ty, "Function"]):
     type_checking = True
 
     @classmethod
-    def equation_factory(cls, *terms: "Function") -> Extensional:
+    def Equation(cls, *terms: "Function") -> Extensional:
         """
         The equation of a law, compared by the graphs of its terms on the
         :meth:`arguments` of their domain, see :class:`testable.Extensional`.

@@ -53,7 +53,7 @@ from discopy.matrix import Matrix
 from discopy.monoidal import Colour
 from discopy.tensor import Dim, Tensor
 from discopy.testable import no_strategy
-from discopy.utils import AxiomError, factory, factory_name, from_tree
+from discopy.utils import export, AxiomError, factory, factory_name, from_tree
 
 white, black = Colour("white"), Colour("black")
 """ The colours of the two regions, the page and the inside of a cut. """
@@ -116,7 +116,7 @@ class Diagram(monoidal.Diagram):
         def ar_map(box):
             negative = diagram.negative_functor()
             return box.rebuild(dom=negative(box.dom), cod=negative(box.cod))
-        return diagram.functor_factory(
+        return diagram.Functor(
             ob_map, ar_map, dom=diagram, cod=diagram, colour_map=NEGATIVE)
 
     def negative(self) -> Diagram:
@@ -187,6 +187,7 @@ class Diagram(monoidal.Diagram):
         return ~(~self @ ~other)
 
 
+@Diagram.extend
 class Box(monoidal.Box, Diagram):
     """
     An alpha box is a proposition, a box on the unit type of its region,
@@ -253,22 +254,7 @@ got white inside white.
         return cls(arg, dom=dom, cod=cod, **kwargs)
 
 
-class Sum(monoidal.Sum, Box):
-    """
-    A formal sum of alpha diagrams with the same boundary, which a model
-    reads as the union of their relations in the white region. Like every
-    structure of the black region, a black sum is the white one conjugated
-    by ¬, i.e. the intersection, so that the negative of a sum is still
-    its complement.
-
-    >>> p, q = Box('p'), Box('q')
-    >>> M = Model(ar={'p': True, 'q': False})
-    >>> assert isinstance(p + q, Sum) and M(p + q) == M(p) + M(q)
-    >>> assert M((p + q).negative()) == M(~(p + q))
-    >>> assert not M((p + q).negative()).array.any()
-    """
-
-
+@Diagram.extend
 class Functor(monoidal.Functor):
     """
     An alpha functor is a monoidal functor that sends a :class:`Cut` to the
@@ -347,7 +333,7 @@ class Model:
             return Tensor[bool](self.ar[box.name], *map(
                 functor, (box.dom, box.cod)))
 
-        functor = dom.functor_factory(
+        functor = dom.Functor(
             ob_map, ar_map, dom=dom, cod=Tensor[bool],
             colour_map=lambda _: None)
         return functor
@@ -359,8 +345,7 @@ class Model:
             else result.map(operator.not_, dtype=bool)
 
 
-Diagram.box_factory = Box
-Diagram.sum_factory = Sum
-Diagram.functor_factory = Functor
 Model.diagram = Diagram
 Id = Diagram.id
+
+export(__name__)

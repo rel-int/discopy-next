@@ -427,7 +427,7 @@ def test_parameterisation():
     from discopy import frobenius
     assert H == Hypergraph[frobenius.Diagram]
     assert H.category == frobenius.Diagram
-    assert H.functor == frobenius.Functor == H.category.functor_factory
+    assert H.functor == frobenius.Functor == H.category.Functor
     assert H.ob == frobenius.Ty
 
 
@@ -469,7 +469,7 @@ def test_Hypergraph_cap_after_states():
         assert decoded in (diagram, diagram.foliation())
     # f @ Cap(x, x) whiskers the cap into a cospan after f, as h @ Swap(x, x)
     # gives a permutation after h, and decodes to them side by side.
-    side_by_side = Diagram((Diagram.layer_factory(Ty(), f, Cap(x, x)), ),
+    side_by_side = Diagram((Diagram.Layer(Ty(), f, Cap(x, x)), ),
                            Ty(), x @ x @ x)
     assert (f @ Cap(x, x)).to_hypergraph().to_diagram() == side_by_side
 
@@ -671,19 +671,19 @@ def test_planar_comparison():
     x, y = braided.Ty('x'), braided.Ty('y')
     braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
     assert braid.to_hypergraph() != inverse.to_hypergraph()
-    assert not braided.Diagram.equation_factory(braid, inverse)
+    assert not braided.Diagram.Equation(braid, inverse)
     x = balanced.Ty('x')
     twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
     assert twist.to_hypergraph() != identity.to_hypergraph()
-    assert not balanced.Diagram.equation_factory(twist, identity)
+    assert not balanced.Diagram.Equation(twist, identity)
     x = rigid.Ty('x')
     left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
     right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
     assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
-    assert not rigid.Diagram.equation_factory(left, right)
+    assert not rigid.Diagram.Equation(left, right)
     x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
     assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
-    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
+    assert not monoidal.Diagram.Equation(scalar @ x, x @ scalar)
 
 
 def test_cups_and_caps_read_the_host_category():
@@ -732,7 +732,7 @@ def test_sum_has_no_hypergraph():
     x = Ty('x')
     f, g = Box('f', x, x), Box('g', x, x)
     for convert in (Diagram.to_hypergraph, Diagram.to_map):
-        for diagram in (f + g, (f + g) @ x, Diagram.sum_factory((), x, x)):
+        for diagram in (f + g, (f + g) @ x, Diagram.Sum((), x, x)):
             with raises(AxiomError, match="has no sums"):
                 convert(diagram)
 
@@ -1221,7 +1221,7 @@ def test_Hypergraph_make_monogamous_carries_leg_order():
 def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
     """
     The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
-    of ``trace_factory``: a class, where the whole nest is one trace box on
+    of ``Trace``: a class, where the whole nest is one trace box on
     the diagram, and a class method, where the cups and caps of a pivotal
     category are atomic and the nest is the onion of ``n`` pairs. So taking
     them in one pass is the same term, not just the same morphism.
@@ -1274,12 +1274,12 @@ def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
 def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
     """
     The onion in one call *is* the pivotal trace, so it is built only when
-    ``trace_factory`` is pivotal's own class method: a category overriding it
+    ``Trace`` is pivotal's own class method: a category overriding it
     gets the nest its own factory builds, one wire at a time, rather than the
     cups and caps it never asked for.
     """
     from discopy import frobenius, pivotal
-    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+    pivotal_trace, calls = pivotal.Diagram.Trace.__func__, []
 
     def overridden(cls, diagram, left=False):
         calls.append(left)
@@ -1289,7 +1289,7 @@ def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
     graph = frobenius.Box('f', x ** 8, x ** 8).to_hypergraph()
     onion = graph.explicit_trace(4)
     monkeypatch.setattr(
-        frobenius.Diagram, "trace_factory", classmethod(overridden))
+        frobenius.Diagram, "Trace", classmethod(overridden))
     assert graph.explicit_trace(4) == onion
     monkeypatch.undo()
     assert calls == 4 * [False]

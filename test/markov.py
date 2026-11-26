@@ -22,10 +22,10 @@ def test_Discard_has_no_copies():
 
 def test_spider_factory():
     x = Ty('x')
-    assert Diagram.spider_factory(1, 3, x) == Copy(x, 3)
+    assert Diagram.Spider(1, 3, x) == Copy(x, 3)
     for n_legs_in, n_legs_out, phase in [(2, 2, None), (2, 1, None), (1, 2, .5)]:
         with raises(ValueError, match="only spiders of markov.Diagram"):
-            Diagram.spider_factory(n_legs_in, n_legs_out, x, phase)
+            Diagram.Spider(n_legs_in, n_legs_out, x, phase)
 
 
 def test_Copy_dagger():
@@ -104,7 +104,7 @@ def test_neural_network():
 
 def test_Permutation():
     x, y, z = map(Ty, "xyz")
-    assert Diagram.permutation_factory is Permutation
+    assert Diagram.Permutation is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     assert isinstance(perm, Box) and perm.cod == z @ x @ y
     assert Equation(perm >> perm.dagger(), Id(x @ y @ z))
@@ -141,7 +141,7 @@ def test_copy_factory():
     class RecipeDiscard(Discard, RecipeCopy):
         """ The discard of an ingredient. """
 
-    Recipe.copy_factory, Recipe.discard_factory = RecipeCopy, RecipeDiscard
+    Recipe.Copy, Recipe.Discard = RecipeCopy, RecipeDiscard
     x = Ty('x')
     assert isinstance(Recipe.copy(x).boxes[0], RecipeCopy)
     assert isinstance(RecipeCopy(x, 0), RecipeDiscard)
