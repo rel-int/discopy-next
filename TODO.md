@@ -12,6 +12,6 @@
 - [x] Exponentials and time on slots: biclosed, closed, feedback, stream, bang, interaction
 - [x] Terms on slots, on Ty and TermBase
 - [x] Applications on slots: lambek, quantum, optyx, neural, peirce, egraph and the rest
-- [ ] Generator(Slot, Rule): rule and premises on root classes, one functor dispatch through box.rule, Rule.admissible
+- [WIP] @T-6271be71-c7d7-4ae7-bf06-85bc2b06ce22-2026-11-26 17:01 Generator(Slot, Rule): rule and premises on root classes, one functor dispatch through box.rule, Rule.admissible
 - [ ] Plumbing as an admissible rule; structural_boxes read from declarations, the boundary law replacing assert_structural_boxes
 - [ ] Regenerate DisCoLean/ABC.lean if needed, remove the shim, docs and changelog
