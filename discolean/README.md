@@ -67,7 +67,7 @@ algorithms there is followed here, or the differential test says so.
 | [`DisCoLean/Premonoidal/Diagram.lean`](DisCoLean/Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
 | [`DisCoLean/Premonoidal/Functor.lean`](DisCoLean/Premonoidal/Functor.lean) | strict premonoidal functors, the functor out of Diagram(S) and its uniqueness |
 | [`DisCoLean/Premonoidal/Oracle.lean`](DisCoLean/Premonoidal/Oracle.lean) | diagrams read and written as `Diagram.encode` does, for the oracle |
-| [`test_premonoidal.py`](test_premonoidal.py) | the differential test of diagrams against `monoidal.Diagram` |
+| [`test_premonoidal.py`](test_premonoidal.py) | the differential test of diagrams against `monoidal.Diagram`, and of the layout against `to_drawing` |
 | [`DisCoLean/Terms/Cat.lean`](DisCoLean/Terms/Cat.lean) | the terms of `cat`, nameless, and the five laws of `cat.TermBase` |
 | [`DisCoLean/Terms/Monoidal.lean`](DisCoLean/Terms/Monoidal.lean) | planar linear terms of `monoidal`, their diagrams and the reading of a diagram |
 | [`DisCoLean/Statements/Terms.lean`](DisCoLean/Statements/Terms.lean) | what is proved of the terms, restated |
@@ -75,7 +75,7 @@ algorithms there is followed here, or the differential test says so.
 | [`DisCoLean/Statements/Isotopy.lean`](DisCoLean/Statements/Isotopy.lean) | what is proved of the tween, restated |
 | [`DisCoLean/Drawing.lean`](DisCoLean/Drawing.lean) | the layered drawing of a diagram, one strip per layer on a grid: every strip is plane, and the drawing is a functor, composition stacking strips and whiskering adding wires |
 | [`DisCoLean/Statements/Drawing.lean`](DisCoLean/Statements/Drawing.lean) | what is proved of the layered drawing, restated |
-| [`DisCoLean/Layout.lean`](DisCoLean/Layout.lean) | the `make_space` layout of `to_drawing`: `make_space` never brings two points closer, `then` and `tensor` keep layouts plane, the loop of `then` aligns the wires, and the layout of every diagram is plane |
+| [`DisCoLean/Layout.lean`](DisCoLean/Layout.lean) | the layout of `to_drawing`, modelled exactly in [`DisCoLean/Layout/Model.lean`](DisCoLean/Layout/Model.lean) and checked against the Python by `test_layout`: `make_space` never brings two points closer, the row of every layer is good, recentering its outputs keeps it good, the loop of `then` aligns the wires, and the layout of every diagram is plane |
 | [`DisCoLean/Statements/Layout.lean`](DisCoLean/Statements/Layout.lean) | what is proved of the `make_space` layout, restated |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` in a theorem of `DisCoLean/Statements`, which restates the main ones; other files are not audited |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
