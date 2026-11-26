@@ -447,7 +447,7 @@ class Kronecker(Realisation):
     >>> fourier(v, shift).round().flatten().tolist()
     [2.0, 4.0, 1.0]
     """
-    fft_from = 64
+    fft_from = 96
     tie: torch.Tensor | None
 
     def __init__(self, dom: Action, cod: Action, fft: bool | None = None):
