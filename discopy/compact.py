@@ -7,6 +7,7 @@ A compact diagram is a symmetric closed diagram, see
 :mod:`discopy.closed.symmetric`, with internal hom ``x ⊸ y = x* @ y``: its
 evaluation and currying are the cups and caps of :mod:`discopy.rigid`.
 
+>>> from discopy import closed
 >>> x, y, z = map(Ty, "xyz")
 >>> f = Box('f', x @ y, z)
 >>> assert isinstance(f, closed.symmetric.Diagram)
