@@ -1556,4 +1556,6 @@ def test_Functor_reads_a_higher_level_type_as_itself():
         f, F = Box('f', x, x), Functor.id(Diagram)
         assert F(x) == x and F(f).dom == F(f.dom) and F(f >> f) == f >> f
         assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
-
+    G = rigid.Functor({rigid.Ty('y'): rigid.Ty('z')}, {})
+    F = Functor(lambda _: G(rigid.Wire('y')), {})  # G reads its own level
+    assert F(Ty('x')) == rigid.Ty('z')

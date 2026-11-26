@@ -2757,8 +2757,11 @@ class Sum(cat.Sum, Box):
 # The type a wire is read in while its type is mapped: the type itself when
 # it is of the level of the domain or above, so that a functor reads a type
 # of a higher level as that type (next#703). A context variable, not an
-# attribute of the functor, so that concurrent calls do not share it.
-_WIRE_LEVEL: ContextVar[type | None] = ContextVar("WIRE_LEVEL", default=None)
+# attribute of the functor, so that concurrent calls do not share it, and
+# paired with the functor that set it, so that another functor called from
+# an object map reads its own domain's level.
+_WIRE_LEVEL: ContextVar[tuple[object, type] | None] = ContextVar(
+    "WIRE_LEVEL", default=None)
 
 
 class Functor(cat.Functor):
@@ -2888,7 +2891,7 @@ class Functor(cat.Functor):
                 return self.cod.ob.id(self(other.dom))
             level = other.factory if isinstance(other, self.dom.ob)\
                 else self.dom.ob
-            token = _WIRE_LEVEL.set(level)
+            token = _WIRE_LEVEL.set((self, level))
             try:
                 head, *tail = map(self, other.inside)
             finally:
@@ -2899,7 +2902,8 @@ class Functor(cat.Functor):
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
                 return self(other.dagger()).dagger()
-            level = _WIRE_LEVEL.get() or self.dom.ob
+            owner, level = _WIRE_LEVEL.get() or (self, self.dom.ob)
+            level = level if owner is self else self.dom.ob
             result = super().__call__(level(other))
             if isinstance(other, Wire) and isinstance(result, Ty):
                 expected = self(other.dom), self(other.cod)
