@@ -1104,3 +1104,35 @@ def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
         bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
         assert alignment == ("bottom" if dagger else "top")
         assert bottom < j < top
+
+
+def test_frame_sides_have_an_edge_between_two_colours():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Wire
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.widths = []
+
+        def draw_wire(self, source, target, *args, **params):
+            self.widths.append(params.get("linewidth"))
+
+        def draw_text(self, text, i, j, **params):
+            pass
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    framed, recorder = Recorder(), Recorder()
+    Box('f', x, x).bubble(dom=x, cod=x, draw_as_frame=True).draw(
+        backend=framed)
+    assert framed.widths and 0 not in framed.widths
+    Box('f', x, x).to_drawing().slot(None).draw(backend=recorder)
+    assert 0 in recorder.widths
+    coloured = Ty(Wire('x', Colour('red'), Colour('blue')))
+    coloured_slot = Recorder()
+    Box('f', coloured, coloured).to_drawing().slot(None).draw(
+        backend=coloured_slot)
+    assert 0 not in coloured_slot.widths

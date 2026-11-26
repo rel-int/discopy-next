@@ -1009,6 +1009,14 @@ class Backend(ABC):
         return typ is not None and getattr(
             typ.inside[0], "frame_boundary", False)
 
+    @staticmethod
+    def same_colour_on_both_sides(typ):
+        """ Whether the regions on either side of a wire have one colour. """
+        if typ is None or not typ.inside:
+            return True
+        x = typ.inside[0]
+        return str(getattr(x, "dom", None)) == str(getattr(x, "cod", None))
+
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
         # With smooth wires, the strands over, the wires that go on from them
@@ -1030,9 +1038,12 @@ class Backend(ABC):
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
-            # The sides of a frame are drawn with zero width.
-            is_frame_boundary = self.is_frame_boundary(source)\
-                or self.is_frame_boundary(target)
+            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
+            # The sides of a frame are drawn with zero width only between two
+            # regions of the same colour, e.g. the slot of an equation's term.
+            is_frame_boundary = (self.is_frame_boundary(source)
+                                 or self.is_frame_boundary(target))\
+                and self.same_colour_on_both_sides(typ)
             if source.kind in ["dom", "box_cod"]:
                 self.draw_wire_label(source.x, *source_position, **params)
             if source_position == target_position:
@@ -1041,7 +1052,6 @@ class Backend(ABC):
                    for n in (source, target)):
                 continue  # crossings are drawn on their own
             bend_out, bend_in = source.kind == "box", target.kind == "box"
-            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             if params.get("smooth_wires") and not (
                     bend_out or bend_in or is_frame_boundary):
                 middle = (source_position[1] + target_position[1]) / 2
