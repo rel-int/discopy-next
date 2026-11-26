@@ -157,6 +157,7 @@ and a :class:`discopy.markov.Application` may use one twice.
 from __future__ import annotations
 
 import itertools
+from contextvars import ContextVar
 from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
@@ -2753,6 +2754,13 @@ class Sum(cat.Sum, Box):
     to_drawing = Diagram.to_drawing
 
 
+# The type a wire is read in while its type is mapped: the type itself when
+# it is of the level of the domain or above, so that a functor reads a type
+# of a higher level as that type (next#703). A context variable, not an
+# attribute of the functor, so that concurrent calls do not share it.
+_WIRE_LEVEL: ContextVar[type | None] = ContextVar("WIRE_LEVEL", default=None)
+
+
 class Functor(cat.Functor):
     """
     A monoidal functor is a functor that preserves the tensor product.
@@ -2858,21 +2866,6 @@ class Functor(cat.Functor):
             for key, value in tree.get('colour_map', [])})
         return functor
 
-    _wire_level: type | None = None
-    """
-    The type a wire is read in while its type is mapped: the type itself when
-    it is of the level of the domain or above, so that a functor reads a type
-    of a higher level as that type (next#703) and ``F(f).dom == F(f.dom)``.
-
-    >>> from discopy import rigid
-    >>> x = rigid.Ty('x')
-    >>> f = Box('f', x, x)
-    >>> F = Functor.id(Diagram)
-    >>> assert F(x) == x and F(f).dom == F(f.dom)
-    >>> assert F(f >> f) == f >> f
-    >>> assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
-    """
-
     def __call__(self, other):
         if other is None or isinstance(other, Colour):
             if not self.colour_map or (
@@ -2895,18 +2888,19 @@ class Functor(cat.Functor):
                 return self.cod.ob.id(self(other.dom))
             level = other.factory if isinstance(other, self.dom.ob)\
                 else self.dom.ob
-            outer, self._wire_level = self._wire_level, level
+            token = _WIRE_LEVEL.set(level)
             try:
                 head, *tail = map(self, other.inside)
             finally:
-                self._wire_level = outer
+                _WIRE_LEVEL.reset(token)
             return head.tensor(*tail)
         if isinstance(other, self.dom.ob.generator_factory):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
                 return self(other.dagger()).dagger()
-            result = super().__call__((self._wire_level or self.dom.ob)(other))
+            level = _WIRE_LEVEL.get() or self.dom.ob
+            result = super().__call__(level(other))
             if isinstance(other, Wire) and isinstance(result, Ty):
                 expected = self(other.dom), self(other.cod)
                 if (result.dom, result.cod) != expected:
