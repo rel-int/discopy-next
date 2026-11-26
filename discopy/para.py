@@ -210,11 +210,12 @@ def indices(dom: tuple, cod: tuple, free: tuple | None = None) -> Iterator:
     Example
     -------
     >>> assert list(indices("aab", "aba")) == [(0, 2, 1), (1, 2, 0)]
-    >>> assert not list(indices("ab", "aa"))
+    >>> assert not list(indices("ab", "aa")) and not list(indices("ab", "a"))
     """
     free = tuple(range(len(dom))) if free is None else free
     if not cod:
-        yield ()
+        if not free:
+            yield ()
         return
     for i in free:
         rest = tuple(j for j in free if j != i)
@@ -380,9 +381,11 @@ class UpToPermutation:
     wires as multisets, and the inside of one is, up to the equation of the
     underlying category, that of the other reparametrised by a permutation
     `sigma` and recoparametrised by a permutation `tau`, chosen independently.
-    This is decided with no search and no bound, by an isomorphism of the
-    hypergraphs of the insides that fixes the boundary and may permute the
-    parameter and coparameter ports of the same type, see :func:`isomorphic`;
+    This is decided with no bound and no enumeration of the permutations, by
+    an isomorphism of the hypergraphs of the insides (networkx's VF2, itself
+    a backtracking search on the graphs) that fixes the boundary and may
+    permute the parameter and coparameter ports of the same type, see
+    :func:`isomorphic`;
     wires of different types, e.g. adjoint ones, are never exchanged.
 
     The underlying category has to be one of diagrams, e.g. ``Symmetric``,
@@ -683,7 +686,9 @@ class Cell:
     the cells of :class:`Symmetric` with an invertible `inside` are the
     isomorphisms, up to which :class:`UpToPermutation` compares maps. Cells
     compose when their maps are equal up to the equation of the category,
-    see :func:`same`, not only on the nose. A cell covers the parameters
+    see :func:`same`, not only on the nose: the check is in the free
+    category, so no cell relates two maps that agree only on the values of a
+    model, e.g. two compiled networks. A cell covers the parameters
     only and needs parallel maps with the same coparameter: the invertible
     2-cells of maps with coparameters, which also permute those, are only
     searched by :class:`UpToPermutation`. The invertible cells are searched

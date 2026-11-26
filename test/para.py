@@ -288,8 +288,12 @@ def test_cell_invertible():
     assert swap.is_invertible and Cell.id(two).is_invertible
     assert not Cell.reparam(two, Box('r', p @ q, p @ q)).is_invertible
     assert not Cell.reparam(f, r1).is_invertible
+    h = Symmetric(x, y, Box('h', x, y), Ty())
+    assert not Cell.reparam(h, Box('discard', p, Ty())).is_invertible
+    assert Cell.id(h).is_invertible
     assert list(permutations(Diagram, p @ q, q @ p))
     assert not list(permutations(Diagram, p @ q, p @ p))
+    assert not list(permutations(Diagram, p, Ty()))
     assert next(permutations(Diagram, p @ p, p @ p)) == Diagram.id(p @ p)
     assert len(list(permutations(Diagram, p @ p, p @ p))) == 2
 
