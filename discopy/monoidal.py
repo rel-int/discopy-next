@@ -2818,6 +2818,21 @@ class Functor(cat.Functor):
             for key, value in tree.get('colour_map', [])})
         return functor
 
+    _wire_level: type | None = None
+    """
+    The type a wire is read in while its type is mapped: the type itself when
+    it is of the level of the domain or above, so that a functor reads a type
+    of a higher level as that type (next#703) and ``F(f).dom == F(f.dom)``.
+
+    >>> from discopy import rigid
+    >>> x = rigid.Ty('x')
+    >>> f = Box('f', x, x)
+    >>> F = Functor.id(Diagram)
+    >>> assert F(x) == x and F(f).dom == F(f.dom)
+    >>> assert F(f >> f) == f >> f
+    >>> assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
+    """
+
     def __call__(self, other):
         if other is None or isinstance(other, Colour):
             if not self.colour_map or (
@@ -2838,14 +2853,20 @@ class Functor(cat.Functor):
                 if not issubclass(self.cod.ob, abc.Category):
                     return self.cod.ob()
                 return self.cod.ob.id(self(other.dom))
-            head, *tail = map(self, other.inside)
+            level = other.factory if isinstance(other, self.dom.ob)\
+                else self.dom.ob
+            outer, self._wire_level = self._wire_level, level
+            try:
+                head, *tail = map(self, other.inside)
+            finally:
+                self._wire_level = outer
             return head.tensor(*tail)
         if isinstance(other, self.dom.ob.generator_factory):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
                 return self(other.dagger()).dagger()
-            result = super().__call__(self.dom.ob(other))
+            result = super().__call__((self._wire_level or self.dom.ob)(other))
             if isinstance(other, Wire) and isinstance(result, Ty):
                 expected = self(other.dom), self(other.cod)
                 if (result.dom, result.cod) != expected:
