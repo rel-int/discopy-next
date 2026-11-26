@@ -62,8 +62,21 @@ class Ty(closed.monoidal.Ty):
 
     >>> x, y = Ty('x'), Ty('y')
     >>> assert x << y == x ** y == y >> x
+
+    Its terms, those of the linear lambda calculus, are not implemented: a
+    type applied to a name or a function raises, see
+    :mod:`discopy.closed.markov` for the terms of a closed Markov category.
+
+    >>> x('a')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError: A symmetric closed type has no terms yet, see \
+discopy.closed.markov.
     """
     generator_factory = Wire
+
+    def __call__(self, arg):
+        raise NotImplementedError(messages.NO_SYMMETRIC_CLOSED_TERMS)
 
 
 class Exp(Wire, closed.monoidal.Exp):

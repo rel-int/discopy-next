@@ -5,8 +5,8 @@
 `discopy.closed` was the free closed Markov category: exponentials and copy and discard in one
 module, `abc.ClosedCategory` a `BiclosedCategory` and a `MarkovCategory`. `discopy.biclosed` was
 the planar level beside it. A compact category is symmetric monoidal closed, with
-`x ⊸ y = x* @ y`, and it has no copy, so `compact` could not subclass `closed`. Alexis ruled
-on 2026-11-25: "compact is not a subclass of closed which is a mistake due to fear of
+`x ⊸ y = x* @ y`, and the free one has no copy, so `compact` could not subclass `closed`.
+Alexis ruled on 2026-11-25: "compact is not a subclass of closed which is a mistake due to fear of
 boilerplate, we should fix it. that means we can't have closed be markov by default, we could
 have a whole subpackage with closed.monoidal (current biclosed), closed.symmetric and
 closed.markov", and "let's do the closed split in a first PR", then: "it seems like we need
@@ -40,6 +40,8 @@ a subsubpackage feedback.closed.symmetric and feedback.closed.markov".
   first and keeps the `braid_factory`, `twist_factory`, `term_factory` and `dagger_monoidality`
   of `symmetric.Diagram` by name, as `frobenius.Diagram` keeps the `map_agreement` and
   `term_factory` of `markov.Diagram`: every class below them resolves each name as before.
+- A `closed.symmetric` type makes no terms yet: the linear lambda calculus with one exponential
+  is a later pull request, and `closed.markov` has the terms it had.
 - `rigid` and `pivotal` were under `closed.monoidal` already: `rigid.Diagram` subclasses it.
 - `feedback.closed.symmetric`, the traced symmetric closed category with no copy, is the next
   pull request.

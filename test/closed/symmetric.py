@@ -34,3 +34,12 @@ def test_functor_keeps_swaps_and_evaluations():
 def test_curry_has_no_dagger():
     with raises(AxiomError):
         Box('f', Ty('x', 'y'), Ty('x')).curry().dagger()
+
+
+def test_types_make_no_terms():
+    from discopy import closed
+    x = Ty('x')
+    for arg in ('a', lambda v: v):
+        with raises(NotImplementedError):
+            x(arg)
+    assert isinstance(closed.markov.Ty('x')('a'), closed.markov.Constant)
