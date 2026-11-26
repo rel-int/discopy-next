@@ -6,5 +6,5 @@
 
 - [WIP] @T-dc6d2cec-2026-11-26 11:41 Reference API order: syntax, semantics, drawing, lambek, neural, optyx, quantum
 - [WIP] @T-dc6d2cec-2026-11-26 11:41 Drawing on its own page docs/api/drawing.rst, out of semantics, shown once
-- [ ] Short names in every autosummary entry and title, with a test that fails on a full name
+- [WIP] @T-dc6d2cec-2026-11-26 11:41 Short names in every autosummary entry and title, with a test that fails on a full name
 - [ ] Changelog entry
