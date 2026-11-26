@@ -1619,8 +1619,12 @@ which to_drawing recomputes.
 
     def frame(self, *others: Drawing,
               dom=None, cod=None, name=None, draw_vertically=False,
-              frame_colour=None) -> Drawing:
+              frame_colour=None, min_width=0) -> Drawing:
         """
+        Draw a frame around ``self`` and ``others``, side by side or one on
+        top of the other when ``draw_vertically``, at least ``min_width``
+        wide, e.g. to leave room for a label drawn in one of its corners.
+
         >>> from discopy.monoidal import *
         >>> x, y = Ty('x'), Ty('y')
         >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
@@ -1653,8 +1657,12 @@ which to_drawing recomputes.
             ) if draw_vertically else dict(
                 height=max([arg.height for arg in args] + [0]))
         slots = tuple(arg.slot(colour, **params) for arg in args)
-        result = getattr(slots[0], method)(*slots[1:]).bubble(
+        inside = getattr(slots[0], method)(*slots[1:])
+        result = inside.bubble(
             dom, cod, name, draw_as_square=True, frame_sides=True)
+        if result.width < min_width:
+            result = inside.bubble(dom, cod, name, width=min_width,
+                                   draw_as_square=True, frame_sides=True)
         result.reposition_box_dom()
         result.reposition_box_cod()
         return result

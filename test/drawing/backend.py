@@ -1215,3 +1215,57 @@ def test_left_to_right_args_in_the_variants_of_a_box():
         "W": (True, False), "dagger": (True, True),
         "transpose": (False, True), "conjugate": (False, False),
         "reflected": (False, False)}
+
+
+def test_frame_has_the_corner_of_its_variant_cut():
+    from discopy import pivotal
+    from discopy.drawing.backend import Backend
+    from discopy.utils import Point
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.polygons, self.texts = [], {}
+
+        def draw_polygon(self, *points, **params):
+            self.polygons.append(points)
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.setdefault(text, []).append(Point(i, j))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x, y = pivotal.Ty('x'), pivotal.Ty('y')
+    f, g = pivotal.Box('f', x, y), pivotal.Box('g', y, x)
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W",
+                    draw_as_frame=True)
+    chopped, labelled = {}, {}
+    for name, diagram in [("W", W), ("dagger", W[::-1]),
+                          ("transpose", W.r), ("conjugate", W[::-1].r),
+                          ("reflected", W.r.to_drawing().dagger())]:
+        recorder = Recorder()
+        diagram.draw(backend=recorder, asymmetry=.25)
+        points = [p for ps in recorder.polygons for p in ps]
+        middle = Point(*((min(p[k] for p in points) + max(
+            p[k] for p in points)) / 2 for k in (0, 1)))
+        (a, b), = (ps for ps in recorder.polygons if len(ps) == 2)
+        chopped[name] = ((a.x + b.x) / 2 > middle.x,
+                         (a.y + b.y) / 2 > middle.y)
+        (label, ), = [recorder.texts["W"]]
+        labelled[name] = (label.x > middle.x, label.y > middle.y)
+    assert chopped == {  # Whether the corner cut off is right, top.
+        "W": (True, False), "dagger": (True, True),
+        "transpose": (False, True), "conjugate": (False, False),
+        "reflected": (False, False)}
+    assert labelled == {  # The label in the corner opposite the cut.
+        name: (not right, not top) for name, (right, top) in chopped.items()}
+    from discopy.utils import text_width
+    name = "a_label_much_much_wider_than_its_frame"
+    recorder = Recorder()
+    pivotal.Box('W', x, y, args=(f, ), drawing_name=name, draw_as_frame=True
+                ).draw(backend=recorder, asymmetry=.25)
+    xs = [p[0] for ps in recorder.polygons for p in ps]
+    (label, ), = [recorder.texts[name]]
+    assert min(xs) < label.x - text_width(name) / 2
+    assert label.x + text_width(name) / 2 < max(xs)

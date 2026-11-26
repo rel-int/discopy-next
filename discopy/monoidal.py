@@ -2715,7 +2715,6 @@ class Box(cat.Box, Diagram):
             for attr in ("is_transpose", "is_conjugate"):
                 setattr(box, attr, bool(getattr(self, attr, False)))
             return box.to_drawing()
-        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
@@ -2725,7 +2724,9 @@ class Box(cat.Box, Diagram):
             return Drawing.bubble(*args, **kwargs)
         result = Drawing.frame(
             *args, draw_vertically=self.draw_vertically,
-            frame_colour=self.frame_colour, **kwargs)
+            frame_colour=self.frame_colour, min_width=text_width(
+                self.drawing_name) + .5 if self.drawing_name else 0,
+            **kwargs)
         # Its top and bottom edges draw the corner cut off as for a box, and
         # its label in the corner opposite, see Backend.draw_frame_corner.
         corner = (0 if getattr(self, "is_conjugate", False) else
