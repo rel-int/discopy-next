@@ -73,7 +73,7 @@ def test_short_names(path):
 def bases(cls):
     """ The bases of a class as the docs extension shows them. """
     spec = importlib.util.spec_from_file_location(
-        "bases", ROOT / "docs" / "_ext" / "bases-fullname.py")
+        "bases", ROOT / "docs" / "_ext" / "bases.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     result = list(cls.__dict__.get("__orig_bases__", cls.__bases__))
