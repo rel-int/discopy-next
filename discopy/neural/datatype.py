@@ -36,8 +36,8 @@ the fold of a term a lax algebra of the free monad of the datatype, in the
 The free monad is the free category of the terms with holes, so every
 coherence law is a :class:`discopy.para.Cell` between maps of a given shape,
 checked by the equation of its category: :meth:`Algebra.lift` is the free
-monad on maps, :meth:`Algebra.unitality` and :meth:`Algebra.associativity`
-are the cells of the lax algebra, copies of the parameter, and
+monad on maps, :meth:`Algebra.lift_cell` on cells,
+:meth:`Algebra.unitality` and :meth:`Algebra.associativity` are the cells of the lax algebra, copies of the parameter, and
 :class:`LaxHomomorphism` the folds of a datatype that are lax and not tied.
 The base is the free copy-discard category: no box is copyable or
 discardable, so a reparametrisation by a box is rejected by every cell
@@ -477,26 +477,22 @@ class Algebra:
             self.param, len(term.boxes)))
 
     def lift(self, term: markov.Diagram, *maps, param=None
-             ) -> para.Symmetric | para.Cell:
+             ) -> para.Symmetric:
         """
         The free monad on a map, i.e. the term with its holes filled by maps
         of this category: the image of the data is the identity of its image,
         and the parameter of the maps is copied into every hole, discarded if
-        there are none (*Categorical Deep Learning*, Appendix G.8). If the
-        maps are cells with the same inside, so is the result, which the
-        equation of the cell rejects unless the inside commutes with the
-        copy.
+        there are none (*Categorical Deep Learning*, Appendix G.8).
 
         Parameters:
             term : A diagram of constructors, with holes.
-            maps : A parametric map or a cell for each hole, with one
-                parameter.
+            maps : A parametric map for each hole, with one parameter.
             param : The parameter of the maps, needed when there are none.
 
         Raises:
-            ValueError : If the algebra is not parametric, the maps are both
-                maps and cells, there are no maps and no parameter, the
-                parameters differ or the maps are not as many as the holes.
+            ValueError : If the algebra is not parametric, a map is a cell,
+                there are no maps and no parameter, the parameters differ or
+                the maps are not as many as the holes.
 
         Example
         -------
@@ -513,15 +509,8 @@ class Algebra:
         >>> assert F.lift(nil, param=P).param == P
         """
         require_parametric(self)
-        cells = [isinstance(m, para.Cell) for m in maps]
-        if any(cells) and not all(cells):
-            raise ValueError("Expected maps or cells.")
-        if maps and all(cells):
-            if any(m.inside != maps[0].inside for m in maps):
-                raise ValueError("Expected cells with the same inside.")
-            return para.Cell(
-                self.lift(term, *(m.dom for m in maps), param=param),
-                self.lift(term, *(m.cod for m in maps)), maps[0].inside)
+        if any(isinstance(m, para.Cell) for m in maps):
+            raise ValueError("Expected maps, got a cell.")
         params = [m.param for m in maps] + ([] if param is None else [param])
         if not params:
             raise ValueError("Expected a param for a term without holes.")
@@ -530,6 +519,49 @@ class Algebra:
         inside = plug(term.dom, self.datatype.carrier, maps,
                       lambda atom: self.cod.id(self.functor(atom)))
         return inside.reparam(self.cod.category.copy(params[0], len(maps)))
+
+    def lift_cell(self, term: markov.Diagram, *cells, param=None
+                  ) -> para.Cell:
+        """
+        The free monad on a cell: the cells have the same inside, so has the
+        result, which is a cell from the lift of their domains to the lift of
+        their codomains. The equation of the cell rejects it unless the
+        inside commutes with the copy.
+
+        Parameters:
+            term : A diagram of constructors, with holes.
+            cells : A cell for each hole, with one inside, at least one.
+            param : The parameter of the domains, as in :meth:`lift`. The
+                codomains have their own, that of the cells.
+
+        Raises:
+            ValueError : If the algebra is not parametric, there are no cells,
+                a cell is a map, the insides differ or the cells are not as
+                many as the holes.
+
+        Example
+        -------
+        >>> from discopy.markov import Box, Diagram, Ty
+        >>> A, S, P = Ty("A"), Ty("S"), Ty("P")
+        >>> L = Datatype.list(A, S)
+        >>> nil, cons = L.constructors
+        >>> Net = para.Markov[Diagram]
+        >>> z = Net(Ty(), S, Box("z", P, S), param=P)
+        >>> c = Net(A @ S, S, Box("c", A @ S @ P, S), param=P)
+        >>> F = Algebra(L, {nil: z, cons: c}, {A: A, S: S}, Net)
+        >>> cell = para.Cell.id(F(nil))
+        >>> assert F.lift_cell(cons, cell).inside == Diagram.id(P)
+        """
+        require_parametric(self)
+        if not cells:
+            raise ValueError("Expected at least one cell.")
+        if not all(isinstance(c, para.Cell) for c in cells):
+            raise ValueError("Expected cells, got a map.")
+        if any(c.inside != cells[0].inside for c in cells):
+            raise ValueError("Expected cells with the same inside.")
+        return para.Cell(
+            self.lift(term, *(c.dom for c in cells), param=param),
+            self.lift(term, *(c.cod for c in cells)), cells[0].inside)
 
     def unitality(self) -> para.Cell:
         """
