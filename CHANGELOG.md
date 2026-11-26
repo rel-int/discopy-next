@@ -901,6 +901,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `quantum.tk.to_tk` drops destructively measured qubits when
+  `Measure(override_bits=True)` overrides existing bits, so gates and
+  measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
+  phases and backend tensor entries without calling `numpy.ravel`,
+  `circuit.Box.array` stacks backend scalars with `matrix.asarray`,
+  `QuantumGate.is_deterministic` detaches tensors before converting to NumPy
+  and `U1.array` converts its constants in the active backend, so `CRz`,
+  `CRx`, `CU1` and `QuantumGate` keep gradients under PyTorch and JAX
+  ([next#445]).
+
 - The dagger, transpose and conjugate of a box with args keep its
   `drawing_name`, and when its args are drawn in another direction its box has
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
