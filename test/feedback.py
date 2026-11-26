@@ -353,6 +353,10 @@ def test_traced_levels_with_duals_delay_trivially():
             >> f @ x.r >> x @ module.Diagram.cups(x, x.r)
         assert module.Trace(f, mem=x @ x).open_traces()\
             == f.trace(2).open_traces()
+        stream = module.FollowedBy(x)
+        assert stream.delay() == stream
+        assert (stream >> stream.dagger()).delay()\
+            == stream.delay() >> stream.dagger().delay()
         for timed in (lambda: pivotal.Wire('x', time_step=1),
                       lambda: module.Box('f', x, x, time_step=1)):
             with raises(AxiomError):
@@ -376,6 +380,7 @@ def test_stream_boxes_raise_into_a_codomain_without_streams():
 
 
 def test_time_stepped_wires_below_feedback():
+    from discopy import compact
     from discopy.feedback import closed, markov
     x = markov.Ty('x')
     assert x.delay() != x and x.delay().inside[0].time_step == 1
@@ -391,6 +396,12 @@ def test_time_stepped_wires_below_feedback():
     assert traced.to_compact() == (
         h.curry() @ y >> closed.monoidal.Diagram.ev(y @ y, y)
     ).to_compact().trace()
+    c = h.curry()
+    assert (c + c).to_compact() == c.to_compact() + c.to_compact()
+    for level in (closed.monoidal, closed.markov):
+        z = level.Ty('z')
+        F = level.Functor({z: compact.Ty('z')}, {}, cod=compact.Diagram)
+        assert F(level.Eval(z << z).delay()) == F(level.Eval(z << z))
 
 
 def test_FollowedBy_delay():

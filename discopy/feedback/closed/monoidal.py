@@ -58,7 +58,7 @@ from functools import cached_property
 from typing import ClassVar
 
 from discopy import closed, cmap, feedback, hypergraph, messages, monoidal
-from discopy.abc import DaggerMonoidalCategory
+from discopy.abc import DaggerMonoidalCategory, FeedbackCategory
 from discopy.cat import factory
 # pylint: disable-next=unused-import
 from discopy.closed.monoidal import Equation  # noqa: F401
@@ -138,6 +138,10 @@ class Diagram(closed.monoidal.Diagram, feedback.Diagram):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, Sum):
+                return self.sum_factory(
+                    tuple(term.to_compact() for term in box.terms),
+                    box.dom, box.cod)
             if isinstance(box, feedback.Trace):
                 return box.arg.to_compact().trace(
                     len(box.mem), left=box.left)
@@ -277,7 +281,9 @@ class Sum(closed.monoidal.Sum, feedback.Sum, Box):
 class Functor(closed.monoidal.Functor, feedback.Functor):
     """
     A closed feedback functor is a closed and a feedback functor: a delayed
-    wire or box goes through the delay of the codomain.
+    wire or box goes through the delay of the codomain, and a delayed
+    evaluation, coevaluation or curry is reset when the delay of the
+    codomain is the identity, e.g. into :mod:`discopy.compact`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) : Map from atomic :class:`Ty` to
@@ -290,6 +296,9 @@ class Functor(closed.monoidal.Functor, feedback.Functor):
     def __call__(self, other):
         if self.cod is not Drawing and isinstance(other, (Wire, Box))\
                 and other.time_step:
+            if isinstance(other, Timed) and getattr(
+                    self.cod.ar, "delay", None) is FeedbackCategory.delay:
+                return self(other.reset())
             return feedback.Functor.__call__(self, other)
         return super().__call__(other)
 

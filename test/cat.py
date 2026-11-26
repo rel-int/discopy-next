@@ -694,6 +694,8 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
+    "{pivotal,ribbon,compact,frobenius}.{Head,Tail}": "c(box(c, x, y, v))",
+    "{pivotal,ribbon,compact,frobenius}.FollowedBy": "c(x, True)",
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False)',
     "feedback.{markov,closed}.Box":
     'c("f", x, y, data=v, is_deterministic=False).delay()',

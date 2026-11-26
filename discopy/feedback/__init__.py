@@ -1458,6 +1458,8 @@ def structural_boxes(
             if isinstance(vars(base).get(attr), type))]
         bases += own
         result[name] = subclass(name, bases, module, doc.format(level))
+        if box.delay is FeedbackCategory.delay:
+            result[name].delay = FeedbackCategory.delay
     for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
