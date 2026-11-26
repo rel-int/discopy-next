@@ -167,7 +167,7 @@ from typing import Iterator, Self, ClassVar
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
-from discopy.testable import GENERATORS
+from discopy.testable import GENERATORS, Rule
 from discopy.cat import factory
 from discopy.utils import (
     export,
@@ -879,7 +879,7 @@ class Sum(biclosed.Sum, Box):  # ty: ignore[inconsistent-mro]
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
 
 
-@Diagram.slot
+@Diagram.slot(RigidCategory.counit)
 class Cup(BinaryBoxConstructor, Box):
     """
     The counit of the adjunction for an atomic type.
@@ -898,6 +898,21 @@ class Cup(BinaryBoxConstructor, Box):
         :align: center
     """
     serialised_attrs = ("left", "right")
+
+    @property
+    def rule(self) -> Rule | None:
+        """
+        The counit of the category, unless left and right adjoints coincide,
+        e.g. in a pivotal category, where a functor need not send ``x.l``
+        to the left adjoint of the image of ``x``: the cup is then
+        sent to the cups on the image of its boundary.
+        """
+        return None if self.left.l == self.left.r else self.factory.counit
+
+    @property
+    def premises(self) -> dict[str, Ty]:
+        """ The atom on the left of the cup, see :attr:`rule`. """
+        return {"x": self.left}
 
     def __init__(self, left: Ty, right: Ty):
         assert_isatomic(left, Ty)
@@ -937,7 +952,7 @@ class Cup(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid cups have no dagger, use pivotal instead.")
 
 
-@Diagram.slot
+@Diagram.slot(RigidCategory.unit)
 class Cap(BinaryBoxConstructor, Box):
     """
     The unit of the adjunction for an atomic type.
@@ -956,6 +971,21 @@ class Cap(BinaryBoxConstructor, Box):
         :align: center
     """
     serialised_attrs = ("left", "right")
+
+    @property
+    def rule(self) -> Rule | None:
+        """
+        The unit of the category, unless left and right adjoints coincide,
+        e.g. in a pivotal category, where a functor need not send ``x.l``
+        to the left adjoint of the image of ``x``: the cap is then
+        sent to the caps on the image of its boundary.
+        """
+        return None if self.left.l == self.left.r else self.factory.unit
+
+    @property
+    def premises(self) -> dict[str, Ty]:
+        """ The atom on the left of the cap, see :attr:`rule`. """
+        return {"x": self.left}
 
     def __init__(self, left: Ty, right: Ty):
         assert_isatomic(left, Ty)
@@ -1032,9 +1062,9 @@ class Functor(biclosed.Functor):
             return super().__call__(other)
         if isinstance(other, Wire):
             return self(other.r).l if other.z < 0 else self(other.l).r
-        if isinstance(other, Cup):
+        if isinstance(other, Cup) and other.rule is None:
             return self.cod.cups(self(other.dom[:1]), self(other.dom[1:]))
-        if isinstance(other, Cap):
+        if isinstance(other, Cap) and other.rule is None:
             return self.cod.caps(self(other.cod[:1]), self(other.cod[1:]))
         if isinstance(other, Box):
             if not other.z:

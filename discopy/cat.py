@@ -134,7 +134,7 @@ from typing import (
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
 from discopy.testable import (
-    FUEL, GENERATORS, Equation as AbstractEquation, Equivalence,
+    FUEL, GENERATORS, Equation as AbstractEquation, Equivalence, Rule,
     Serialisable, TestableGeneric, axiom)
 from discopy.utils import (  # noqa: F401
     factory,
@@ -847,6 +847,9 @@ cat.Ob('y'), data=[42]),))
 
     args: tuple[Arrow, ...] = ()
     method = "bubble"
+    rule: Rule | None = None
+    """ The rule a box concludes, :obj:`None` but for a generator, see
+    :class:`discopy.testable.Generator`, which defines its ``premises``. """
 
     def __init__(
             self, name: str, dom: Ob, cod: Ob, data=None, is_dagger=False,
@@ -1489,23 +1492,29 @@ which JSON cannot hold.
             return self(other.dagger()).dagger()
         if isinstance(other, Box) and not other.is_dagger\
                 and (rule := getattr(other, "rule", None)) is not None\
-                and isinstance(getattr(
-                    type(self).dom, rule.name, None), type(rule))\
-                and isinstance(image := getattr(
-                    self.cod, rule.name, None), type(rule)):
-            return image(**{
+                and isinstance(level := getattr(
+                    type(self).dom, rule.name, None), Rule)\
+                and hasattr(self.cod, level.operation):
+            return level.bind(self.cod)(**{
                 key: self(value) if isinstance(value, Ob) else value
                 for key, value in other.premises.items()})
         if isinstance(other, Box):
-            result = self.ar_map[other]
-            # This allows some nice syntactic sugar for the ar mapping.
-            return result if isinstance(result, self.cod)\
-                else self.cod(result, self(other.dom), self(other.cod))
+            return self.image(other)
         assert_isinstance(other, Arrow)
         result = self.cod.id(self(other.dom))
         for box in other.inside:
             result = result >> self(box)
         return result
+
+    def image(self, box: Box) -> Arrow:
+        """
+        The image of a box by :attr:`ar_map`, cast to the codomain with the
+        image of its boundary when it is not an arrow of it, whatever
+        structure the box has, e.g. a generator, see :meth:`__call__`.
+        """
+        result = self.ar_map[box]
+        return result if isinstance(result, self.cod)\
+            else self.cod(result, self(box.dom), self(box.cod))
 
 
 Arrow.Atom = Box

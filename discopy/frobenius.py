@@ -93,6 +93,7 @@ from discopy import (
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, HypergraphCategory)
 from discopy.cat import factory
+from discopy.testable import Rule
 from discopy.python import finset
 from discopy.utils import (
     export,
@@ -778,6 +779,16 @@ class Spider(Box):
         len(self.dom), len(self.cod), 1) if self.phase is None else None)
     tensor, __rmatmul__, fuse = Cospan.tensor, Cospan.__rmatmul__, Cospan.fuse
 
+    @property
+    def rule(self) -> Rule | None:
+        """ The spider of the category, but for a spider with a phase. """
+        return None if self.phase is not None else self.factory.spider
+
+    @property
+    def premises(self) -> dict:
+        """ The type of the spider and the number of its legs. """
+        return {"x": self.typ, "m": len(self.dom), "n": len(self.cod)}
+
     def __init__(self, n_legs_in: int, n_legs_out: int, typ: Ty, data=None,
                  is_dagger=False, **params):
         assert_isatomic(typ)
@@ -923,9 +934,6 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Spider) and other.phase is None:
-            return self.cod.spiders(
-                len(other.dom), len(other.cod), self(other.typ))
         if isinstance(other, Cospan)\
                 and not isinstance(other, symmetric.Permutation):
             return self(other.to_spiders())

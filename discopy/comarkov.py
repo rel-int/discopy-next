@@ -415,7 +415,7 @@ class Permutation(symmetric.Permutation, Diagram.Box):
 Cofunction.register(Permutation)
 
 
-@Diagram.slot
+@Diagram.slot(ComarkovCategory.multiplication)
 class Merge(Cofunction):
     """
     The merge of an atomic type :code:`x` some :code:`n` number of times,
@@ -435,6 +435,11 @@ class Merge(Cofunction):
         Diagram.Box.__init__(
             self, name, dom=x ** n, cod=x,
             draw_as_spider=True, color="black", drawing_name="")
+
+    @property
+    def premises(self) -> dict:
+        """ The atom merged and the number of its copies, see :attr:`rule`. """
+        return {"x": self.cod, "n": len(self.dom)}
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
         n = len(n) if isinstance(n, Sized) else index(n)
@@ -549,15 +554,14 @@ class Functor(symmetric.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Merge) and hasattr(self.cod, "merge"):
-            return self.cod.merge(self(other.cod), len(other.dom))
         if isinstance(other, Cofunction) and hasattr(
-                self.cod.ar, "Cofunction")\
+                self.cod.ar, "Cofunction") and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             sizes = [Nat(len(self(x))) for x in other.cod]
             return self.cod.ar.from_cofunction(finset.Function.function(
                 other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
+                and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
                 or ComarkovCategory.cofunction.__func__.__get__(self.cod)

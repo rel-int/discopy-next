@@ -95,7 +95,7 @@ from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
-    GENERATORS, Equation as AbstractEquation, Serialisable,
+    GENERATORS, Equation as AbstractEquation, Rule, Serialisable,
     Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import AlphaEquivalence, Renamed, factory
@@ -478,7 +478,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         .failing(messages.FREE_CURRY)
 
 
-@Diagram.slot
+@Diagram.slot(BiclosedCategory.ev_left)
 class Eval(Diagram.Box):
     """
     The evaluation of an exponential type.
@@ -542,6 +542,16 @@ class Eval(Diagram.Box):
 
     def dagger(self) -> Coeval:
         return self.Coeval(self.x, self.left)
+
+    @property
+    def rule(self) -> Rule:
+        """ The evaluation on the left or on the right, as :attr:`left`. """
+        return getattr(self.factory, "ev_left" if self.left else "ev_right")
+
+    @property
+    def premises(self) -> dict[str, Ty]:
+        """ The base and the exponent of the evaluated type. """
+        return {"base": self.x.base, "exponent": self.x.exponent}
 
     @property
     def drawing_name(self):
@@ -732,10 +742,8 @@ class Functor(monoidal.Functor):
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
             n = len(self(other.cod.exponent)) if other.n else 0
             return self.cod.curry(self(other.arg), n, other.left)
-        if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
-            base, exponent, left = other.x.base, other.x.exponent, other.left
-            result = self.cod.ev(self(base), self(exponent), left)
-            return result.dagger() if isinstance(other, Coeval) else result
+        if isinstance(other, Coeval) and hasattr(self.cod, "ev"):
+            return self(other.dagger()).dagger()
         if self.cod is Drawing:
             if isinstance(other, Ty) and other.inside == (other, ):
                 # Avoid infinite recursion when drawing.

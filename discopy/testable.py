@@ -81,8 +81,10 @@ Summary
 
 from __future__ import annotations
 
+import ast
 import builtins
 import inspect
+import textwrap
 import pickle
 import sys
 import types
@@ -1094,6 +1096,30 @@ class Rule[**P, T](Declaration[P, T], classmethod):
             for side in sides)
 
     @cached_property
+    def operation(self) -> str | None:
+        """
+        The method of the category the rule calls first, which a codomain
+        needs for a functor to send a generator to the rule there, see
+        :class:`Generator`, or :obj:`None` when the rule calls none.
+
+        >>> from discopy.abc import BraidedCategory, RigidCategory
+        >>> BraidedCategory.braiding.operation
+        'braid'
+        >>> RigidCategory.counit.operation
+        'cups'
+        """
+        function = inspect.unwrap(self.function)
+        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+        first = next(iter(tree.body[0].args.args), None)
+        calls = sorted((
+            node for node in ast.walk(tree) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and first is not None and node.func.value.id == first.arg),
+            key=lambda node: (node.lineno, node.col_offset))
+        return calls[0].func.attr if calls else None
+
+    @cached_property
     def is_recursive(self) -> bool:
         """
         Whether the rule has a morphism among its premises, i.e. a parameter
@@ -1316,6 +1342,11 @@ class Generator[**P, T](Slot[P, T]):
     the image of its premises, see :meth:`discopy.cat.Functor.__call__`,
     rather than each level matching the class of its boxes.
 
+    A class whose boxes conclude different rules, e.g. an evaluation on
+    the left or on the right, or one of them only when undecorated, e.g. a
+    spider with no phase, defines its own ``rule``, :obj:`None` for a box
+    that concludes none, which a functor then maps as any other box.
+
     Parameters:
         rule : The rule the generator concludes.
 
@@ -1334,8 +1365,9 @@ class Generator[**P, T](Slot[P, T]):
 
     def __set_name__(self, owner: type, name: str):
         super().__set_name__(owner, name)
-        self.function.rule = classproperty(
-            lambda cls, rule=self.rule: rule.bind(cls.factory))
+        if "rule" not in vars(self.function):
+            self.function.rule = classproperty(
+                lambda cls, rule=self.rule: rule.bind(cls.factory))
 
 
 def slots(category: type) -> dict[str, Slot]:

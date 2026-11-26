@@ -717,7 +717,7 @@ class Permutation(symmetric.Permutation, Box):
 Function.register(Permutation)
 
 
-@Diagram.slot
+@Diagram.slot(MarkovCategory.comultiplication)
 class Copy(Function):
     """
     The copy of an atomic type :code:`x` some :code:`n` number of times,
@@ -737,6 +737,11 @@ class Copy(Function):
             else f"Discard({x})"
         Box.__init__(self, name, dom=x, cod=x ** n,
                      draw_as_spider=True, color="black", drawing_name="")
+
+    @property
+    def premises(self) -> dict:
+        """ The atom copied and the number of its copies, see :attr:`rule`. """
+        return {"x": self.dom, "n": len(self.cod)}
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
         n = len(n) if isinstance(n, Sized) else index(n)
@@ -880,15 +885,14 @@ class Functor(symmetric.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Copy) and hasattr(self.cod, "copy"):
-            return self.cod.copy(self(other.dom), len(other.cod))
         if isinstance(other, Function) and hasattr(
-                self.cod.ar, "Function")\
+                self.cod.ar, "Function") and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             sizes = [Nat(len(self(x))) for x in other.dom]
             return self.cod.ar.from_function(finset.Function.function(
                 other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
+                and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\
                 or MarkovCategory.function.__func__.__get__(self.cod)

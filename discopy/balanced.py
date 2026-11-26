@@ -322,7 +322,7 @@ class DualRailTwist(Diagram.Box):
             from_tree(tree['dom']), is_dagger=tree.get('is_dagger', False))
 
 
-@Diagram.slot
+@Diagram.slot(BalancedCategory.twisting)
 class Twist(Diagram.Box):
     """
     The twist on atomic type :code:`dom`.
@@ -337,6 +337,11 @@ class Twist(Diagram.Box):
     For complex types, use :meth:`Diagram.twist` instead.
     """
     serialised_attrs = ("dom", "is_dagger")
+
+    @property
+    def premises(self) -> dict[str, monoidal.Ty]:
+        """ The atom the twist is the :attr:`rule` of. """
+        return {"x": self.dom}
     drawing_name = "Twist"
 
     def __init__(self, dom: monoidal.Ty, is_dagger=False):
@@ -402,12 +407,6 @@ class Functor(braided.Functor, feedback.Functor):
             The codomain, :code:`Diagram` by default.
     """
     dom = cod = Diagram
-
-    def __call__(self, other):
-        if isinstance(other, Twist) and not other.is_dagger\
-                and hasattr(self.cod, "twist"):
-            return self.cod.twist(self(other.dom))
-        return super().__call__(other)
 
 
 @Diagram.slot

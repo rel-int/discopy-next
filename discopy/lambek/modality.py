@@ -125,9 +125,12 @@ class Functor(bang.Functor, categorial.Functor):
 
     def __call__(self, other):
         if not self.has_exp and isinstance(other, (
-                categorial.Over, categorial.Under, categorial.Diagram.Eval,
-                categorial.Diagram.Coeval, categorial.Diagram.Curry)):
+                categorial.Over, categorial.Under)):
             return monoidal.Functor.__call__(self, other)
+        if not self.has_exp and isinstance(other, (
+                categorial.Diagram.Eval, categorial.Diagram.Coeval,
+                categorial.Diagram.Curry)):
+            return self.image(other)
         return super().__call__(other)
 
 
