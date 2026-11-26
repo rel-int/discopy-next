@@ -5,7 +5,7 @@
 >
 > yes, get to work, machine. let's drop the max 1000 LOC diff constraint on this PR and do everything on the same one. after implementing the necessary infrastructure, the global refactor itself will be mechanical and hopefully delete a bunch of LOCs too.
 
-- [WIP] @T-6271be71-c7d7-4ae7-bf06-85bc2b06ce22-2026-11-26 13:14 Mechanism: split Declaration (classmethod moves to Rule and Axiom), add Slot with per-level building, .extend mixins, lazy module exports, subscripts carrying their slots, the *_factory deprecation shim and the tests of ef86d2e9 (is_generator/generator stay, as atoms() already means the generators a term names)
+- [x] Mechanism: split Declaration (classmethod moves to Rule and Axiom), add Slot with per-level building, .extend mixins, lazy module exports, subscripts carrying their slots, the *_factory deprecation shim and the tests of ef86d2e9 (is_generator/generator stay, as atoms() already means the generators a term names)
 - [ ] cat and monoidal on slots, equation_factory becomes Equation
 - [ ] The symmetric spine on slots: braided, balanced, traced, symmetric, markov, comarkov, spacial
 - [ ] Dualities on slots: rigid, pivotal, ribbon, compact, frobenius, tensor (dtype fix), hypergraph, cmap
