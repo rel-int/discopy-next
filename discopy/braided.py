@@ -66,6 +66,7 @@ The hexagon equations hold on the nose.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import ClassVar
 
@@ -368,6 +369,7 @@ Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.sum_factory = Sum
 Rewrite = rewrite.Rewrite[Diagram]
+TILT = .2  # The angle in radians a braid turns as it slides through a wire.
 
 
 class Slide[category](rewrite.Step):
@@ -441,13 +443,17 @@ class Slide[category](rewrite.Step):
         return type(self)(self.box, self.wire, left=not self.left,
                           down=not self.down, braid=self.braid)
 
-    def frame(self, t: float) -> Drawing:
+    def frame(  # pylint: disable=too-many-locals  # Reidemeister III
+            self, t: float) -> Drawing:
         """
         The crossings shrink into the box and grow out of its other side,
         see :meth:`discopy.drawing.Drawing.slide`. When the box is itself a
-        braid, this is the third Reidemeister move, the Yang-Baxter equation,
-        and the braid slides as a spider with no dot would: its legs keep
-        their shape and the wire passes under them.
+        braid, this is the third Reidemeister move, the Yang-Baxter equation:
+        the braid moves in a straight line through the wire, turning by up to
+        ``TILT`` radians on the way, the wire keeps its curve and only moves
+        up or down, and the crossings of the wire with the legs of the braid
+        shrink into the braid's ports until the three strands meet at
+        ``t = .5``.
 
         Parameters:
             t : The fraction of the way, from ``0`` to ``1``.
@@ -463,20 +469,60 @@ class Slide[category](rewrite.Step):
         >>> assert step.frame(0) == step.dom.to_drawing()
         >>> assert step.frame(1) == step.cod.to_drawing()
         >>> middle = step.frame(.5)
-        >>> sorted({p for node, p in middle.positions.items()
-        ...         if node.kind == "box"})
-        [Point(x=1.5, y=1.5)]
+        >>> for node in middle.box_nodes: print(middle.positions[node])
+        Point(x=1.0, y=2.0)
+        Point(x=2.0, y=1.0)
+        Point(x=1.5, y=1.5)
         >>> _ = step.to_gif(tween=12, timestep=80, loop=True,
         ...     doctest="docs/_static/braided/reidemeister-3.gif")
 
         .. image:: /_static/braided/reidemeister-3.gif
             :align: center
         """
+        source, target = self.dom.to_drawing(), self.cod.to_drawing()
+        if not getattr(self.box, "draw_as_braid", False):
+            return source.slide(target, t)
+        k, drawing = (0, source) if t < .5 else (1, target)
         indices = (0, len(self.cod.inside) - 1) if self.down\
             else (len(self.dom.inside) - 1, 0)
-        return self.dom.to_drawing().slide(
-            self.cod.to_drawing(), t, indices if getattr(
-                self.box, "draw_as_braid", False) else None)
+        j, strands = indices[k], drawing.strands()
+        legs = {strands[node] for node in drawing.nodes
+                if node.kind == "box_dom" and node.j == j}
+        centres = [d.positions[d.box_nodes[i]]
+                   for d, i in zip((source, target), indices)]
+        centre, angle = between(*centres, t), TILT * math.sin(math.pi * t)
+
+        def turned(p):
+            dx, dy = p.x - centres[k].x, p.y - centres[k].y
+            return Point(
+                centre.x + dx * math.cos(angle) - dy * math.sin(angle),
+                centre.y + dx * math.sin(angle) + dy * math.cos(angle))
+
+        def top(d):
+            return max((p for node, p in d.positions.items()
+                        if node.kind == "box_dom"
+                        and d.strands()[node] not in legs), key=lambda p: p.y)
+        shift = (top(target).y - top(source).y) * (t - k)
+
+        def position(node, p):
+            if node.kind in ("dom", "cod"):
+                return p
+            if node.data.get("j") == j:
+                return turned(p)
+            if node.kind == "box" or strands[node] not in legs:
+                return p.shift(0, shift)
+            port = min((n for n in drawing.nodes if n.kind != "box"
+                        and n.data.get("j") == j
+                        and strands[n] == strands[node]),
+                       key=lambda n: abs(drawing.positions[n].y - p.y))
+            start = drawing.positions[port]
+            shrink = 1 - 2 * abs(t - k)
+            return turned(start).shift(
+                shrink ** 2 * (p.x - start.x), shrink * (p.y - start.y))
+        return drawing.relabel_nodes(positions={
+            node: position(node, p)
+            for node, p in drawing.positions.items()}).resized(
+                source, target, t)
 
     @classmethod
     # pylint: disable-next=too-many-arguments  # naturality's arguments

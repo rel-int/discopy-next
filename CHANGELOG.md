@@ -15,8 +15,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   once, each level having its own, e.g. `monoidal.Rewrite`, with
   `monoidal.Interchange` (`bifunctoriality` with identities, the side it winds
   an argument), `braided.Slide` (`braid_naturality`, a box through a braid, and the third
-  Reidemeister move when the box is a braid, which slides with its legs
-  keeping their shape, as a spider's do),
+  Reidemeister move when the box is a braid, which turns slightly as it
+  slides while the wire keeps its curve and only moves up or down),
   `braided.Unbraid` (`braid_then_inverse`, the second Reidemeister move) and
   `rigid.Unsnake` (`snake_equations`, a snake straightened into a wire) as
   steps, `Diagram.rewrite_to` the step from a diagram to one a move away, whiskering and

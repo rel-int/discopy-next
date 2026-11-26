@@ -818,8 +818,7 @@ which to_drawing recomputes.
             for node in source}).resized(self, other, t)
 
     def slide(  # pylint: disable=too-many-locals  # its matching
-            self, other: Drawing, t: float,
-            indices: tuple[int, int] | None = None) -> Drawing:
+            self, other: Drawing, t: float) -> Drawing:
         """
         The drawing a fraction ``t`` of the way from ``self`` to ``other``
         when a box slides through the crossings next to it, i.e. the boxes
@@ -846,10 +845,6 @@ which to_drawing recomputes.
         Parameters:
             other : The drawing to move to.
             t : The fraction of the way, from ``0`` to ``1``.
-            indices : The index in each drawing of the box that slides,
-                when it is itself drawn as a braid: its legs then keep their
-                shape as those of a spider with no dot, see
-                :meth:`discopy.braided.Slide.frame`.
 
         Raises:
             ValueError : When the drawings are not of the same boxes in the
@@ -873,9 +868,8 @@ which to_drawing recomputes.
         crossings = [{
             node.j: (node.box, drawing.positions[node])
             for node in drawing.box_nodes
-            if (node.box.draw_as_braid or node.box.draw_as_wires)
-            and (indices is None or node.j != indices[k])}
-            for k, drawing in enumerate(ends)]
+            if node.box.draw_as_braid or node.box.draw_as_wires}
+            for drawing in ends]
         moving = [{j for j, crossing in mine.items()
                    if crossing not in theirs.values()}
                   for mine, theirs in (crossings, crossings[::-1])]
@@ -932,7 +926,6 @@ which to_drawing recomputes.
             (left, low), (right, high) = drawing.relabel_nodes(positions={
                 node: current[label] for node, label in labels[k].items()
             }).rectangle(box.j)
-            legged = box.box.draw_as_spider or indices is not None
             dot = current[labels[k][box]]
             legs = [p for label, p in current.items()
                     if label.data.get("j") == labels[k][box].j]
@@ -958,7 +951,7 @@ which to_drawing recomputes.
             def behind(node, _):
                 if node in ends_of:
                     return ends_of[node]
-                if node.kind == "box" and legged:
+                if node.kind == "box" and box.box.draw_as_spider:
                     return dot
                 if node.kind == "box":
                     ports = {kind: [
@@ -974,7 +967,7 @@ which to_drawing recomputes.
                     drawing.graph.predecessors(node),
                     drawing.graph.successors(node))
                     if n in labels[k] and n.kind != "box"), None)
-                if legged:
+                if box.box.draw_as_spider:
                     if q is None:
                         return dot
                     return dot.shift(
@@ -1003,8 +996,7 @@ which to_drawing recomputes.
         def position(node, p):
             if node in labels[k]:
                 return current[labels[k][node]]
-            if node in on_legs or not (
-                    sliding.box.draw_as_spider or indices is not None):
+            if node in on_legs or not sliding.box.draw_as_spider:
                 return anchor[node].shift(
                     shrink ** 2 * (p.x - start[node].x),
                     shrink * (p.y - start[node].y))
