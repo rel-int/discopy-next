@@ -1313,10 +1313,11 @@ class Sum(monoidal.Sum, Box):
 class Functor(monoidal.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
-    and traces. Into a codomain whose delay is the identity, e.g.
-    :class:`discopy.tensor.Tensor`, a delayed box that is not a key of a
-    mapping :code:`ar_map` goes to the image of the box itself, as its
-    delay does; a callable :code:`ar_map` gets the delayed box.
+    and traces: a delayed box that is not a key of a mapping
+    :code:`ar_map` goes to the delay of the image of the box, which is the
+    image itself in a codomain that overrides :code:`delay` with the
+    identity, e.g. :class:`discopy.tensor.Tensor`; a callable
+    :code:`ar_map` gets the delayed box.
 
     Parameters:
         ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
@@ -1399,9 +1400,10 @@ class Functor(monoidal.Functor):
                 dom=self(other.dom), cod=self(other.cod),
                 mem=self(other.mem), **left)
         if isinstance(other, Box) and other.time_step\
+                and hasattr(self.cod.ar, "delay")\
                 and isinstance(self.ar_map.mapping, Mapping)\
                 and other not in self.ar_map.mapping:
-            return self(other.reset())
+            return self(other.reset()).delay(other.time_step)
         return super().__call__(other)
 
 

@@ -779,6 +779,18 @@ and 'Matrix[int]'
                 raise ValueError(messages.MATRIX_SINGULAR)
             return type(self)(inverse, self.dom, self.cod)
 
+    def delay(self, n_steps: int = 1) -> Matrix:
+        """
+        The delay of a matrix is itself, as the twist of a compact category
+        is the identity: a matrix has no time steps, so a functor sends a
+        delayed box to the image of the box.
+
+        >>> f = Matrix[int]([[1, 2]], 1, 2)
+        >>> assert f.delay() == f == f.delay(3)
+        """
+        del n_steps
+        return self
+
     def trace(self, n=1, left=False) -> Matrix:
         """
         The partial trace ``A + B >> D* >> C`` of a matrix with blocks
