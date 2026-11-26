@@ -24,6 +24,7 @@ Summary
         :nosignatures:
         :toctree:
 
+        check
         tying
         labels
         act
@@ -64,9 +65,53 @@ import numpy
 import torch
 
 from discopy import para
-from discopy.group import Action
+from discopy.group import Action, FiniteGroup
 from discopy.neural.network import Box, Dim, Dims, Network
 from discopy.python.finset import Permutation
+
+
+def check(dom: Action, cod: Action) -> type[FiniteGroup]:
+    """
+    The group of two actions, if it is the same.
+
+    Parameters:
+        dom : The action on the input points.
+        cod : The action on the output points.
+
+    Raises:
+        TypeError : If the actions are of different groups.
+
+    Example
+    -------
+    >>> from discopy.group import Cyclic
+    >>> rotations = Cyclic[3].action()
+    >>> assert check(rotations, rotations) is Cyclic[3]
+    """
+    if dom.group is not cod.group:
+        raise TypeError(f"Expected actions of {dom.group}, got {cod.group}.")
+    return dom.group
+
+
+def labels(action: Action) -> numpy.ndarray:
+    """
+    The orbit of each point of an action, numbered in the order of the
+    least point of each orbit, see :meth:`Action.orbits`.
+
+    Parameters:
+        action : The action.
+
+    Example
+    -------
+    >>> from discopy.group import Symmetric
+    >>> labels(Action.trivial(Symmetric[3], 2)).tolist()
+    [0, 1]
+    >>> labels(Symmetric[3].action()).tolist()
+    [0, 0, 0]
+    """
+    index = numpy.empty(action.size, dtype=int)
+    for k, orbit in enumerate(action.orbits()):
+        index[list(orbit)] = k
+    return index
 
 
 def tying(dom: Action, cod: Action) -> numpy.ndarray:
@@ -100,10 +145,7 @@ def tying(dom: Action, cod: Action) -> numpy.ndarray:
     ...
     TypeError: Expected an action of ...
     """
-    index = numpy.empty(cod.size * dom.size, dtype=int)
-    for k, orbit in enumerate(cod.tensor(dom).orbits()):
-        index[list(orbit)] = k
-    return index.reshape(cod.size, dom.size)
+    return labels(cod.tensor(dom)).reshape(cod.size, dom.size)
 
 
 def act(image: Permutation, tensor: torch.Tensor) -> torch.Tensor:
@@ -126,28 +168,6 @@ def act(image: Permutation, tensor: torch.Tensor) -> torch.Tensor:
     return tensor[..., list(image.dagger()), :]
 
 
-def labels(action: Action) -> numpy.ndarray:
-    """
-    The orbit of each point of an action, numbered in the order of the
-    least point of each orbit, see :meth:`Action.orbits`.
-
-    Parameters:
-        action : The action.
-
-    Example
-    -------
-    >>> from discopy.group import Symmetric
-    >>> labels(Action.trivial(Symmetric[3], 2)).tolist()
-    [0, 1]
-    >>> labels(Symmetric[3].action()).tolist()
-    [0, 0, 0]
-    """
-    index = numpy.empty(action.size, dtype=int)
-    for k, orbit in enumerate(action.orbits()):
-        index[list(orbit)] = k
-    return index
-
-
 class Realisation(torch.nn.Module):
     """
     A way to compute the equivariant linear maps from ``dom`` to ``cod``
@@ -166,7 +186,6 @@ class Realisation(torch.nn.Module):
         orbits : The number of orbits on pairs of points, i.e. of weights.
 
     Attributes:
-        orbits : The number of orbits on pairs of points, i.e. of weights.
         bias_orbits : The number of orbits on output points, i.e. of biases.
 
     Raises:
@@ -183,14 +202,14 @@ class Realisation(torch.nn.Module):
     >>> dense.bias(torch.zeros(1, 3, 1), torch.tensor([[2.]])).flatten()
     tensor([2., 2., 2.])
     """
+    bias_index: torch.Tensor
+
     def __init__(self, dom: Action, cod: Action, orbits: int):
         super().__init__()
-        if dom.group is not cod.group:
-            raise TypeError(
-                f"Expected actions of {dom.group}, got {cod.group}.")
+        check(dom, cod)
         bias = labels(cod)
         self.dom, self.cod, self.orbits = dom, cod, orbits
-        self.bias_orbits = int(bias.max()) + 1 if bias.size else 0
+        self.bias_orbits = int(numpy.max(bias, initial=-1)) + 1
         self.register_buffer(
             "bias_index", torch.from_numpy(bias), persistent=False)
 
@@ -211,7 +230,7 @@ class Realisation(torch.nn.Module):
         """
         if b is None:
             return out
-        return out + b[self.bias_index]  # ty: ignore[invalid-argument-type]
+        return out + b[self.bias_index]
 
 
 class Dense(Realisation):
@@ -223,17 +242,11 @@ class Dense(Realisation):
 
     ``out[..., y, d] = sum(w[o(y, x), d, c] * v[..., x, c]) + b[o(y), d]``.
 
-    It materialises a ``(|Y|, |X|, D, C)`` weight, in ``O(|Y||X|DC)`` memory:
-    it is a dense reference, not meant to scale, fast realisations come
-    separately.
+    It materialises a ``(|Y|, |X|, D, C)`` weight, in ``O(|Y||X|DC)`` memory.
 
     Parameters:
         dom : The action on the input points.
         cod : The action on the output points.
-
-    Attributes:
-        orbits : The number of orbits on pairs of points, i.e. of weights.
-        bias_orbits : The number of orbits on output points, i.e. of biases.
 
     Example
     -------
@@ -247,15 +260,17 @@ class Dense(Realisation):
     >>> dense(torch.tensor([[1.], [2.], [4.]]), w).flatten().tolist()
     [2.0, 4.0, 1.0]
     """
+    index: torch.Tensor
+
     def __init__(self, dom: Action, cod: Action):
         index = tying(dom, cod)
-        super().__init__(dom, cod, int(index.max()) + 1 if index.size else 0)
+        super().__init__(dom, cod, int(numpy.max(index, initial=-1)) + 1)
         self.register_buffer(
             "index", torch.from_numpy(index), persistent=False)
 
     def tying(self) -> numpy.ndarray:
         """ The gathered index of the weights, on the host. """
-        return self.index.cpu().numpy()  # ty: ignore[call-non-callable]
+        return self.index.cpu().numpy()
 
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
@@ -270,10 +285,7 @@ class Dense(Realisation):
         Returns:
             The output, of shape ``(..., |Y|, D)``.
         """
-        out = torch.einsum(
-            "yxdc,...xc->...yd",
-            w[self.index],  # ty: ignore[invalid-argument-type]
-            v)
+        out = torch.einsum("yxdc,...xc->...yd", w[self.index], v)
         return self.bias(out, b)
 
 
@@ -284,9 +296,6 @@ class Legs(torch.nn.Module):
     last axis, with one output channel so are the output points, and a
     single point has no axis at all. The weights and the biases are legs too,
     so their unit dimensions are dropped as well.
-
-    The module :mod:`discopy.neural.factorised` imports this one, so it is
-    imported inside the constructor to avoid an import cycle.
 
     Parameters:
         dom : The action on the input points.
@@ -349,15 +358,8 @@ class Legs(torch.nn.Module):
     def forward(self, v: torch.Tensor, w: torch.Tensor,
                 b: torch.Tensor | None = None) -> torch.Tensor:
         """
-        Apply the layer to the tensors of the legs.
-
-        Parameters:
-            v : The input, of shape ``(..., |X|, C)`` without unit axes.
-            w : The weights, of shape ``(orbits, D, C)`` without unit axes.
-            b : The biases, of shape ``(bias_orbits, D)`` without unit axes.
-
-        Returns:
-            The output, of shape ``(..., |Y|, D)`` without unit axes.
+        Apply the layer on the tensors of the legs: the shapes of
+        :meth:`Dense.forward` without unit axes.
         """
         c, d = self.channels
         out = self.realisation(
@@ -451,8 +453,7 @@ def equivariance(function: Callable[[torch.Tensor], torch.Tensor],
     >>> equivariance(lambda v: v.flip(0), rotations, rotations, v)
     3.0
     """
-    if dom.group is not cod.group:
-        raise TypeError(f"Expected actions of {dom.group}, got {cod.group}.")
+    check(dom, cod)
     return max((
         (function(act(g, v)) - act(h, function(v))).abs().max().item()
         for v in tensors for g, h in zip(dom.images, cod.images)),
