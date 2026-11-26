@@ -572,7 +572,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - A box drawn as a rectangle tells its dagger, transpose and conjugate apart
-  by a corner cut off rather than one shifted, short of its wires. The drawings nested in a box
+  by a corner cut off rather than one shifted, short of its wires, and so does
+  a frame drawn around its args, wide enough for its label in the corner
+  opposite. The drawings nested in a box
   lie on slots with a margin between them rather than a line, centred in the
   box, which has its label in the corner opposite its cut, and the wire labels
   of a drawing turned half way round hang along their wire. The args of a
