@@ -2,6 +2,6 @@
 >
 > and: "trivial point: let's rename drawing.drawing to drawing.planegraph"
 
-- [ ] Rename docs/_ext/bases-fullname.py to bases.py
+- [WIP] @T-dc6d2cec-2026-11-26 12:55 Rename docs/_ext/bases-fullname.py to bases.py
 - [ ] Rename discopy.drawing.drawing to discopy.drawing.planegraph, the old module a deprecated alias
 - [ ] Changelog entry
