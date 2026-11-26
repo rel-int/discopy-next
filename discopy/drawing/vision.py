@@ -1,5 +1,5 @@
 """
-The networks that read a picture, see :mod:`discopy.drawing.picture`: one
+The networks that read a picture, see :mod:`~discopy.drawing.picture`: one
 says what each pixel is, the other reads the name of each box and the type
 of each wire from the text drawn on it.
 

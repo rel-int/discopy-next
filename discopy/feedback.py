@@ -15,7 +15,7 @@ delayed.
 Note that these diagrams are planar, so that e.g. :mod:`~discopy.pivotal`
 diagrams are traced in this sense. See :mod:`~discopy.symmetric` for the usual
 notion of trace, :mod:`~discopy.markov` for the syntax of streams and
-:mod:`discopy.stream` for its interpretation, the main example of a feedback
+:mod:`~discopy.stream` for its interpretation, the main example of a feedback
 category.
 
 Summary
@@ -1415,7 +1415,7 @@ def structural_boxes(
     written by hand: each subclasses the one of every level ``diagram``
     subclasses and ``box``, lives in their module and is bound to the
     factory of ``diagram`` that builds it. A level whose trace is not a
-    bubble, e.g. made of cups and caps in :mod:`discopy.pivotal`, keeps its
+    bubble, e.g. made of cups and caps in :mod:`~discopy.pivotal`, keeps its
     own :attr:`Diagram.trace_factory`.
 
     Parameters:

@@ -137,7 +137,7 @@ fixed `s` through, `w` reading the state `v` wrote:
 >>> assert state.dom == x @ s and state.cod == z @ s
 
 Iterating a map on its own memory is the feedback operator of
-:mod:`discopy.feedback`, which :mod:`discopy.stream` unrolls by chaining
+:mod:`~discopy.feedback`, which :mod:`~discopy.stream` unrolls by chaining
 the memory from one time step to the next.
 
 Example

@@ -172,7 +172,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     Note
     ----
     A Markov diagram is a feedback diagram whose wires carry a time step, so
-    that it is the syntax of streams, see :mod:`discopy.stream`.
+    that it is the syntax of streams, see :mod:`~discopy.stream`.
 
     >>> x = Ty('x')
     >>> zero = Box('0', Ty(), x.head)

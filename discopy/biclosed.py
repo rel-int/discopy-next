@@ -1342,7 +1342,7 @@ class Sampler:
         counter : The numbers of the free variables and constants built.
         linear : Whether each bound variable occurs exactly once, in the
             order of the binders, as :mod:`biclosed` requires; a term of
-            :mod:`discopy.closed` may use one any number of times.
+            :mod:`~discopy.closed` may use one any number of times.
         constants : Whether a leaf or the head of a spine may be a
             constant, else a free variable, so that beta reduction reads a
             variable at every head, see :class:`Reducible`.

@@ -608,7 +608,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ...     == F(frobenius.Id(n @ n) >> cup)
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
 
-        A hypergraph of :mod:`discopy.frobenius` is contracted as it
+        A hypergraph of :mod:`~discopy.frobenius` is contracted as it
         stands, see :meth:`spider_operands`, any other through its diagram,
         see :meth:`operands`.
 

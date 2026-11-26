@@ -111,7 +111,7 @@ from discopy.utils import (
 class Wire(feedback.Wire, biclosed.Wire):
     """
     A closed object is a biclosed object with a time step, i.e. a feedback
-    object, as is every wire below :mod:`discopy.feedback`.
+    object, as is every wire below :mod:`~discopy.feedback`.
 
     An exponential and a product are closed objects of their own, delayed as
     a whole, leaving their factors alone: the delay is not a closed functor.

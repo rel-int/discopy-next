@@ -54,8 +54,8 @@ Summary
         proofnet
         neural
 
-:mod:`discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
-and is imported here. :mod:`discopy.lambek.abstract.neural` needs PyTorch,
+:mod:`~discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
+and is imported here. :mod:`~discopy.lambek.abstract.neural` needs PyTorch,
 which the ``lambek`` extra installs, so it is not: import it on its own.
 
 Vocabularies and lexicons
@@ -505,7 +505,7 @@ class Function(closed.Function, Box):
     """
     A markov function in an abstract diagram, which copies or discards, so
     that plumbing tensors into a function of this level rather than of
-    :mod:`discopy.closed`.
+    :mod:`~discopy.closed`.
 
     >>> x = Ty('x')
     >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x

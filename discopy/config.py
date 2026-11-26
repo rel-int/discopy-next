@@ -17,7 +17,7 @@ rather than rebinding them, and change the backend with
 * ``NUMPY_THRESHOLD``: the number of array entries printed before a ``repr``
   elides.
 * ``MAX_EINSUM_INDICES``: the number of indices one ``einsum`` call in
-  :mod:`discopy.tensor` can take.
+  :mod:`~discopy.tensor` can take.
 * ``BOX_DRAWING_ATTRIBUTES``, ``WIRE_DRAWING_ATTRIBUTES`` and
   ``COLOUR_DRAWING_ATTRIBUTES``: the default drawing attributes of each box,
   wire and coloured region.

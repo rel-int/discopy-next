@@ -2583,7 +2583,7 @@ cycles of this map.
                 category is not a :class:`SpacialCategory`: the map of a
                 diagram does not say in which face a component that touches
                 nothing else lies, which only a spacial category does not
-                mind, see :mod:`discopy.spacial`.
+                mind, see :mod:`~discopy.spacial`.
 
         Example
         -------

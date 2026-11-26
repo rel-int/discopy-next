@@ -199,7 +199,7 @@ class Layer(compact.Layer):
     between cospans and generators.
 
     A category below frobenius whose spiders are not its own cospans, e.g.
-    :mod:`discopy.tensor`, keeps them as generators, and only its
+    :mod:`~discopy.tensor`, keeps them as generators, and only its
     permutations as plumbing.
 
     Parameters:
@@ -836,7 +836,7 @@ class Spider(Box):
         flags, is the spider with its legs swapped. A phased spider is a
         generator: its dagger keeps its phase and is marked as a dagger, so
         that any phase has one, a functor maps it to the dagger of its image,
-        and negating a phase is left to :mod:`discopy.quantum.zx`, where
+        and negating a phase is left to :mod:`~discopy.quantum.zx`, where
         phases form a group.
 
         >>> x = Ty('x')
@@ -904,7 +904,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     A spider with no phase is the Frobenius structure, mapped to the spiders
     of the codomain; a spider with a phase is a generator, mapped by
     ``ar_map`` like any box, e.g. the Z and X spiders of
-    :mod:`discopy.quantum.zx`.
+    :mod:`~discopy.quantum.zx`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) :

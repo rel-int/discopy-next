@@ -6,7 +6,8 @@ grammar-based CCG parsing with transformer models (2021)
 <https://arxiv.org/abs/2109.10044>`_) trained on CCGrebank: a transformer
 reads the words, a :class:`ChartClassifier` gives a supertag to each word and
 a label to each span, and the CKY chart of a :class:`Parser` combines them
-into a :class:`Derivation`, i.e. a diagram of :mod:`discopy.lambek.categorial`.
+into a :class:`Derivation`, i.e. a diagram of
+:mod:`~discopy.lambek.categorial`.
 
 It needs PyTorch, and :meth:`Parser.from_pretrained` needs ``transformers``,
 both of which the ``lambek`` extra installs.

@@ -1,8 +1,8 @@
 """
-DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
+DisCoPy's drawing modules: :mod:`~discopy.drawing.drawing` is the category of
 drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
-is sent by a functor; :mod:`discopy.drawing.backend` renders them with
-matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget` shows them as
+is sent by a functor; :mod:`~discopy.drawing.backend` renders them with
+matplotlib, TikZ or Typst; :mod:`~discopy.drawing.widget` shows them as
 interactive anywidget widgets in notebooks.
 """
 
@@ -100,7 +100,7 @@ def draw(diagram, **params):
 def from_picture(jpeg, config: dict):
     """
     The diagram a picture of it shows, read back by
-    :mod:`discopy.drawing.vision`: a pixel net says what each pixel is, a
+    :mod:`~discopy.drawing.vision`: a pixel net says what each pixel is, a
     small OCR model reads the name of each box and the type of each
     labelled wire, the module is the smallest in which it decodes from the
     one whose structural primitives and types appear, and

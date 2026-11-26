@@ -60,7 +60,7 @@ Summary
 
         bobcat
 
-:mod:`discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
+:mod:`~discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
 extra installs, so it is not imported here: import it on its own.
 """
 

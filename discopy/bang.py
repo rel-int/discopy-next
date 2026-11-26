@@ -4,7 +4,7 @@
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
 :class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure,
-so it branches off :mod:`discopy.monoidal` in the hierarchy.
+so it branches off :mod:`~discopy.monoidal` in the hierarchy.
 
 Summary
 -------

@@ -903,8 +903,8 @@ class TracedCategory[
     trace of a morphism over some objects, and the trace of the swap of an
     object with itself is its identity, that of a braid its twist, see
     :meth:`yanking`, :meth:`BalancedCategory.yanking` and
-    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`discopy.feedback` and the
-    levels below it, whose wires carry a time step, are traced on their
+    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`~discopy.feedback` and
+    the levels below it, whose wires carry a time step, are traced on their
     undelayed wires, the :class:`discopy.feedback.Trace` bubble being the
     feedback over an undelayed memory.
     """
@@ -1246,7 +1246,7 @@ class LinearCategory[
     comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
     nor closure, which none of its laws uses: a banged object is exchanged
     with any other, the rule of the Lambek calculus with a relevant modality
-    !L* of :cite:t:`KanovichEtAl16`. :mod:`discopy.bang` is the free one.
+    !L* of :cite:t:`KanovichEtAl16`. :mod:`~discopy.bang` is the free one.
 
     * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
       comultiplication :meth:`digging` ``!x -> !!x``,

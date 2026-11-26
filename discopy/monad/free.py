@@ -24,7 +24,7 @@ and every homomorphism ``h`` restricts along the unit to the channel
 :math:`\\eta_X \\mathbin{;} h`. The two are inverse to each other, so the
 Kleisli category is isomorphic to the category of free algebras, the full
 subcategory of the Eilenberg-Moore category on them, see
-:mod:`discopy.monad.algebra`: Kleisli composition is bind followed by plain
+:mod:`~discopy.monad.algebra`: Kleisli composition is bind followed by plain
 composition.
 
 Summary

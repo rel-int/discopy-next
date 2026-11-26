@@ -22,7 +22,7 @@ satisfying the unit and associativity laws of a monoid, i.e. for every type
 A monad may also come with an :attr:`Monad.iterate` operator, i.e. the
 extra structure of an `Elgot monad
 <https://ncatlab.org/nlab/show/Elgot+monad>`_ needed to trace the Kleisli
-category, see :mod:`discopy.kleisli.additive`.
+category, see :mod:`~discopy.kleisli.additive`.
 
 Summary
 -------
@@ -37,6 +37,7 @@ Summary
 .. admonition:: Data
 
     .. autosummary::
+        :template: data.rst
         :nosignatures:
         :toctree:
 
@@ -544,7 +545,7 @@ def make_state(S: type) -> Monad:
     ----
     The state monad is not commutative: two channels tensored in its Kleisli
     category run their effects in a given order, so the two biased tensors
-    differ, see :mod:`discopy.kleisli.multiplicative`. It comes with no
+    differ, see :mod:`~discopy.kleisli.multiplicative`. It comes with no
     :attr:`Monad.iterate`, so tracing one of its channels raises rather
     than guessing at the semantics, see
     :meth:`discopy.kleisli.additive.Channel.trace`.

@@ -13,10 +13,10 @@ of the next, tensor ``@`` runs two side by side, :meth:`Network.copy` sends
 an activation to several layers, :meth:`Network.discard` drops one and
 :meth:`Network.trace` feeds an output back into an input, as a recurrent
 network does. Networks form the free traced Markov and comarkov category on
-their boxes, see :mod:`discopy.markov`, :mod:`discopy.comarkov` and
-:mod:`discopy.feedback`. A feedforward network
+their boxes, see :mod:`~discopy.markov`, :mod:`~discopy.comarkov` and
+:mod:`~discopy.feedback`. A feedforward network
 compiles to a function on tensors with :meth:`Network.to_function`, which
-:mod:`discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
+:mod:`~discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
 as it is, and to its reverse derivative with :meth:`Network.to_lens`, a
 :class:`Lens` whose ``put`` is backpropagation.
 

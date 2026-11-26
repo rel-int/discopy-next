@@ -3,7 +3,7 @@ Property-based testing of the axioms with `Hypothesis
 <https://hypothesis.readthedocs.io>`_.
 
 An :class:`Axiom` is an equation stated once on an abstract base class of
-:mod:`discopy.abc` and inherited by every category below it, its signature a
+:mod:`~discopy.abc` and inherited by every category below it, its signature a
 sequent: its type parameters are variables, e.g. objects ``A: Obj[C0]``, its
 parameters premises, e.g. a morphism ``f: Hom[C1, A, B]`` from ``A`` to
 ``B``, and its return annotation the type of its output, e.g. an equation
@@ -928,7 +928,7 @@ class Axiom[**P, T](Declaration[P, T]):
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
         ``Diagram.yanking = BalancedCategory.yanking.modulo(
-        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
+        Diagram.to_hypergraph)`` in :mod:`~discopy.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):

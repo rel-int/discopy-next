@@ -3,7 +3,7 @@
 """
 Functions between finite sets as Python lists, read backwards: the free
 Markov category on one object, i.e. the opposite of the category of finite
-sets (see :mod:`discopy.op`), with cycles, permutations and cospans.
+sets (see :mod:`~discopy.op`), with cycles, permutations and cospans.
 
 Summary
 -------

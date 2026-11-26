@@ -73,7 +73,7 @@ Terms
 -----
 
 A diagram also reads as a term of the planar linear kappa calculus, see
-:class:`TermBase`: the terms of :mod:`discopy.cat` with a list of variables
+:class:`TermBase`: the terms of :mod:`~discopy.cat` with a list of variables
 as context, each used once and in order.
 
 A term has exactly one output, and the translation between diagrams and
@@ -148,7 +148,7 @@ A term is drawn as its diagram:
 .. image:: /_static/monoidal/let.svg
     :align: center
 
-The modules above have terms of their own, down to :mod:`discopy.biclosed`
+The modules above have terms of their own, down to :mod:`~discopy.biclosed`
 where they are lambda terms: a :class:`discopy.symmetric.Kappa` binds its
 variables in any order, a :class:`discopy.markov.Kappa` need not use them
 and a :class:`discopy.markov.Application` may use one twice.
@@ -1797,7 +1797,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         identifies diagrams up to moving a scalar across a wire, as
         :meth:`to_hypergraph` does. From braided categories on, a scalar
         slides past a wire anyway, by naturality of the braiding; below, the
-        map presents the free spacial category, see :mod:`discopy.spacial`
+        map presents the free spacial category, see :mod:`~discopy.spacial`
         and :meth:`discopy.cmap.CMap.match`, rather than the free category.
 
         >>> x, c = Ty('x'), Box('c', Ty(), Ty())
@@ -1943,7 +1943,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         Like :meth:`to_map`, it identifies diagrams up to moving a closed
         component, i.e. a scalar, across a wire, which below braided
         categories presents the free spacial category, see
-        :mod:`discopy.spacial`. Decoding gives back a diagram with the same
+        :mod:`~discopy.spacial`. Decoding gives back a diagram with the same
         hypergraph, i.e. ``d.to_hypergraph().to_diagram().to_hypergraph()``
         is ``d.to_hypergraph()``, and that diagram is ``d`` up to the axioms
         and, below braided, up to where its scalars lie.
@@ -2162,7 +2162,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         come later, e.g. ``(f >> g) @ h``. Each layering of
         :meth:`dependencies` is foliated, then merged by the level's own
         :meth:`Layer.merge`, e.g. two permutations fuse in
-        :mod:`discopy.symmetric`.
+        :mod:`~discopy.symmetric`.
 
         Parameters:
             limit : The maximum number of foliations to return.
@@ -2350,13 +2350,13 @@ let(e(x2), lambda: h(x1), offset=1)))
         This is a planar rewrite, as are :meth:`interchange` and
         :meth:`discopy.rigid.Diagram.snake_removal`, which yanks snakes
         before it interchanges boxes: their scope is the planar levels, from
-        :mod:`discopy.monoidal` to :mod:`discopy.rigid`. Above them, a braid,
+        :mod:`~discopy.monoidal` to :mod:`~discopy.rigid`. Above them, a braid,
         a swap or a trace is just one more box, so they do not compute a
         normal form for the axioms of the level, e.g. in
-        :mod:`discopy.symmetric` the diagrams
+        :mod:`~discopy.symmetric` the diagrams
         ``Swap(x, y) >> y @ f >> Swap(y, x)`` and ``f @ y`` have the same
         hypergraph and neither is rewritten into the other. From
-        :mod:`discopy.symmetric` up, the ``Equation`` of the level compares
+        :mod:`~discopy.symmetric` up, the ``Equation`` of the level compares
         diagrams up to their hypergraph instead.
         """
         diagram = self

@@ -339,7 +339,7 @@ class Diagram[natural](
     ...     == D.id(two).transpose(left=True)
 
     Python functions with tuples as tensor have neither dagger nor twist,
-    their integer diagrams are the lenses of :mod:`discopy.lens`:
+    their integer diagrams are the lenses of :mod:`~discopy.lens`:
 
     >>> from discopy.python import Function
     >>> R = Ty[Function.ob]((float, ), (float, ))
@@ -853,7 +853,7 @@ class Diagram[natural](
     def twist(cls, dom: Ty) -> Diagram:
         """
         The twist of an integer type is the trace of its braid, as in
-        :mod:`discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
+        :mod:`~discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
 
         Parameters:
             dom : The integer type to twist.

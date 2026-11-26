@@ -103,18 +103,18 @@ let(f(a), lambda y: let(g(y), lambda z: h(z)))
 >>> assert statement.normal_form() == e(d(c(a)))
 >>> assert statement.eval() == arrow
 
-Every module of the hierarchy below :mod:`discopy.biclosed` has terms of its
+Every module of the hierarchy below :mod:`~discopy.biclosed` has terms of its
 own, each a variant of the kappa calculus: planar and linear in
-:mod:`discopy.monoidal`, linear in :mod:`discopy.symmetric`, with copy and
-discard in :mod:`discopy.markov`. A module that adds no way to bind a
-variable, e.g. :mod:`discopy.braided`, gets its terms from
+:mod:`~discopy.monoidal`, linear in :mod:`~discopy.symmetric`, with copy and
+discard in :mod:`~discopy.markov`. A module that adds no way to bind a
+variable, e.g. :mod:`~discopy.braided`, gets its terms from
 :func:`kappa_calculus`, with its structural boxes as constants. From
-:mod:`discopy.biclosed` up, terms are those of the lambda calculus.
+:mod:`~discopy.biclosed` up, terms are those of the lambda calculus.
 
 Every module up the hierarchy has terms of its own, subclasses of these
 which say what a context is: one variable in a category, a list of variables
 each used once and in order in a monoidal one, see
-:class:`discopy.monoidal.TermBase`. Below :mod:`discopy.biclosed`, which
+:class:`discopy.monoidal.TermBase`. Below :mod:`~discopy.biclosed`, which
 adds the abstraction of the lambda calculus, they are variants of the kappa
 calculus.
 """
@@ -2867,11 +2867,11 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
 
 
 TERMS = {
-    "TermBase": "A term of the kappa calculus of :mod:`discopy.{}`.",
-    "Variable": "A variable of the terms of :mod:`discopy.{}`.",
-    "Constant": "A box of :mod:`discopy.{}` as a term.",
-    "Application": "An application of terms of :mod:`discopy.{}`.",
-    "Kappa": "A kappa abstraction of terms of :mod:`discopy.{}`."}
+    "TermBase": "A term of the kappa calculus of :mod:`~discopy.{}`.",
+    "Variable": "A variable of the terms of :mod:`~discopy.{}`.",
+    "Constant": "A box of :mod:`~discopy.{}` as a term.",
+    "Application": "An application of terms of :mod:`~discopy.{}`.",
+    "Kappa": "A kappa abstraction of terms of :mod:`~discopy.{}`."}
 
 
 def kappa_calculus(
@@ -2885,11 +2885,11 @@ def kappa_calculus(
     generated with its boxes and read its structural boxes, e.g. a braid,
     as constants like any other.
 
-    This is for the levels below :mod:`discopy.biclosed`: from there up a
+    This is for the levels below :mod:`~discopy.biclosed`: from there up a
     type applied to a Python function is a lambda abstraction, see
     :class:`discopy.biclosed.Ty`, and a diagram reads with the kappa terms
     of the level it subclasses, e.g. a compact one with those of
-    :mod:`discopy.symmetric`.
+    :mod:`~discopy.symmetric`.
 
     Parameters:
         diagram : The diagram class of the level.

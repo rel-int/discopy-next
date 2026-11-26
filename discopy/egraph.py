@@ -736,7 +736,7 @@ class EGraph[category](
     """
     An e-graph over a copy-discard ``category``, i.e. a monoidal e-graph or
     e-hypergraph, equal to another up to renaming its spiders, see
-    :mod:`discopy.egraph`.
+    :mod:`~discopy.egraph`.
 
     Parameters:
         graph : A left-monogamous acyclic hypergraph, its boxes the e-nodes.

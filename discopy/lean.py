@@ -1,5 +1,5 @@
 """
-The categories of :mod:`discopy.abc` compiled to definitions of `Lean
+The categories of :mod:`~discopy.abc` compiled to definitions of `Lean
 <https://lean-lang.org>`_, read off the classes themselves.
 
 Each :class:`discopy.testable.Declaration` of a class is evaluated on
@@ -22,7 +22,7 @@ A category declares which of the laws it inherits are broken, see
 :meth:`discopy.testable.Declaration.failing`: its :func:`theory` is the
 conjunction of the others, the structure its diagrams are meant to be the
 free one of. The Lean package ``discolean/`` proves it of the diagrams of
-:mod:`discopy.monoidal` and checks every definition compiled here, see
+:mod:`~discopy.monoidal` and checks every definition compiled here, see
 :func:`generate`.
 
 Summary
@@ -394,7 +394,7 @@ def declarations(cls: type) -> dict[str, tuple[Declaration, Compiled]]:
 
 
 def bases(cls: type) -> list[type]:
-    """ The abstract classes of :mod:`discopy.abc` a class extends. """
+    """ The abstract classes of :mod:`~discopy.abc` a class extends. """
     return [base for base in cls.__bases__
             if base.__module__ == abc.__name__
             and issubclass(base, abc.Category)]
@@ -435,7 +435,7 @@ def type_arguments(cls: type, prime: str = "") -> str:
 
 
 SIGNATURE_SORTS = {"C0": "Ob", "C1": "Hom", "int": "Nat", "bool": "Bool"}
-""" The Lean type of an annotation of the methods of :mod:`discopy.abc`. """
+""" The Lean type of an annotation of the methods of :mod:`~discopy.abc`. """
 
 
 def method(cls: type, name: str) -> tuple[str, str]:
@@ -694,7 +694,7 @@ THEORIES = ((monoidal.Diagram, abc.MonoidalCategory), )
 
 def generate() -> str:
     """
-    The Lean file of every class of :mod:`discopy.abc` the compiler
+    The Lean file of every class of :mod:`~discopy.abc` the compiler
     translates, in order, and of the :data:`THEORIES`, listing the classes it
     does not translate with the reason, a class whose base it does not
     translate included. Run ``python -m discopy.lean`` to print it, as

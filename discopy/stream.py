@@ -163,7 +163,7 @@ steps: `==` on a stream is intensional, see :class:`Ty`.
 >>> assert symmetric.Equation(
 ...     LHS.now, id_dom.permute(*pi) >> RHS.now.permute(*pi))
 
-See :mod:`discopy.feedback` for the other axioms for feedback categories.
+See :mod:`~discopy.feedback` for the other axioms for feedback categories.
 """
 from __future__ import annotations
 
