@@ -331,3 +331,19 @@ def test_wreath():
         assert dense.orbits == orbits
         assert equivariant.equivariance(
             partial(dense, w=w), action, action, v) < 1e-9
+
+
+def test_unbatched():
+    """
+    An unbatched input gives the batched output without its batch axis,
+    down to a single point with one channel, which has no axis at all.
+    """
+    torch, equivariant = modules()
+    torch.manual_seed(6)
+    action = Symmetric[5].action()
+    for cod, shape in ((Action.trivial(action.group), ()), (action, (5, ))):
+        for bias in (False, True):
+            module = compiled(torch, equivariant.layer(action, cod, bias=bias))
+            v = torch.randn(action.size, dtype=torch.float64)
+            assert module(v).shape == shape
+            torch.testing.assert_close(module(v), module(v[None])[0])
