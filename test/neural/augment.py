@@ -194,8 +194,8 @@ def test_augmentation_box():
     arrow = augment.augment(dom, dom)
     pair = (x[:, None], y[:, None])
     (a, b), after = arrow(pair)(42)
-    (c, d), after = arrow((a, b))(after % 2 ** 63)
-    assert key2.item() == after % 2 ** 63 and key2.dtype == key.dtype
+    (c, d), after = arrow((a, b))(after)
+    assert key2.item() == after and key2.dtype == key.dtype
     assert u.equal(c[:, 0]) and v.equal(d[:, 0])
     assert augment.augmentation(cod, cod).dom == Dims(1) @ Dims(3) @ Dims(3)
 
@@ -231,7 +231,7 @@ def test_augmentation_box_one_element_per_batch():
         expected_y = torch.stack([
             equivariant.act(cod(g), row[:, None])[:, 0] for row in y])
         assert u.equal(expected_x) and v.equal(expected_y)
-        assert key.item() == after % augment.MODULUS
+        assert key.item() == after
 
 
 def test_augmentation_box_refuses_bad_keys():

@@ -31,7 +31,6 @@ Summary
         :nosignatures:
         :toctree:
 
-        check
         sample
         augment
         augmentation
@@ -67,37 +66,12 @@ from discopy.group import Action, FiniteGroup
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Seed
 from discopy.monad.algebra import Homomorphism, Writer
-from discopy.neural.equivariant import Legs, act, equivariance
+from discopy.neural.equivariant import Legs, act, check, equivariance
 from discopy.neural.network import Box, Dim, Dims
 from discopy.neural.torch import Module
 
 MAX_ORDER = 10_000
 """ The largest group :func:`symmetrise` sums over exactly. """
-
-MODULUS = 2 ** 63
-""" The keys of :class:`Augment` are seeds modulo this, to fit ``int64``. """
-
-
-def check(dom: Action, cod: Action) -> type[FiniteGroup]:
-    """
-    The group of two actions, if it is the same.
-
-    Parameters:
-        dom : The action on the input points.
-        cod : The action on the output points.
-
-    Raises:
-        TypeError : If the actions are of different groups.
-
-    Example
-    -------
-    >>> from discopy.group import Cyclic
-    >>> rotations = Cyclic[3].action()
-    >>> assert check(rotations, rotations) is Cyclic[3]
-    """
-    if dom.group is not cod.group:
-        raise TypeError(f"Expected actions of {dom.group}, got {cod.group}.")
-    return dom.group
 
 
 def sample(group: type[FiniteGroup]) -> Callable[[int], tuple]:
@@ -121,7 +95,7 @@ def sample(group: type[FiniteGroup]) -> Callable[[int], tuple]:
     """
     def inside(seed: int) -> tuple:
         generator = random.Random(seed)
-        return group.sample(generator), generator.getrandbits(64)
+        return group.sample(generator), generator.getrandbits(63)
     return inside
 
 
@@ -159,7 +133,6 @@ def augment(dom: Action, cod: Action) -> Channel:
             g, after = draw(seed)
             return (act(dom(g), x), act(cod(g), y)), after
         return computation
-    # The parameter of a channel is a monad value, not a type.
     return Channel[Seed](  # ty: ignore[invalid-type-form]
         inside, tuple, tuple)
 
@@ -173,10 +146,8 @@ class Augment(torch.nn.Module):
 
     The key is one non-negative integer, a seed, in a tensor with one
     element. One element ``g`` is drawn per call and acts on every row of a
-    batch alike. The next key is the next seed of :func:`sample` reduced
-    modulo :data:`MODULUS` to fit in ``torch.int64``: the box and the arrow
-    :func:`augment` agree on the first draw, and on the following ones only
-    if the arrow is given the next seed reduced in the same way.
+    batch alike. The next key is the next seed of :func:`sample`: the box and
+    :func:`augment` agree on every draw.
 
     Parameters:
         dom : The action on the points of the inputs.
@@ -219,7 +190,7 @@ class Augment(torch.nn.Module):
         pair = (Legs.restore(x, self.dom.size, 1),
                 Legs.restore(y, self.cod.size, 1))
         (u, v), seed = self.arrow(pair)(int(key))
-        return (key.new_full(key.shape, seed % MODULUS),
+        return (key.new_full(key.shape, seed),
                 u.reshape(x.shape), v.reshape(y.shape))
 
 
@@ -268,7 +239,6 @@ def symmetrise(function: Callable[[torch.Tensor], torch.Tensor],
     The average is over the elements of the group, or over ``samples``
     elements drawn by :func:`sample` from the seed, each from the seed that
     the previous draw returned, which is an unbiased estimate of it. The
-    draws of ``k`` samples are the first ``k`` draws of ``k + 1`` samples. The
     elements are drawn once, so the result is a pure function.
 
     Parameters:
@@ -351,7 +321,6 @@ def homomorphism(function: Callable[[int], int], dom: Action, cod: Action
     >>> assert first.preservation((Cyclic[3](2), 4))
     """
     writer = Writer(check(dom, cod))
-    # The parameter of a homomorphism is a monad value, not a type.
     return Homomorphism[writer](  # ty: ignore[invalid-type-form]
         function, writer.from_action(dom), writer.from_action(cod))
 
@@ -361,13 +330,8 @@ def is_homomorphism(function: Callable[[int], int],
     """
     Whether a function between the points of two actions commutes with the
     group, i.e. :func:`homomorphism` preserves the structure at every point
-    and every generator. The generators suffice: if
-    ``f . dom(s) = cod(s) . f`` for every generator ``s``, then it holds for
-    every product of generators, since
-    ``f . dom(st) = cod(s) . f . dom(t) = cod(st) . f``, and an inverse is a
-    positive power in a finite group, so every element is such a product.
-    This uses that the images of the generators satisfy the relations of the
-    group, the precondition of an :class:`~discopy.group.Action`.
+    and every generator. The generators suffice, since their images satisfy
+    the relations of the group, see :class:`~discopy.group.Action`.
 
     Parameters:
         function : A function from the points of ``dom`` to those of ``cod``.
@@ -417,10 +381,8 @@ def strictness(layer: para.Symmetric, dom: Action, cod: Action,
     The channels and the shapes are those of the legs of the layer: its
     input and output are one leg each, ``Dim(|X|, C)`` and ``Dim(|Y|, D)``
     with the unit dimensions dropped, and the weights are one tensor per leg
-    of its parameter space. Weights and inputs are standard normal, in
-    ``float64``, from a generator seeded by ``seed``, so that the result is
-    a pure function. The group acts on the points by :func:`act`, through
-    :func:`~discopy.neural.equivariant.equivariance`.
+    of its parameter space, all standard normal in ``float64`` from a
+    generator seeded by ``seed``.
 
     Parameters:
         layer : A parametric network, e.g. from
