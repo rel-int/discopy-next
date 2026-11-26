@@ -11,7 +11,7 @@
 - [ ] Dualities on slots: rigid, pivotal, ribbon, compact, frobenius, tensor (dtype fix), hypergraph, cmap
 - [x] Exponentials and time on slots: biclosed, closed, feedback, stream, bang, interaction
 - [x] Terms on slots, on Ty and TermBase
-- [ ] Applications on slots: lambek, quantum, optyx, neural, peirce, egraph and the rest
+- [x] Applications on slots: lambek, quantum, optyx, neural, peirce, egraph and the rest
 - [ ] Generator(Slot, Rule): rule and premises on root classes, one functor dispatch through box.rule, Rule.admissible
 - [ ] Plumbing as an admissible rule; structural_boxes read from declarations, the boundary law replacing assert_structural_boxes
 - [ ] Regenerate DisCoLean/ABC.lean if needed, remove the shim, docs and changelog
