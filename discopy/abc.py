@@ -2533,9 +2533,10 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
         """
         inside = cls.laxator(dom, mem) >> f.bang() >> cls.colaxator(cod, mem)
         return cls.equation_factory(
-            f.trace(  # ty: ignore[unknown-argument]
-                dom=dom, cod=cod, mem=mem).bang(),
-            inside.trace(  # ty: ignore[unknown-argument]
+            f.trace(
+                dom=dom, cod=cod, mem=mem  # ty: ignore[unknown-argument]
+            ).bang(),
+            inside.trace(
                 dom=cls.banged(dom), cod=cls.banged(cod),
                 mem=cls.banged(mem)))
 
