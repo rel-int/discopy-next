@@ -2,12 +2,13 @@
 
 Runs from ``changelog.yml`` with the files the pull request changes against
 its merge base, one ``<status>\\t<path>`` line each as ``git diff --name-status
---no-renames`` prints them, on standard input, and its labels in ``LABELS``,
-comma-separated. A fragment is ``changelog.d/<slug>.<section>[.<n>].md``,
-``<section>`` one of the ``[[tool.towncrier.type]]`` directories of
-``pyproject.toml``. Every fragment the pull request adds or edits must be
-named so, whatever it touches; one must be added when it touches
-``discopy/``, unless it carries the ``no-changelog`` label.
+--no-renames`` prints them, on standard input, and ``LABELS`` set to
+``no-changelog`` when the pull request carries that label, matched exactly.
+A fragment is ``changelog.d/<slug>.<section>[.<n>].md``, ``<section>`` one
+of the ``[[tool.towncrier.type]]`` directories of ``pyproject.toml``. Every
+fragment the pull request adds or edits must be named so, whatever it
+touches; one must be added when it touches ``discopy/``, unless it carries
+the ``no-changelog`` label.
 """
 
 import os

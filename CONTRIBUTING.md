@@ -469,9 +469,10 @@ python -m build
 Every user-facing change adds a fragment to [`changelog.d/`](changelog.d/), one file per
 entry, rather than a line of [CHANGELOG.md](CHANGELOG.md), so that two pull requests never
 conflict on it. A fragment is `changelog.d/<slug>.<section>.md`: `<slug>` is the name of the
-branch, `/` read as `-`, and `<section>` one of `added`, `changed`, `deprecated`, `removed`,
+branch in lower case, `/` and `.` read as `-`, and `<section>` one of `added`, `changed`, `deprecated`, `removed`,
 `fixed`, or `project` for the repo's own tooling and process (Keep a Changelog's headings). A
-second entry in the same section is `<slug>.<section>.2.md`. Its text is the bullet without
+second entry in the same section is `<slug>.<section>.2.md`; two branches of the same name
+conflict on their fragment, and the second renames its own. Its text is the bullet without
 its `- `, citing the pull request as an inline link, `[next#N](https://github.com/rel-int/discopy-next/pull/N)`
 for rel-int/discopy-next, `[#N](https://github.com/discopy/discopy/pull/N)` for
 discopy/discopy, e.g. `changelog.d/amp-qp-layout.added.md`:

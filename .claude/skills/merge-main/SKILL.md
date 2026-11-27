@@ -33,5 +33,6 @@ CHANGELOG.md as text. The driver keeps CRLF and odd bytes; identical bullets add
 appear once.
 
 A branch cut before `changelog.d/` still adds bullets under `## [Unreleased]`: the driver keeps
-them there. Move each into a fragment, `changelog.d/<slug>.<section>.md` with its links inline,
+them there. Move each into a fragment of its own, `changelog.d/<slug>.<section>[.<n>].md` with its
+links inline,
 and take `main`'s CHANGELOG.md, which holds released versions only.

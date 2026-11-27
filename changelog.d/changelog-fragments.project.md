@@ -1,4 +1,4 @@
-Each pull request adds its changelog entry as a fragment,
+Each user-facing change adds its changelog entry as a fragment,
 `changelog.d/<slug>.<section>.md`, compiled into CHANGELOG.md by towncrier
 at release, and the `changelog` workflow fails one that changes `discopy/`
 without a fragment unless it is labelled `no-changelog`. Architecture decision

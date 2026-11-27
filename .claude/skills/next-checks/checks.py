@@ -530,9 +530,12 @@ FRAGMENT = re.compile(
 
 def gate_changelog(ctx):
     names = [p for p in ctx.under("changelog.d/")
-             if p != "changelog.d/template.md.jinja"
+             if p not in {"changelog.d/README.md",
+                          "changelog.d/template.md.jinja"}
              and (ctx.root / p).exists()]
     bad = [p for p in names if not FRAGMENT.fullmatch(p)]
+    base = set(git("ls-tree", "-r", "--name-only", ctx.base, "--",
+                   "changelog.d/", cwd=ctx.root).splitlines())
     if bad:
         return "FAIL", "not changelog.d/<slug>.<section>.md: " + capped(bad)
     conflict = [p for p in names + ["CHANGELOG.md"] if re.search(
@@ -540,6 +543,7 @@ def gate_changelog(ctx):
             encoding="utf-8"), re.M)]
     if conflict:
         return "FAIL", f"conflict marker in {conflict[0]}"
+    names = [p for p in names if p not in base]
     if not names:
         if ctx.under("discopy/"):
             return "SKIP", ("no fragment added; discopy/ changed, add one "
