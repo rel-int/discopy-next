@@ -6,12 +6,12 @@ the characteristic generator of its categorical structure as an
 ``abc.abstractmethod``, e.g. :class:`BraidedCategory` is a
 :class:`MonoidalCategory` with an abstract :meth:`BraidedCategory.braid`.
 
-Each class also declares its :func:`discopy.testable.axiom` equations, which
+Each class also declares its :func:`~discopy.testable.axiom` equations, which
 every free category inherits along with the structure they axiomatise:
 :class:`Category` states the unitality and associativity of composition; a
 law quantifies over the type parameters of its signature, objects of the
 category, and over morphisms between them, see
-:class:`discopy.testable.Declaration`; a :class:`DaggerCategory`
+:class:`~discopy.testable.Declaration`; a :class:`DaggerCategory`
 adds the involution and contravariance of its dagger; a
 :class:`ColouredMonoid` inherits the first two as the unitality and
 associativity of its product, its composition; a :class:`Groupoid` is a
@@ -111,7 +111,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         What the type parameters of the category stand for, in order: its
         objects ``C0`` and its arrows ``C1``, so that a sequent stated with
         them reads as one of the category it is bound to, see
-        :func:`discopy.testable.position`.
+        :func:`~discopy.testable.position`.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.typeparams() == (Ty, Diagram)
@@ -127,7 +127,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         A class that quotients its equations overrides this, e.g. by
         hypergraph isomorphism from symmetric categories on, so an axiom
         built with it is checked up to whatever quotient the category
-        defines — and :meth:`discopy.testable.Axiom.modulo` weakens it
+        defines — and :meth:`~discopy.testable.Axiom.modulo` weakens it
         further.
         """
         return Equation(*terms)
@@ -137,9 +137,9 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         """
         Construct an equation of objects, using strict equality by default,
         as :meth:`equation_factory` does of morphisms: what
-        :func:`discopy.testable.inhabits` checks the boundary of a term
+        :func:`~discopy.testable.inhabits` checks the boundary of a term
         with, so that a category whose objects compare only up to a
-        quotient, e.g. :class:`discopy.stream.Stream`, says which.
+        quotient, e.g. :class:`~discopy.stream.Stream`, says which.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.ob_equation(Ty('x'), Ty('x'))
@@ -238,7 +238,7 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
         """
         Whether the morphisms of the category have a dagger, true unless
         it depends on a parameter, as for
-        :class:`discopy.interaction.Diagram` over a category with none.
+        :class:`~discopy.interaction.Diagram` over a category with none.
         """
         return True
 
@@ -405,7 +405,7 @@ class Nat(Monoid["Nat"]):
     it off as a sequence of ``1``'s, e.g. ``Nat(3)[:1] == Nat(1)``.
 
     It is the sort of a law's number variable ``N: Nat`` too, see
-    :class:`discopy.testable.Declaration`, and :meth:`__index__` lets it stand
+    :class:`~discopy.testable.Declaration`, and :meth:`__index__` lets it stand
     wherever a number of copies or legs does, e.g. ``x ** Nat(2) == x @ x``
     and ``spiders(Nat(2), 1, x)``.
 
@@ -456,21 +456,21 @@ class Nat(Monoid["Nat"]):
         return type(self)(1)
 
     def to_tree(self) -> dict:
-        """ The tree of a natural number, see :func:`discopy.utils.dumps`. """
+        """ The tree of a natural number, see :func:`~discopy.utils.dumps`. """
         return {'factory': factory_name(type(self)), 'n': self.n}
 
     @classmethod
     def from_tree(cls, tree: dict) -> Nat:
-        """ The natural number of a tree, see :func:`discopy.utils.loads`. """
+        """ The natural number of a tree, see :func:`~discopy.utils.loads`. """
         return cls(tree['n'])
 
     @classmethod
     def strategy(cls, *, max_size=3, **_):
         """
         Generate natural numbers up to ``max_size``, so that a category
-        whose objects they are, e.g. :class:`discopy.matrix.Matrix`, and a
+        whose objects they are, e.g. :class:`~discopy.matrix.Matrix`, and a
         law with a number variable ``N: Nat`` quantify over them like any
-        other :class:`discopy.testable.Testable`.
+        other :class:`~discopy.testable.Testable`.
         """
         from hypothesis import strategies as st
 
@@ -485,7 +485,7 @@ class Nat(Monoid["Nat"]):
 
 
 Nat.canonical = Nat(2)
-""" The number of a law's :meth:`discopy.testable.Declaration.canonical`
+""" The number of a law's :meth:`~discopy.testable.Declaration.canonical`
 instance, the least that is neither the unit nor a single wire. """
 
 
@@ -502,7 +502,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
     of :meth:`FeedbackCategory.feedback` too, through
     :meth:`FeedbackCategory.keyword_form`, whether the subclass declares
     :class:`TracedCategory` or only has a trace, as
-    :class:`discopy.matrix.Matrix` and :class:`discopy.hypergraph.Hypergraph`
+    :class:`~discopy.matrix.Matrix` and :class:`~discopy.hypergraph.Hypergraph`
     do: the hook is here so that it fires for those too.
     """
     def __init_subclass__(cls, **kwargs):
@@ -600,7 +600,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         The tensor of two morphisms is the first whiskered by the domain of
         the second, then the second whiskered by the codomain of the first:
         with the laws above, those of a strict premonoidal category, which
-        unlike :meth:`bifunctoriality` hold of :class:`discopy.monoidal`.
+        unlike :meth:`bifunctoriality` hold of :mod:`~discopy.monoidal`.
         """
         return cls.equation_factory(f @ g, f @ g.dom >> f.cod @ g)
 
@@ -642,7 +642,7 @@ class SpacialCategory[
     its right, see :cite:t:`Selinger10`. Its diagrams are planar up to the
     face each scalar lies in, i.e. a component that touches nothing else can
     be lifted out of the plane and put down anywhere, see
-    :meth:`discopy.cmap.CMap.match`.
+    :meth:`~discopy.cmap.CMap.match`.
     """
     @axiom
     def scalar_sliding[A: Obj[C0], B: Obj[C0]](
@@ -797,7 +797,7 @@ class FeedbackCategory[
         ``n`` objects of the codomain, the first when ``left``, one by
         default; the domain and codomain default to what the memory leaves.
         Each of them is cast into the type of the codomain, e.g. an integer
-        into the :class:`Nat` of a :class:`discopy.matrix.Matrix`.
+        into the :class:`Nat` of a :class:`~discopy.matrix.Matrix`.
 
         Example
         -------
@@ -847,10 +847,10 @@ class FeedbackCategory[
         with :meth:`split_memory`, checked to be what the codomain feeds back
         and passed on as its :meth:`memory_size`, those of
         :class:`FeedbackCategory` when the class has none, e.g. a
-        :class:`discopy.matrix.Matrix`. The domain is checked on the result,
+        :class:`~discopy.matrix.Matrix`. The domain is checked on the result,
         since the boundary takes in the delay of the memory when the trace is
         the :meth:`TracedCategory.feedback` of a category that labels the two
-        apart, e.g. a :class:`discopy.drawing.Drawing`. The positional form is
+        apart, e.g. a :class:`~discopy.drawing.Drawing`. The positional form is
         split too, so that an ``n`` the boundary cannot spare raises
         ``ValueError`` in either form. A method that takes ``mem`` already is
         returned as it is, so that a class wraps the trace it defines once,
@@ -903,9 +903,9 @@ class TracedCategory[
     trace of a morphism over some objects, and the trace of the swap of an
     object with itself is its identity, that of a braid its twist, see
     :meth:`yanking`, :meth:`BalancedCategory.yanking` and
-    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`discopy.feedback` and the
-    levels below it, whose wires carry a time step, are traced on their
-    undelayed wires, the :class:`discopy.feedback.Trace` bubble being the
+    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`~discopy.feedback` and
+    the levels below it, whose wires carry a time step, are traced on their
+    undelayed wires, the :class:`~discopy.feedback.Trace` bubble being the
     feedback over an undelayed memory.
     """
     @abstractmethod
@@ -1246,7 +1246,7 @@ class LinearCategory[
     comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
     nor closure, which none of its laws uses: a banged object is exchanged
     with any other, the rule of the Lambek calculus with a relevant modality
-    !L* of :cite:t:`KanovichEtAl16`. :mod:`discopy.bang` is the free one.
+    !L* of :cite:t:`KanovichEtAl16`. :mod:`~discopy.bang` is the free one.
 
     * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
       comultiplication :meth:`digging` ``!x -> !!x``,
@@ -1965,7 +1965,7 @@ class SymmetricCategory[
         The permutation of the atomic objects of ``dom`` by
         :meth:`permutation`, i.e. a composition of swaps unless the category
         writes it directly; a free category overrides it with a native box,
-        see :meth:`discopy.symmetric.Diagram.from_permutation`.
+        see :meth:`~discopy.symmetric.Diagram.from_permutation`.
         """
         return cls.permutation(perm, dom)  # ty: ignore[invalid-argument-type]
 
@@ -2100,7 +2100,7 @@ class MarkovCategory[
         ``i`` is a copy of ``doms[xs[i]]``: the copies of each object, as
         many as the outputs that read it, then the permutation that puts
         each copy in its place, see
-        :meth:`discopy.python.finset.Function.factorise`.
+        :meth:`~discopy.python.finset.Function.factorise`.
 
         Parameters:
             xs : The object of ``doms`` that each output reads.
@@ -2119,7 +2119,7 @@ class MarkovCategory[
         """
         The function on the atomic objects of ``dom`` by :meth:`function`;
         a free category overrides it with a native box, see
-        :meth:`discopy.markov.Diagram.from_function`.
+        :meth:`~discopy.markov.Diagram.from_function`.
         """
         return cls.function(func, [dom[i:i + 1] for i in range(len(dom))])
 
@@ -2236,7 +2236,7 @@ class ComarkovCategory[
         """
         The cofunction on the atomic objects of ``cod`` by
         :meth:`cofunction`; a free category overrides it with a native box,
-        see :meth:`discopy.comarkov.Diagram.from_cofunction`.
+        see :meth:`~discopy.comarkov.Diagram.from_cofunction`.
         """
         return cls.cofunction(cofunc, [cod[i:i + 1] for i in range(len(cod))])
 
@@ -2471,7 +2471,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """
         Merge the inputs into the ``apexes`` then copy them out, so that
         input ``i`` goes to ``apexes[left[i]]`` and output ``j`` reads
-        ``apexes[right[j]]``, see :class:`discopy.python.finset.Cospan`: the
+        ``apexes[right[j]]``, see :class:`~discopy.python.finset.Cospan`: the
         permutation that gathers the inputs of each object, one spider on
         each object, then the permutation that scatters its outputs.
 
@@ -2499,7 +2499,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """
         The cospan on the atomic objects of ``apex`` by :meth:`cospan`; a
         free category overrides it with a native box, see
-        :meth:`discopy.frobenius.Diagram.from_cospan`.
+        :meth:`~discopy.frobenius.Diagram.from_cospan`.
         """
         return cls.cospan(
             left, right, [apex[i:i + 1] for i in range(len(apex))])

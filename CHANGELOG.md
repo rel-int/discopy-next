@@ -578,6 +578,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
+  alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -923,6 +926,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `PhotonThresholdMeasurement` from its domain, and `NumOp` and `HadamardBS`
   with no argument, so `loads(dumps(...))` round-trips across `optyx.photonic`
   ([next#731]).
+- The API docs show short names: a page is titled with the last part of its
+  name, which it lost when its package did not import it, e.g.
+  `neural.cell`, module tables and references to modules and objects drop
+  the `discopy.` prefix, and the bases of a class name only as much of their
+  path as tells two of them apart, e.g. `pivotal.Diagram, balanced.Diagram`
+  for `ribbon.Diagram`, as references in one paragraph do; `test/api_names.py`
+  checks both. `discopy.drawing` has
+  its own page instead of appearing twice under semantics, and the subpackages
+  follow it in the order lambek, neural, optyx, quantum ([next#746]).
 - `tensor.Functor.contract` lifts NumPy's default bound on intermediates, the
   size of the largest operand, for combinatorial maps as well as hypergraphs on
   the `"greedy"` path: when every pairwise step exceeds the largest operand,
@@ -2838,6 +2850,7 @@ for the changelog of `1.2.1` and earlier.
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
+[next#746]: https://github.com/rel-int/discopy-next/pull/746
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

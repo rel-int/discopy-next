@@ -261,7 +261,7 @@ class Ty(frobenius.Ty):
 
     Equality is structural rather than nominal: a :class:`Mode` or
     :class:`Bit` equals the plain :class:`Ty` with the same objects,
-    mirroring :class:`discopy.monoidal.PRO`.
+    mirroring :class:`~discopy.monoidal.PRO`.
     """
 
     generator_factory = Ob
@@ -331,7 +331,7 @@ class Diagram(frobenius.Diagram):
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
         of a :class:`Diagram`, or a formal
-        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
+        :class:`~discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams.
 
@@ -363,7 +363,7 @@ class Diagram(frobenius.Diagram):
             effect : The boundary plugged in the output memory after the last
                 time step, a diagram with `dom == mem`. `None` gives
                 :meth:`Feedback.default_effect`, the identity on `mem` here
-                and :class:`discopy.optyx.channel.Discard` for a channel
+                and :class:`~discopy.optyx.channel.Discard` for a channel
                 diagram.
 
         The boundaries are set here and read back by :meth:`boundary`:
@@ -430,11 +430,11 @@ class Diagram(frobenius.Diagram):
             -> Diagram:
         """
         Unroll the feedback loops of a diagram `n_steps` times, by
-        interpreting it as a :class:`discopy.stream.Stream`: every box maps
+        interpreting it as a :class:`~discopy.stream.Stream`: every box maps
         to the constant stream and every :class:`Feedback` loop moves its
         memory from the wires to the memory of the stream.
 
-        As in :meth:`discopy.stream.Stream.unroll`, `n_steps` counts
+        As in :meth:`~discopy.stream.Stream.unroll`, `n_steps` counts
         unrollings rather than time steps, so `unroll(0)` is one time step
         and `unroll(n)` is `n + 1` of them.
 
@@ -680,7 +680,7 @@ class Diagram(frobenius.Diagram):
 
 
 def array_backend(array) -> str:
-    """The name of the :func:`discopy.matrix.backend` an array belongs to,
+    """The name of the :func:`~discopy.matrix.backend` an array belongs to,
     read from the module of its type.
 
     >>> assert array_backend(np.zeros(2)) == array_backend([0]) == "numpy"
@@ -773,7 +773,7 @@ class Box(frobenius.Box, Diagram):
         Inheriting boxes should implement this method.
         Otherwise it is defined by the array.
 
-        As for :meth:`discopy.cat.Box.dagger`, the dagger keeps the name
+        As for :meth:`~discopy.cat.Box.dagger`, the dagger keeps the name
         and flips :code:`is_dagger`, so the dagger of the dagger is the box
         itself. Its array is the :meth:`array_adjoint`, and its
         :meth:`truncation` the dagger of the truncation of the box.
@@ -1481,7 +1481,7 @@ class Feedback(Box):
     back to its last `mem` inputs, one time step later.
 
     The delay is real but left unwritten: the memory of `arg` is not typed
-    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
+    with :meth:`~discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
@@ -1652,8 +1652,9 @@ class Functor(frobenius.Functor):
 class Hypergraph(hypergraph.Hypergraph):
     """
     A hypergraph whose functor keeps spiders as boxes: `bit` carries two
-    frobenius structures — :class:`discopy.optyx.core.zx.Z` and
-    :class:`discopy.optyx.core.zx.X` — so neither can dissolve into the wiring,
+    frobenius structures — :class:`~discopy.optyx.core.zx.Z` and
+    :class:`~discopy.optyx.core.zx.X` — so neither can dissolve into the
+    wiring,
     only the symmetric structure of the swaps does.
     """
     functor = symmetric.Functor

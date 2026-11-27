@@ -724,7 +724,7 @@ def classical_controlled():
 
 
 # The matplotlib rendering of classical_controlled() is exercised as a
-# doctest in the Gallery section of discopy/drawing/drawing.py, alongside
+# doctest in the Gallery section of discopy/drawing/planegraph.py, alongside
 # long-controlled; this only checks the TikZ backend, whose bending is
 # computed differently from Matplotlib.
 @tikz_and_compare('controlled-classical.tikz')
