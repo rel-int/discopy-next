@@ -495,7 +495,7 @@ class List[Atom](Monoid["List"], TestableGeneric):
         >>> from discopy.python import Ty
         >>> assert Ty.alphabet() == tuple(map(Ty, testable.VALUES))
         """
-        if cls.generator_factory is not type:
+        if cls.Atom is not type:
             return None
         return tuple(map(cls, testable.VALUES))
 
@@ -620,7 +620,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
         >>> assert Ty.alphabet()[0] == Ty('a')
         """
-        return tuple(cls(cls.generator_factory(name)) for name in GENERATORS)
+        return tuple(cls(cls.Atom(name)) for name in GENERATORS)
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):

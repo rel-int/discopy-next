@@ -264,7 +264,7 @@ from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    DaggerCategory, DaggerMonoidalCategory, DelayMonoid, FeedbackCategory,
+    DaggerCategory, DelayMonoid, FeedbackCategory,
     MonoidalCategory, TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import

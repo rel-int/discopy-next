@@ -979,7 +979,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `feedback.Ty.delay` keeps the colour of a unit: a type with no wire is its own delay, as
   `abc.DelayMonoid.delay_unit` states.
 
-- `comarkov.Diagram.spider_factory` builds a spider with no leg out as the trace of a merge,
+- `comarkov.Diagram.Spider` builds a spider with no leg out as the trace of a merge,
   the mirror of `markov`'s traced copy, so that a traced merge reads back from its hypergraph
   and `hypergraph_section` holds on it.
 

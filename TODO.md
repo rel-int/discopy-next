@@ -1,11 +1,11 @@
-make a new discopy-next branch (no PR) with all the upstream fixes we want to make. if not already the case, the constructors in `testable` should map to rules instantiations. feel free to make any other changes as well
+* rebase your discopy-next branch on https://github.com/rel-int/discopy-next/pull/763 and make the most out of the new architecture
+* optimize the shit out of the boltzmann/ library
+* simplify diagrams/ as much as possible, don't try to make ad-hoc adjustments for some axioms or categories, make a clear classification that makes the sampling predictable over a few different sorts of things we want to boltzmann-sample (types, diagrams, terms, cmaps/hypergraphs, ...). even better if you can share as much code across them
+* streamline it, so that every axiom gets:
+   * its own species, also generated from the recoloring signature
+   * when the signature changes in discopy, automatically rebuild the weights and update them in the lake, per structure, reusing past weights as much as possible to hopefully accelerate convergence
+* the sampling should work not just for diagrams, but any law-carrying class. for those that are not sampled via boltzmann, keep them in your discopy-next branch if you ever need to change them
 
-- [x] `Constructor` subclasses `Rule`: the constructor `K` decorates its formation rule, `@K`, on the class of objects whose structure it is, a `Hom` of the objects' own category (ruled by joseph: on the types, not the categories)
-- [x] formers on the abstract classes of objects: `ColouredMonoid` (`cut` = `Tensor`, `ax` = `Unit`, `form_repeat`), `ResiduatedMonoid` (`form_over`, `form_under`), `Pregroup` (`form_l`, `form_r`), new `DelayMonoid` (`form_delay`) and `BangMonoid` (`form_bang`); `feedback.Ty`, `bang.Ty`, `biclosed.Ty` take them
-- [x] an atom alphabet per class of objects: `ColouredMonoid.alphabet`, a tuple (free wires, `Nat(1)`, Python types) or an unbounded iterator (`Dim(n)`, digits and qudits)
-- [x] type equations as axioms on the classes of types: `Pregroup` (adjoint involution, contravariance, residuation), `DelayMonoid` (delay preserves tensor and unit); `L = R` is `PivotalCategory.self_dual` already
-- [x] a strategy hook: `testable.PROVIDERS`, tried by `Declaration.sequents` before its own draw; `Declaration.provider` names it, noted in each matrix cell
-- [x] `comarkov.Diagram.hypergraph_section` on `Trace(Merge(x, 2), left=True)`: fixed, `spider_factory` builds a spider with no leg out as a traced merge, the mirror of `markov`
-- [ ] changelog entry, docs and tests for each change (the changelog bullets cite no pull request yet: add the `[next#N]` link once one is opened)
-- [x] every check of CONTRIBUTING.md's "Run the unit tests": flake8, pylint 9.3825, ruff, ty, the full suite (6243 passed, coverage 98.0%) and the whole property matrix at seed 0 (3037 passed; its 7 failures fail on `main` too, below)
-- [ ] report `TermBase.str_transparency` of balanced, braided, comarkov, feedback, markov, spacial and symmetric, failing on `main` too: `str` of a term evaluates to a `monoidal.Kappa`, not a term of its own module
+- [x] Rebase onto #763 (amp/generators): constructors, providers, alphabet and type equations on slots
+- [ ] The generators of a category (declared slots, rules with no hom premise) as the signature its species is read from
+- [ ] Changes needed upstream for law-carrying classes that are not Boltzmann-sampled
