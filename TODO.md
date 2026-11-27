@@ -1,3 +1,0 @@
-> feedback.closed.markov should go back under feedback.closed.symmetric, as #744's description says. Your commit dace97a9f dropped that relation, and #744 merged into main without it (7e474455). Was there a reason, such as a class-order (MRO) conflict or a failing law? If there was, reply with it and change nothing. If there wasn't, restore the relation on a new branch from main, open a dedicated PR that closes #777, and get its checks green. Keep it out of #771. (toumix, on discopy-next#777)
-
-- [x] feedback.closed.markov's Wire, Ty, Exp, Diagram, Box, Permutation, Swap, Sum and Functor subclass those of feedback.closed.symmetric, with a regression test
