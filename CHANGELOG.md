@@ -909,6 +909,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `tensor.Functor.contract` lifts NumPy's default bound on intermediates, the
+  size of the largest operand, for combinatorial maps as well as hypergraphs on
+  the `"greedy"` path: when every pairwise step exceeds the largest operand,
+  e.g. `hopf.Double(hopf.GroupAlgebra(Symmetric[3])).is_valid()`, NumPy no
+  longer falls back to one naive sum over all indices ([next#579], [#595]).
 - The label of an exponential wire is made of the labels of its base and
   exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
   `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
@@ -2459,6 +2464,7 @@ for the changelog of `1.2.1` and earlier.
 [#588]: https://github.com/discopy/discopy/pull/588
 [#590]: https://github.com/discopy/discopy/pull/590
 [#594]: https://github.com/discopy/discopy/pull/594
+[#595]: https://github.com/discopy/discopy/issues/595
 [#603]: https://github.com/discopy/discopy/pull/603
 [#606]: https://github.com/discopy/discopy/pull/606
 [#614]: https://github.com/discopy/discopy/pull/614
@@ -2713,6 +2719,7 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#579]: https://github.com/rel-int/discopy-next/issues/579
 [next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#582]: https://github.com/rel-int/discopy-next/pull/582
