@@ -6,6 +6,6 @@
 >
 > 3. Add axioms for dataflow on the abc pattern, a `DataflowCategory` or whatever name fits the repo, each checked by the property matrix: head and tail on types and arrows as monoidal endofunctors, stated as functor equations; apart from functoriality `x.head.head == x.head`, `x.head.tail == Ty()`, `x.d.head == Ty()`, `x.d.tail == x`, `x.tail == x` for constant `x`; head and tail commute with dagger; `followed_by(x)` is an isomorphism with its dagger as inverse; `followed_by` is natural, `f.head @ f.tail.d >> followed_by(y) == followed_by(x) >> f`, on the nose where it can be and otherwise up to the functor into `stream.Stream`; `followed_by(x.d)` is the identity on `x.d`, up to the unit. No law about `x.tail.head`.
 
-- [WIP] @T-96926d43-2026-11-27 14:13 Move the mixins of dataflow/__init__.py into dataflow/symmetric.py
+- [x] Move the mixins of dataflow/__init__.py into dataflow/symmetric.py
 - [WIP] @T-96926d43-2026-11-27 14:13 Add a dataflow Hypergraph with the primitives and make the functor strict
 - [WIP] @T-96926d43-2026-11-27 14:13 Add abc.DataflowCategory with its axioms, checked by the property matrix
