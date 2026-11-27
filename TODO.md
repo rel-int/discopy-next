@@ -10,6 +10,6 @@
 - [x] discopy/dataflow.py: the mixins, Diagram on feedback.markov, Functor raising into a codomain without streams
 - [x] remove HeadOb, TailOb, Head, Tail, FollowedBy, is_constant from feedback and every level, structural_wires, the Functor branches, Dim/Nat/Dims heads, circuit and optyx heads
 - [x] move the fib, random-walk and walk doctests, test_walk/test_fibonacci and the notebook to dataflow; plumbing tests to test/dataflow.py
-- [ ] docs API, CHANGELOG, ADR
+- [x] docs API, CHANGELOG, ADR
 - [ ] next-checks green, PR opened
 - [ ] Alexis's layout change: dataflow is a package, mixins in __init__, dataflow.symmetric the base level, dataflow.markov over it and feedback.markov
