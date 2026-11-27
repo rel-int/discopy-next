@@ -68,7 +68,7 @@ drawn, fair or biased four to one towards heads, and flipped. On heads
 the token leaves with the coin, on tails it goes back to the start.
 
 ```python
-from discopy import comarkov
+from discopy.feedback import comarkov
 from discopy.kleisli.additive import Channel, Tagged
 from discopy.kleisli.monad import Subdistribution
 

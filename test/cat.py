@@ -694,7 +694,9 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
-    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
+    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False)',
+    "feedback.{markov,closed}.Box":
+    'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
     "lambek.cfg.Id": "c(x)",
@@ -703,23 +705,29 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "{rigid,frobenius}.Cup": "c(x, x.r)",
     "{rigid,frobenius}.Cap": "c(x, x.l)",
     "pivotal.Box": 'c("f", x, y, data=v).delay().r',
+    "feedback.{balanced,symmetric,comarkov}.Box": 'c("f", x, y, data=v).delay()',
     "lambek.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
-    "bang.Bang": "c(box(c, x, y, v))",
-    "bang.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
-    "bang.Exchange": "c(x, y, True)",
-    "bang.Laxator": "c(x, y)",
+    "linear.{cat,monoidal}.Bang": "c(box(c, x, y, v))",
+    "linear.cat.{Dereliction,Digging} "
+    "linear.monoidal.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "linear.monoidal.Exchange": "c(x, y, True)",
+    "linear.monoidal.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
-    "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "closed.{Eval,Coeval}": "c(x << y)",
+    "feedback.closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
+    "feedback.closed.Curry":
+    "c(box(c, x @ y, x, v), 1, False, time_step=1)",
     "biclosed.Constant": 'c("c", x, data=v)',
     "{closed,lambek.categorial}.Constant {biclosed,closed}.Variable":
     'c("c", x)',
     "{biclosed,closed}.Application lambek.categorial.FA": "c(f, a)",
     "{biclosed,closed,lambek.categorial}.Abstraction": "c(u, f(u))",
-    "closed.{Pack,Unpack}": "c(x * y, 1)",
+    "closed.{Pack,Unpack}": "c(x * y)",
+    "feedback.closed.{Pack,Unpack}": "c(x * y, 1)",
     "closed.Tuple": "c(a, u)",
     "closed.Projection": "c(closed.Tuple(a, u), 1)",
     "closed.Let": "c(closed.Tuple(a), [u], u)",
@@ -835,7 +843,8 @@ BROKEN = {
         "*.Cofunction": "it keeps its cofunc in an op",
         "*.Cospan": "it keeps left and right as legs",
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
-        "closed.{Pack,Unpack}": "it keeps its type delayed",
+        "{closed,feedback.closed}.{Pack,Unpack}":
+        "it is built from its type alone",
     },
     "dagger": {
         "*.{Constant,Variable,Abstraction,Application} "
@@ -846,8 +855,10 @@ BROKEN = {
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
-        "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
-        "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
+        "{closed,markov,lambek.abstract,feedback.closed,feedback.markov}"
+        ".{Copy,Discard,Function} "
+        "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
+        "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
@@ -900,7 +911,8 @@ def test_every_box(law):
 
 
 @pytest.mark.parametrize(
-    "module", ["symmetric", "feedback", "markov", "frobenius"])
+    "module", ["feedback.symmetric", "feedback", "feedback.markov",
+               "frobenius"])
 def test_rebuild_strict_init(module):
     """ A box whose constructor takes only some fields gets the others set,
     as main did, see #169. """

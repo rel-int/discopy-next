@@ -76,7 +76,7 @@ from typing import ClassVar
 
 from discopy import feedback, messages, tensor, frobenius
 from discopy.cat import factory
-from discopy.matrix import backend
+from discopy.matrix import asarray, backend
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance, deprecated_alias, factory_name
 
@@ -977,9 +977,12 @@ class Box(tensor.Box[complex], Circuit):
     def array(self):
         """ The array of a quantum box. """
         if self.data is not None:
+            array = asarray(self.data, dtype=complex).reshape(tuple(
+                obj.dim for obj in self.dom.inside + self.cod.inside))
             with backend() as np:
-                return np.array(self.data, dtype=complex).reshape(tuple(
-                    obj.dim for obj in self.dom.inside + self.cod.inside))
+                # numpy's asarray may return a view of the data: copy it,
+                # so that writing to the array leaves the box unchanged
+                return array.copy() if np.__name__ == "numpy" else array
 
     def grad(self, var, **params):
         if var not in self.free_symbols:

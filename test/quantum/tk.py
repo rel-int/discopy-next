@@ -10,6 +10,7 @@ import numpy as np
 from pytest import raises
 
 from discopy.quantum import tk
+from discopy.quantum.tk import from_tk, to_tk
 from discopy.quantum.circuit import Swap
 from discopy.quantum.gates import *
 from discopy.tensor import Tensor, Dim
@@ -253,3 +254,18 @@ def test_pickle_keeps_post_selection():
 def test_Ry_from_tk():
     circuit = Ket(0) >> Ry(0.25)
     assert Circuit.from_tk(circuit.to_tk()) == circuit.init_and_discard()
+
+
+def test_override_bits_measure_qubits_to_tk():
+    circuits = [
+        Ket(0) @ Bits(0) @ Ket(1) >> Measure(override_bits=True) @ qubit
+        >> bit @ X >> bit @ Measure(),
+        Ket(0) @ Bits(0) @ Ket(1)
+        >> Measure(destructive=False, override_bits=True) @ qubit
+        >> X @ bit @ X >> Measure() @ bit @ Measure(),
+        Ket(1, 0) @ Bits(0, 0) @ Ket(1)
+        >> Measure(2, destructive=True, override_bits=True) @ qubit
+        >> bit ** 2 @ X >> bit ** 2 @ Measure(),
+    ]
+    for c in circuits:
+        assert np.allclose(from_tk(to_tk(c)).measure(), c.measure())

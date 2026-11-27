@@ -74,6 +74,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from discopy import (
     comarkov, frobenius, interaction, markov, messages, op, symmetric)
+from discopy.feedback import symmetric as traced
 from discopy.abc import (
     ComarkovCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
@@ -425,9 +426,9 @@ class Traced(Symmetric, TracedCategory):
 
     Example
     -------
-    >>> from discopy.symmetric import Ty as T, Box, Diagram
+    >>> from discopy.feedback.symmetric import Ty as T, Box, Diagram
     >>> x, x_, u, u_, m = map(T, ["x", "x'", "u", "u'", "m"])
-    >>> X, U = Ty(x, x_), Ty(u, u_)
+    >>> X, U = Ty[T](x, x_), Ty[T](u, u_)
     >>> f = Traced(X @ U, X @ U, Box('f', x @ u, x @ u @ m),
     ...            Box("f'", m @ x_ @ u_, x_ @ u_), m)
     >>> assert f.trace().dom == X == f.trace().cod
@@ -435,6 +436,7 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
+    category = traced.Diagram
     trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
         messages.PAIR_LENGTH)
     trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(

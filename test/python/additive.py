@@ -91,7 +91,7 @@ def test_trace_takes_the_keyword_form():
 
 def test_Hypergraph_pass_token():
     from pytest import raises
-    from discopy.comarkov import Ty, Box, Diagram
+    from discopy.feedback.comarkov import Ty, Box, Diagram
     from discopy.hypergraph import Functor, Hypergraph
     from discopy.python.additive import Function
     from discopy.utils import AxiomError

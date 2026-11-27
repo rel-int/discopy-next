@@ -82,12 +82,13 @@ edge to node: {tying(nodes, edges).max() + 1} weights
 ## Architectures are parametric maps
 
 In the 2-category $\mathbf{Para}$, a map $A \to B$ is a pair of a parameter object $P$ and a map $P \times A \to B$, drawn with $P$ as one more wire.
-[`discopy.para`](../../_api/discopy.para.html) implements it over any symmetric category, here the free Markov category of [`discopy.markov`](../../_api/discopy.markov.html).
+[`discopy.para`](../../_api/discopy.para.html) implements it over any symmetric category, here the free Markov category with feedback of [`discopy.feedback.markov`](../../_api/discopy.feedback.markov.html).
 Composition puts the parameters side by side (Figure 4):
 
 ```python {.marimo}
-from discopy import markov, para
-from discopy.markov import Box, Diagram, Ty
+from discopy import para
+from discopy.feedback import markov
+from discopy.feedback.markov import Box, Diagram, Ty
 from discopy.monoidal import Equation
 
 Para = para.Markov[Diagram]
@@ -201,7 +202,8 @@ recurrent
 Its semantics are [monoidal streams](../../_api/discopy.stream.html), the final coalgebra: a functor sends it to a stream of boxes, one per time step, and unrolling the stream gives the first steps as a finite diagram (Figure 13):
 
 ```python {.marimo}
-from discopy import stream, symmetric
+from discopy import stream
+from discopy.feedback import symmetric
 
 sequences = {x: stream.Ty.sequence(str(x)) for x in (I, O, S)}
 to_stream = markov.Functor(
@@ -232,7 +234,7 @@ To tie them across every time step, the parameter becomes a constant stream: rea
 The cell reads it at every step like any other input:
 
 ```python {.marimo}
-from discopy.markov import FollowedBy
+from discopy.feedback.markov import FollowedBy
 
 always = (FollowedBy(P) >> Diagram.copy(P)).feedback(
     dom=P.head, cod=P, mem=P)

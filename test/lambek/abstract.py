@@ -32,14 +32,14 @@ def context_free_grammar():
 
 def test_factory_closure():
     x, y = Ty("x"), Ty("y")
-    f, loop = Box("f", x, y), Box("loop", x @ y, x @ y)
+    f = Box("f", x, y)
     assert type(Diagram.swap(x, y)) is Swap
     assert type(Diagram.copy(x)) is Copy and type(Diagram.discard(x)) is Discard
-    assert type(loop.trace()) is Trace and type(f + f) is Sum
+    assert type(f + f) is Sum
     assert type(f.curry()) is Curry and type(f.curry().uncurry()) is Diagram
     assert all(cls.ob is Ty for cls in (
         Diagram, Box, Eval, Coeval, Curry, Copy, Discard,
-        Permutation, Swap, Trace, Sum, Constant, Variable))
+        Permutation, Swap, Sum, Constant, Variable))
     assert type(f.to_map()) is CMap and CMap.category is Diagram
     graph = f.to_hypergraph()
     assert type(graph) is Hypergraph and type(graph.to_diagram()) is Diagram

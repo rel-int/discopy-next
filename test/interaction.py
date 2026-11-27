@@ -49,7 +49,7 @@ def test_Diagram_permutation():
 
 
 def test_snake_equations():
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     x = Ty[symmetric.Ty](symmetric.Ty('a'), symmetric.Ty('b'))
     D = Diagram[symmetric.Diagram]
     hypergraph = lambda diagram: diagram.inside.to_hypergraph()
@@ -94,8 +94,8 @@ def test_Ty_split():
 
 
 def test_trace():
-    from discopy import symmetric
-    from discopy.symmetric import Ty as T, Box
+    from discopy.feedback import symmetric
+    from discopy.feedback.symmetric import Ty as T, Box
     a, a_, u, u_, b, b_ = map(T, ["a", "a'", "u", "u'", "b", "b'"])
     A, U, B = Ty[T](a, a_), Ty[T](u, u_), Ty[T](b, b_)
     D = Diagram[symmetric.Diagram]
@@ -160,8 +160,8 @@ def test_twist():
 
 
 def test_curry():
-    from discopy import symmetric
-    from discopy.symmetric import Ty as T, Box
+    from discopy.feedback import symmetric
+    from discopy.feedback.symmetric import Ty as T, Box
     x, x_, y, y_, z, z_ = map(T, ["x", "x'", "y", "y'", "z", "z'"])
     X, Y, Z = Ty[T](x, x_), Ty[T](y, y_), Ty[T](z, z_)
     D = Diagram[symmetric.Diagram]
@@ -227,8 +227,8 @@ def test_Ty_pregroup():
 
 
 def test_trace_takes_the_keyword_form():
-    from discopy import symmetric
-    from discopy.symmetric import Ty as T, Box
+    from discopy.feedback import symmetric
+    from discopy.feedback.symmetric import Ty as T, Box
     a, a_, u, u_, b, b_ = map(T, ["a", "a'", "u", "u'", "b", "b'"])
     A, U, B = Ty[T](a, a_), Ty[T](u, u_), Ty[T](b, b_)
     D = Diagram[symmetric.Diagram]

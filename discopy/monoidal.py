@@ -181,7 +181,7 @@ from discopy.testable import (
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
-    COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
+    COLOUR_DRAWING_ATTRIBUTES, DRAWING_DEFAULT, TRANSPARENT)
 from discopy.utils import (
     factory,
     factory_key,
@@ -2693,36 +2693,51 @@ class Box(cat.Box, Diagram):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
-            framed = [arg.framed() for arg in args]
+            # The dagger of a box daggers its args, which its drawing does as
+            # it reflects them with the box: draw them as they were.
+            framed = [(arg[::-1].to_drawing() if self.is_dagger else drawing)
+                      .framed() for arg, drawing in zip(self.args, args)]
             height = max(arg.height for arg in framed)
             nested = tuple(
                 arg.stretch(height - arg.height) for arg in framed)
-            width = sum(arg.width for arg in nested)
+            width = sum(arg.width for arg in nested)\
+                + DRAWING_DEFAULT["nested_margin"] * (len(nested) - 1)
+            # As wide a margin around the args as above and below them, and
+            # room for the label in its corner.
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
             box = Box(
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
-                min_width=max(label + height + .5,
+                min_width=max(height + 1, label,
                               getattr(self, "min_width", 0)),
                 height=max(width + 1, getattr(self, "height", 0)))
-            # The box is drawn slanted as its own variant, its args as theirs.
+            # The box has a corner cut as its own variant, its args as theirs.
             box.is_dagger = self.is_dagger
             for attr in ("is_transpose", "is_conjugate"):
                 setattr(box, attr, bool(getattr(self, attr, False)))
             return box.to_drawing()
-        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
-            name=self.drawing_name)
-        if self.draw_as_frame:
-            kwargs['draw_vertically'] = self.draw_vertically
-            kwargs['frame_colour'] = self.frame_colour
-        else:
+            name="" if self.draw_as_frame else self.drawing_name)
+        if not self.draw_as_frame:
             kwargs['draw_as_square'] = self.draw_as_square
-        return getattr(Drawing, method)(*args, **kwargs)
+            return Drawing.bubble(*args, **kwargs)
+        result = Drawing.frame(
+            *args, draw_vertically=self.draw_vertically,
+            frame_colour=self.frame_colour, min_width=text_width(
+                self.drawing_name) + .5 if self.drawing_name else 0,
+            **kwargs)
+        # Its top and bottom edges draw the corner cut off as for a box, and
+        # its label in the corner opposite, see Backend.draw_frame_corner.
+        corner = (0 if getattr(self, "is_conjugate", False) else
+                  1 if getattr(self, "is_transpose", False) else
+                  2 if self.is_dagger else 3)
+        for edge in (result.boxes[0], result.boxes[-1]):
+            edge.frame_corner, edge.frame_name = corner, self.drawing_name
+        return result
 
 
 class Sum(cat.Sum, Box):

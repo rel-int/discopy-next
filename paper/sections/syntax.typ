@@ -25,7 +25,9 @@ with more boxes, which states its axioms by inheriting a class of
   for the delay then vanishing, joining, strength, tightening and
   sliding. A traced category is the case where the delay is the
   identity: `abc.TracedCategory` is a subclass, and the module `traced`
-  is deprecated for this one.
+  is deprecated for this one. The `feedback` package has a module for
+  each level that carries a feedback or a trace:
+  `feedback.balanced`, `symmetric`, `markov`, `comarkov` and `closed`.
 - `spacial` is the free spacial category @Selinger10, where a scalar on
   the left of a diagram is the same scalar on its right. A free scalar
   is a box, which does not slide on a list of layers, and the law is
@@ -216,7 +218,7 @@ is one of hypergraphs (@fig:syntax_swap).
 
 ```python
 from discopy import compact
-from discopy.symmetric import Box, Equation, Swap, Ty
+from discopy.feedback.symmetric import Box, Equation, Swap, Ty
 
 x, y = Ty('x'), Ty('y')
 f, g, k = Box('f', x, x), Box('g', y, y), Box('k', x @ x, x @ x)
@@ -250,8 +252,8 @@ hypergraph category, this is rewriting modulo the Frobenius axioms
 @BonchiEtAl22. Over a symmetric category the hypergraph has to be
 monogamous and acyclic, and the matches are the convex ones, where no
 path leaves the image and comes back @BonchiEtAl22b: this is sound for
-the symmetric diagrams of the library, which are traced, and misses the
-rewrites that need a trace.
+the symmetric diagrams of the library, and misses the rewrites that
+need the trace of `discopy.feedback.symmetric`.
 `rewrite` gives every rewrite in one step, `normalize` the steps of a
 reduction and `normal_form` its last one. `hypergraph.Rewriter` does the
 same in place, for rules that are left-linear, _i.e._ the boundary of
@@ -264,8 +266,9 @@ applies where a swap separates the unit from the product
 
 ```python
 from discopy.hypergraph import Rewriter
-from discopy.symmetric import Hypergraph
+from discopy.symmetric import Box, Hypergraph, Swap, Ty
 
+x = Ty('x')
 m, u = Box('m', x @ x, x), Box('u', Ty(), x)
 unit_law = (u @ x >> m).to_hypergraph(), Hypergraph.id(x)
 assoc = (m @ x >> m).to_hypergraph(), (x @ m >> m).to_hypergraph()

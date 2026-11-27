@@ -42,6 +42,7 @@ Summary
     TracedCategory
     ResiduatedMonoid
     BiclosedCategory
+    ComonadCategory
     LinearCategory
     Pregroup
     RigidCategory
@@ -54,7 +55,9 @@ Summary
     ComarkovCategory
     ClosedCategory
     BalancedCategory
+    BalancedTracedCategory
     RibbonCategory
+    GoISituation
     CompactCategory
     HypergraphCategory
 """
@@ -72,8 +75,8 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
-    Tensor, Testable, Under, Unit, Var, axiom, rule)
+    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R,
+    Reflexive, Repeat, Tensor, Testable, Under, Unit, Var, axiom, rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -902,11 +905,11 @@ class TracedCategory[
     the yanking axiom: its :meth:`feedback` is its :meth:`trace`, the partial
     trace of a morphism over some objects, and the trace of the swap of an
     object with itself is its identity, that of a braid its twist, see
-    :meth:`yanking`, :meth:`BalancedCategory.yanking` and
-    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`~discopy.feedback` and
-    the levels below it, whose wires carry a time step, are traced on their
-    undelayed wires, the :class:`~discopy.feedback.Trace` bubble being the
-    feedback over an undelayed memory.
+    :meth:`yanking`, :meth:`BalancedTracedCategory.yanking` and
+    :cite:t:`JoyalEtAl96`. The free diagrams of the :mod:`~discopy.feedback`
+    package, whose wires carry a time step, are traced on their undelayed
+    wires, the :class:`~discopy.feedback.Trace` bubble being the feedback over
+    an undelayed memory.
     """
     @abstractmethod
     def trace(self, n: int = 1, left: bool = False) -> C1:
@@ -949,7 +952,7 @@ class TracedCategory[
         either side, the yanking axiom of a symmetric traced category: on a
         compact category it is Reidemeister move 1 for either trace. A
         braided one states it with its twist, see
-        :meth:`BalancedCategory.yanking`, and a planar one, which has no
+        :meth:`BalancedTracedCategory.yanking`, and a planar one, which has no
         swap, declares it inapplicable.
         """
         # pylint: disable-next=no-member  # stated where there is a swap
@@ -1239,28 +1242,12 @@ class BiclosedCategory[
         return cls.ev(base, exponent, left=False)
 
 
-class LinearCategory[
-        C0: ColouredMonoid, C1: LinearCategory](MonoidalCategory[C0, C1]):
+class ComonadCategory[C0, C1: ComonadCategory](Category[C0, C1]):
     """
-    A linear category is a :class:`MonoidalCategory` with a linear exponential
-    comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
-    nor closure, which none of its laws uses: a banged object is exchanged
-    with any other, the rule of the Lambek calculus with a relevant modality
-    !L* of :cite:t:`KanovichEtAl16`. :mod:`~discopy.bang` is the free one.
-
-    * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
-      comultiplication :meth:`digging` ``!x -> !!x``,
-    * it is lax monoidal, with :meth:`laxator` ``!x @ !y -> !(x @ y)`` and
-      ``Ty() -> !Ty()``, the dereliction and the digging monoidal,
-    * each ``!x`` is a comonoid, with :meth:`contraction` ``!x -> !x @ !x``
-      and :meth:`weakening` ``!x -> Ty()``, natural and morphisms of
-      coalgebras, the digging a morphism of comonoids,
-    * the :meth:`exchange` ``!x @ y -> y @ !x`` is invertible, natural and
-      satisfies the hexagon: ``!x`` is central, which replaces the symmetry,
-      and the comonoid is cocommutative through it.
-
-    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
-    digging, then the bang of the arrow.
+    A comonad category is a :class:`Category` with a comonad :meth:`bang`,
+    with counit :meth:`dereliction` ``!x -> x`` and comultiplication
+    :meth:`digging` ``!x -> !!x``: the part of a :class:`LinearCategory`
+    that needs no tensor. :mod:`~discopy.linear.cat` is the free one.
     """
     @abstractmethod
     def bang(self: C1) -> C1:
@@ -1284,52 +1271,6 @@ class LinearCategory[
 
         Parameters:
             x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def contraction(cls, x: C0) -> C1:
-        """
-        The copy ``!x -> !x @ !x`` of a banged object, to be instantiated.
-
-        Parameters:
-            x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def weakening(cls, x: C0) -> C1:
-        """
-        The discard ``!x -> Ty()`` of a banged object, to be instantiated.
-
-        Parameters:
-            x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def exchange(cls, x: C0, y: C0, is_dagger: bool = False) -> C1:
-        """
-        The exchange ``!x @ y -> y @ !x`` of a banged object with another,
-        its inverse ``y @ !x -> !x @ y`` when ``is_dagger``, to be
-        instantiated.
-
-        Parameters:
-            x : The object that is banged.
-            y : The object it is exchanged with.
-            is_dagger : Whether to take the inverse.
-        """
-
-    @classmethod
-    @abstractmethod
-    def laxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
-        """
-        The laxator ``!x @ !y -> !(x @ y)`` of the bang, or its unit
-        ``Ty() -> !Ty()`` when given no object, to be instantiated.
-
-        Parameters:
-            x : The object on the left.
-            y : The object on the right.
         """
 
     @classmethod
@@ -1384,6 +1325,77 @@ class LinearCategory[
         digging = cls.digging(x)
         return cls.equation_factory(
             digging >> cls.digging(cls.banged(x)), digging >> digging.bang())
+
+
+class LinearCategory[
+        C0: ColouredMonoid, C1: LinearCategory](
+            MonoidalCategory[C0, C1], ComonadCategory[C0, C1]):
+    """
+    A linear category is a :class:`MonoidalCategory` with a linear exponential
+    comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
+    nor closure, which none of its laws uses: a banged object is exchanged
+    with any other, the rule of the Lambek calculus with a relevant modality
+    !L* of :cite:t:`KanovichEtAl16`. :mod:`~discopy.linear.monoidal` is the
+    free one.
+
+    * ``!`` is a comonad, see :class:`ComonadCategory`,
+    * it is lax monoidal, with :meth:`laxator` ``!x @ !y -> !(x @ y)`` and
+      ``Ty() -> !Ty()``, the dereliction and the digging monoidal,
+    * each ``!x`` is a comonoid, with :meth:`contraction` ``!x -> !x @ !x``
+      and :meth:`weakening` ``!x -> Ty()``, natural and morphisms of
+      coalgebras, the digging a morphism of comonoids,
+    * the :meth:`exchange` ``!x @ y -> y @ !x`` is invertible, natural and
+      satisfies the hexagon: ``!x`` is central, which replaces the symmetry,
+      and the comonoid is cocommutative through it.
+
+    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
+    digging, then the bang of the arrow.
+    """
+    @classmethod
+    @abstractmethod
+    def contraction(cls, x: C0) -> C1:
+        """
+        The copy ``!x -> !x @ !x`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def weakening(cls, x: C0) -> C1:
+        """
+        The discard ``!x -> Ty()`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def exchange(cls, x: C0, y: C0, is_dagger: bool = False) -> C1:
+        """
+        The exchange ``!x @ y -> y @ !x`` of a banged object with another,
+        its inverse ``y @ !x -> !x @ y`` when ``is_dagger``, to be
+        instantiated.
+
+        Parameters:
+            x : The object that is banged.
+            y : The object it is exchanged with.
+            is_dagger : Whether to take the inverse.
+        """
+
+    @classmethod
+    @abstractmethod
+    def laxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
+        """
+        The laxator ``!x @ !y -> !(x @ y)`` of the bang, or its unit
+        ``Ty() -> !Ty()`` when given no object, to be instantiated.
+
+        Parameters:
+            x : The object on the left.
+            y : The object on the right.
+        """
 
     @axiom
     def laxator_naturality[
@@ -2307,11 +2319,10 @@ class ClosedCategory[
 
 
 class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
-        BraidedCategory[C0, C1], TracedCategory[C0, C1]):
+        BraidedCategory[C0, C1]):
     """
-    A balanced category is a :class:`BraidedCategory` and a
-    :class:`TracedCategory` with a method :code:`twist` for the natural
-    automorphism :code:`x -> x`.
+    A balanced category is a :class:`BraidedCategory` with a method
+    :code:`twist` for the natural automorphism :code:`x -> x`.
     """
     @classmethod
     @abstractmethod
@@ -2346,6 +2357,26 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         unit = cls.ob()
         return cls.equation_factory(cls.twist(unit), cls.id(unit))
 
+    @rule
+    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The twist of an atom. """
+        return cls.twist(x)
+
+    @rule
+    def inverse_twisting[X: Atom[C0]](
+            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The inverse of the twist of an atom. """
+        return cls.twist(x).dagger()
+
+
+class BalancedTracedCategory[
+        C0: ColouredMonoid, C1: BalancedTracedCategory](
+            BalancedCategory[C0, C1], TracedCategory[C0, C1]):
+    """
+    A balanced traced category is a :class:`BalancedCategory` and a
+    :class:`TracedCategory` whose yanking gives the twist, see
+    :cite:t:`JoyalEtAl96`.
+    """
     @axiom
     def yanking[X: Atom[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
@@ -2361,27 +2392,171 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
             cls.twist(x),
             braid.trace(mem=x))  # ty: ignore[unknown-argument]
 
-    @rule
-    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The twist of an atom. """
-        return cls.twist(x)
-
-    @rule
-    def inverse_twisting[X: Atom[C0]](
-            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The inverse of the twist of an atom. """
-        return cls.twist(x).dagger()
-
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
-        PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
+        PivotalCategory[C0, C1], BalancedTracedCategory[C0, C1]):
     """
     A ribbon category is a :class:`PivotalCategory` which is also a
     :class:`BalancedCategory`, i.e. where diagrams can draw knots and links:
-    it yanks as a balanced category does, with the braid a planar pivotal
-    category lacks.
+    it yanks as a balanced traced category does, with the braid a planar
+    pivotal category lacks.
     """
-    yanking = BalancedCategory.yanking
+    yanking = BalancedTracedCategory.yanking
+
+
+class GoISituation[C0: ColouredMonoid, C1: GoISituation](
+        LinearCategory[C0, C1], TracedCategory[C0, C1],
+        SymmetricCategory[C0, C1]):
+    """
+    A GoI situation :cite:p:`AbramskyEtAl02` is a traced symmetric monoidal
+    category with a traced symmetric monoidal functor ``T``, here the
+    :meth:`bang` of a :class:`LinearCategory` with its comonad and comonoid
+    equalities, and a :meth:`reflexive` object ``U``: reflexive in the sense
+    of Abramsky, Haghverdi and Scott, with ``U @ U``, the unit and ``TU`` as
+    retracts. There is no standard name for a category with such an object,
+    a C-monoid of Lambek and Scott being one object.
+
+    * ``T`` is strong symmetric monoidal, the :meth:`colaxator` inverting
+      the :meth:`laxator`, unit included, and sending the swap to the swap,
+      see :meth:`bang_symmetry`,
+    * ``T`` preserves the trace up to its monoidal structure, see
+      :meth:`bang_trace`,
+    * each of :meth:`reflexive_tensor`, :meth:`reflexive_unit` and
+      :meth:`reflexive_bang` is a section into ``U`` and a retraction out of
+      it, whose composite is the identity, see :meth:`retract`.
+
+    It is where :mod:`~discopy.linear` and :mod:`~discopy.feedback` meet,
+    neither of which imports the other: the geometry of interaction of
+    :mod:`~discopy.interaction`. No free GoI situation is implemented.
+    """
+    @classmethod
+    @abstractmethod
+    def colaxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
+        """
+        The inverse ``!(x @ y) -> !x @ !y`` of the :meth:`laxator`, or of its
+        unit when given no object, to be instantiated: ``T`` is strong
+        monoidal.
+
+        Parameters:
+            x : The object on the left.
+            y : The object on the right.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive(cls) -> C0:
+        """ The reflexive object ``U``, to be instantiated. """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_tensor(cls) -> tuple[C1, C1]:
+        """
+        The section ``U @ U -> U`` and the retraction ``U -> U @ U``, to be
+        instantiated.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_unit(cls) -> tuple[C1, C1]:
+        """
+        The section ``Ty() -> U`` and the retraction ``U -> Ty()``, to be
+        instantiated.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_bang(cls) -> tuple[C1, C1]:
+        """
+        The section ``!U -> U`` and the retraction ``U -> !U``, to be
+        instantiated.
+        """
+
+    @classmethod
+    def retract(cls, section: C1, retraction: C1) -> Equation:
+        """
+        The section then the retraction is the identity on the domain of the
+        section, which is a retract of its codomain.
+
+        Parameters:
+            section : The morphism into the bigger object.
+            retraction : The morphism out of it.
+        """
+        return cls.equation_factory(
+            section >> retraction, cls.id(section.dom))
+
+    @axiom
+    def laxator_inverse[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Tensor[Bang[C1, X], Bang[C1, Y]]]]:
+        """ The colaxator is a retraction of the laxator. """
+        return cls.retract(cls.laxator(x, y), cls.colaxator(x, y))
+
+    @axiom
+    def colaxator_inverse[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Bang[C1, Tensor[X, Y]], Bang[C1, Tensor[X, Y]]]]:
+        """ The laxator is a retraction of the colaxator. """
+        return cls.retract(cls.colaxator(x, y), cls.laxator(x, y))
+
+    @axiom
+    def laxator_unit_inverse(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The unit of the colaxator is a retraction of the laxator's. """
+        return cls.retract(cls.laxator(), cls.colaxator())
+
+    @axiom
+    def colaxator_unit_inverse(cls) -> Equation[Hom[
+            C1, Bang[C1, Unit[C0]], Bang[C1, Unit[C0]]]]:
+        """ The unit of the laxator is a retraction of the colaxator's. """
+        return cls.retract(cls.colaxator(), cls.laxator())
+
+    @axiom
+    def bang_symmetry[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Bang[C1, Tensor[Y, X]]]]:
+        """ The bang is symmetric monoidal: it sends the swap to the swap. """
+        return cls.equation_factory(
+            cls.swap(cls.banged(x), cls.banged(y)) >> cls.laxator(y, x),
+            cls.laxator(x, y) >> cls.swap(x, y).bang())
+
+    @axiom
+    def bang_trace[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], dom: Var[C0, Γ],
+            cod: Var[C0, Δ], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, Bang[C1, Γ], Bang[C1, Δ]]]:
+        """
+        The bang of a trace is the trace over the bang of the memory of the
+        bang conjugated by the laxator, ``T`` being a traced functor. The
+        boundary is bound rather than sliced off ``f``, so that it holds of a
+        category whose objects are not lists, e.g. pairs in ``Int``.
+        """
+        inside = cls.laxator(dom, mem) >> f.bang() >> cls.colaxator(cod, mem)
+        return cls.equation_factory(
+            f.trace(
+                dom=dom, cod=cod, mem=mem  # ty: ignore[unknown-argument]
+            ).bang(),
+            inside.trace(
+                dom=cls.banged(dom), cod=cls.banged(cod),
+                mem=cls.banged(mem)))
+
+    @axiom
+    def reflexive_tensor_retract(cls) -> Equation[Hom[
+            C1, Tensor[Reflexive[C1], Reflexive[C1]],
+            Tensor[Reflexive[C1], Reflexive[C1]]]]:
+        """ ``U @ U`` is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_tensor())
+
+    @axiom
+    def reflexive_unit_retract(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The unit is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_unit())
+
+    @axiom
+    def reflexive_bang_retract(cls) -> Equation[Hom[
+            C1, Bang[C1, Reflexive[C1]], Bang[C1, Reflexive[C1]]]]:
+        """ ``!U`` is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_bang())
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](

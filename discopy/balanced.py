@@ -18,12 +18,6 @@ Summary
     Ribbon
     DualRailBraid
     DualRailTwist
-    Feedback
-    Feedforward
-    Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     TermBase
@@ -64,12 +58,11 @@ from __future__ import annotations
 from copy import copy
 from dataclasses import dataclass
 
-from discopy import (
-    config, monoidal, braided, feedback, cmap, hypergraph, messages)
+from discopy import config, monoidal, braided, cmap, hypergraph, messages
 from discopy.abc import BalancedCategory
 from discopy.cat import factory, kappa_calculus
-from discopy.feedback import Ty
-from discopy.monoidal import Colour
+from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
+    Colour, Ty)
 from discopy.utils import factory_name, assert_isatomic, from_tree
 
 
@@ -89,7 +82,7 @@ class Ribbon(Colour):
             default with the back of a twisting ribbon filled dark gray.
         label : An optional label for the drawing legend.
         width : The gap between the two rails, defaults to the
-            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+            ``ribbon_width`` in :data:`~discopy.config.DRAWING_DEFAULT`.
 
     Example
     -------
@@ -129,7 +122,7 @@ def double_rail(
     Parameters:
         typ : The type to double.
         width : The gap between the two rails, defaults to the ``ribbon_width``
-            in :data:`discopy.config.DRAWING_DEFAULT`.
+            in :data:`~discopy.config.DRAWING_DEFAULT`.
         colour : The name of the colour filling the inside of each ribbon,
             or a function from object to colour name.
     """
@@ -143,30 +136,18 @@ def double_rail(
 
 
 @factory
-class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
+class Diagram(braided.Diagram, BalancedCategory):
     """
-    A balanced diagram is a braided diagram with :class:`Twist`, and a
-    feedback diagram whose wires carry a time step.
+    A balanced diagram is a braided diagram with :class:`Twist`, see
+    :mod:`~discopy.feedback.balanced` for the traced ones.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
-
-    Note
-    ----
-    By default, our balanced diagrams are traced. Although not every balanced
-    category embeds faithfully into a traced one (see the `nLab`_), the free
-    balanced category does have the desired cancellation property and it does
-    in fact embed faithfully into the free balanced traced category.
-
-    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category
     """
     twist_naturality = BalancedCategory.twist_naturality.failing(
         messages.FREE_TWIST)
-
-    ob = Ty
-    yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
 
     @classmethod
     def twist(cls, dom: monoidal.Ty) -> Diagram:
@@ -190,13 +171,13 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
         """
         The dual rail encoding of a diagram, see :class:`DualRail`: it doubles
         every object and sends the twist to its two rails crossing twice. It
-        lands in balanced :class:`Diagram`, so that a trace has somewhere to
-        go, as the dual rail of a ribbon diagram lands in ribbon diagrams.
+        lands in balanced :class:`Diagram`, as the dual rail of a ribbon
+        diagram lands in ribbon diagrams.
 
         Parameters:
             width : The width of a ribbon, i.e. the gap between the two wires
                 encoding each object, defaults to the ``ribbon_width`` in
-                :data:`discopy.config.DRAWING_DEFAULT`. Set to ``0`` to return
+                :data:`~discopy.config.DRAWING_DEFAULT`. Set to ``0`` to return
                 the diagram as is, i.e. without doubling it into dual rails.
             colour : The name of the colour filling the inside of each ribbon
                 (or a function from object to colour name), passed on to
@@ -220,9 +201,9 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
             else self.dual_rail_factory(width, colour)(self)
 
 
-class Box(braided.Box, feedback.Box, Diagram):
+class Box(braided.Box, Diagram):
     """
-    A balanced box is a braided box and a feedback box in a balanced diagram.
+    A balanced box is a braided box in a balanced diagram.
 
     Parameters:
         name (str) : The name of the box.
@@ -260,7 +241,7 @@ class DualRailBraid(Box):
             is_dagger=is_dagger, draw_as_dual_rail_braid=True)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.left, self.right, self.is_dagger
 
@@ -313,7 +294,7 @@ class DualRailTwist(Box):
             is_dagger=is_dagger, draw_as_dual_rail_twist=True)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.dom, self.is_dagger
 
@@ -383,7 +364,7 @@ class Twist(Box):
         return type(self)(self.dom, not self.is_dagger)
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
         """
         return self.dom, self.is_dagger
 
@@ -405,9 +386,9 @@ class Twist(Box):
         return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
 
 
-class Sum(braided.Sum, feedback.Sum, Box):
+class Sum(braided.Sum, Box):
     """
-    A balanced sum is a braided and feedback sum and a balanced box.
+    A balanced sum is a braided sum and a balanced box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
@@ -416,7 +397,7 @@ class Sum(braided.Sum, feedback.Sum, Box):
     """
 
 
-class Functor(braided.Functor, feedback.Functor):
+class Functor(braided.Functor):
     """
     A balanced functor is a braided functor that twists.
 
@@ -442,13 +423,12 @@ class DualRail(Functor):
     doubling every object into the two rails of a ribbon, every generator into
     a box on the rails of its ribbons and every :class:`Twist` and
     :class:`Braid` into a single box crossing the two ribbons of a wire as a
-    whole. It lands in balanced :class:`Diagram`, so that a trace has
-    somewhere to go, as :class:`~discopy.ribbon.DualRail` lands in ribbon
-    diagrams.
+    whole. It lands in balanced :class:`Diagram`, as
+    :class:`~discopy.ribbon.DualRail` lands in ribbon diagrams.
 
     Parameters:
         width : The gap between the two rails of each ribbon, defaults to the
-            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+            ``ribbon_width`` in :data:`~discopy.config.DRAWING_DEFAULT`.
         colour : The name of the colour filling the inside of each ribbon (or
             a function from object to colour name), see :func:`double_rail`.
 
@@ -496,8 +476,6 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
