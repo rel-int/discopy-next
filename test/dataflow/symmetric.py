@@ -1,0 +1,148 @@
+import pickle
+
+from pytest import raises
+
+from discopy import feedback, python, stream
+from discopy.dataflow.symmetric import *
+from discopy.utils import AxiomError, dumps, loads
+
+
+def test_invalid_inputs():
+    with raises(ValueError):
+        HeadOb(Wire('x').delay())
+    with raises(ValueError):
+        TailOb(Wire('x').delay())
+    with raises(ValueError):
+        TailOb(Wire('x'))
+
+
+def test_Head_Tail_FollowedBy_to_tree():
+    from discopy import dataflow
+    x, y = Ty(Wire('x', is_constant=False)), Ty('y')
+    f = Box('f', x, y)
+    for term in (x.head, x.tail, x.head.delay(), f.head, f.tail, f.tail.delay(2),
+                 FollowedBy(x), FollowedBy(x, is_dagger=True).delay()):
+        assert loads(dumps(term)) == term
+        assert pickle.loads(pickle.dumps(term)) == term
+        assert eval(repr(term)) == term
+
+
+def test_Head_Tail_dagger():
+    from itertools import product
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    f, g = Box('f', x, y), Box('g', y, x)
+    for arg, part, steps in product((f, f >> g), ("head", "tail"), (0, 2)):
+        term = getattr(arg, part).delay(steps)
+        dagger = getattr(arg.dagger(), part).delay(steps)
+        assert term.dagger() == term[::-1] == dagger
+        assert type(term.dagger()) is type(term)
+        assert term.dagger().dagger() == term
+    assert (f.head >> g.head).dagger() == g.dagger().head >> f.dagger().head
+
+
+def test_FollowedBy_delay():
+    x = Ty('x')
+    for is_dagger in (False, True):
+        fby = FollowedBy(x, is_dagger)
+        assert fby.delay().delay() == fby.delay(2)\
+            == FollowedBy(x, is_dagger, time_step=2)
+        assert fby.delay(2).dom == fby.dom.delay(2)
+        assert fby.delay(2).cod == fby.cod.delay(2)
+
+
+def test_Functor_sends_equal_heads_to_equal_images():
+    """ The head and tail of a daggered wire are named after its string,
+    which shows the dagger, so that they are not those of the wire it
+    daggers, which a functor sends elsewhere (next#445). """
+    x, y, z = map(Ty, "xyz")
+    w = Ty(Wire('w', is_constant=False))
+    F = Functor({x: y @ z, w: Ty(Wire('v', is_constant=False))}, {})
+    types = [x.head, x[::-1].head, w.tail, w[::-1].tail, w.head]
+    assert len(set(types)) == len(types)
+    assert F(x.head) == (y @ z).head != (z[::-1] @ y[::-1]).head\
+        == F(x[::-1]).head == F(x[::-1].head)
+    assert F(w[::-1].tail) == F(w[::-1]).tail
+    for term in types:
+        assert eval(str(term), {'x': x, 'w': w}) == term
+
+
+def test_functor_preserves_the_boundary_of_FollowedBy():
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    F, identity = Functor({x: y}, {}), Functor(lambda t: t, lambda f: f)
+    for fby in (FollowedBy(x), FollowedBy(x, is_dagger=True),
+                FollowedBy(x, is_dagger=True).delay()):
+        assert identity(fby) == fby
+        assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
+    iso = FollowedBy(x) >> FollowedBy(x).dagger()
+    assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()
+
+
+def test_stream_boxes_raise_into_a_codomain_without_streams():
+    x = Ty('x')
+    f = Box('f', x, x)
+    F = Functor({x: int}, {f: lambda n: n + 1}, cod=python.Function)
+    assert F(f.delay())(1) == F(f)(1) == 2
+    for term in (x.head, f.head, f.tail, FollowedBy(x), f.head.delay()):
+        with raises(AxiomError):
+            F(term)
+
+
+def test_HeadOb_TailOb_dagger():
+    x = Ty(Wire('x', is_constant=False))
+    for term in (x.head, x.tail, x.head.delay(2), x.tail.delay()):
+        assert term.dagger().dagger() == term
+        assert type(term.dagger().inside[0]) is type(term.inside[0])
+    with raises(TypeError):
+        Wire('x', is_constant=1)
+
+
+def test_terms_evaluate_back_to_dataflow():
+    from discopy.dataflow import markov
+    for diagram in (Diagram, markov.Diagram):
+        d = diagram.id(diagram.ob('x'))
+        assert d.to_term().eval() == d
+        assert type(d.to_term().eval()) is diagram
+
+
+def test_mapping_or_callable_raises_into_a_codomain_without_streams():
+    from discopy import symmetric
+    x, y = Ty('x'), symmetric.Ty('y')
+    f, g, fby = Box('f', x, x), symmetric.Box('g', y, y), FollowedBy(x)
+    terms = (x.head, x.head.delay(), f.head, f.tail.delay(), fby, fby[::-1])
+    for F in (Functor({x: y, x.head: y, x.head.delay(): y},
+                      {f: g, f.head: g, f.tail.delay(): g, fby: g},
+                      cod=symmetric.Diagram),
+              Functor(lambda _: y, lambda _: g, cod=symmetric.Diagram)):
+        for term in terms:
+            with raises(AxiomError, match="symmetric.Diagram has no head"):
+                F(term)
+
+
+def test_hypergraph_has_the_primitives():
+    x = Ty(Wire('x', is_constant=False))
+    f = Box('f', x, x)
+    for term in (f.head.delay(2), f.tail.delay(), FollowedBy(x)[::-1].delay()):
+        graph = term.to_hypergraph()
+        assert graph.boxes == (term, ) and graph.to_diagram() == term
+    assert f.delay(2).to_hypergraph() == f.to_hypergraph().delay(2)
+    assert Equation((f >> f).head, Head(f >> f >> Id(x)))
+
+
+def test_up_to_streams_tells_apart_what_the_laws_identify():
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    f, g = Box('f', x, y), Box('g', x, y)
+    fby = Diagram.followed_by
+    assert up_to_streams(f.head @ f.tail.delay() >> fby(y))\
+        == up_to_streams(fby(x) >> f)\
+        != up_to_streams(f.head @ g.tail.delay() >> fby(y))
+    assert up_to_streams(f.head) != up_to_streams(f.tail)
+    assert up_to_streams((f >> Box('h', y, x)).tail)\
+        != up_to_streams(f.tail >> Box('k', y, x).tail)
+
+
+def test_to_stream_keeps_the_data_of_a_box():
+    x = Ty(Wire('x', is_constant=False))
+    f, g = Box('f', x, x, data=1), Box('f', x, x, data=2)
+    assert f.to_stream().later.now.data == 1
+    assert up_to_streams(f) != up_to_streams(g)
+

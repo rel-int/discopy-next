@@ -7,10 +7,6 @@ from discopy.utils import AxiomError
 def test_invalid_inputs():
     with raises(NotImplementedError):
         Ty('x').delay(-1)
-    with raises(ValueError):
-        HeadOb(Wire('x').delay())
-    with raises(ValueError):
-        TailOb(Wire('x').delay())
 
 
 def test_trace_is_a_feedback_diagram():
@@ -63,30 +59,6 @@ def test_Feedback_to_tree():
     for fb in (f.feedback(mem=z), f.feedback(mem=y @ z), Feedback(f, mem=y @ z)):
         assert loads(dumps(fb)) == fb
         assert loads(dumps(fb)).mem == fb.mem
-
-
-def test_Head_Tail_FollowedBy_to_tree():
-    from discopy.utils import dumps, loads
-    x, y = Ty(Wire('x', is_constant=False)), Ty('y')
-    f = Box('f', x, y)
-    for term in (x.head, x.tail, x.head.delay(), f.head, f.tail, f.tail.delay(2),
-                 FollowedBy(x), FollowedBy(x, is_dagger=True).delay()):
-        assert loads(dumps(term)) == term
-
-
-def test_Head_Tail_dagger():
-    from itertools import product
-    from discopy.feedback import markov
-    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
-    f, g = Box('f', x, y), Box('g', y, x)
-    h = markov.Box('h', markov.Ty('x'), markov.Ty('y'))
-    for arg, part, steps in product((f, f >> g, h), ("head", "tail"), (0, 2)):
-        term = getattr(arg, part).delay(steps)
-        dagger = getattr(arg.dagger(), part).delay(steps)
-        assert term.dagger() == term[::-1] == dagger
-        assert type(term.dagger()) is type(term)
-        assert term.dagger().dagger() == term
-    assert (f.head >> g.head).dagger() == g.dagger().head >> f.dagger().head
 
 
 def test_trace_repr():
@@ -304,7 +276,7 @@ def test_types_without_wires_are_their_own_delay():
     for x in (monoidal.Nat(2), rigid.Nat(2), Nat(2), symmetric.Nat(2),
               pivotal.Nat(2), frobenius.Nat(2), monoidal.Dim(2, 3),
               frobenius.Dim(2, 3), Dims(2, 3)):
-        assert x.delay() == x.delay(2) == x.head == x.tail == x
+        assert x.delay() == x.delay(2) == x
     f = frobenius.Box('f', frobenius.Nat(1), frobenius.Nat(1))
     assert f.delay().dom == f.dom and f.delay().time_step == 1
 
@@ -383,20 +355,6 @@ def test_traced_levels_with_duals():
     assert spider.delay() == frobenius.Spider(1, 2, frobenius.Ty('x').d)
 
 
-def test_stream_boxes_raise_into_a_codomain_without_streams():
-    from discopy import frobenius
-    from discopy.tensor import Dim, Tensor
-    x = frobenius.Ty('x')
-    f = frobenius.Box('f', x @ x, x @ x)
-    F = frobenius.Functor(
-        {x: Dim(2)}, {f: list(range(16))}, cod=Tensor[int])
-    assert F(f.trace()) == F(f.trace().open_traces())
-    assert F(f.delay()) == F(f)
-    for box in (f.head, f.tail, frobenius.FollowedBy(x)):
-        with raises(KeyError):
-            F(box)
-
-
 def test_time_stepped_wires_below_feedback():
     from discopy import compact, frobenius, pivotal
     from discopy.feedback import closed, markov
@@ -431,27 +389,18 @@ def test_time_stepped_wires_below_feedback():
         assert F(level.Eval(z << z).delay()) == F(level.Eval(z << z)).delay()
 
 
-def test_FollowedBy_delay():
-    x = Ty('x')
-    for is_dagger in (False, True):
-        fby = FollowedBy(x, is_dagger)
-        assert fby.delay().delay() == fby.delay(2)\
-            == FollowedBy(x, is_dagger, time_step=2)
-        assert fby.delay(2).dom == fby.dom.delay(2)
-        assert fby.delay(2).cod == fby.cod.delay(2)
-
-
 def test_generated_boxes_at_every_level():
     import pickle
-    from discopy import compact, frobenius, pivotal, ribbon
+    from discopy import compact, dataflow, frobenius, pivotal, ribbon
     from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
                    compact, frobenius, closed.monoidal, closed.balanced,
-                   closed.symmetric, closed.markov, network):
+                   closed.symmetric, closed.markov, network,
+                   dataflow.symmetric, dataflow.markov):
         diagram = getattr(module, "Diagram", getattr(module, "Network", None))
-        for name in ("Feedback", "Trace", "FollowedBy", "Head", "Tail"):
+        for name in ("Feedback", "Trace"):
             cls = getattr(module, name)
             assert cls.__module__ == module.__name__ and cls.__doc__
             assert issubclass(cls, module.Box)
@@ -459,52 +408,19 @@ def test_generated_boxes_at_every_level():
             assert factory_name(cls) == module.__name__.removeprefix(
                 "discopy.") + "." + name
         assert diagram.feedback_factory is module.Feedback
-        assert diagram.head_factory is module.Head
-    for module in (balanced, symmetric, markov, comarkov):
+    for module in (balanced, symmetric, markov, comarkov,
+                   dataflow.symmetric, dataflow.markov):
         x = module.Ty('x')
         f = module.Box('f', x @ x.delay(), x @ x)
-        for box in (f.feedback(), f.head, f.tail, module.Box(
-                'g', x @ x, x @ x).trace(), module.FollowedBy(x)):
+        for box in (f.feedback(), module.Box('g', x @ x, x @ x).trace()):
             assert type(box).__module__ == module.__name__
             assert eval(repr(box), {module.__name__.split('.')[-1]: module,
                                     'feedback': __import__(
-                                        'discopy.feedback').feedback}) == box
+                                        'discopy.feedback').feedback,
+                                    'dataflow': dataflow}) == box
             assert pickle.loads(pickle.dumps(box)) == box
             assert loads(dumps(box)) == box
     assert pivotal.Diagram.trace_factory is pivotal.Trace
-
-
-def test_Functor_sends_equal_heads_to_equal_images():
-    """ The head and tail of a daggered wire are named after its string,
-    which shows the dagger, so that they are not those of the wire it
-    daggers, which a functor sends elsewhere (next#445). """
-    x, y, z = map(Ty, "xyz")
-    w = Ty(Wire('w', is_constant=False))
-    F = Functor({x: y @ z, w: Ty(Wire('v', is_constant=False))}, {})
-    types = [x.head, x[::-1].head, w.tail, w[::-1].tail, w.head]
-    assert len(set(types)) == len(types)
-    assert F(x.head) == (y @ z).head != (z[::-1] @ y[::-1]).head\
-        == F(x[::-1]).head == F(x[::-1].head)
-    assert F(w[::-1].tail) == F(w[::-1]).tail
-    for term in types:
-        assert eval(str(term), {'x': x, 'w': w}) == term
-
-
-def test_heads_of_pivotal_types():
-    import pickle
-    from discopy import compact, frobenius, pivotal
-    from discopy.utils import dumps, loads
-    for module in (pivotal, compact, frobenius):
-        x = module.Ty('x')
-        assert isinstance(x.head.inside[0], module.Wire)
-        assert x.head.l == x.l.head and x.head.r == x.r.head
-        assert x.head.delay().tail == x.head
-        f = module.Box('f', x, x @ x)
-        assert type(f.head).__module__ == module.Diagram.head_factory.__module__
-        assert f.head.dom == x.head and f.head.cod == (x @ x).head
-        for term in (x.head, x.head.delay(), f.head):
-            assert pickle.loads(pickle.dumps(term)) == term
-            assert loads(dumps(term)) == term
 
 
 def test_structural_boxes_have_no_time_step():
@@ -601,17 +517,6 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
     assert not noisy.delay().is_deterministic
 
 
-def test_functor_preserves_the_boundary_of_FollowedBy():
-    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
-    F, identity = Functor({x: y}, {}), Functor(lambda t: t, lambda f: f)
-    for fby in (FollowedBy(x), FollowedBy(x, is_dagger=True),
-                FollowedBy(x, is_dagger=True).delay()):
-        assert identity(fby) == fby
-        assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
-    iso = FollowedBy(x) >> FollowedBy(x).dagger()
-    assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()
-
-
 def test_Ty_has_canonical_instances():
     assert Ty.box_factory is Wire
     for law in Ty.axioms.values():
@@ -656,9 +561,8 @@ def test_delay_types():
     for typ in (x, x << y, y >> x, x ** y, x * y, x.product(y, x),
                 Ty(Product()), U):
         delayed = typ.delay()
-        assert delayed != typ and delayed.delay(-1) == typ == delayed.tail
-        assert delayed.delay(2) == typ.delay(3) and delayed.head == Ty()
-        assert typ.head.delay().head == Ty() and typ.d.d == typ.delay(2)
+        assert delayed != typ and delayed.delay(-1) == typ
+        assert delayed.delay(2) == typ.delay(3) and typ.d.d == typ.delay(2)
         assert eval(repr(delayed), Ty.environment()) == delayed
         assert loads(dumps(delayed)) == delayed
         assert hash(delayed) == hash(typ.delay().delay(-1).delay())

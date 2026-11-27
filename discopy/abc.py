@@ -40,6 +40,8 @@ Summary
     PRO
     DelayCategory
     FeedbackCategory
+    DataflowCategory
+    DaggerDataflowCategory
     TracedCategory
     ResiduatedMonoid
     ClosedMonoidalCategory
@@ -62,6 +64,15 @@ Summary
     GoISituation
     CompactCategory
     HypergraphCategory
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        monoidality
 """
 
 from __future__ import annotations
@@ -77,8 +88,9 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R,
-    Reflexive, Repeat, Tensor, Testable, Under, Unit, Var, axiom, rule)
+    Atom, Bang, Delay, Equation, Head, Hom, L, Obj, Objs, Over, Perm, R,
+    Reflexive, Repeat, Tail, Tensor, Testable, Under, Unit, Var, axiom,
+    rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -906,6 +918,172 @@ class FeedbackCategory[
             return result
         method.__signature__ = signature(method, follow_wrapped=False)
         return method
+
+
+def monoidality(functor: Callable, category, x, y, unit, f, g, h) -> tuple:
+    """
+    The two sides of the laws of a monoidal endofunctor of a category, given
+    on objects and morphisms alike, e.g. ``lambda t: t.head``: it preserves
+    the tensor and the unit of objects, then the identity, the composition
+    and the tensor of morphisms.
+
+    Parameters:
+        functor : The endofunctor, on objects and morphisms.
+        category : The category it is an endofunctor of.
+        x, y : Two objects.
+        unit : The unit object.
+        f, g, h : Three morphisms, ``f`` and ``g`` composable.
+    """
+    return ((functor(x @ y), functor(unit), functor(category.id(x)),
+             functor(f >> g), functor(f @ h)),
+            (functor(x) @ functor(y), unit, category.id(functor(x)),
+             functor(f) >> functor(g), functor(f) @ functor(h)))
+
+
+class DataflowCategory[
+        C0: ColouredMonoid, C1: DataflowCategory](FeedbackCategory[C0, C1]):
+    """
+    A dataflow category is a :class:`FeedbackCategory` with two monoidal
+    endofunctors :attr:`head` and :attr:`tail`, on its objects and its
+    morphisms, and a natural isomorphism :meth:`followed_by` from
+    ``x.head @ x.tail.delay()`` to ``x``, see :cite:t:`DiLavoreEtAl22`: a
+    morphism is a process on streams, its head the first step and its tail
+    the steps after it, which the followed-by, the ``fby`` of Lucid, puts
+    back together.
+
+    Writing ``H``, ``T`` and ``D`` for the head, the tail and the delay, and
+    ``1`` for the constant functor to the unit, its laws are that ``H`` and
+    ``T`` are monoidal, the functor equations ``H∘H = H``, ``T∘H = 1``,
+    ``H∘D = 1`` and ``T∘D = Id``, each checked on an object and a morphism
+    at once, and that the followed-by is natural and the identity on a
+    delay. :mod:`~discopy.dataflow` is the free one, up to the functor into
+    :class:`~discopy.stream.Stream`.
+    """
+    @property
+    @abstractmethod
+    def head(self) -> C1:
+        """ The head of a morphism, to be instantiated. """
+
+    @property
+    @abstractmethod
+    def tail(self) -> C1:
+        """ The tail of a morphism, to be instantiated. """
+
+    @classmethod
+    @abstractmethod
+    def followed_by(cls, dom: C0) -> C1:
+        """
+        The isomorphism from ``dom.head @ dom.tail.delay()`` to ``dom``, to
+        be instantiated.
+
+        Parameters:
+            dom : The object it is the followed-by of.
+        """
+
+    @axiom
+    def head_monoidality[
+            X: Obj[C0], Y: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0],
+            U: Obj[C0], V: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y], unit: Var[C0, Unit[C0]],
+            f: Hom[C1, A, B], g: Hom[C1, B, C], h: Hom[C1, U, V]
+    ) -> Equation[tuple[C0, C0, C1, C1, C1]]:
+        """ The head is a monoidal endofunctor. """
+        return cls.equation_factory(*monoidality(
+            lambda term: term.head, cls, x, y, unit, f, g, h))
+
+    @axiom
+    def tail_monoidality[
+            X: Obj[C0], Y: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0],
+            U: Obj[C0], V: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y], unit: Var[C0, Unit[C0]],
+            f: Hom[C1, A, B], g: Hom[C1, B, C], h: Hom[C1, U, V]
+    ) -> Equation[tuple[C0, C0, C1, C1, C1]]:
+        """ The tail is a monoidal endofunctor. """
+        return cls.equation_factory(*monoidality(
+            lambda term: term.tail, cls, x, y, unit, f, g, h))
+
+    @axiom
+    def head_idempotence[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B]
+    ) -> Equation[tuple[C0, C1]]:
+        """ ``H∘H = H``: the head of a head is itself. """
+        return cls.equation_factory(
+            (x.head.head, f.head.head), (x.head, f.head))
+
+    @axiom
+    def tail_of_head[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
+            cls, unit: Var[C0, Unit[C0]], x: Var[C0, X], f: Hom[C1, A, B]
+    ) -> Equation[tuple[C0, C1]]:
+        """ ``T∘H = 1``: a head is over after its first step. """
+        return cls.equation_factory(
+            (x.head.tail, f.head.tail), (unit, cls.id(unit)))
+
+    @axiom
+    def head_of_delay[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
+            cls, unit: Var[C0, Unit[C0]], x: Var[C0, X], f: Hom[C1, A, B]
+    ) -> Equation[tuple[C0, C1]]:
+        """ ``H∘D = 1``: a delay does nothing at its first step. """
+        return cls.equation_factory(
+            (cls.id(x).delay().dom.head, f.delay().head),
+            (unit, cls.id(unit)))
+
+    @axiom
+    def tail_of_delay[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B]
+    ) -> Equation[tuple[C0, C1]]:
+        """ ``T∘D = Id``: after its first step, a delay is what it delays. """
+        return cls.equation_factory(
+            (cls.id(x).delay().dom.tail, f.delay().tail), (x, f))
+
+    @axiom
+    def followed_by_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, Tensor[Head[A], Delay[C1, Tail[A]]], B]]:
+        """ The followed-by is natural: a morphism is its head then tail. """
+        return cls.equation_factory(
+            f.head @ f.tail.delay() >> cls.followed_by(f.cod),
+            cls.followed_by(f.dom) >> f)
+
+    @axiom
+    def followed_by_delay[X: Obj[C0]](
+            cls, x: Var[C0, X]
+    ) -> Equation[Hom[C1, Delay[C1, X], Delay[C1, X]]]:
+        """
+        The followed-by of a delay is its identity, its domain being the
+        unit followed by the delay.
+        """
+        delay = cls.id(x).delay().dom
+        return cls.equation_factory(cls.followed_by(delay), cls.id(delay))
+
+
+class DaggerDataflowCategory[
+        C0: ColouredMonoid, C1: DaggerDataflowCategory](
+            DaggerMonoidalCategory[C0, C1], DataflowCategory[C0, C1]):
+    """
+    A dagger dataflow category is a :class:`DaggerMonoidalCategory` and a
+    :class:`DataflowCategory` whose head and tail commute with the dagger,
+    and whose followed-by is unitary, i.e. its dagger is its inverse.
+    """
+    @axiom
+    def head_dagger[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Head[B], Head[A]]]:
+        """ The head commutes with the dagger. """
+        return cls.equation_factory(f.head.dagger(), f.dagger().head)
+
+    @axiom
+    def tail_dagger[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Tail[B], Tail[A]]]:
+        """ The tail commutes with the dagger. """
+        return cls.equation_factory(f.tail.dagger(), f.dagger().tail)
+
+    @axiom
+    def followed_by_unitarity[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[tuple[C1, C1]]:
+        """ The dagger of the followed-by is its inverse, in both orders. """
+        fby = cls.followed_by(x)
+        return cls.equation_factory(
+            (fby >> fby.dagger(), fby.dagger() >> fby),
+            (cls.id(fby.dom), cls.id(x)))
 
 
 class TracedCategory[

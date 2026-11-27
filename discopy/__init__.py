@@ -27,6 +27,7 @@ from discopy import (
     inet,
     interaction,
     feedback,
+    dataflow,
     stream,
     para,
     lens,

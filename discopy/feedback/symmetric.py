@@ -22,9 +22,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     DualRail
@@ -132,8 +129,7 @@ class DualRail(symmetric.DualRail, balanced.DualRail):
     dom = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.swap_factory = Swap

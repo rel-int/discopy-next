@@ -12,8 +12,6 @@ def test_errors():
     with raises(AxiomError):
         S(now, dom, cod)
     with raises(AxiomError):
-        S(now, dom, cod, mem.head)
-    with raises(AxiomError):
         non_constant = T(dom, _later=lambda: dom)
         S(now, non_constant, cod, mem)
     mismatched_cod = python.Function(lambda x: x, (int, ), (int, ))

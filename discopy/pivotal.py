@@ -13,8 +13,6 @@ Summary
     :toctree:
 
     Wire
-    HeadOb
-    TailOb
     Ty
     Nat
     Layer
@@ -25,9 +23,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Equation
     Functor
@@ -86,7 +81,6 @@ class Wire(feedback.Wire, rigid.Wire):
         name : The name of the object.
         z (bool) : Whether the object is an adjoint or not.
         time_step : The number of times the object has been delayed.
-        is_constant : Whether the object is a constant stream.
 
     Example
     -------
@@ -120,9 +114,6 @@ class Wire(feedback.Wire, rigid.Wire):
         swaps its domain and codomain colours.
         """
         return self.l
-
-
-HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -412,8 +403,7 @@ class Functor(rigid.Functor, planar.Functor):
     dom = cod = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

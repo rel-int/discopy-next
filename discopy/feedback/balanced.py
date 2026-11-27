@@ -21,9 +21,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     DualRail
@@ -130,8 +127,7 @@ class DualRail(balanced.DualRail, Functor):
     dual_rail_braid_factory = DualRailBraid
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.braid_factory = Braid

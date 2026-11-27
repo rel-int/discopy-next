@@ -693,8 +693,8 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
     "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
-    "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
-    "feedback.FollowedBy": "c(x, True, 1)",
+    "dataflow.{symmetric,markov}.{Head,Tail}": "c(box(c, x, y, v), 1)",
+    "dataflow.{symmetric,markov}.FollowedBy": "c(x, True, 1)",
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False)',
     "feedback.{markov,closed}.Box":
     'c("f", x, y, data=v, is_deterministic=False).delay()',
@@ -860,16 +860,17 @@ BROKEN = {
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
         "{closed.markov,markov,lambek.abstract,feedback.closed.markov,"
-        "feedback.markov,linear.markov}"
+        "feedback.markov,linear.markov,dataflow.markov}"
         ".{Copy,Discard,Function} "
         "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
         "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy}":
+        PIVOTALS + ".{Feedback,Feedforward}":
         "it has no stated rotation",
-        "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace":
+        "*.{Feedback,Feedforward} "
+        "{feedback,feedback.*,dataflow.*,neural.network}.Trace":
         "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
@@ -879,7 +880,7 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "neural.network.{Box,Feedback,Feedforward,Trace}":
         "a module has none",
         "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",

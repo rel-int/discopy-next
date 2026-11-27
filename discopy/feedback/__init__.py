@@ -4,8 +4,8 @@
 The free feedback category, i.e. diagrams with delayed feedback loops, and
 the free traced category as the case where the loop is not delayed.
 
-We follow the definition of :cite:t:`DiLavoreEtAl22` with some extra structure
-for the head and tail of streams with the :class:`FollowedBy` generator.
+We follow the definition of :cite:t:`DiLavoreEtAl22`, whose head and tail of
+streams live in :mod:`~discopy.dataflow`.
 A traced category is a feedback category whose delay is the identity: the
 wires of a feedback diagram carry a time step, and a :class:`Trace` is a
 :class:`Feedback` whose memory is not delayed.
@@ -42,8 +42,6 @@ Summary
     :toctree:
 
     Wire
-    HeadOb
-    TailOb
     Ty
     Nat
     Layer
@@ -52,9 +50,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     TermBase
@@ -71,7 +66,6 @@ Summary
         :toctree:
 
         structural_boxes
-        structural_wires
 
 Axioms
 ------
@@ -258,20 +252,6 @@ of an object with itself is its identity.
     :align: center
 
 >>> assert yanking
-
-Note
-----
-We also implement endofunctors :class:`Head` and :class:`Tail` together with an
-isomorphism :class:`FollowedBy` between `x` and `x.head @ x.tail.delay()`.
-
-This satisfies the following equations:
-
->>> assert x.head.head == x.head
->>> assert x.head.tail == Ty()
->>> assert x.delay().head == Ty()
->>> assert x.delay().tail == x
-
-In the category of streams, this is just the identity.
 """
 
 from __future__ import annotations
@@ -302,16 +282,14 @@ def str_delayed(time_step: int | None):
 
 class Wire(monoidal.Wire):
     """
-    A feedback object is an object with a `time_step` and an optional argument
-    `is_constant` for whether the object is interpreted as a constant stream.
+    A feedback object is an object with a `time_step`.
 
-    The time step and constancy are keywords, so that a wire of a level below,
-    e.g. a :class:`~discopy.pivotal.Wire`, passes its own arguments through.
+    The time step is a keyword, so that a wire of a level below, e.g. a
+    :class:`~discopy.pivotal.Wire`, passes its own arguments through.
 
     Parameters:
         name : The name of the object.
         time_step : The number of times the object has been delayed.
-        is_constant : Whether the object is a constant stream.
 
     Example
     -------
@@ -320,20 +298,17 @@ class Wire(monoidal.Wire):
     >>> assert x.delay().time_step == 1 and x.delay().reset() == x
     >>> assert eval(repr(x.delay(2))) == x.delay(2)
     """
-    time_step, is_constant = 0, True
+    time_step = 0
 
-    def __init__(self, name: str, *args, time_step: int = 0,
-                 is_constant: bool = True, **params):
+    def __init__(self, name: str, *args, time_step: int = 0, **params):
         assert_isinstance(time_step, int)
-        assert_isinstance(is_constant, bool)
         if time_step < 0:
             raise NotImplementedError
         super().__init__(name, *args, **params)
-        self.time_step, self.is_constant = time_step, is_constant
+        self.time_step = time_step
 
     def __setstate__(self, state):
         state.setdefault('time_step', 0)
-        state.setdefault('is_constant', True)
         super().__setstate__(state)
 
     def delay(self, n_steps=1) -> Wire:
@@ -350,36 +325,19 @@ class Wire(monoidal.Wire):
 
     def dagger(self) -> Wire:
         result = super().dagger()
-        result.time_step, result.is_constant = self.time_step, self.is_constant
+        result.time_step = self.time_step
         return result
 
-    @property
-    def head(self) -> HeadOb | None:
-        """ The :attr:`head_factory` of the object, or `None` if delayed. """
-        return None if self.time_step else self.head_factory(self)
-
-    @property
-    def tail(self) -> Wire | None:
-        """
-        The :attr:`tail_factory` of the object, or `self` if `is_constant`.
-        """
-        return self.delay(-1) if self.time_step > 0 else (
-            self if self.is_constant else self.tail_factory(self))
-
     def __eq__(self, other):
-        return super().__eq__(other) and (
-            self.time_step, self.is_constant) == (
-                other.time_step, other.is_constant)
+        return super().__eq__(other) and self.time_step == other.time_step
 
     def __hash__(self):
-        return hash((super().__hash__(), self.time_step, self.is_constant))
+        return hash((super().__hash__(), self.time_step))
 
     def repr_time_step(self) -> str:
         """ The keyword arguments of the time step, as :meth:`__repr__` reads
         them. """
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        is_constant = "" if self.is_constant else ", is_constant=False"
-        return time_step + is_constant
+        return f", time_step={self.time_step}" if self.time_step else ""
 
     def __repr__(self):
         return monoidal.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
@@ -391,15 +349,12 @@ class Wire(monoidal.Wire):
         tree = super().to_tree()
         if self.time_step:
             tree['time_step'] = self.time_step
-        if not self.is_constant:
-            tree['is_constant'] = False
         return tree
 
     @classmethod
     def from_tree(cls, tree):
         result = super().from_tree(tree)
         result.time_step = tree.get('time_step', 0)
-        result.is_constant = tree.get('is_constant', True)
         return result
 
     @property
@@ -408,109 +363,14 @@ class Wire(monoidal.Wire):
         return self.delay()
 
 
-class HeadOb(Wire):
-    """
-    The head of a feedback object, interpreted as the first element of a stream
-    followed by the constant stream on the empty type.
-
-    Note the object `arg: Wire` cannot be itself a `HeadOb` or be delayed.
-    """
-    def __init__(self, arg: Wire, time_step: int = 0):
-        assert_isinstance(arg, Wire)
-        if isinstance(arg, HeadOb) or arg.time_step:
-            raise ValueError
-        self.arg = arg
-        super().__init__(f"{arg}.head", time_step=time_step, is_constant=False)
-
-    def __repr__(self):
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return factory_name(type(self)) + f"({repr(self.arg)}{time_step})"
-
-    def delay(self, n_steps=1):
-        return type(self)(self.arg, self.time_step + n_steps)
-
-    def reset(self) -> HeadOb:
-        return type(self)(self.arg)
-
-    @property
-    def l(self) -> HeadOb:
-        """ The head of the left adjoint, for wires that have adjoints. """
-        return type(self)(self.arg.l, self.time_step)
-
-    @property
-    def r(self) -> HeadOb:
-        """ The head of the right adjoint, for wires that have adjoints. """
-        return type(self)(self.arg.r, self.time_step)
-
-    @property
-    def head(self):
-        return None if self.time_step else self
-
-    @property
-    def tail(self):
-        return self.delay(-1) if self.time_step else None
-
-    def to_tree(self) -> dict:
-        """
-        Serialise the head of an object by its argument and its time step.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty('x')
-        >>> assert loads(dumps(x.head.delay())) == x.head.delay()
-        """
-        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> HeadOb:
-        return cls(from_tree(tree['arg']), tree.get('time_step', 0))
-
-
-class TailOb(Wire):
-    """
-    The tail of a non-constant feedback object, interpreted as the stream
-    starting from the second time step.
-
-    Example
-    -------
-    >>> x = Wire('x', is_constant=False)
-    >>> assert x.tail == TailOb(x)
-    """
-    def __init__(self, arg: Wire, time_step: int = 0):
-        assert_isinstance(arg, Wire)
-        if isinstance(arg, HeadOb) or arg.is_constant or arg.time_step > 0:
-            raise ValueError
-        self.arg = arg
-        super().__init__(f"{arg}.tail", time_step=time_step, is_constant=False)
-
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
-    l, r = HeadOb.l, HeadOb.r
-
-
-Wire.head_factory, Wire.tail_factory = HeadOb, TailOb
-
-
 @factory
 class Ty(monoidal.Ty):
-    """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
+    """ A feedback type is a monoidal type with a `delay`. """
     generator_factory = Wire
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
         return self.factory(*(x.delay(n_steps) for x in self.inside))
-
-    @property
-    def head(self):
-        """ The head of a feedback type, see :class:`HeadOb`. """
-        return self.factory(*(x.head for x in self.inside if x.head))
-
-    @property
-    def tail(self):
-        """ The tail of a feedback type, see :class:`TailOb`. """
-        return self.factory(*(x.tail for x in self.inside if x.tail))
 
     d = Wire.d
 
@@ -556,9 +416,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
     functor_factory: ClassVar[type["Functor"]]
     feedback_factory: ClassVar[type["Feedback"]]
     trace_factory: ClassVar[type["Trace"]]
-    head_factory: ClassVar[type["Head"]]
-    tail_factory: ClassVar[type["Tail"]]
-    followed_by_factory: ClassVar[type["FollowedBy"]]
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
@@ -652,21 +509,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
         if len(self) != 1 or self != self.boxes[0]:
             raise ValueError
         return self.boxes[0].time_step
-
-    @property
-    def head(self):
-        """ Syntactic sugar for :class:`Head`. """
-        return self.head_factory(self)
-
-    @property
-    def tail(self):
-        """ Syntactic sugar for :class:`Tail`. """
-        return self.tail_factory(self)
-
-    @classmethod
-    def followed_by(cls, dom: Ty) -> Diagram:
-        """ Syntactic sugar for :class:`FollowedBy`. """
-        return cls.followed_by_factory(dom)
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
@@ -1155,137 +997,6 @@ class Trace(Feedback, Feedforward):
         return self.ar.to_drawing(self)
 
 
-class Head(Box):
-    """
-    The head of a feedback diagram, interpreted as the first element followed
-    by the identity stream on the empty type.
-
-    Parameters:
-        arg : The diagram to take the head of.
-        time_step : The number of times the head has been delayed.
-    """
-    serialised_attrs = ("*args", "time_step")
-    part = "head"
-
-    def __init__(self, arg: Diagram, time_step=0):
-        dom, cod = (
-            getattr(x, self.part).delay(time_step) for x in [arg.dom, arg.cod])
-        Box.__init__(self, f"({arg}).{self.part}", dom, cod,
-                     time_step=time_step, args=(arg, ))
-
-    def dagger(self):
-        """
-        The dagger of a head is the head of the dagger, and the same for a
-        tail: on streams both are functors, which commute with the dagger.
-
-        >>> x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
-        >>> f = Box('f', x, y)
-        >>> assert f.head.dagger() == f.dagger().head
-        >>> assert f.tail.delay().dagger() == f.dagger().tail.delay()
-        """
-        return type(self)(self.arg.dagger(), self.time_step)
-
-    def __str__(self):
-        return self.name + str_delayed(self.time_step)
-
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
-
-
-class Tail(Box):
-    """
-    The tail of a feedback diagram, interpreted as the stream starting from the
-    second time step with the identity on the empty type at the first step.
-
-    Parameters:
-        arg : The diagram to take the tail of.
-        time_step : The number of times the tail has been delayed.
-    """
-    serialised_attrs = ("*args", "time_step")
-    part = "tail"
-
-    __init__, dagger, __str__ = Head.__init__, Head.dagger, Head.__str__
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
-
-
-class FollowedBy(Box):
-    """
-    The isomorphism between `x.head @ x.tail.delay()` and `x`.
-
-    In the category of streams, this is just the identity.
-
-    Example
-    -------
-    >>> from discopy import stream
-    >>> x = Ty(Wire('x', is_constant=False))
-    >>> FollowedBy(x).draw(doctest="docs/_static/feedback/followed-by.svg")
-
-    .. image:: /_static/feedback/followed-by.svg
-        :align: center
-
-    >>> F = Functor({x: stream.Ty.sequence('x')}, cod=stream.Stream)
-    >>> X, Xh, Xtd = map(F, (x, x.head, x.tail.delay()))
-    >>> for xh, xtd in [(Xh.now, Xtd.now),
-    ...                 (Xh.later.now, Xtd.later.now),
-    ...                 (Xh.later.later.now, Xtd.later.later.now)]:
-    ...     print(f"({xh}, {xtd})")
-    (x0, Ty())
-    (Ty(), x1)
-    (Ty(), x2)
-    >>> eq_up_to_F = lambda f, g: F(f).unroll(2).now == F(g).unroll(2).now
-    >>> assert eq_up_to_F(FollowedBy(x), Id(x))
-    """
-    serialised_attrs = ("arg", "is_dagger", "time_step")
-    arg: Ty = None  # ty: ignore[invalid-assignment]  # shadows Box.arg
-
-    def __init__(self, arg: Ty, is_dagger=False, time_step=0):
-        self.arg = arg
-        dagger_name = ", is_dagger=True" if is_dagger else ""
-        name = f"FollowedBy({arg}{dagger_name})"
-        dom, cod = arg.head @ arg.tail.delay(), arg
-        dom, cod = (cod, dom) if is_dagger else (dom, cod)
-        dom, cod = [x.delay(time_step) for x in (dom, cod)]
-        super().__init__(
-            name, dom, cod, time_step=time_step, is_dagger=is_dagger)
-
-    def __repr__(self):
-        is_dagger = ", is_dagger=True" if self.is_dagger else ""
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return factory_name(type(self))\
-            + f"({repr(self.arg)}{is_dagger}{time_step})"
-
-    def delay(self, n_steps=1):
-        return type(self)(self.arg, self.is_dagger, self.time_step + n_steps)
-
-    def reset(self):
-        return type(self)(self.arg, self.is_dagger)
-
-    def dagger(self):
-        return type(self)(self.arg, not self.is_dagger, self.time_step)
-
-    def to_tree(self) -> dict:
-        """
-        Serialise by the type, the direction and the time step.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty(Wire('x', is_constant=False))
-        >>> fby = FollowedBy(x, is_dagger=True).delay()
-        >>> assert loads(dumps(fby)) == fby
-        """
-        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
-        if self.is_dagger:
-            tree['is_dagger'] = True
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> FollowedBy:
-        return cls(from_tree(tree['arg']), tree.get('is_dagger', False),
-                   tree.get('time_step', 0))
-
-
 class Sum(monoidal.Sum, Box):
     """
     A feedback sum is a sum of feedback diagrams, over which delay
@@ -1328,7 +1039,7 @@ class Functor(monoidal.Functor):
 
     Example
     -------
-    >>> x, y, m = [Ty(Wire(n, is_constant=False)) for n in "xym"]
+    >>> x, y, m = map(Ty, "xym")
     >>> f = Box('f', x @ m.d, y @ m)
     >>> g = Box('g', y.d @ m.d.d, x.d @ m.d)
     >>> F = Functor({x: y.d, y: x.d, m: m.d}, {f: g})
@@ -1336,9 +1047,6 @@ class Functor(monoidal.Functor):
     >>> assert F(f.delay()) == F(f).delay()
     >>> assert F(f.feedback()) == F(f).feedback()
     >>> assert F(f.feedback().dagger()) == F(f).feedback().dagger()
-    >>> assert F(x.head) == F(x).head and F(x.tail) == F(x).tail
-    >>> assert F(FollowedBy(x)) == FollowedBy(F(x))
-    >>> assert F(f.head) == F(f).head and F(f.tail) == F(f).tail
 
     Let's compute the golden ratio as the trace of a Python function, i.e.
     the nested radical iterated from ``float()``, see
@@ -1385,19 +1093,6 @@ class Functor(monoidal.Functor):
                 for _ in range(other.time_step):
                     result = result.delay()
                 return result
-        if isinstance(other, (HeadOb, TailOb, Head, Tail)):
-            cod = self.cod if isinstance(
-                other, (Head, Tail)) else self.cod.ob
-            attr = "head" if isinstance(other, (HeadOb, Head)) else "tail"
-            if hasattr(cod, attr):
-                return getattr(self(other.arg), attr)
-        if isinstance(
-                other, FollowedBy) and hasattr(self.cod, "followed_by"):
-            arg = other.dom if other.is_dagger else other.cod
-            result = self.cod.followed_by(self(arg))
-            return result.dagger() if other.is_dagger\
-                and issubclass(self.cod, DaggerCategory)\
-                and self.cod.has_dagger() else result
         if isinstance(other, Feedforward) and not isinstance(other, Feedback)\
                 and issubclass(self.cod, DaggerCategory)\
                 and self.cod.has_dagger():
@@ -1424,8 +1119,6 @@ Diagram.functor_factory = Functor
 Diagram.feedback_factory = Feedback
 Diagram.feedforward_factory = Feedforward
 Diagram.trace_factory = Trace
-Diagram.head_factory, Diagram.tail_factory = Head, Tail
-Diagram.followed_by_factory = FollowedBy
 Diagram.sum_factory = Sum
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
@@ -1436,24 +1129,19 @@ STRUCTURAL_BOXES = {
     "Feedforward": (
         "feedforward_factory", "A feedforward of {} diagrams."),
     "Trace": ("trace_factory", "A trace of {} diagrams."),
-    "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
-    "Head": ("head_factory", "The head of a {} diagram."),
-    "Tail": ("tail_factory", "The tail of a {} diagram."),
 }
 
 
 def structural_boxes(
         diagram: type, box: type
-        ) -> tuple[type, type, type, type, type, type]:
+        ) -> tuple[type, type, type]:
     """
-    The :class:`Feedback`, :class:`Feedforward`, :class:`Trace`,
-    :class:`FollowedBy`, :class:`Head` and :class:`Tail` of a level of the
-    hierarchy, generated rather than
-    written by hand: each subclasses the one of every level ``diagram``
-    subclasses and ``box``, lives in their module and is bound to the
-    factory of ``diagram`` that builds it. A level whose trace is not a
-    bubble, e.g. made of cups and caps in :mod:`~discopy.pivotal`, keeps its
-    own :attr:`Diagram.trace_factory`.
+    The :class:`Feedback`, :class:`Feedforward` and :class:`Trace` of a level
+    of the hierarchy, generated rather than written by hand: each subclasses
+    the one of every level ``diagram`` subclasses and ``box``, lives in their
+    module and is bound to the factory of ``diagram`` that builds it. A level
+    whose trace is not a bubble, e.g. made of cups and caps in
+    :mod:`~discopy.pivotal`, keeps its own :attr:`Diagram.trace_factory`.
 
     Parameters:
         diagram : The diagram class of the level.
@@ -1462,9 +1150,9 @@ def structural_boxes(
     Example
     -------
     >>> from discopy.feedback import markov, symmetric
-    >>> assert issubclass(markov.Head, symmetric.Head)
-    >>> assert issubclass(markov.Head, markov.Box)
-    >>> assert markov.Diagram.head_factory is markov.Head
+    >>> assert issubclass(markov.Feedback, symmetric.Feedback)
+    >>> assert issubclass(markov.Feedback, markov.Box)
+    >>> assert markov.Diagram.feedback_factory is markov.Feedback
     >>> assert repr(markov.Trace).endswith("'discopy.feedback.markov.Trace'>")
     >>> assert issubclass(markov.Trace, markov.Feedforward)
     """
@@ -1483,36 +1171,7 @@ def structural_boxes(
     for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
-    return (result["Feedback"], result["Feedforward"], result["Trace"],
-            result["FollowedBy"], result["Head"], result["Tail"])
-
-
-def structural_wires(wire: type) -> tuple[type, type]:
-    """
-    The :class:`HeadOb` and :class:`TailOb` of a wire class below feedback,
-    generated as :func:`structural_boxes` does for boxes, so that the head of a
-    wire is a wire of its own level, and bound to its factories.
-
-    Parameters:
-        wire : The wire class of the level.
-
-    Example
-    -------
-    >>> from discopy import pivotal
-    >>> x = pivotal.Ty('x')
-    >>> assert x.head.inside[0] == pivotal.HeadOb(pivotal.Wire('x'))
-    >>> assert x.head.l == x.l.head and x.head.r.r == x.head
-    """
-    parents = [base for base in wire.__bases__ if issubclass(base, Wire)]
-    module, level = wire.__module__, wire.__module__.split('.')[-1]
-    head, tail = (
-        subclass(name, [getattr(parent, attr) for parent in parents] + [wire],
-                 module, f"The {part} of a {level} wire.")
-        for name, attr, part in (
-            ("HeadOb", "head_factory", "head"),
-            ("TailOb", "tail_factory", "tail")))
-    wire.head_factory, wire.tail_factory = head, tail
-    return head, tail
+    return result["Feedback"], result["Feedforward"], result["Trace"]
 
 
 __getattr__ = deprecated_alias(__name__, {
