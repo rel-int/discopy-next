@@ -518,6 +518,9 @@ print([hash(value) for value in (
     biclosed.Ty('x') >> biclosed.Ty('y'),
     closed.Ty('x') >> closed.Ty('y'), matrix.NumPy(),
     tensor.Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]),
+    tensor.Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]).bubble(),
+    tensor.Box('g', tensor.Dim(2), tensor.Dim(2)).bubble(func=abs).bubble(),
+    tensor.Diff('x', abs), cat.Arrow.associativity,
     monoidal.List[type](int, str), python.Ty(int, str),
     testable.Equation(g, g.dagger()))])
 """
@@ -530,10 +533,9 @@ def test_deterministic_hashes():
     `hash` then answers a fresh number in every interpreter, which the
     determinism of `STYLE.md` rules out. One value per module that leads a
     setoid or a `__hash__`, hashed in two interpreters with `PYTHONHASHSEED`
-    fixed, see #479.
-
-    `tensor.Elementwise` is absent because its setoid holds the function it maps
-    with, whose hash is an address of its own, see #506.
+    fixed, see #479. A function is compared but not hashed, since its hash
+    is an address too: the func of a `tensor.Elementwise` or a `tensor.Diff`,
+    and that of a `testable.Declaration`, see #506.
 
     A `List` of classes, i.e. `python.Ty`, is here rather than in
     `test_setoid_holds_no_class` because a list hashes without a setoid, so
@@ -553,8 +555,7 @@ def test_setoid_holds_no_class():
     """
     A class in a setoid is an address in the hash whatever leads it: the hash
     of a class object is its identity, so `tensor.Box.setoid`'s `dtype` moved
-    between interpreters whether or not the key before it did, see #479. The
-    one component left that hashes as an address is a function, see #506.
+    between interpreters whether or not the key before it did, see #479.
     """
     from discopy import monoidal, tensor
     from discopy.quantum import gates

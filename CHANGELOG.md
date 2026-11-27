@@ -919,6 +919,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `hash` of a `tensor.Elementwise`, a `tensor.Diff` and a
+  `testable.Declaration` is the same in every interpreter: the function each
+  holds is compared by `==` but left out of the hash, its hash being its
+  address, and a declaration's category is hashed by its `factory_key`
+  ([next#506]).
 - `quantum.tk.to_tk` drops destructively measured qubits when
   `Measure(override_bits=True)` overrides existing bits, so gates and
   measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
