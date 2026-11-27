@@ -43,5 +43,4 @@ to zero.
 
 ## Status
 
-Accepted, 2026-11-22. [#693](https://github.com/rel-int/discopy-next/pull/693), which carries
-it out, is open.
+Accepted, 2026-11-22.

@@ -8,16 +8,16 @@ at call time. ``DEFAULT_BACKEND``, ``TRANSPARENT`` and ``RIBBON_FOLD_DEPTH``,
 some uses of ``NUMPY_THRESHOLD`` and ``DRAWING_DEFAULT``, and the dicts, are
 bound when the modules that use them are imported: mutate the dicts in place
 rather than rebinding them, and change the backend with
-:func:`discopy.matrix.set_backend`.
+:func:`~discopy.matrix.set_backend`.
 
-* ``DEFAULT_BACKEND``: the array backend of :class:`discopy.matrix.Matrix`
-  and :class:`discopy.tensor.Tensor`.
+* ``DEFAULT_BACKEND``: the array backend of :class:`~discopy.matrix.Matrix`
+  and :class:`~discopy.tensor.Tensor`.
 * ``OVERRIDE_DOCTEST_IMAGES``: when ``True``, ``draw(doctest=...)``
   overwrites the baseline image instead of comparing against it.
 * ``NUMPY_THRESHOLD``: the number of array entries printed before a ``repr``
   elides.
 * ``MAX_EINSUM_INDICES``: the number of indices one ``einsum`` call in
-  :mod:`discopy.tensor` can take.
+  :mod:`~discopy.tensor` can take.
 * ``BOX_DRAWING_ATTRIBUTES``, ``WIRE_DRAWING_ATTRIBUTES`` and
   ``COLOUR_DRAWING_ATTRIBUTES``: the default drawing attributes of each box,
   wire and coloured region.
@@ -104,7 +104,7 @@ WIRE_DRAWING_ATTRIBUTES = {
 #: coloured region on either side of a wire: ``min_right_margin`` adds extra
 #: space to the right of a wire, e.g. to make room for a long label, while
 #: ``ribbon`` is the region to the right of a wire whenever it carries a
-#: ``width``, i.e. the inside of a :class:`discopy.balanced.Ribbon` whose
+#: ``width``, i.e. the inside of a :class:`~discopy.balanced.Ribbon` whose
 #: two rails are ``width`` apart, see :meth:`monoidal.Ty.wire_offsets`.
 COLOUR_DRAWING_ATTRIBUTES = {
     "min_right_margin": lambda _: 0,
@@ -114,7 +114,7 @@ COLOUR_DRAWING_ATTRIBUTES = {
 
 #: Default drawing parameters. In Matplotlib, ``fontsize`` is the size of the
 #: labels of boxes and wires, and ``fontsize_spiders`` the size of the labels
-#: of spiders, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+#: of spiders, e.g. the symbol of an :class:`~discopy.monoidal.Equation`,
 #: which do not follow the ``fontsize`` given to ``draw``.
 DRAWING_DEFAULT: dict[str, Any] = {
     "fontsize": 10,
@@ -162,7 +162,7 @@ def darken(hexcode, factor=0.6):
 
     Used to fill the back of a twisting ribbon with a darker shade of the
     colour filling its front, see
-    :meth:`discopy.drawing.backend.Backend.draw_dual_rail_twist`.
+    :meth:`~discopy.drawing.backend.Backend.draw_dual_rail_twist`.
     """
     return '#' + ''.join(f'{round(int(hexcode[i:i + 2], 16) * factor):02x}'
                          for i in (1, 3, 5)) + hexcode[7:]

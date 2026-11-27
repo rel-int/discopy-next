@@ -10,8 +10,8 @@ normalises it and emits one belief. A :class:`DeepSet` is the one module
 every factor shares: it embeds its members' beliefs, sums the embeddings and
 answers each member from its own belief and the sum. A :class:`Refresh`
 updates the answer trace from the state once per cycle, and a
-:class:`HaltHead` reads a halting logit off it. :mod:`discopy.neural.recursion`
-wires them into a network.
+:class:`HaltHead` reads a halting logit off it.
+:mod:`~discopy.neural.recursion` wires them into a network.
 
 Every module here computes exactly what it computed in the experiment it
 comes from, operation for operation, so that a network built from them under

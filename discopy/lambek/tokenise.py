@@ -3,7 +3,7 @@
 r"""
 The words of English text as the Penn Treebank writes them, which is how
 CCGbank and CCGrebank write them, so that a parser trained on either, e.g.
-:class:`discopy.lambek.categorial.bobcat.Parser`, reads raw text. It is the
+:class:`~discopy.lambek.categorial.bobcat.Parser`, reads raw text. It is the
 rule-based tokenizer and sentencizer of `spaCy <https://spacy.io>`_, with no
 statistical model, as lambeq's ``SpacyTokeniser`` is, and it needs spaCy,
 which the ``lambek`` extra installs.

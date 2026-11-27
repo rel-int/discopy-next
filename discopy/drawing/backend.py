@@ -593,7 +593,7 @@ class Backend(ABC):
         """
         Draws a half circle (or ellipse if ``depth`` differs from the radius)
         from ``(left, centre)`` to ``(right, centre)`` with vertical sides up
-        to ``end``, e.g. the fold of a :class:`discopy.ribbon.DualRailCup`,
+        to ``end``, e.g. the fold of a :class:`~discopy.ribbon.DualRailCup`,
         see :meth:`half_circle_beziers`.
         """
         if end != centre:
@@ -1045,7 +1045,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cup(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCup` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCup` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cup is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1069,7 +1069,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cap(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCap` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCap` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cap is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1112,11 +1112,11 @@ class Backend(ABC):
         """
         The nodes joined by each rail of a dual rail box, as
         :meth:`crossing_wires` gives the strands of a crossing: a
-        :class:`discopy.balanced.DualRailBraid` sends the ribbon of inputs
+        :class:`~discopy.balanced.DualRailBraid` sends the ribbon of inputs
         ``(0, 1)`` to outputs ``(2, 3)`` and vice-versa, a
-        :class:`discopy.balanced.DualRailTwist` sends each rail back to its
-        own position, a :class:`discopy.ribbon.DualRailCup` (resp.
-        :class:`discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
+        :class:`~discopy.balanced.DualRailTwist` sends each rail back to its
+        own position, a :class:`~discopy.ribbon.DualRailCup` (resp.
+        :class:`~discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
         onto ``3`` and ``1`` onto ``2``, see :meth:`draw_dual_rail_braid`,
         :meth:`draw_dual_rail_twist`, :meth:`draw_dual_rail_cup` and
         :meth:`draw_dual_rail_cap`.
@@ -1380,7 +1380,7 @@ class Backend(ABC):
             Point(x, apex) for x in reversed(tips)]
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Discard` box. """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         for i in range(len(box.dom)):
@@ -1395,7 +1395,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -1407,7 +1407,7 @@ class Backend(ABC):
 
     def draw_dual_rail_braid(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailBraid`, i.e. the two ribbons
+        Draws a :class:`~discopy.balanced.DualRailBraid`, i.e. the two ribbons
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1433,7 +1433,7 @@ class Backend(ABC):
 
     def draw_dual_rail_twist(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailTwist`, i.e. the two rails of
+        Draws a :class:`~discopy.balanced.DualRailTwist`, i.e. the two rails of
         a ribbon crossing each other twice in quick succession.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1506,7 +1506,7 @@ class Backend(ABC):
                                    adaptive=color is None)
 
     def draw_brakets(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Ket` box. """
+        """ Draws a :class:`~discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
         is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
@@ -1528,7 +1528,7 @@ class Backend(ABC):
                 fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
+        """ Draws a :class:`~discopy.quantum.gates.Controlled` gate. """
         box, j = node.box, node.j
         distance = box.distance
         c_size = len(box.controlled.dom)
@@ -1775,7 +1775,7 @@ class TikZ(Backend):
         """
         The length of one unit of a drawing, at which the label of a box fits
         it: the layout measures a label at twelve points in inches, see
-        :func:`discopy.utils.text_width`, and TikZ sets it at
+        :func:`~discopy.utils.text_width`, and TikZ sets it at
         :attr:`LABEL_SIZE` points.
 
         >>> TikZ.unit()
@@ -2389,7 +2389,7 @@ class Typst(Backend):
         matplotlib draws it: a square, a triangle pointing up or down, a
         plus sign in its colour or else a disc. Nothing when its colour is
         transparent: such a spider is just its label, e.g. the symbol of an
-        :class:`discopy.monoidal.Equation`.
+        :class:`~discopy.monoidal.Equation`.
 
         >>> from discopy.frobenius import Ty, Spider
         >>> spider = Spider(1, 1, Ty('x'))
@@ -2675,7 +2675,7 @@ class Matplotlib(Backend):
         Draws the spiders, grouped by shape and by whether they adapt to a
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
-        its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+        its label, e.g. the symbol of an :class:`~discopy.monoidal.Equation`,
         which leaves no patch on a coloured page. The labels are drawn at
         ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """

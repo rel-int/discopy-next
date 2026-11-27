@@ -3,8 +3,8 @@
 """
 DisCoPy's monad modules: free and algebra.
 
-The monads themselves are :class:`discopy.kleisli.monad.Monad`, and their
-Kleisli categories are :mod:`discopy.kleisli`.
+The monads themselves are :class:`~discopy.kleisli.monad.Monad`, and their
+Kleisli categories are :mod:`~discopy.kleisli`.
 
 .. autosummary::
     :template: module.rst
