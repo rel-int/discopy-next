@@ -53,7 +53,7 @@ Summary
 import copy
 import math
 import numbers
-from collections.abc import Sized
+from collections.abc import Iterable, Sized
 from math import e, pi
 
 from discopy import messages
@@ -363,12 +363,36 @@ class Encode(SelfConjugate):
         return self.dagger()._decompose().dagger()
 
 
+def _ravel(data):
+    ndim = getattr(data, "ndim", None)
+    if ndim == 0:
+        yield data
+    elif ndim and hasattr(data, "reshape"):
+        flat = data.reshape(-1)
+        # a numpy.matrix stays two-dimensional, its flat iterator does not
+        for item in data.flat if flat.ndim != 1 else flat:
+            yield from _ravel(item)
+    elif isinstance(data, Iterable) and not isinstance(data, (str, bytes)):
+        for item in data:
+            yield from _ravel(item)
+    else:
+        yield data
+
+
+def _gate_entry(value):
+    if getattr(value, "free_symbols", None) or (
+            getattr(value, "ndim", None) == 0
+            and type(value).__module__ != "numpy"):
+        return value
+    return complex(value)
+
+
 class QuantumGate(Box):
     """
     Quantum gates, i.e. unitaries on n qubits.
 
     Its data is flattened into a list of complex numbers, except for the
-    entries with free symbols.
+    entries with free symbols or backend array scalars.
 
     >>> from sympy.abc import phi  # doctest: +EXTRA
     >>> import numpy as np
@@ -380,10 +404,8 @@ class QuantumGate(Box):
     is_classical = False
 
     def __init__(self, name: str, dom: Ty, cod: Ty, data=None, **params):
-        if isinstance(data, Sized):
-            with backend('numpy') as np:
-                data = [value if getattr(value, "free_symbols", None)
-                        else complex(value) for value in np.ravel(data)]
+        if isinstance(data, Sized) and getattr(data, "ndim", None) != 0:
+            data = [_gate_entry(value) for value in _ravel(data)]
         super().__init__(name, dom, cod, data, **params)
 
     def __setstate__(self, state):
@@ -412,8 +434,14 @@ class QuantumGate(Box):
         """
         if not super().is_deterministic or self.free_symbols:
             return False
+        array = self.array
+        if hasattr(array, "detach"):
+            array = array.detach().cpu()
         with backend('numpy') as np:
-            array = np.array(self.array, dtype=complex)
+            try:
+                array = np.asarray(array, dtype=complex)
+            except TypeError:
+                return False
             rows = array.reshape(math.prod(array.shape[:len(self.dom)]), -1)
             return bool(np.isin(rows, (0, 1)).all()
                         and (rows.sum(axis=1) <= 1).all())
@@ -1130,8 +1158,9 @@ class U1(AntiConjugate, Rotation):
     def array(self):
         with backend() as np:
             theta = np.array(2 * self.modules.pi * self.phase)
+            one, zero = np.array(1), np.array(0)
             return np.stack(
-                (1, 0, 0, self.modules.exp(1j * theta))).reshape(2, 2)
+                (one, zero, zero, self.modules.exp(1j * theta))).reshape(2, 2)
 
 
 class ControlledRotation(Controlled, Rotation):
