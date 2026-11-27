@@ -423,7 +423,7 @@ class Cospan(Box):
     It is the plumbing of Frobenius diagrams alone, not a slot, and their
     functions, copies and discards are those of Markov diagrams, their
     cofunctions, merges and noise those of comarkov ones: a level below,
-    e.g. :mod:`discopy.quantum.zx`, inherits them all and so composes its
+    e.g. :mod:`~discopy.quantum.zx`, inherits them all and so composes its
     own spiders and permutations instead.
 
     Parameters:

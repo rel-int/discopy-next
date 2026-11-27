@@ -850,7 +850,7 @@ cat.Ob('y'), data=[42]),))
     method = "bubble"
     rule: Rule | None = None
     """ The rule a box concludes, :obj:`None` but for a generator, see
-    :class:`discopy.testable.Generator`, which defines its ``premises``. """
+    :class:`~discopy.testable.Generator`, which defines its ``premises``. """
 
     def __init__(
             self, name: str, dom: Ob, cod: Ob, data=None, is_dagger=False,

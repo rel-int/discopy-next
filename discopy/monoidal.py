@@ -1488,7 +1488,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         among its factories that draw themselves with a ``strategy`` of
         their own rather than that of its :attr:`Box`, e.g.
         :class:`~discopy.braided.Braid` for
-        :attr:`~discopy.braided.Diagram.Braid`. A box class of
+        :attr:`Diagram.Braid <discopy.braided.Diagram.Braid>`. A box class of
         another category, e.g. the braid a symmetric diagram inherits from
         a balanced one, and a factory that is a method rather than a class
         are left out. :func:`~discopy.testable.assert_structural_boxes`

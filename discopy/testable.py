@@ -1207,11 +1207,11 @@ class Slot[**P, T](Declaration[P, T]):
     """
     The class of a generator, declared once by the category introducing it
     and built on first access by every level below, i.e. every subclass of
-    the category decorated with :func:`discopy.utils.factory`, see
+    the category decorated with :func:`~discopy.utils.factory`, see
     :meth:`Testable.slot`.
 
     Its function is the class it builds the others from, its root, e.g.
-    :class:`discopy.symmetric.Swap` for ``symmetric.Diagram.Swap``. At a
+    :class:`~discopy.symmetric.Swap` for ``symmetric.Diagram.Swap``. At a
     level below, the slot is the subclass of the slot of each base of the
     level, of the slots of the level that the root subclasses, and of the
     level itself when the root subclasses its category, so that
@@ -1286,7 +1286,7 @@ class Slot[**P, T](Declaration[P, T]):
         """
         The names of the slots of the category that the root subclasses
         directly or through bases that are not slots, e.g. the box of
-        :class:`discopy.bang.Digging` through ``Structural``.
+        :class:`~discopy.bang.Digging` through ``Structural``.
         """
         roots = {
             getattr(self.category, name): name for name in slots(self.category)
@@ -1306,7 +1306,7 @@ class Slot[**P, T](Declaration[P, T]):
         ``level`` and ``level`` itself, with the ``extension`` first, or the
         root when no base of ``level`` has the slot. A class that depends on
         no level, i.e. that is no morphism, has no parent and refers to no
-        category, e.g. :class:`discopy.monoidal.Layer`, is that of the base.
+        category, e.g. :class:`~discopy.monoidal.Layer`, is that of the base.
         """
         roots = list(dict.fromkeys(
             value for base in level.__bases__
@@ -1344,10 +1344,10 @@ class Generator[**P, T](Slot[P, T]):
     """
     A :class:`Slot` whose class is the conclusion of an inference rule with
     no morphism among its premises, e.g. the braid of two atoms is
-    :meth:`discopy.abc.BraidedCategory.braiding`. Every box it builds reads
+    :meth:`~discopy.abc.BraidedCategory.braiding`. Every box it builds reads
     the rule as its ``rule`` and the objects the rule takes as its
     ``premises``, so that a functor sends it to the rule of its codomain on
-    the image of its premises, see :meth:`discopy.cat.Functor.__call__`,
+    the image of its premises, see :meth:`~discopy.cat.Functor.__call__`,
     rather than each level matching the class of its boxes.
 
     A class whose boxes conclude different rules, e.g. an evaluation on
@@ -1506,7 +1506,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
     def extend[S: type](cls, extension: S) -> S:
         """
         Extend the :class:`Slot` of ``cls`` named after a class, e.g.
-        ``@Diagram.extend`` above ``class Swap`` in :mod:`discopy.compact`.
+        ``@Diagram.extend`` above ``class Swap`` in :mod:`~discopy.compact`.
         A class that subclasses the root of the slot or the level is the
         slot at that level as it is written, bases included. Any other class
         is a mixin holding what the level adds: the slot is built with it

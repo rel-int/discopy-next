@@ -471,7 +471,7 @@ def export(module_name: str) -> None:
     """
     Bind in a module, under its own name, the class each level the module
     defines builds for each of its slots, e.g. ``markov.Swap`` for
-    ``markov.Diagram.Swap``, see :class:`discopy.testable.Slot`, unless the
+    ``markov.Diagram.Swap``, see :class:`~discopy.testable.Slot`, unless the
     module binds that name already. A module defining levels calls it once,
     last, so that its doctests, a star import and the code it runs find
     each class by name, as :mod:`pickle` and :func:`from_tree` do through
@@ -502,7 +502,7 @@ def exports(module_name: str) -> Callable[[str], type]:
     The module-level ``__getattr__`` of a module defining levels of the
     hierarchy, i.e. classes decorated with :func:`factory`, that finds the
     class each level builds for a slot named after it, e.g. ``markov.Swap``
-    for ``markov.Diagram.Swap``, see :class:`discopy.testable.Slot`, even
+    for ``markov.Diagram.Swap``, see :class:`~discopy.testable.Slot`, even
     when the level shadows the slot with a behaviour, e.g. ``pivotal.Trace``
     for the trace of a pivotal diagram, made of cups and caps. A module
     writes none of them out, and :mod:`pickle` and :func:`from_tree` find
