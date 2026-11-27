@@ -581,7 +581,7 @@ for law in sorted(
         messages.FREE_BANG))
 
 
-class Functor(monoidal.Functor):
+class Functor(monoidal.Functor, cat.Functor):
     """
     A functor from the free linear category: into a linear category it
     sends a :class:`BangOb`, a :class:`Bang` and the structural boxes

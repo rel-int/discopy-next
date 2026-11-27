@@ -1,5 +1,6 @@
 from pytest import raises
 
+from discopy import linear
 from discopy.linear import monoidal as bang
 from discopy.linear.monoidal import *
 from discopy.utils import AxiomError, dumps, loads
@@ -83,6 +84,7 @@ def test_Functor_sends_the_bang_through_the_codomain():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
     F = Functor({x: y, y: x}, {f: f[::-1]})
+    assert isinstance(F, linear.cat.Functor)
     assert F(x.bang()) == y.bang() and F(f.bang()) == f[::-1].bang()
     assert F(Dereliction(x)) == Dereliction(y)
     assert F(Exchange(x, y, True)) == Exchange(y, x, True)
