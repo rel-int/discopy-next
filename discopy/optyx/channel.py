@@ -415,6 +415,19 @@ qubit = Ty("qubit")
 qmode = Ty("qmode")
 
 
+def refuse_chi_one(needed: int, max_chi: int) -> None:
+    """
+    Refuse a compressed contraction at ``max_chi=1`` once a wire of the
+    codomain needs dimension ``needed > max_chi``: quimb's compressed QR
+    divides by zero there.
+    """
+    if max_chi == 1:
+        raise ValueError(
+            f"Compressed contraction needs max_chi >= 2 when "
+            f"a wire of the network needs dimension {needed} > 1 "
+            "(pass max_chi=None for exact contraction).")
+
+
 @factory
 class Diagram(frobenius.Diagram):
     """Classical-quantum circuits over qubits and optical modes"""
@@ -1097,11 +1110,7 @@ class Diagram(frobenius.Diagram):
             (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         needed = max(network.truncation_dimensions(), default=1)
         if compressible and needed > max_chi:
-            if max_chi == 1:
-                raise ValueError(
-                    f"Compressed contraction needs max_chi >= 2 when "
-                    f"a wire of the network needs dimension {needed} > 1 "
-                    "(pass max_chi=None for exact contraction).")
+            refuse_chi_one(needed, max_chi)
             warnings.warn(
                 f"the contraction needs dimension {needed} but "
                 f"max_chi={max_chi}: the result is an approximation with "
@@ -1186,11 +1195,7 @@ class Diagram(frobenius.Diagram):
             network = self.at_time(depth)
             needed = max(network.truncation_dimensions(), default=1)
             if max_chi is not None and needed > max_chi:
-                if max_chi == 1:
-                    raise ValueError(
-                        f"Compressed contraction needs max_chi >= 2 when "
-                        f"a wire of the network needs dimension {needed} > 1 "
-                        "(pass max_chi=None for exact contraction).")
+                refuse_chi_one(needed, max_chi)
                 if not warned:
                     warned = True
                     warnings.warn(
