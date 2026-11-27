@@ -2,4 +2,4 @@
 >
 > > discopy/drawing/optimiser.py:1236 [P2] `width` ignores the box corners added by `framed()`, so a wide `min_width` box can extend beyond the declared drawing width and default canvas. Include the corner x-coordinates when computing `width`.
 
-- [WIP] @T-01a1fdff-2026-11-27 17:52 optimiser.py:1236 the width and height of a pivotal drawing hold its box corners
+- [x] optimiser.py:1236 the width and height of a pivotal drawing hold its box corners
