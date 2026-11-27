@@ -135,7 +135,7 @@ import numpy as np
 from discopy import messages, monoidal
 from discopy.abc import MonoidalCategory
 from discopy.drawing import backend
-from discopy.drawing.drawing import (
+from discopy.drawing.planegraph import (
     Drawing, Node, PlaneGraph, Point, trailing_margin)
 from discopy.utils import assert_iscomposable, factory, unbiased
 

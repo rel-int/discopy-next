@@ -1,11 +1,11 @@
 """
-DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
-drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
-is sent by a functor; :mod:`discopy.drawing.optimiser` lays a diagram out
-by another, into open quadratic programs, and a pivotal one as a planar map
-with rotating boxes; :mod:`discopy.drawing.backend`
-renders them with matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget`
-shows them as interactive anywidget widgets in notebooks.
+DisCoPy's drawing modules: :mod:`~discopy.drawing.planegraph` is the
+category of drawings, i.e. labeled graphs embedded in the plane, onto which
+every diagram is sent by a functor; :mod:`~discopy.drawing.optimiser` lays a
+diagram out by another, into open quadratic programs, and a pivotal one as a
+planar map with rotating boxes; :mod:`~discopy.drawing.backend` renders them
+with matplotlib, TikZ or Typst; :mod:`~discopy.drawing.widget` shows them as
+interactive anywidget widgets in notebooks.
 """
 
 import os
@@ -14,7 +14,7 @@ from PIL import Image
 from tempfile import TemporaryDirectory
 
 from discopy.utils import Node, Point
-from discopy.drawing import backend, drawing
+from discopy.drawing import backend, planegraph
 from discopy.drawing.backend import (
     Backend,
     TikZ,
@@ -25,7 +25,7 @@ from discopy.drawing.backend import (
     COLORS,
     SHAPES,
 )
-from discopy.drawing.drawing import (
+from discopy.drawing.planegraph import (
     Point,
     PlaneGraph,
     Drawing,
@@ -47,7 +47,7 @@ def __getattr__(name):
 def draw(diagram, **params):
     """
     Draws a diagram with matplotlib, or as TikZ code with ``to_tikz=True``,
-    see :func:`discopy.drawing.backend.draw`.
+    see :func:`~discopy.drawing.backend.draw`.
 
     Parameters
     ----------
@@ -102,13 +102,13 @@ def draw(diagram, **params):
 def from_picture(jpeg, config: dict):
     """
     The diagram a picture of it shows, read back by
-    :mod:`discopy.drawing.vision`: a pixel net says what each pixel is, a
+    :mod:`~discopy.drawing.vision`: a pixel net says what each pixel is, a
     small OCR model reads the name of each box and the type of each
     labelled wire, the module is the smallest in which it decodes from the
     one whose structural primitives and types appear, and
-    :func:`discopy.drawing.picture.decode` builds the diagram. It needs
+    :func:`~discopy.drawing.picture.decode` builds the diagram. It needs
     PyTorch and trained weights, see
-    :func:`discopy.drawing.vision.from_picture` for the ``config``.
+    :func:`~discopy.drawing.vision.from_picture` for the ``config``.
     """
     from discopy.drawing import vision
     return vision.from_picture(jpeg, config)

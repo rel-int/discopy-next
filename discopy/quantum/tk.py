@@ -189,7 +189,8 @@ class Circuit(tk.Circuit):
 
 def to_tk(circuit):
     """
-    Takes a :class:`discopy.quantum.Circuit`, returns a :class:`Circuit`.
+    Takes a :class:`quantum.Circuit <discopy.quantum.Circuit>`, returns a
+    :class:`Circuit`.
     """
     # bits and qubits are lists of register indices, at layer i we want
     # len(bits) == circuit[:i].cod.count(bit) and same for qubits

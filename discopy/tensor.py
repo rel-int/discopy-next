@@ -553,7 +553,7 @@ class Functor(frobenius.Functor):
     def to_tree(self) -> dict:
         """
         Serialise a tensor functor, its dtype in the name of its codomain,
-        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        see :meth:`~discopy.cat.Functor.to_tree`, unless it has ``params``
         or a ``contractor``.
 
         >>> from discopy.utils import dumps, loads
@@ -608,7 +608,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ...     == F(frobenius.Id(n @ n) >> cup)
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
 
-        A hypergraph of :mod:`discopy.frobenius` is contracted as it
+        A hypergraph of :mod:`~discopy.frobenius` is contracted as it
         stands, see :meth:`spider_operands`, any other through its diagram,
         see :meth:`operands`.
 
@@ -810,10 +810,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ``config.MAX_EINSUM_INDICES`` indices are contracted with
         :class:`OptEinsum` instead.
 
-        A spider of a hypergraph is an index on any number of arrays, so
-        NumPy's default bound on intermediates, the size of the largest
+        An intermediate of a network can exceed its largest input tensor,
+        so NumPy's default bound on intermediates, the size of the largest
         operand, can forbid every pairwise step and leave one naive sum
-        over all the indices: a hypergraph lifts it for the ``"greedy"``
+        over all the indices: this bound is lifted for the ``"greedy"``
         path, not for ``"optimal"``, whose search it would let explode.
 
         Parameters:
@@ -839,9 +839,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         params = dict(self.params, optimize=self.optimize)\
             if isinstance(contractor, (NumPy, JAX, Contractor))\
             else self.params
-        if isinstance(other, hypergraph.Hypergraph)\
-                and isinstance(contractor, NumPy)\
-                and self.optimize in ("greedy", True):
+        if isinstance(contractor, NumPy) and self.optimize in ("greedy", True):
             params['optimize'] = ("greedy", sys.maxsize)
         array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
@@ -1164,11 +1162,11 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         part the pair of its parts, so that a box holding nan equals itself
         and its hash is stable: the data labels a generator, it is not a
         number being compared. The winding number ``z`` is compared too, as
-        in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
-        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
-        :func:`discopy.utils.factory_name`, a class object hashing as its
-        address and a backend's descriptor, e.g. ``torch.float64``, being no
-        class at all.
+        in :meth:`rigid.Box.setoid <discopy.rigid.Box.setoid>`, and the time
+        step, as in :meth:`feedback.Box.setoid <discopy.feedback.Box.setoid>`.
+        The ``dtype`` is compared by its :func:`~discopy.utils.factory_name`,
+        a class object hashing as its address and a backend's descriptor,
+        e.g. ``torch.float64``, being no class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1299,7 +1297,7 @@ class Spider[dtype](frobenius.Spider, Box[dtype]):
 class Sum[dtype](frobenius.Sum, Box[dtype]):
     """
     A formal sum of tensor diagrams with the same domain and codomain, a
-    frobenius sum with the flags of a :class:`discopy.markov.Sum`.
+    frobenius sum with the flags of a :class:`~discopy.markov.Sum`.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.

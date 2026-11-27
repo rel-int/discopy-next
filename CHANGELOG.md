@@ -23,6 +23,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   rotation, cups and caps are turning points of a wire, and each step of the
   descent from the monoidal layout is a quadratic program, kept only when
   the drawing stays valid ([next#689]).
+- `discopy.inet`: interaction nets on flat port lists (`Symbol`, `Signature`,
+  `Net`, `Rewriter`) and the symmetric interaction combinators `combinators`
+  with optional labels on duplicators `δ`, checked against double-pushout
+  rewriting in `discopy.hypergraph`, together with their Geometry of
+  Interaction token machine `Net.path` checked against `Net.to_int` in
+  `Int(python.additive.Function)` ([next#542]).
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -585,6 +592,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
+  alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -923,6 +933,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The API docs show short names: a page is titled with the last part of its
+  name, which it lost when its package did not import it, e.g.
+  `neural.cell`, module tables and references to modules and objects drop
+  the `discopy.` prefix, and the bases of a class name only as much of their
+  path as tells two of them apart, e.g. `pivotal.Diagram, balanced.Diagram`
+  for `ribbon.Diagram`, as references in one paragraph do; `test/api_names.py`
+  checks both. `discopy.drawing` has
+  its own page instead of appearing twice under semantics, and the subpackages
+  follow it in the order lambek, neural, optyx, quantum ([next#746]).
+- `tensor.Functor.contract` lifts NumPy's default bound on intermediates, the
+  size of the largest operand, for combinatorial maps as well as hypergraphs on
+  the `"greedy"` path: when every pairwise step exceeds the largest operand,
+  e.g. `hopf.Double(hopf.GroupAlgebra(Symmetric[3])).is_valid()`, NumPy no
+  longer falls back to one naive sum over all indices ([next#579], [#595]).
 - The label of an exponential wire is made of the labels of its base and
   exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
   `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
@@ -949,6 +973,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   those of boxes and bubbles are, wherever the regions on either side have
   different colours, rather than with zero width, e.g. around each term of
   an equation between coloured diagrams ([next#742]).
+
+- `optyx.channel.Diagram.from_tket` and `optyx.qubits.Circuit` convert a
+  `pytket.Circuit` to an open diagram on `qubit ** n @ bit ** m`, keeping its
+  unitary (global phase included) and routing non-adjacent gates and
+  measurements; `QubitChannel.from_discopy` gains `U1`, `Ry`, `CRy`, `CY`,
+  daggered gates, `Discard` and `Measure` ([next#296]).
+
+- Every remaining box of `optyx.qubits` loads its own tree: `Z` and `X` from
+  their boundary and `data`, `H` with no argument, `Scalar` from `data`,
+  `BitFlipError` and `DephasingError` from `prob`, `Ket` and `Bra` from
+  `value` and their boundary, and `QubitChannel` from `kraus` and `env`
+  ([next#731]).
 
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
@@ -2160,6 +2196,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py --check` fails when a notebook in `KNOWN_BROKEN`
+  executes cleanly, naming the notebook and its issue, so an exemption whose
+  bug has been fixed cannot stay silently ([next#435]).
+- Read the Docs embeds the notebooks the `build` workflow renders on `main`
+  instead of linking to their sources, still running none itself: a
+  `notebooks` job pushes them to the `rendered-notebooks` branch, whose
+  tarball `docs/export_notebooks.py` downloads when `DISCOPY_RENDERED_NOTEBOOKS`
+  names it, as `docs/conf.py` does on Read the Docs ([next#765]).
+
 - `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
   run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
   `--check` and the docs build, which give it a page linking to its source,
@@ -2467,6 +2512,7 @@ for the changelog of `1.2.1` and earlier.
 [#588]: https://github.com/discopy/discopy/pull/588
 [#590]: https://github.com/discopy/discopy/pull/590
 [#594]: https://github.com/discopy/discopy/pull/594
+[#595]: https://github.com/discopy/discopy/issues/595
 [#603]: https://github.com/discopy/discopy/pull/603
 [#606]: https://github.com/discopy/discopy/pull/606
 [#614]: https://github.com/discopy/discopy/pull/614
@@ -2612,6 +2658,7 @@ for the changelog of `1.2.1` and earlier.
 [next#293]: https://github.com/rel-int/discopy-next/issues/293
 [next#294]: https://github.com/rel-int/discopy-next/issues/294
 [next#295]: https://github.com/rel-int/discopy-next/issues/295
+[next#296]: https://github.com/rel-int/discopy-next/issues/296
 [next#297]: https://github.com/rel-int/discopy-next/issues/297
 [next#298]: https://github.com/rel-int/discopy-next/issues/298
 [next#299]: https://github.com/rel-int/discopy-next/issues/299
@@ -2703,6 +2750,7 @@ for the changelog of `1.2.1` and earlier.
 [next#539]: https://github.com/rel-int/discopy-next/pull/539
 [next#540]: https://github.com/rel-int/discopy-next/pull/540
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
+[next#542]: https://github.com/rel-int/discopy-next/issues/542
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
 [next#550]: https://github.com/rel-int/discopy-next/pull/550
@@ -2721,6 +2769,7 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#579]: https://github.com/rel-int/discopy-next/issues/579
 [next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#582]: https://github.com/rel-int/discopy-next/pull/582
@@ -2798,16 +2847,19 @@ for the changelog of `1.2.1` and earlier.
 [next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#748]: https://github.com/rel-int/discopy-next/pull/748
 [next#762]: https://github.com/rel-int/discopy-next/pull/762
+[next#765]: https://github.com/rel-int/discopy-next/pull/765
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#703]: https://github.com/rel-int/discopy-next/issues/703
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#731]: https://github.com/rel-int/discopy-next/issues/731
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
+[next#746]: https://github.com/rel-int/discopy-next/pull/746
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

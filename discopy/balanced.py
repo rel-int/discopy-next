@@ -78,7 +78,7 @@ class Ribbon(Colour):
     """
     The coloured region between the two rails of a ribbon in the dual rail
     drawing of a balanced or ribbon diagram, see :func:`double_rail`. Like
-    any :class:`discopy.monoidal.Colour` it fills the region between the two
+    any :class:`~discopy.monoidal.Colour` it fills the region between the two
     wires on either side of it; it also carries the ``width`` of the ribbon,
     i.e. how far apart its two rails are drawn. Taking the adjoint of a
     doubled type swaps the sides of each object, so the two rails stay one
@@ -443,7 +443,7 @@ class DualRail(Functor):
     a box on the rails of its ribbons and every :class:`Twist` and
     :class:`Braid` into a single box crossing the two ribbons of a wire as a
     whole. It lands in balanced :class:`Diagram`, so that a trace has
-    somewhere to go, as :class:`discopy.ribbon.DualRail` lands in ribbon
+    somewhere to go, as :class:`~discopy.ribbon.DualRail` lands in ribbon
     diagrams.
 
     Parameters:
@@ -457,7 +457,7 @@ class DualRail(Functor):
     A dual rail encoding is not determined by its maps: it sends a twist or a
     braid, and at the levels above a swap, a cup or a cap, to a box rather
     than to the same structure on the encoded wires. So it composes with no
-    functor but the identity, see :meth:`discopy.cat.Functor.then`: apply the
+    functor but the identity, see :meth:`~discopy.cat.Functor.then`: apply the
     two in turn instead.
 
     >>> x = Ty('x')
