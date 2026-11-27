@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 ADR_DIR = Path(__file__).parent.parent / "docs" / "adr"
-RECORD = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
+RECORD = re.compile(r"^([0-9]{4})-[a-z0-9-]+\.md$")
 
 
 def adr_numbers(paths):
@@ -52,6 +52,7 @@ def test_adr_malformed_filename(tmp_path):
         "0008_underscore.md",
         "0008-Upper.md",
         "adr.md",
+        "\u0660\u0660\u0660\u0661-record.md",
     ):
         with pytest.raises(ValueError, match="Malformed ADR filename"):
             adr_numbers([tmp_path / "index.md", tmp_path / bad])
