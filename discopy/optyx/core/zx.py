@@ -313,7 +313,7 @@ class Spider(diagram.Spider, ZXBox):
     @classmethod
     def from_tree(cls, tree: dict) -> "Spider":
         return cls(
-            tree['n_legs_in'], tree['n_legs_out'], tree.get('phase', 0))
+            tree['n_legs_in'], tree['n_legs_out'], tree.get('phase'))
 
     def subs(self, *args):
         phase = cat.rsubs(self.phase, *args)

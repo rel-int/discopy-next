@@ -289,7 +289,11 @@ class Mode(Ty):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        return cls(tree['n'] if 'n' in tree else len(tree['inside']))
+        if 'n' in tree:
+            return cls(tree['n'])
+        # a monoidal tree, or an outdated one listing its objects
+        return cls(len(tree['inside'] if 'inside' in tree
+                       else tree['objects']))
 
 
 class Bit(Ty):
@@ -838,7 +842,10 @@ class Box(frobenius.Box, Diagram):
     def to_tree(self) -> dict:
         tree = super().to_tree()
         if self.array is not None:
-            tree['array'] = np.asarray(self.array).tolist()
+            array = self.array
+            if hasattr(array, "detach"):  # a PyTorch tensor, maybe on a GPU
+                array = array.detach().cpu()
+            tree['array'] = np.asarray(array).tolist()
         if self.is_dagger is None:
             tree['is_dagger'] = None
         return tree

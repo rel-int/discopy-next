@@ -250,6 +250,16 @@ DIAGRAM_BOXES = [
 ]
 
 
+def test_a_mode_loads_an_outdated_tree():
+    assert Mode.from_tree({"objects": [{}, {}]}) == Mode(2)
+
+
+def test_a_box_writes_the_tree_of_a_tensor_with_a_gradient():
+    torch = pytest.importorskip("torch")
+    box = Box("f", bit, bit, array=torch.eye(2, requires_grad=True))
+    assert box.to_tree()["array"] == [[1.0, 0.0], [0.0, 1.0]]
+
+
 @pytest.mark.parametrize("box", DIAGRAM_BOXES, ids=repr)
 def test_a_diagram_box_loads_its_own_tree(box):
     from discopy.utils import dumps, loads
