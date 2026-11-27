@@ -54,6 +54,7 @@ Summary
     MarkovCategory
     ComarkovCategory
     ClosedCategory
+    ClosedMarkovCategory
     BalancedCategory
     BalancedTracedCategory
     RibbonCategory
@@ -2301,10 +2302,11 @@ class ComarkovCategory[
 
 class ClosedCategory[
         C0: ResiduatedMonoid, C1: ClosedCategory](
-            BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
+            BiclosedCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
-    A closed category is a symmetric :class:`BiclosedCategory`. We also assume
-    it comes with copy and discard so it is also a :class:`MarkovCategory`.
+    A closed category is a symmetric :class:`BiclosedCategory`, i.e. a
+    symmetric monoidal closed category, see :class:`ClosedMarkovCategory`
+    for one with copy and discard.
     """
 
     @axiom
@@ -2316,6 +2318,15 @@ class ClosedCategory[
         base = f.dom[:len(f.dom) - n]
         return cls.equation_factory(
             f.curry(n), (cls.swap(exponent, base) >> f).curry(n, left=False))
+
+
+class ClosedMarkovCategory[
+        C0: ResiduatedMonoid, C1: ClosedMarkovCategory](
+            ClosedCategory[C0, C1], MarkovCategory[C0, C1]):
+    """
+    A closed Markov category is a :class:`ClosedCategory` with copy and
+    discard, i.e. which is also a :class:`MarkovCategory`.
+    """
 
 
 class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
@@ -2560,15 +2571,20 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](
-        RibbonCategory[C0, C1], SymmetricCategory[C0, C1]):
+        RibbonCategory[C0, C1], ClosedCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
-    :class:`SymmetricCategory`, i.e. with cups, caps and swaps and where
-    the twist is the identity.
+    :class:`ClosedCategory`, i.e. with cups, caps and swaps and where
+    the twist is the identity. Its internal hom ``x ⊸ y`` is ``x* @ y``,
+    so that evaluation and currying are cups and caps, as in a
+    :class:`RigidCategory`.
     """
     @classmethod
     def twist(cls, dom: C0) -> C1:
         return cls.id(dom)
+
+    currying_symmetry = ClosedCategory.currying_symmetry.inapplicable(
+        messages.COMPACT_EXPONENTIALS)
 
     @axiom
     def reidemeister_1_cap[X: Obj[C0]](

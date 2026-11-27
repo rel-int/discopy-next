@@ -426,7 +426,7 @@ def test_Box_flags_cooperate():
     assert sample.r.l == sample and sample.r.flags() == sample.flags()
     assert eval(repr(sample), {
         'Word': Word, 'lambek': lambek, 'rigid': rigid}) == sample
-    constant = closed.Constant('c', closed.Ty('x'))
+    constant = closed.markov.Constant('c', closed.markov.Ty('x'))
     assert loads(dumps(constant)) == constant
     t = tensor.Box('t', d, d, data=[[1, 2j], [3, 4]])
     assert np.allclose(t.r.dagger().eval().array, t.r.eval().dagger().array)

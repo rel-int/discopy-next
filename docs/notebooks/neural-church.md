@@ -54,7 +54,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from discopy import symmetric
-from discopy.closed import (
+from discopy.closed.markov import (
     Abstraction, Application, Constant, Ty, Unitype, Variable)
 from discopy.python.finset import Permutation
 

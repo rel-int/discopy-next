@@ -30,7 +30,6 @@ forgetful functors between the categories go the other way.
     markov
     comarkov
     closed
-    biclosed
     linear
     rigid
     pivotal

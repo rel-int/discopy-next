@@ -350,7 +350,7 @@ def test_inherited_permutation_factory():
     from discopy import closed, markov, frobenius, tensor
 
     cases = [
-        (closed, closed.Ty("x"), closed.Ty("y")),
+        (closed.markov, closed.markov.Ty("x"), closed.markov.Ty("y")),
         (markov, markov.Ty("x"), markov.Ty("y")),
         (frobenius, frobenius.Ty("x"), frobenius.Ty("y")),
         (tensor, tensor.Dim(2), tensor.Dim(3))]

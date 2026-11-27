@@ -16,12 +16,13 @@ does not compile yet:
 - `PROP`: it extends SymmetricCategory
 - `MarkovCategory`: it extends SymmetricCategory
 - `ComarkovCategory`: it extends SymmetricCategory
-- `ClosedCategory`: it extends BiclosedCategory, MarkovCategory
+- `ClosedCategory`: it extends BiclosedCategory, SymmetricCategory
+- `ClosedMarkovCategory`: it extends ClosedCategory, MarkovCategory
 - `BalancedCategory`: ob is not declared
 - `BalancedTracedCategory`: it extends BalancedCategory, TracedCategory
 - `RibbonCategory`: it extends PivotalCategory, BalancedTracedCategory
 - `GoISituation`: it extends LinearCategory, TracedCategory, SymmetricCategory
-- `CompactCategory`: it extends RibbonCategory, SymmetricCategory
+- `CompactCategory`: it extends RibbonCategory, ClosedCategory
 - `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
 -/
 

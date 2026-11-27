@@ -117,7 +117,7 @@ from typing import ClassVar, Self
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
 from discopy.abc import (
-    BalancedCategory, BiclosedCategory, CompactCategory,
+    BalancedCategory, BiclosedCategory, ClosedCategory, CompactCategory,
     DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
     SymmetricCategory)
 from discopy.testable import (
@@ -918,7 +918,8 @@ class DualRail(balanced.DualRail, Functor):
 CMap = cmap.CMap[Diagram]
 
 for level in (
-        BiclosedCategory, RigidCategory, PivotalCategory, CompactCategory):
+        BiclosedCategory, ClosedCategory, RigidCategory, PivotalCategory,
+        CompactCategory):
     for name, law in vars(level).items():
         if isinstance(law, (Axiom, Rule)):
             setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
