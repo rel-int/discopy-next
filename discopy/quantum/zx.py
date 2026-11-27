@@ -1132,7 +1132,8 @@ class Hypergraph(hypergraph.Hypergraph):
                 :meth:`discopy.rigid.Nat.strategy` if ``None``.
             min_leaves : The minimum number of :data:`H` boxes.
             max_leaves : The maximum number of :data:`H` boxes.
-            max_scalars : The maximum number of zero-legged spiders.
+            max_scalars : The maximum number of zero-legged spiders, one
+                by default.
 
         Example
         -------
@@ -1146,6 +1147,7 @@ class Hypergraph(hypergraph.Hypergraph):
         from hypothesis import strategies as st
 
         min_boxes = min_leaves or 0
+        max_scalars = 1 if max_scalars is None else max_scalars
 
         @st.composite
         def hypergraphs(draw):

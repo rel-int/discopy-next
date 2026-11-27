@@ -768,3 +768,9 @@ def test_copy_and_supplement():
         result = rewriter.to_hypergraph()
         assert fired == [name] and result.size() == (2, 0, 0)
         assert same(contract(result), contract(graph))
+
+
+def test_hypergraph_strategy_default_scalars():
+    from hypothesis import find
+    graph = find(Hypergraph.strategy(max_scalars=None), lambda g: True)
+    assert isinstance(graph, Hypergraph)

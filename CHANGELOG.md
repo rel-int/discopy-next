@@ -9,6 +9,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `quantum.zx.Hypergraph.strategy` draws Hadamard boxes, rational phases
+  and Clifford or zero `Number` scalars ([next#43]).
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -915,10 +917,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   round-trip through `to_diagram`, `zx.Spider` writes non-dyadic `Fraction`
   phases as `Fraction(p, q)` in `__str__` (keeping `p/q` for dyadic ones) and
   exact phases in `__repr__`, and `zx.Scalar.__str__` formats its number
-  without rounding; `quantum.zx.Hypergraph.strategy` draws Hadamard boxes,
-  rational phases and Clifford or zero `Number` scalars, with regression cases
-  in `proptest/corpus/zx.py` ([next#43], [next#718]).
-
+  without rounding, with regression cases in `proptest/corpus/zx.py`
+  ([next#718]).
 - A box with as many outputs as inputs, e.g. a swap drawn as a box, draws
   each output straight down from the input above it, rather than bending the
   wire below into the next box when the labels of its inputs and outputs have
