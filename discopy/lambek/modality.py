@@ -3,14 +3,14 @@
 """
 The Lambek calculus with a relevant modality ``!L*``, i.e. the free biclosed
 category of :mod:`discopy.lambek.categorial` with the bang of
-:mod:`discopy.linear.monoidal`: a banged type ``!x`` may be copied by contraction,
-read once by dereliction and moved past any type by exchange, see
+:mod:`discopy.linear.monoidal`: a banged type ``!x`` may be copied by
+contraction, read once by dereliction and moved past any type by exchange, see
 McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
 (`arXiv:2110.10641 <https://arxiv.org/abs/2110.10641>`_).
 
-A term is a kappa term of :mod:`discopy.linear.monoidal` whose functions are words
-of exponential type, applied by :class:`Eval`: a banged variable used twice
-is copied by :class:`Contraction`, brought where it is read by
+A term is a kappa term of :mod:`discopy.linear.monoidal` whose functions are
+words of exponential type, applied by :class:`Eval`: a banged variable used
+twice is copied by :class:`Contraction`, brought where it is read by
 :class:`Exchange`, and every other variable is used once and in order.
 
 Summary
@@ -72,7 +72,8 @@ from discopy.utils import get_origin
 class Ty(bang.Ty, categorial.Ty):
     """
     A type of ``!L*``, a categorial type whose wires may be banged, called
-    on a Python function for the kappa abstraction of :mod:`discopy.linear.monoidal`.
+    on a Python function for the kappa abstraction of
+    :mod:`discopy.linear.monoidal`.
 
     Example
     -------
@@ -181,7 +182,9 @@ class Functor(bang.Functor, categorial.Functor):
 
 
 class TermBase(bang.TermBase):
-    """ A kappa term of ``!L*``, see :class:`discopy.linear.monoidal.TermBase`. """
+    """
+    A kappa term of ``!L*``, see :class:`discopy.linear.monoidal.TermBase`.
+    """
 
 
 class Variable(TermBase, bang.Variable):
