@@ -26,9 +26,9 @@ exit 1 on any FAIL. What the lines do not say:
   collected) is a SKIP.
   A change to `test/plugin.py`, `test/fixtures/` or a conftest only gets a collection check:
   run `--full` (~10 min locally, the whole suite under coverage, failures diffed with base).
-- `changelog` SKIPs when no bullet was added, even if other lines changed: add one if the
-  change is user-facing.
-  It names any of base's lines the branch removes, since a bad merge drops main's bullets.
+- `changelog` SKIPs when no `changelog.d/` fragment was added or changed: add one if the
+  change is user-facing, as CI's `changelog` workflow asks of any change to `discopy/`.
+  It fails on a misnamed fragment or a conflict marker.
 - SKIP is not PASS: say which gates skipped when you report.
 
 Cost: pylint takes ~5 min, serially, whenever `discopy/`, `.pylintrc`, `pyproject.toml` or

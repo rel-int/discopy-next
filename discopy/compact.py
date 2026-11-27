@@ -192,7 +192,7 @@ class Permutation(traced.Permutation, Box):
 
 class Swap(Permutation, traced.Swap, Box):
     """
-    A compact swap is a symmetric swap and a ribbon braid.
+    A compact swap is a symmetric swap in a compact diagram.
 
     Parameters:
         left (pivotal.Ty) : The type on the top left and bottom right.
