@@ -417,6 +417,11 @@ class Circuit(Diagram):
             raise NotImplementedError(
                 "Mixed scalar scaling in tket circuits is not supported.")
 
+        permutation = underlying_circuit.implicit_qubit_permutation()
+        if any(key != value for key, value in permutation.items()):
+            # the commands omit implicit wire swaps, so make them explicit
+            underlying_circuit = underlying_circuit.copy()
+            underlying_circuit.replace_implicit_wire_swaps()
         tk_qubits = list(underlying_circuit.qubits)
         tk_bits = list(underlying_circuit.bits)
         n_qubits = len(tk_qubits)

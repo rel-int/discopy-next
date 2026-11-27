@@ -63,6 +63,13 @@ def test_graphix():
                 phase * optyx_res[keys], graphix_result[keys], atol=1e-6)
 
 
+def _implicit_swap(circuit):
+    circuit.replace_SWAPs()
+    assert circuit.implicit_qubit_permutation() != {
+        q: q for q in circuit.qubits}
+    return circuit
+
+
 @pytest.mark.parametrize("build", [
     lambda: Circuit(1).H(0),
     lambda: Circuit(1).X(0),
@@ -85,6 +92,7 @@ def test_graphix():
     lambda: Circuit(3).CRy(0.3, 0, 2),
     lambda: Circuit(3).CU1(0.3, 2, 0),
     lambda: Circuit(3).SWAP(0, 2),
+    lambda: _implicit_swap(Circuit(3).SWAP(0, 2).CX(0, 1)),
     lambda: Circuit(2).H(0).CX(0, 1).Rz(0.3, 1).add_barrier([0, 1]).add_phase(
         0.37),
 ])
