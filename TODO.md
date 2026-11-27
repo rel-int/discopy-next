@@ -8,4 +8,4 @@
 
 - [x] Move the mixins of dataflow/__init__.py into dataflow/symmetric.py
 - [x] Add a dataflow Hypergraph with the primitives and make the functor strict
-- [WIP] @T-96926d43-2026-11-27 14:13 Add abc.DataflowCategory with its axioms, checked by the property matrix
+- [x] Add abc.DataflowCategory with its axioms, checked by the property matrix
