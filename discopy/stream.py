@@ -40,7 +40,7 @@ Monoidal streams form a feedback category as follows:
 Dataflow
 --------
 
-The diagrams of :mod:`discopy.dataflow`, e.g. the Fibonacci sequence and a
+The diagrams of :mod:`~discopy.dataflow`, e.g. the Fibonacci sequence and a
 random walk, are interpreted as streams, their head and tail those of
 :class:`Ty` and their followed-by the identity.
 

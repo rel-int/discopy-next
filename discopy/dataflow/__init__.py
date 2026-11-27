@@ -11,13 +11,14 @@ is constant. A diagram has a :attr:`StreamDiagram.head` and a
 ``x.head @ x.tail.delay()`` to ``x``, the ``fby`` of Lucid.
 
 This package holds the structure as mixins over the classes of
-:mod:`discopy.feedback`, which a level of the hierarchy takes as they are,
+:mod:`~discopy.feedback`, which a level of the hierarchy takes as they are,
 each class of the level subclassing its mixin and the class of the feedback
-level it extends: :mod:`~discopy.dataflow.symmetric` over
-:mod:`discopy.feedback.symmetric`, since monoidal streams are defined over
-symmetric categories, and :mod:`~discopy.dataflow.markov` over
-:mod:`discopy.feedback.markov`. See :mod:`discopy.stream` for their
-interpretation as streams.
+level it extends: :mod:`dataflow.symmetric <discopy.dataflow.symmetric>`
+over :mod:`feedback.symmetric <discopy.feedback.symmetric>`, since monoidal
+streams are defined over symmetric categories, and
+:mod:`dataflow.markov <discopy.dataflow.markov>` over
+:mod:`feedback.markov <discopy.feedback.markov>`. See :mod:`~discopy.stream`
+for their interpretation as streams.
 
 .. autosummary::
     :template: module.rst
@@ -378,11 +379,12 @@ class FollowedBy(feedback.Box):
 class Functor(feedback.Functor):
     """
     The mixin of a functor that sends heads, tails and followed-bys to those
-    of its codomain, e.g. :class:`discopy.stream.Stream`. Into a codomain
+    of its codomain, e.g. :class:`~discopy.stream.Stream`. Into a codomain
     that has none, they are generators, not the bubbles of their args: a
-    callable map, e.g. that of :meth:`discopy.symmetric.Diagram.to_hypergraph`,
-    is called on them, and a mapping sends them to their images and raises
-    on those it does not have rather than make them up.
+    callable map, e.g. that of
+    :meth:`~discopy.symmetric.Diagram.to_hypergraph`, is called on them, and
+    a mapping sends them to their images and raises on those it does not
+    have rather than make them up.
     """
     def __call__(self, other):
         if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy))\

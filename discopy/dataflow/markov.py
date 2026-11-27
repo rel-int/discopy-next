@@ -2,7 +2,7 @@
 
 """
 The free Markov dataflow category, i.e. Markov feedback diagrams whose wires
-carry streams with a head and a tail, see :mod:`discopy.dataflow`.
+carry streams with a head and a tail, see :mod:`~discopy.dataflow`.
 
 Summary
 -------

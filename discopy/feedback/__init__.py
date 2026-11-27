@@ -5,7 +5,7 @@ The free feedback category, i.e. diagrams with delayed feedback loops, and
 the free traced category as the case where the loop is not delayed.
 
 We follow the definition of :cite:t:`DiLavoreEtAl22`, whose head and tail of
-streams live in :mod:`discopy.dataflow`.
+streams live in :mod:`~discopy.dataflow`.
 A traced category is a feedback category whose delay is the identity: the
 wires of a feedback diagram carry a time step, and a :class:`Trace` is a
 :class:`Feedback` whose memory is not delayed.

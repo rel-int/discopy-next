@@ -35,7 +35,7 @@ A running sum feeds its output back, delayed, into its second input.
 >>> running_sum = (plus >> Copy(x)).feedback()
 >>> assert (running_sum.dom, running_sum.cod) == (x, x)
 
-See :mod:`discopy.dataflow` for the head and the tail of streams.
+See :mod:`~discopy.dataflow` for the head and the tail of streams.
 """
 
 from __future__ import annotations

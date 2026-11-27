@@ -2,7 +2,7 @@
 
 """
 The free symmetric dataflow category, i.e. symmetric feedback diagrams whose
-wires carry streams with a head and a tail, see :mod:`discopy.dataflow`.
+wires carry streams with a head and a tail, see :mod:`~discopy.dataflow`.
 
 Summary
 -------
@@ -78,12 +78,12 @@ class Wire(dataflow.StreamWire, feedback.Wire):
 
 
 class HeadOb(dataflow.HeadOb, Wire):
-    """ The head of a dataflow wire, see :class:`discopy.dataflow.HeadOb`. """
+    """ The head of a dataflow wire, see :class:`~discopy.dataflow.HeadOb`. """
 
 
 class TailOb(dataflow.TailOb, Wire):
     """
-    The tail of a dataflow wire, see :class:`discopy.dataflow.TailOb`.
+    The tail of a dataflow wire, see :class:`~discopy.dataflow.TailOb`.
 
     Example
     -------
@@ -141,17 +141,21 @@ class Sum(symmetric.Sum, Box):
 
 
 class Head(dataflow.Head, Box):
-    """ The head of a dataflow diagram, see :class:`discopy.dataflow.Head`. """
+    """
+    The head of a dataflow diagram, see :class:`~discopy.dataflow.Head`.
+    """
 
 
 class Tail(dataflow.Tail, Box):
-    """ The tail of a dataflow diagram, see :class:`discopy.dataflow.Tail`. """
+    """
+    The tail of a dataflow diagram, see :class:`~discopy.dataflow.Tail`.
+    """
 
 
 class FollowedBy(dataflow.FollowedBy, Box):
     """
     The followed-by of a dataflow type, see
-    :class:`discopy.dataflow.FollowedBy`.
+    :class:`~discopy.dataflow.FollowedBy`.
     """
 
 
@@ -159,7 +163,7 @@ class Functor(dataflow.Functor, symmetric.Functor):
     """
     A symmetric dataflow functor is a symmetric feedback functor that sends
     heads, tails and followed-bys to those of its codomain, see
-    :class:`discopy.dataflow.Functor`.
+    :class:`~discopy.dataflow.Functor`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) : Map from atomic :class:`Ty` to
