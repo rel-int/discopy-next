@@ -747,7 +747,15 @@ class Declaration[**P, T](classmethod):
         return f"{factory_name(self.category)}.{self.name}"
 
     def __hash__(self):
-        return hash((self.function, self.category, self.name))
+        """
+        The hash of the name and the category's key, the same in every
+        interpreter: the function is compared but not hashed, and the
+        category is hashed by its :func:`factory_key`, the hash of a function
+        or of a class being its address, see #506.
+        """
+        category = None if self.category is None\
+            else factory_key(self.category)
+        return hash((category, self.name))
 
     def bind(self, category: type[T]) -> Self:
         """ Bind the declaration to a concrete category. """
