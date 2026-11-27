@@ -3,7 +3,7 @@
 """
 Functions between finite sets as Python lists, read backwards: the free
 Markov category on one object, i.e. the opposite of the category of finite
-sets (see :mod:`discopy.op`), with cycles, permutations and cospans.
+sets (see :mod:`~discopy.op`), with cycles, permutations and cospans.
 
 Summary
 -------
@@ -324,9 +324,10 @@ class Permutation(Function, PROP, Groupoid, DaggerMonoidalCategory):
         ``result[offset + i] == xs[i]``.
 
         This is the wire routing of
-        :meth:`discopy.hypergraph.Hypergraph.to_diagram` and
-        :meth:`discopy.cmap.CMap.to_diagram`, which gather the domain wires
-        of each box at its offset.
+        :meth:`Hypergraph.to_diagram
+        <discopy.hypergraph.Hypergraph.to_diagram>` and
+        :meth:`CMap.to_diagram <discopy.cmap.CMap.to_diagram>`, which gather
+        the domain wires of each box at its offset.
 
         >>> Permutation.gather([3, 1], 5, offset=1)
         python.finset.Permutation((0, 3, 1, 2, 4))

@@ -2,9 +2,10 @@
 
 """
 Interaction nets :cite:p:`Lafont97`, checked against double-pushout rewriting
-in :mod:`discopy.hypergraph`, and their Geometry of Interaction token machine
+in :mod:`~discopy.hypergraph`, and their Geometry of Interaction token machine
 :cite:p:`JoyalEtAl96,Abramsky96`, checked against
-:func:`discopy.interaction.Int` over :class:`discopy.python.additive.Function`.
+:func:`~discopy.interaction.Int` over
+:class:`~discopy.python.additive.Function`.
 
 A :class:`Signature` gives each :class:`Symbol` an auxiliary arity and maps
 active pairs of symbols to right-hand-side nets. A :class:`Net` stores its
@@ -42,7 +43,7 @@ Example
 -------
 Lafont's :cite:p:`Lafont97` Fig. 11 net reduces to two parallel wires in five
 steps, matching the double-pushout normal form of
-:meth:`discopy.hypergraph.Hypergraph.normalize`:
+:meth:`~discopy.hypergraph.Hypergraph.normalize`:
 
 >>> from discopy.frobenius import Ty, Box, Hypergraph as H
 >>> from discopy.inet import Net, combinators
@@ -200,7 +201,7 @@ class Signature:
         return rhs
 
     def box(self, symbol: Symbol | str) -> frobenius.Box:
-        """Encode ``symbol`` as a :class:`discopy.frobenius.Box`."""
+        """Encode ``symbol`` as a :class:`~discopy.frobenius.Box`."""
         sym = Symbol.cast(symbol)
         x = frobenius.Ty("x")
         return frobenius.Box(
@@ -432,7 +433,7 @@ class Net:
 
     def to_hypergraph(self, n_dom: int = 0) -> frobenius.Hypergraph:
         """
-        Convert this net to a bijective :class:`discopy.frobenius.Hypergraph`
+        Convert this net to a bijective :class:`~discopy.frobenius.Hypergraph`
         with ``n_dom`` free ports in the domain and the rest in the codomain.
         """
         if not 0 <= n_dom <= len(self.free):
@@ -484,7 +485,7 @@ class Net:
         signature: Signature | None = None,
     ) -> Self:
         """
-        Decode a bijective :class:`discopy.frobenius.Hypergraph` whose boxes
+        Decode a bijective :class:`~discopy.frobenius.Hypergraph` whose boxes
         have unary domains (principal ports) into a :class:`Net`.
         """
         if not graph.is_bijective:

@@ -33,4 +33,4 @@ in the functor that trips on it.
 
 ## Status
 
-Accepted, 2026-11-22. #694, which carries it out, is open.
+Accepted, 2026-11-22.

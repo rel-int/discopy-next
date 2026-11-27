@@ -15,10 +15,11 @@ DisCoPy documentation
 
     api/syntax
     api/semantics
-    api/neural
-    api/quantum
-    api/optyx
+    api/drawing
     api/lambek
+    api/neural
+    api/optyx
+    api/quantum
 
 .. toctree::
     :caption: What is a diagram?

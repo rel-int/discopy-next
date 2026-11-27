@@ -1,28 +1,28 @@
 """
-The categories of :mod:`discopy.abc` compiled to definitions of `Lean
+The categories of :mod:`~discopy.abc` compiled to definitions of `Lean
 <https://lean-lang.org>`_, read off the classes themselves.
 
-Each :class:`discopy.testable.Declaration` of a class is evaluated on
+Each :class:`~discopy.testable.Declaration` of a class is evaluated on
 :class:`Term`, symbols that record what is done to them, instead of the
-morphisms of a category. A :class:`discopy.testable.Rule` gives an operation
+morphisms of a category. A :class:`~discopy.testable.Rule` gives an operation
 of the structure with its typing law, e.g. ``cut`` gives ``comp`` and
 ``dom (comp f g) = A ∧ cod (comp f g) = C`` for ``f : A → B`` and
-``g : B → C``, and an :class:`discopy.testable.Axiom` gives a law, a
+``g : B → C``, and an :class:`~discopy.testable.Axiom` gives a law, a
 proposition about these operations. A class compiles to a ``structure`` of
 these operations and of its abstract methods, extending those of its bases,
 with one ``def`` per law, a ``Laws`` predicate of all the laws it inherits
 and a ``Functor`` structure of the maps that preserve its operations.
 Morphisms are untyped, as in the Python: one type ``Hom`` with ``dom`` and
 ``cod`` into ``Ob``, or into the objects a class specialises its bases to,
-e.g. ``Nat`` for :class:`discopy.abc.PRO`, see :func:`ob_type`, every law
+e.g. ``Nat`` for :class:`~discopy.abc.PRO`, see :func:`ob_type`, every law
 assuming its morphisms have the boundary their annotation states, so that the
 laws of a strict structure are plain equalities.
 
 A category declares which of the laws it inherits are broken, see
-:meth:`discopy.testable.Declaration.failing`: its :func:`theory` is the
+:meth:`~discopy.testable.Declaration.failing`: its :func:`theory` is the
 conjunction of the others, the structure its diagrams are meant to be the
 free one of. The Lean package ``discolean/`` proves it of the diagrams of
-:mod:`discopy.monoidal` and checks every definition compiled here, see
+:mod:`~discopy.monoidal` and checks every definition compiled here, see
 :func:`generate`.
 
 Summary
@@ -140,7 +140,7 @@ class Term:
     def __matmul__(self, other):
         """
         The tensor, whiskering an object beside a morphism into its identity
-        as :meth:`discopy.abc.MonoidalCategory.whisker` does.
+        as :meth:`~discopy.abc.MonoidalCategory.whisker` does.
         """
         left, right = (
             apply("id", (term, ), {}, "Hom") if term.sort == "Ob"
@@ -394,7 +394,7 @@ def declarations(cls: type) -> dict[str, tuple[Declaration, Compiled]]:
 
 
 def bases(cls: type) -> list[type]:
-    """ The abstract classes of :mod:`discopy.abc` a class extends. """
+    """ The abstract classes of :mod:`~discopy.abc` a class extends. """
     return [base for base in cls.__bases__
             if base.__module__ == abc.__name__
             and issubclass(base, abc.Category)]
@@ -407,8 +407,8 @@ OBJECTS = {abc.Nat: "Nat", type(None): "Unit"}
 def ob_type(cls: type) -> str:
     """
     The Lean type of the objects of an abstract class: ``Ob``, unless it or
-    one of its bases specialises them, e.g. :class:`discopy.abc.PRO` to
-    ``Nat`` and :class:`discopy.abc.Monoid` to the single object ``Unit``.
+    one of its bases specialises them, e.g. :class:`~discopy.abc.PRO` to
+    ``Nat`` and :class:`~discopy.abc.Monoid` to the single object ``Unit``.
 
     >>> print(ob_type(abc.PROB), ob_type(abc.Group), ob_type(abc.Category))
     Nat Unit Ob
@@ -435,7 +435,7 @@ def type_arguments(cls: type, prime: str = "") -> str:
 
 
 SIGNATURE_SORTS = {"C0": "Ob", "C1": "Hom", "int": "Nat", "bool": "Bool"}
-""" The Lean type of an annotation of the methods of :mod:`discopy.abc`. """
+""" The Lean type of an annotation of the methods of :mod:`~discopy.abc`. """
 
 
 def method(cls: type, name: str) -> tuple[str, str]:
@@ -525,7 +525,7 @@ def structure(cls: type) -> str:
     ``Laws`` of the structure, extending those of its bases.
 
     Parameters:
-        cls : An abstract class, e.g. :class:`discopy.abc.Category`.
+        cls : An abstract class, e.g. :class:`~discopy.abc.Category`.
 
     >>> print(structure(abc.DaggerCategory).splitlines()[2])
       dagger : Hom → Hom
@@ -664,7 +664,8 @@ def theory(category: type, cls: type) -> str:
     structure its diagrams are meant to be the free one of.
 
     Parameters:
-        category : A concrete category, e.g. :class:`discopy.monoidal.Diagram`.
+        category : A concrete category, e.g.
+            :class:`~discopy.monoidal.Diagram`.
         cls : The abstract class whose operations it is stated with.
 
     >>> from discopy.monoidal import Diagram
@@ -694,7 +695,7 @@ THEORIES = ((monoidal.Diagram, abc.MonoidalCategory), )
 
 def generate() -> str:
     """
-    The Lean file of every class of :mod:`discopy.abc` the compiler
+    The Lean file of every class of :mod:`~discopy.abc` the compiler
     translates, in order, and of the :data:`THEORIES`, listing the classes it
     does not translate with the reason, a class whose base it does not
     translate included. Run ``python -m discopy.lean`` to print it, as
