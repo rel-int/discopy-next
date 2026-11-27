@@ -1240,8 +1240,11 @@ class Backend(ABC):
         on_edge = (1, 2) if top else (0, 3)
         inward = -1 if top else 1
         cut, label = box.frame_corner, (box.frame_corner + 2) % 4
+        canvas = params.get('boundary_color')
         outside = getattr(sides.inside[0].dom if cut < 2
-                          else sides.inside[-1].cod, "name", None)
+                          else sides.inside[-1].cod, "name", None) or (
+            "white" if canvas is None or self.is_transparent(canvas)
+            else canvas)
         if cut in on_edge:
             cx, cy = corners[cut]
             dx = 1 if cut < 2 else -1
@@ -1254,7 +1257,7 @@ class Backend(ABC):
                     a, a.shift(y=-inward * eps),
                     Point(cx - dx * eps, cy - inward * eps),
                     b.shift(x=-dx * eps), b,
-                    facecolor=outside or "white", edgecolor=TRANSPARENT)
+                    facecolor=outside, edgecolor=TRANSPARENT)
                 self.draw_polygon(a, b, facecolor=TRANSPARENT)
         if label in on_edge and box.frame_name\
                 and params.get('draw_box_labels', True):

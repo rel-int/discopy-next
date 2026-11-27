@@ -1192,10 +1192,12 @@ def test_frame_has_the_corner_of_its_variant_cut():
     class Recorder(Backend):
         def __init__(self):
             super().__init__()
-            self.polygons, self.texts = [], {}
+            self.polygons, self.texts, self.fills = [], {}, []
 
         def draw_polygon(self, *points, **params):
             self.polygons.append(points)
+            if len(points) == 5 and params.get("edgecolor") == "none":
+                self.fills.append(params["facecolor"])  # The corner patch.
 
         def draw_text(self, text, i, j, **params):
             self.texts.setdefault(text, []).append(Point(i, j))
@@ -1236,3 +1238,7 @@ def test_frame_has_the_corner_of_its_variant_cut():
     (label, ), = [recorder.texts[name]]
     assert min(xs) < label.x - text_width(name) / 2
     assert label.x + text_width(name) / 2 < max(xs)
+    # The corner cut off is painted as the canvas behind the frame.
+    recorder = Recorder()
+    W.draw(backend=recorder, asymmetry=.25, boundary_color="black")
+    assert recorder.fills == ["black"]
