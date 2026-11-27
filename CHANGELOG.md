@@ -968,6 +968,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   those of boxes and bubbles are, wherever the regions on either side have
   different colours, rather than with zero width, e.g. around each term of
   an equation between coloured diagrams ([next#742]).
+- `optyx.channel.Diagram.fix` and `power_fix` raise `ValueError` naming
+  `max_chi >= 2` when compressed contraction is asked for `max_chi=1` on a
+  network whose bond dimension exceeds one, rather than failing with
+  `LinAlgError` inside Quimb's stabilized QR, and `test_fix.py` checks
+  `max_chi=1` against the real `QuimbBackend` ([next#442]).
 
 - `optyx.channel.Diagram.from_tket` and `optyx.qubits.Circuit` convert a
   `pytket.Circuit` to an open diagram on `qubit ** n @ bit ** m`, keeping its
