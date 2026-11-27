@@ -12,3 +12,4 @@ drawing
     typst_ast
     widget
     nicer
+    optimiser

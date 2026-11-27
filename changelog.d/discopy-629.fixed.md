@@ -1,0 +1,1 @@
+`Bubble.dagger` ([#629](https://github.com/discopy/discopy/pull/629)) and the drawing of bubbles ([#431](https://github.com/discopy/discopy/pull/431), [#564](https://github.com/discopy/discopy/pull/564)).

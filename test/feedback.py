@@ -670,6 +670,13 @@ def test_free_delay_category():
         f.delay(-3)
     with raises(TypeError):
         cat.Box('f', x, y, time_step=1.5)
+    g = cat.Box('g', x, y)
+    assert str(g.bubble().delay()) == "(g).bubble().d"
+    assert eval(str(g.bubble().delay()), {'g': g}) == g.bubble().delay()
+    for time_step, error in ((-1, NotImplementedError), (1.5, TypeError)):
+        with raises(error):
+            cat.Box.from_tree(dict(f.to_tree(), time_step=time_step))
+    assert cat.Arrow.generator_factory is cat.Box
 
 
 def test_draw_the_trace_of_ribbons():

@@ -182,6 +182,8 @@ class Box(cat.Box, Arrow):
         return super().__repr__()[:-1] + time_step + ")"
 
     def __str__(self):
+        if self.args and self.time_step:
+            return str(self.reset()) + str_delayed(self.time_step)
         return super().__str__() + str_delayed(self.time_step)
 
     def to_tree(self) -> dict:
@@ -192,9 +194,8 @@ class Box(cat.Box, Arrow):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        box = super().from_tree(tree)
-        box.time_step = tree.get('time_step', 0)
-        return box
+        return super().from_tree(tree).rebuild(
+            time_step=tree.get('time_step', 0))
 
 
 class Functor(cat.Functor):
@@ -231,6 +232,6 @@ class Functor(cat.Functor):
         return super().__call__(other)
 
 
-Arrow.box_factory = Box
+Arrow.generator_factory = Arrow.box_factory = Box
 Arrow.functor_factory = Functor
 Id = Arrow.id
