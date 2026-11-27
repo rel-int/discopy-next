@@ -8,7 +8,7 @@
 
 - [x] changelog.d/ fragments compiled by towncrier: config, template, CHANGELOG.md keeps released versions
 - [x] Migrate every [Unreleased] bullet of CHANGELOG.md into a fragment
-- [ ] CI check: a PR touching discopy/ adds a fragment, label no-changelog opts out
+- [x] CI check: a PR touching discopy/ adds a fragment, label no-changelog opts out
 - [ ] Repoint the tooling that reads [Unreleased]: checkboxes finish, next-checks changelog gate, merge-main driver, CONTRIBUTING, AGENTS
 - [ ] Rename ADRs 0001-0011 to YYYY-MM-DD-slug.md, update index.md and every reference
 - [ ] Repurpose test/adr.py: dated-slug filenames, every ADR cross-reference resolves
