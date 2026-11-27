@@ -645,7 +645,9 @@ def test_Bubble_no_common_boundary():
         Bubble()
 
 
-ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
+ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized",
+            # the mixins of discopy.dataflow, boxes of no category of their own
+            "dataflow.Head", "dataflow.Tail", "dataflow.FollowedBy")
 
 
 @cache
@@ -778,7 +780,8 @@ def example(cls, value):
     from discopy.quantum import circuit, gates
     from discopy.rigid import Nat
     from discopy.utils import factory_name
-    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT:
+    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT\
+            or factory_name(cls) in ABSTRACT:
         return None
     templates = {name: template for key, template in EXAMPLES.items()
                  for name in globs(key)}

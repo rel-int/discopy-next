@@ -87,3 +87,12 @@ def test_stream_boxes_raise_into_a_codomain_without_streams():
             F(term)
     G = Functor({x: int, x.head: int}, {}, cod=python.Function)
     assert G(x.head) == G(x)
+
+
+def test_HeadOb_TailOb_dagger():
+    x = Ty(Wire('x', is_constant=False))
+    for term in (x.head, x.tail, x.head.delay(2), x.tail.delay()):
+        assert term.dagger().dagger() == term
+        assert type(term.dagger().inside[0]) is type(term.inside[0])
+    with raises(TypeError):
+        Wire('x', is_constant=1)

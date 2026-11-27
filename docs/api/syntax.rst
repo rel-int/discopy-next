@@ -13,7 +13,7 @@ symmetry, then copies; going right along a row adds structure to the
 category: ``feedback`` a delay and a trace, ``closed`` exponentials,
 ``feedback.closed`` both, and the last column duals, whose trace at delay
 zero is a cap and a cup; ``linear`` beside the plain levels adds a bang, and
-``dataflow`` beside ``feedback`` the head, tail and followed-by of streams. A module imports the
+``dataflow`` beside ``feedback`` adds the head, tail and followed-by of streams. A module imports the
 ones above it in its column, and ``feedback.closed`` imports ``feedback`` and
 ``closed`` on its row, but ``linear``, ``feedback`` and ``closed`` import
 nothing from one another; forgetful functors between the categories go the

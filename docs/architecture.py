@@ -15,25 +15,28 @@ PICTURES = DOCS / "_static" / "architecture"
 HEAD = [
     ("plain", None, ""), ("linear", "linear", "a bang"),
     ("feedback", "feedback", "a delay and a trace"),
+    ("dataflow", "dataflow", "head, tail, fby"),
     ("closed", "closed", "exponentials"),
     ("feedback.closed", "feedback.closed", "both"),
     ("duals", None, "trace = cups at delay 0")]
 GRID = [
-    [["cat"], ["linear.cat"], ["feedback.cat"], [], [], []],
-    [["monoidal"], ["linear.monoidal"], ["feedback"],
+    [["cat"], ["linear.cat"], ["feedback.cat"], [], [], [], []],
+    [["monoidal"], ["linear.monoidal"], ["feedback"], [],
      ["closed.monoidal"], ["feedback.closed.monoidal"], ["pivotal"]],
-    [["spacial"], [], [], ["rigid"], [], []],
-    [["braided"], [], [], [], [], []],
-    [["balanced"], [], ["feedback.balanced"], [],
+    [["spacial"], [], [], [], ["rigid"], [], []],
+    [["braided"], [], [], [], [], [], []],
+    [["balanced"], [], ["feedback.balanced"], [], [],
      ["feedback.closed.balanced"], ["ribbon"]],
     [["symmetric"], ["linear.symmetric"], ["feedback.symmetric"],
-     ["closed.symmetric"], ["feedback.closed.symmetric"], ["compact"]],
+     ["dataflow.symmetric"], ["closed.symmetric"],
+     ["feedback.closed.symmetric"], ["compact"]],
     [["markov", "comarkov"], ["linear.markov"],
-     ["feedback.markov", "feedback.comarkov"],
+     ["feedback.markov", "feedback.comarkov"], ["dataflow.markov"],
      ["closed.markov"], ["feedback.closed.markov"], ["frobenius"]],
 ]
 LABELS = {
-    "<<": "ev", ">>": "ev", "**": "ev", "__call__": "ev", "lambda": "λ"}
+    "<<": "ev", ">>": "ev", "**": "ev", "__call__": "ev", "lambda": "λ",
+    "FollowedBy(x)": "fby"}
 
 
 def picture(name):
@@ -77,6 +80,11 @@ def picture(name):
         return (m.Copy(x) >> x @ f).trace()
     if name == "feedback.comarkov":
         return (f @ x >> m.Merge(x)).trace(left=True)
+    if name == "dataflow.symmetric":
+        return m.FollowedBy(m.Ty(m.Wire("x", is_constant=False)))
+    if name == "dataflow.markov":
+        return (m.FollowedBy(x) >> m.Copy(x)).feedback(
+            dom=x.head, cod=x, mem=x)
     if name == "closed.monoidal":
         return m.Eval(x << x)
     if name == "closed.symmetric":
@@ -108,7 +116,8 @@ def picture(name):
 
 
 def draw(name):
-    """ Draw the picture of a module, with ``ev`` and ``λ`` as labels. """
+    """ Draw the picture of a module, with ``ev``, ``λ`` and ``fby`` as
+    labels. """
     drawing = picture(name).to_drawing()
     for node in drawing.nodes:
         if node.kind == "box":

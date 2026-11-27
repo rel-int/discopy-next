@@ -65,7 +65,8 @@ from typing import ClassVar
 
 from discopy import feedback, messages
 from discopy.abc import DaggerCategory
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import (
+    AxiomError, assert_isinstance, factory_name, from_tree)
 
 
 class StreamWire(feedback.Wire):
@@ -82,6 +83,7 @@ class StreamWire(feedback.Wire):
     tail_factory: ClassVar[type]
 
     def __init__(self, *args, is_constant: bool = True, **params):
+        assert_isinstance(is_constant, bool)
         super().__init__(*args, **params)
         self.is_constant = is_constant
 
@@ -160,6 +162,17 @@ class HeadOb(StreamWire):
     def reset(self):
         return type(self)(self.arg)
 
+    def dagger(self):
+        """
+        The dagger of the head of a wire, the head of its dagger.
+
+        >>> from discopy.dataflow.symmetric import Ty, Wire
+        >>> x = Ty(Wire('x', is_constant=False))
+        >>> assert x.head.delay().dagger() == x[::-1].head.delay()
+        >>> assert x.tail.dagger() == x[::-1].tail
+        """
+        return type(self)(self.arg.dagger(), self.time_step)
+
     @property
     def head(self):
         return None if self.time_step else self
@@ -205,8 +218,9 @@ class TailOb(StreamWire):
         super().__init__(
             f"{arg}.{self.part}", time_step=time_step, is_constant=False)
 
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
+    delay, reset, dagger = HeadOb.delay, HeadOb.reset, HeadOb.dagger
+    __repr__, to_tree = HeadOb.__repr__, HeadOb.to_tree
+    from_tree = classmethod(HeadOb.from_tree.__func__)
 
 
 class StreamTy(feedback.Ty):

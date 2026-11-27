@@ -227,8 +227,9 @@ NO_TREE_DRAWING = "A drawing has no tree: it is the layout of a diagram, "\
 NO_TREE_PARAMS = "A tensor functor with params or a contractor has no "\
     "tree: they go to the einsum of a backend verbatim, which a file should "\
     "not reach."
-NO_DATAFLOW = "{} has no head, tail or followed-by: a dataflow diagram "\
-    "maps only into streams, e.g. discopy.stream.Stream."
+NO_DATAFLOW = "{} has no head, tail or followed-by: a dataflow functor into "\
+    "it needs them in its mapping, or a codomain of streams, e.g. "\
+    "discopy.stream.Stream."
 NO_TREE_STREAM = "A stream has no tree: its later is what a Python callable "\
     "returns or, for a constant stream, itself, which JSON cannot hold."
 NO_SUCH_TYPE = "No type named {!r} in builtins or numpy, so the name of the "\
