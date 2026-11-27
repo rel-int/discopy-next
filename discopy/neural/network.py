@@ -42,9 +42,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Functor
     Unroll
     Lens
@@ -197,7 +194,7 @@ class Dims(monoidal.Ty):
 
     __str__ = __repr__
 
-    delay, head, tail = Dim.delay, Dim.head, Dim.tail
+    delay = Dim.delay
 
     def check(self, *tensors) -> None:
         """
@@ -1025,8 +1022,7 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Network, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor
 Network.copy_factory, Network.merge_factory = Copy, Merge

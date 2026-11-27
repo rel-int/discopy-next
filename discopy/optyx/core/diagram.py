@@ -208,7 +208,7 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
+    monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
@@ -254,9 +254,6 @@ class Ob(frobenius.Wire):
     Basic object in an optyx Diagram: bit or mode, delayed as a stream is,
     with a time step.
     """
-
-
-HeadOb, TailOb = feedback.structural_wires(Ob)
 
 
 @factory

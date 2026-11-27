@@ -26,6 +26,7 @@ from discopy import (
     cmap,
     interaction,
     feedback,
+    dataflow,
     stream,
     para,
     lens,

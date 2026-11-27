@@ -23,9 +23,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
 
@@ -121,8 +118,7 @@ class Functor(comarkov.Functor, symmetric.Functor):
     dom = cod = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.merge_factory = Merge

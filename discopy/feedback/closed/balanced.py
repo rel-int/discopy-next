@@ -44,9 +44,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
 """
@@ -60,7 +57,7 @@ from discopy.feedback import balanced
 from discopy.feedback.closed import monoidal as planar
 # pylint: disable-next=unused-import
 from discopy.feedback.closed.monoidal import (  # noqa: F401
-    Wire, HeadOb, TailOb, Ty, Exp, Over, Under, Equation)
+    Wire, Ty, Exp, Over, Under, Equation)
 
 
 @factory
@@ -128,8 +125,7 @@ for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
     setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
         messages.CURRY_HAS_NO_DAGGER))
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval

@@ -30,8 +30,6 @@ Summary
     :toctree:
 
     Wire
-    HeadOb
-    TailOb
     Ty
     Exp
     Over
@@ -45,9 +43,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
 """
@@ -68,9 +63,6 @@ from discopy.utils import factory_name
 
 class Wire(feedback.Wire, closed.monoidal.Wire):
     """ A closed feedback object is a closed object with a time step. """
-
-
-HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -315,8 +307,7 @@ for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
     setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
         messages.CURRY_HAS_NO_DAGGER))
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval

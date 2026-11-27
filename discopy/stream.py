@@ -37,72 +37,12 @@ Monoidal streams form a feedback category as follows:
 .. image:: /_static/stream/feedback-to-stream.svg
     :align: center
 
-Fibonacci
----------
+Dataflow
+--------
 
-We can define the Fibonacci sequence as a Markov diagram, which is a feedback
-diagram, interpreted in the category of streams of python types and functions.
-
->>> from discopy import *
->>> from discopy.feedback.markov import *
-
->>> X = Ty('X')
->>> fby, wait = FollowedBy(X), Swap(X, X.d).feedback()
->>> zero, one = Box('zero', Ty(), X.head), Box('one', Ty(), X.head)
->>> copy, plus = Copy(X), Box('plus', X @ X, X)
-
->>> @Diagram.feedback
-... @Diagram.from_callable(X.d, X @ X)
-... def fib(x):
-...     y = fby(zero(), plus.d(fby.d(one.d(), wait.d(x)), x))
-...     return (y, y)
-
->>> fib_ = (copy.d >> one.d @ wait.d @ X.d
-...                >> fby.d @ X.d
-...                >> plus.d
-...                >> zero @ X.d
-...                >> fby >> copy).feedback()
->>> assert Equation(fib.arg, fib_.arg)
->>> fib_.draw(wire_labels=False, figsize=(5, 5),
-...           doctest="docs/_static/stream/fibonacci-feedback.svg")
-
-.. image:: /_static/stream/fibonacci-feedback.svg
-    :align: center
-
->>> cod = stream.Stream[python.Function]
->>> F = Functor(
-...     ob_map={X: int},
-...     ar_map={zero: cod.singleton(python.Function(lambda: 0, (), int)),
-...         one: cod.singleton(python.Function(lambda: 1, (), int)),
-...         plus: lambda x, y: x + y}, cod=cod)
->>> assert F(fib).unroll(9).now()[:10] == (0, 1, 1, 2, 3, 5, 8, 13, 21, 34)
-
-Random walk
------------
-
-We can define a simple random walk as a feedback diagram interpreted in the
-category of streams of python types and probabilistic functions.
-
->>> from random import choice, seed; seed(420)
->>> rand = Box('rand', Ty(), X)
->>> F.ar_map[rand] = lambda: choice([-1, +1])
-
->>> @Diagram.feedback
-... @Diagram.from_callable(X.d, X @ X)
-... def walk(x):
-...     x = plus.d(rand.d(), x)
-...     x = fby(zero(), x)
-...     return (x, x)
-
->>> walk.draw(wire_labels=False, figsize=(5, 5),
-...           doctest="docs/_static/stream/random-walk-feedback.svg")
-
-.. image:: /_static/stream/random-walk-feedback.svg
-    :align: center
-
->>> assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 2, 1, 0, -1, 0, 1)
->>> assert F(walk).unroll(9).now()[:10] == (0, -1, -2, -1, 0, 1, 0, 1, 2, 1)
->>> assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 0, 1, 0, -1, 0, -1)
+The diagrams of :mod:`discopy.dataflow`, e.g. the Fibonacci sequence and a
+random walk, are interpreted as streams, their head and tail those of
+:class:`Ty` and their followed-by the identity.
 
 Axioms
 ------

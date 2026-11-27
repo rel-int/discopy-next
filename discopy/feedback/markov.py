@@ -2,7 +2,7 @@
 
 """
 The free Markov feedback category, i.e. Markov diagrams with feedback, whose
-wires carry a time step: the syntax of streams, see :mod:`discopy.stream`.
+wires carry a time step, interpreted as streams by :mod:`discopy.stream`.
 
 Summary
 -------
@@ -23,24 +23,19 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
 
 Example
 -------
->>> x = Ty('x')
->>> zero = Box('0', Ty(), x.head)
->>> rand = Box('rand', Ty(), x)
->>> plus = Box('+', x @ x, x)
->>> walk = (rand.delay() @ x.delay() >> zero @ plus.delay()
-...         >> FollowedBy(x) >> Copy(x)).feedback()
->>> walk.draw(doctest="docs/_static/feedback/feedback-random-walk.svg")
+A running sum feeds its output back, delayed, into its second input.
 
-.. image:: /_static/feedback/feedback-random-walk.svg
-    :align: center
+>>> x = Ty('x')
+>>> plus = Box('+', x @ x.delay(), x)
+>>> running_sum = (plus >> Copy(x)).feedback()
+>>> assert (running_sum.dom, running_sum.cod) == (x, x)
+
+See :mod:`discopy.dataflow` for the head and the tail of streams.
 """
 
 from __future__ import annotations
@@ -145,8 +140,7 @@ class Functor(markov.Functor, symmetric.Functor):
     dom = cod = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.copy_factory = Copy

@@ -950,8 +950,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
 
     def delay(self, n_steps: int = 1) -> Self:
         """
-        The identity: a type whose atoms are not wires has no time step, so
-        its :attr:`head` and :attr:`tail` are itself too, see
+        The identity: a type whose atoms are not wires has no time step, see
         :class:`discopy.feedback.Ty`.
 
         Parameters:
@@ -959,12 +958,10 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
 
         Example
         -------
-        >>> assert Nat(2).delay() == Nat(2).head == Nat(2).tail == Nat(2)
+        >>> assert Nat(2).delay() == Nat(2)
         """
         del n_steps
         return self
-
-    head = tail = property(lambda self: self)
 
     def to_tree(self):
         return {'factory': factory_name(type(self)), 'n': self.n}
@@ -1033,7 +1030,7 @@ class Dim(Ty):
         """
         return ", ".join(map(str, self.inside)) or "1"
 
-    delay, head, tail = Nat.delay, Nat.head, Nat.tail
+    delay = Nat.delay
 
     def to_tree(self) -> dict:
         return {'factory': factory_name(type(self)),

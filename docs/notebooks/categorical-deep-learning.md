@@ -230,29 +230,33 @@ in_time(unrolled).reparam(Diagram.copy(P, 4)).inside.simplify()
 ```
 
 That ties the weights of a finite prefix, chosen after unrolling.
-To tie them across every time step, the parameter becomes a constant stream: read once at time zero, then followed by its own copy, i.e. [`FollowedBy`](../../_api/discopy.feedback.FollowedBy.html) from `P.head @ P.delay()` to `P` and a `copy` fed back.
+To tie them across every time step, the parameter becomes a constant stream: read once at time zero, then followed by its own copy.
+A wire with a head and a tail is a [dataflow](../../_api/discopy.dataflow.html) wire, so the cell is drawn in `dataflow.markov`, with [`FollowedBy`](../../_api/discopy.dataflow.markov.FollowedBy.html) from `P.head @ P.delay()` to `P` and a `copy` fed back.
 The cell reads it at every step like any other input:
 
 ```python {.marimo}
-from discopy.feedback.markov import FollowedBy
+from discopy.dataflow import markov as dataflow
 
-always = (FollowedBy(P) >> Diagram.copy(P)).feedback(
-    dom=P.head, cod=P, mem=P)
-weighted = Box("mealy", I @ P @ S.delay(), O @ S)
-tied_in_time = I @ always >> weighted.feedback(dom=I @ P, cod=O, mem=S)
+In, Out, State, Param = map(dataflow.Ty, "IOSP")
+always = (dataflow.FollowedBy(Param) >> dataflow.Diagram.copy(Param)).feedback(
+    dom=Param.head, cod=Param, mem=Param)
+weighted = dataflow.Box("mealy", In @ Param @ State.delay(), Out @ State)
+tied_in_time = In @ always >> weighted.feedback(
+    dom=In @ Param, cod=Out, mem=State)
 tied_in_time
 ```
 
 Over streams, `P` is a constant stream of types, and unrolling gives a network with one parameter, copied to every step:
 
 ```python {.marimo}
-P_always = stream.Ty(symmetric.Ty("P"))
-to_streams = markov.Functor(
-    ob_map=sequences | {P: P_always},
-    ar_map={weighted: stream.Stream[Diagram].sequence(
-        "mealy", sequences[I] @ P_always @ sequences[S].delay(),
-        sequences[O] @ sequences[S])},
-    cod=stream.Stream[Diagram])
+Streams = stream.Stream[Diagram]
+I_s, O_s, S_s = (Streams.ob.sequence(str(x)) for x in (I, O, S))
+P_always = Streams.ob(Ty("P"))
+to_streams = dataflow.Functor(
+    ob_map={In: I_s, Out: O_s, State: S_s, Param: P_always},
+    ar_map={weighted: Streams.sequence(
+        "mealy", I_s @ P_always @ S_s.delay(), O_s @ S_s)},
+    cod=Streams)
 everywhere = to_streams(tied_in_time).unroll(2).now
 assert [str(x) for x in everywhere.dom] == ["I0", "P", "I1", "I2"]
 everywhere.foliation()

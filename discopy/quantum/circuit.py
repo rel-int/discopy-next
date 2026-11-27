@@ -14,8 +14,6 @@ Summary
     Wire
     Digit
     Qudit
-    HeadOb
-    TailOb
     Ty
     Circuit
     Box
@@ -74,7 +72,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import ClassVar
 
-from discopy import feedback, messages, tensor, frobenius
+from discopy import messages, tensor, frobenius
 from discopy.cat import factory
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
@@ -92,15 +90,14 @@ class Wire(frobenius.Wire):
     Note
     ----
     This class can only be instantiated via its subclasses :class:`Digit` and
-    :class:`Qudit`, and as the :class:`HeadOb` or :class:`TailOb` of one,
-    with its dimension, but feel free to open a pull-request if you discover
-    a third kind of information unit.
+    :class:`Qudit`, but feel free to open a pull-request if you discover a
+    third kind of information unit.
     """
+    is_quantum: ClassVar[bool]
+
     def __init__(self, name: str, dim=2, z=0, **params):
-        assert_isinstance(self, (Digit, Qudit, HeadOb, TailOb))
-        if isinstance(self, (HeadOb, TailOb)):
-            dim = self.arg.dim  # pylint: disable=no-member  # set before
         assert_isinstance(dim, int)
+        assert_isinstance(self, (Digit, Qudit))
         if dim < 2:
             raise ValueError
         self.dim = dim
@@ -108,18 +105,6 @@ class Wire(frobenius.Wire):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dim}{self.repr_time_step()})"
-
-    @property
-    def is_quantum(self) -> bool:
-        """
-        Whether the wire is a :class:`Qudit`, or the head or the tail of one,
-        which is of the same kind and dimension as its argument.
-
-        >>> assert qubit.head.inside[0].is_quantum
-        >>> assert not bit.head.inside[0].is_quantum
-        >>> assert qubit.head.inside[0].dim == 2
-        """
-        return self.arg.is_quantum  # pylint: disable=no-member  # a head
 
     def atoms(self) -> list:
         """ A circuit object names no atom, its module binds it: qubit. """
@@ -129,8 +114,7 @@ class Wire(frobenius.Wire):
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
         return cls(  # ty: ignore[missing-argument]
-            dim=dim, z=z, time_step=tree.get('time_step', 0),
-            is_constant=tree.get('is_constant', True))
+            dim=dim, z=z, time_step=tree.get('time_step', 0))
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -177,9 +161,6 @@ class Qudit(Wire):
 
     __setstate__ = Digit.__setstate__
     is_quantum = True
-
-
-HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory

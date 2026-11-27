@@ -16,8 +16,6 @@ Summary
     :toctree:
 
     Wire
-    HeadOb
-    TailOb
     Ty
     Nat
     Dim
@@ -34,9 +32,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Functor
     Equation
 
@@ -136,9 +131,6 @@ class Wire(pivotal.Wire):
 
     r = l
     windings = (0, )
-
-
-HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -1009,8 +1001,7 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 for name in ("map_agreement", "term_factory"):
     setattr(Diagram, name, vars(markov.Diagram)[name])
 Diagram.box_factory = Box

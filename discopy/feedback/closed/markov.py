@@ -20,8 +20,6 @@ Summary
     :toctree:
 
     Wire
-    HeadOb
-    TailOb
     Ty
     Exp
     Product
@@ -42,9 +40,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
 """
@@ -66,9 +61,6 @@ from discopy.utils import factory_name, from_tree
 
 class Wire(feedback.Wire, closed.markov.Wire):
     """ A closed feedback object is a closed object with a time step. """
-
-
-HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -116,8 +108,7 @@ class Product(closed.markov.Product, Wire):
 
     def __eq__(self, other):
         return closed.markov.Product.__eq__(self, other)\
-            and (self.time_step, self.is_constant)\
-            == (other.time_step, other.is_constant)
+            and self.time_step == other.time_step
 
     def __hash__(self):
         return hash(repr(self))
@@ -137,8 +128,7 @@ class Product(closed.markov.Product, Wire):
     @classmethod
     def from_tree(cls, tree):
         return cls(*map(from_tree, tree['factors']),
-                   time_step=tree.get('time_step', 0),
-                   is_constant=tree.get('is_constant', True))
+                   time_step=tree.get('time_step', 0))
 
 
 class Unitype(closed.markov.Unitype, Exp):
@@ -148,7 +138,6 @@ class Unitype(closed.markov.Unitype, Exp):
 
     Parameters:
         time_step : The number of times the unitype has been delayed.
-        is_constant : Whether the unitype is a constant stream.
 
     Example
     -------
@@ -156,24 +145,21 @@ class Unitype(closed.markov.Unitype, Exp):
     >>> assert U == U >> U
     >>> assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
     """
-    def __init__(self, time_step: int = 0, is_constant: bool = True):
+    def __init__(self, time_step: int = 0):
         monoidal.Wire.__init__(self, "U")
-        self.time_step, self.is_constant = time_step, is_constant
-        self.base = self.exponent = Ty(
-            Unitype(is_constant=is_constant) if time_step else self)
+        self.time_step = time_step
+        self.base = self.exponent = Ty(Unitype() if time_step else self)
 
     def __eq__(self, other):
         return isinstance(other, Exp)\
-            and (self.time_step, self.is_constant)\
-            == (other.time_step, other.is_constant)\
+            and self.time_step == other.time_step\
             and (isinstance(other, Unitype) or (
                 other.base, other.exponent) == (self.base, self.exponent))
 
     def __hash__(self):
         return hash(Exp(
             self.base,  # ty: ignore[invalid-argument-type]
-            self.exponent, time_step=self.time_step,
-            is_constant=self.is_constant))
+            self.exponent, time_step=self.time_step))
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
@@ -188,11 +174,11 @@ class Unitype(closed.markov.Unitype, Exp):
 
     def to_tree(self):
         return {'factory': factory_name(type(self)),
-                'time_step': self.time_step, 'is_constant': self.is_constant}
+                'time_step': self.time_step}
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(tree.get('time_step', 0), tree.get('is_constant', True))
+        return cls(tree.get('time_step', 0))
 
 
 @factory
@@ -441,9 +427,8 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-for structural in (Feedback, Feedforward, Head, Tail):
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
+for structural in (Feedback, Feedforward):
     structural.is_linear = property(lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
 Diagram.pack_factory = Pack

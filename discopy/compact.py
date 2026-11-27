@@ -32,9 +32,6 @@ Summary
     Feedback
     Feedforward
     Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     DualRail
@@ -247,8 +244,7 @@ CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
+Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
