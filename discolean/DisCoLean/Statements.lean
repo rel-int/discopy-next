@@ -3,6 +3,9 @@ import DisCoLean.Statements.Premonoidal
 import DisCoLean.Statements.English
 import DisCoLean.Statements.Coherence
 import DisCoLean.Statements.Terms
+import DisCoLean.Statements.Isotopy
+import DisCoLean.Statements.Drawing
+import DisCoLean.Statements.Layout
 
 /-!
 # What is proved about the model of `discopy.egraph`

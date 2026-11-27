@@ -15,6 +15,7 @@ import json
 import os
 import pathlib
 import subprocess
+from fractions import Fraction
 
 import pytest
 from hypothesis import HealthCheck, Phase, given, seed, settings
@@ -145,3 +146,55 @@ def test_premonoidal(random_seed, strategy):
             expected.offsets), case
     print(f"{strategy.__name__}: {len(drawn_cases)} agree under seed "
           f"{random_seed}, {len(set(map(json.dumps, drawn_cases)))} distinct")
+
+
+def node_x(drawing, kind: str, **data) -> Fraction:
+    """ The ``x`` of the node of a drawing of that kind and data. """
+    node, = (n for n in drawing.nodes if n.kind == kind and all(
+        n.data.get(key) == value for key, value in data.items()))
+    return Fraction(drawing.positions[node].x)
+
+
+@st.composite
+def layouts(draw) -> dict:
+    """ One to five boxes of up to three wires on each side, to lay out:
+    wider than those of :func:`diagrams`, so that ``make_space`` spreads the
+    inputs of a box and ``reposition_box_cod`` recentres its outputs. """
+    dom = draw(st.lists(st.just("x"), max_size=3))
+    cod, boxes = dom, []
+    for _ in range(draw(st.integers(1, 5))):
+        offset = draw(st.integers(0, len(cod)))
+        width = draw(st.integers(0, min(3, len(cod) - offset)))
+        box = {"name": "f", "offset": offset,
+               "dom": cod[offset:offset + width],
+               "cod": ["x"] * draw(st.integers(0, 3))}
+        cod = cod[:offset] + box["cod"] + cod[offset + width:]
+        boxes.append(box)
+    return {"op": "layout", "f": {"dom": dom, "cod": cod, "boxes": boxes}}
+
+
+@pytest.mark.parametrize("random_seed", SEEDS)
+def test_layout(random_seed):
+    """ The layout of the model is that of ``to_drawing``, node for node. """
+    drawn_cases = drawn(layouts(), random_seed)
+    for case, result in zip(drawn_cases, answers(drawn_cases)):
+        drawing = decode(case["f"]).to_drawing()
+        rows = [{key: [Fraction(*q) for q in value] if key != "box"
+                 else Fraction(*value) for key, value in row.items()}
+                for row in result["rows"]]
+        assert Fraction(*result["width"]) == Fraction(drawing.width), case
+        assert len(rows) == drawing.height, case
+        for j, row in enumerate(rows):
+            assert row["box"] == node_x(drawing, "box", j=j), case
+            for side, kind in [("dom", "box_dom"), ("cod", "box_cod")]:
+                assert row[side] == [node_x(drawing, kind, i=i, j=j)
+                                     for i in range(len(row[side]))], case
+        ends = [("dom", rows[0], "dom"), ("cod", rows[-1], "cod")]
+        for side, row, key in ends:
+            ports = row["left"] + row[side] + row["right"]
+            assert ports == [node_x(drawing, key, i=i)
+                             for i in range(len(ports))], case
+        assert all(drawing.positions[u].x == drawing.positions[v].x
+                   for u, v in drawing.edges
+                   if "box" not in (u.kind, v.kind)), case
+    print(f"layout: {len(drawn_cases)} agree under seed {random_seed}")

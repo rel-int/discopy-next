@@ -51,6 +51,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `monoidal` evaluates to a diagram of its context, which a diagram with one
   output reads back from, box for box ([next#705]).
 
+- `discolean/` models the tween of `Drawing.interpolate` on two boxes: separated
+  along one side in both drawings they stay apart, and the straight-line tween
+  of an interchanger can overlap them, with a counterexample; and the layered
+  drawing of a diagram, one strip per layer on a grid, is plane and a functor of
+  strict premonoidal categories; and the layout of `to_drawing`, modelled
+  exactly with `make_space`, `stretch` and the recentering of the outputs of
+  each box and checked against the Python by a differential test, is plane,
+  `make_space` never bringing two points closer and the loop of `Drawing.then`
+  aligning the wires it composes ([next#711]).
+
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
   those of a strict premonoidal category, `tensor_whiskering` broken on Markov
@@ -2830,6 +2840,7 @@ for the changelog of `1.2.1` and earlier.
 [next#707]: https://github.com/rel-int/discopy-next/pull/707
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
 [next#709]: https://github.com/rel-int/discopy-next/pull/709
+[next#711]: https://github.com/rel-int/discopy-next/pull/711
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
 [next#715]: https://github.com/rel-int/discopy-next/pull/715

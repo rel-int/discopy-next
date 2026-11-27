@@ -1,10 +1,12 @@
 import Lean.Data.Json
 import DisCoLean.Premonoidal.Functor
+import DisCoLean.Layout.Model
 
 /-!
 The model of diagrams as an oracle: a case names an operation and its
 arguments, `{"op": "then", "f": ..., "g": ...}`, or a functor into diagrams
-by its images of wires and boxes, `{"op": "functor", "ob": ..., "ar": ..., "f": ...}`, a diagram is written as
+by its images of wires and boxes, `{"op": "functor", "ob": ..., "ar": ..., "f": ...}`, or the
+layout `to_drawing` gives a diagram, `{"op": "layout", "f": ...}`, a diagram is written as
 `Diagram.encode` writes it, `{"dom": ["x"], "boxes": [{"name": "f",
 "dom": ["x"], "cod": ["y"], "offset": 0}]}`, and so is the answer, with its
 codomain.
@@ -54,6 +56,20 @@ def encode (f : Diagram Named) : Json :=
       ("name", toJson layer.box.1), ("dom", toJson layer.box.2.1),
       ("cod", toJson layer.box.2.2), ("offset", toJson layer.left.length)])]
 
+/-- A rational as its numerator and denominator. -/
+def rat (q : Rat) : Json := Json.arr #[toJson q.num, toJson q.den]
+
+/-- The layout of a diagram: its rows from top to bottom, each with the `x`
+of every node, and its width. -/
+def layoutJson (f : Diagram Named) : Json :=
+  match f.layout with
+  | none => Json.null
+  | some T => Json.mkObj [("width", rat T.width), ("rows", Json.arr (T.rows.toArray.map
+      fun r => Json.mkObj [("left", Json.arr (r.left.toArray.map rat)),
+        ("dom", Json.arr (r.dom.toArray.map rat)), ("box", rat r.box),
+        ("cod", Json.arr (r.cod.toArray.map rat)),
+        ("right", Json.arr (r.right.toArray.map rat))]))]
+
 def answer (op : String) (case : Json) : Except String Json := do
   let f ← parse (← case.getObjVal? "f")
   match op with
@@ -61,6 +77,7 @@ def answer (op : String) (case : Json) : Except String Json := do
     let g ← parse (← case.getObjVal? "g")
     if f.cod = g.dom then return encode (f.comp g)
     throw "the diagrams do not compose"
+  | "layout" => return layoutJson f
   | "tensor" => return encode (f.tensor (← parse (← case.getObjVal? "g")))
   | "whisker_left" =>
     return encode (Diagram.whiskerLeft (← case.getObjValAs? (List String) "ob") f)
