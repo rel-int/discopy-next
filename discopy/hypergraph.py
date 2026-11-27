@@ -326,8 +326,8 @@ class Hypergraph[category](
             closed, compact, feedback, frobenius, markov, symmetric)
         from discopy.lambek import abstract
         return tuple(category.Diagram for category in (
-            symmetric, markov, compact, frobenius, closed, feedback,
-            abstract))
+            symmetric, markov, compact, frobenius, closed.symmetric,
+            closed.markov, feedback, abstract))
 
     MAX_ARITY = 3
     """ The largest number of ports :meth:`strategy` samples for a box. """
@@ -888,7 +888,8 @@ class Hypergraph[category](
         constructor call rather than being composed pair by pair; a category
         overriding it gets the nest its own factory builds.
 
-        >>> from discopy import frobenius, markov
+        >>> from discopy import frobenius
+        >>> from discopy.feedback import markov
         >>> x = markov.Ty('x')
         >>> f = markov.Box('f', x @ x @ x, x @ x @ x).to_hypergraph()
         >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
@@ -965,7 +966,8 @@ class Hypergraph[category](
             n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
-        >>> from discopy import symmetric, feedback
+        >>> from discopy import feedback
+        >>> from discopy.feedback import symmetric
         >>> x = symmetric.Ty('x')
         >>> f = symmetric.Box('f', x @ x, x @ x).to_hypergraph()
         >>> assert f.trace().cod == f.trace(left=True).cod == x
@@ -980,6 +982,32 @@ class Hypergraph[category](
         assert_istraceable(self, n, left)
         if not issubclass(self.category, SymmetricCategory):
             return self.explicit_trace(n, left)
+        return self.glue(n, left)
+
+    def glue(self, n: int = 1, left: bool = False) -> Hypergraph:
+        """
+        Glue the last ``n`` outputs to the last ``n`` inputs, or the first
+        when ``left``, i.e. the pushout that identifies their spiders. This
+        is the :meth:`trace` over a traced symmetric category, and it needs
+        no trace when the result is acyclic, as in :meth:`plug`.
+
+        Parameters:
+            n : The number of wires to glue.
+            left : Whether to glue on the left or right.
+
+        >>> from discopy.symmetric import Ty, Box
+        >>> x = Ty('x')
+        >>> f = Box('f', x @ x, x @ x).to_hypergraph()
+        >>> assert f.glue().cod == x and not f.glue().is_acyclic
+        >>> assert f.glue(0) == f == f.glue(0, left=True)
+        >>> f.glue(3)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cannot split 3 atoms off f.
+        """
+        assert_istraceable(self, n, left)
+        if n == 0:
+            return self
         (dom, inputs, dom_wires), (cod, outputs, cod_wires) = (
             (typ[n:], wires[:n], wires[n:]) if left
             else (typ[:-n], wires[-n:], wires[:-n])
@@ -1553,9 +1581,9 @@ class Hypergraph[category](
         of the hole ``dom -> cod`` to the start of the boundary of the
         context ``cod @ x -> dom @ y``, giving a hypergraph ``x -> y``.
 
-        This is the trace of the hole then the context, as the pushout of a
-        composition is the composition of pushouts, so the category must be
-        traced, as those of :meth:`rewrite` are.
+        This is the hole then the context, glued along the boundary of the
+        hole, see :meth:`glue`, as the pushout of a composition is the
+        composition of pushouts.
 
         Parameters:
             hole : The hypergraph to plug in.
@@ -1567,12 +1595,12 @@ class Hypergraph[category](
         >>> f = Box('f', x, y).to_hypergraph()
         >>> context = Box('g', y @ z, x @ z).to_hypergraph()
         >>> assert context.plug(f)\\
-        ...     == (f @ z >> context).trace(left=True)
+        ...     == (f @ z >> context).glue(left=True)
         """
         n_dom, n_cod = len(hole.dom), len(hole.cod)
         if self.dom[:n_cod] != hole.cod or self.cod[:n_dom] != hole.dom:
             raise AxiomError(messages.NOT_A_HOLE.format(hole, self))
-        result = (hole @ self.dom[n_cod:] >> self).trace(n_dom, left=True)
+        result = (hole @ self.dom[n_cod:] >> self).glue(n_dom, left=True)
         return result.topological_order() if result.is_acyclic else result
 
     def rewrite(self, *rules: Rule) -> Iterator[Hypergraph]:
@@ -2391,7 +2419,7 @@ class Hypergraph[category](
         The trace of a box, i.e. its second output wired back to its second
         input, is a while loop: here one step of the Collatz map.
 
-        >>> from discopy.comarkov import Ty, Box
+        >>> from discopy.feedback.comarkov import Ty, Box
         >>> from discopy.python.additive import Function
         >>> x = Ty('x')
         >>> f = Box('f', x @ x, x @ x)
@@ -2780,7 +2808,7 @@ class Hypergraph[category](
 
         Example
         -------
-        >>> from discopy.comarkov import Ty, Box, Merge
+        >>> from discopy.feedback.comarkov import Ty, Box, Merge
         >>> x = Ty('x')
         >>> f = Box('f', x @ x, x @ x)
         >>> graph = (Merge(x) @ x >> f).trace().to_hypergraph()
@@ -3303,9 +3331,11 @@ class Hypergraph[category](
         factory = cls if cls.category is category else cls[category]
         if any(isinstance(box, cat.Sum) for box in old.boxes):
             raise AxiomError(messages.NO_SUMS.format(factory_name(factory)))
-        functor = factory.functor(
-            ob_map=lambda typ: typ, ar_map=factory.from_box,
-            dom=category, cod=factory)
+        functor = next(
+            functor for functor in factory.functor.__mro__
+            if issubclass(factory, getattr(functor, "requires", object)))(
+                ob_map=lambda typ: typ, ar_map=factory.from_box,
+                dom=category, cod=factory)
         trace = getattr(category, "trace_factory", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()

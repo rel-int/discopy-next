@@ -1,6 +1,6 @@
 from pytest import raises
 
-from discopy import cat, lambek, biclosed, monoidal
+from discopy import cat, lambek, closed, monoidal
 from discopy.utils import dumps, from_tree, loads
 from discopy.lambek.categorial import *
 

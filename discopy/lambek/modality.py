@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 
 """
-The Lambek calculus with a relevant modality ``!L*``, i.e. the free biclosed
-category of :mod:`~discopy.lambek.categorial` with the bang of
-:mod:`~discopy.bang`: a banged type ``!x`` may be copied by contraction,
-read once by dereliction and moved past any type by exchange, see
-McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
+The Lambek calculus with a relevant modality ``!L*``, i.e. the free
+biclosed category of :mod:`~discopy.lambek.categorial` with the bang of
+:mod:`linear.monoidal <discopy.linear.monoidal>`: a banged type ``!x`` may be
+copied by contraction, read once by dereliction and moved past any type by
+exchange, see McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
 (`arXiv:2110.10641 <https://arxiv.org/abs/2110.10641>`_).
 
-A term is a kappa term of :mod:`~discopy.bang` whose functions are words
-of exponential type, applied by :class:`Eval`: a banged variable used twice
-is copied by :class:`Contraction`, brought where it is read by
-:class:`Exchange`, and every other variable is used once and in order.
+A term is a kappa term of :mod:`linear.monoidal <discopy.linear.monoidal>`
+whose functions are words of exponential type, applied by :class:`Eval`: a
+banged variable used twice is copied by :class:`Contraction`, brought where it
+is read by :class:`Exchange`, and every other variable is used once and in
+order.
 
 Summary
 -------
@@ -61,8 +62,8 @@ read by dereliction for ``sleeps : N\\S``, the other passed to the anaphor
 
 from __future__ import annotations
 
-from discopy import bang, monoidal
-from discopy.abc import ClosedCategory
+from discopy.linear import monoidal as bang
+from discopy.abc import BiclosedCategory
 from discopy.cat import factory
 from discopy.lambek import categorial
 from discopy.utils import get_origin
@@ -72,7 +73,8 @@ from discopy.utils import get_origin
 class Ty(bang.Ty, categorial.Ty):
     """
     A type of ``!L*``, a categorial type whose wires may be banged, called
-    on a Python function for the kappa abstraction of :mod:`~discopy.bang`.
+    on a Python function for the kappa abstraction of
+    :mod:`linear.monoidal <discopy.linear.monoidal>`.
 
     Example
     -------
@@ -143,39 +145,48 @@ class Laxator(bang.Laxator, Box):
 
 class Functor(bang.Functor, categorial.Functor):
     """
-    A functor from ``!L*``: the bang and the structural boxes go through the
-    bang of the codomain when it is linear, and the exponentials, evaluation
-    and currying through its closed structure when it is closed. Into any
-    other category, e.g. the photonic diagrams of :mod:`~discopy.optyx`, they
-    go through ``ob_map`` and ``ar_map`` like generators.
+    A functor from ``!L*`` into a biclosed category: the exponentials,
+    evaluation and currying go through the closed structure of the codomain,
+    and the bang and the structural boxes through its bang when it is
+    linear. Into a category that is not biclosed, e.g. a monoidal one, send
+    the underlying monoidal diagram with a :class:`~discopy.monoidal.Functor`,
+    which takes them through ``ob_map`` and ``ar_map`` like generators.
 
     Example
     -------
+    Into tensors, which are compact hence biclosed, ``N >> S`` is the internal
+    hom ``N* @ S`` and its evaluation a cup.
+
     >>> from discopy import tensor
     >>> N, S = Ty('N'), Ty('S')
     >>> F = Functor(
-    ...     ob_map=lambda x: tensor.Dim(4 if x.is_exp else 2),
-    ...     ar_map={Eval(N >> S): tensor.Box('ev', tensor.Dim(2, 4), 2)},
+    ...     ob_map={N: tensor.Dim(2), S: tensor.Dim(3)}, ar_map={},
     ...     cod=tensor.Diagram)
-    >>> assert F(Eval(N >> S)).dom == tensor.Dim(2, 4)
+    >>> assert F(N >> S) == tensor.Dim(2, 3)
+    >>> assert F(Eval(N >> S)).dom == tensor.Dim(2, 2, 3)
+    >>> assert F(Eval(N >> S)).cod == tensor.Dim(3)
+
+    >>> from discopy import monoidal
+    >>> Functor(ob_map={}, ar_map={}, cod=monoidal.Diagram)
+    Traceback (most recent call last):
+    ...
+    TypeError: A functor from !L* needs a biclosed codomain, got ...
     """
     dom = cod = Diagram
+    requires = BiclosedCategory
 
-    @property
-    def has_exp(self) -> bool:
-        """ Whether the codomain is a closed category. """
-        return issubclass(get_origin(self.cod), ClosedCategory)
-
-    def __call__(self, other):
-        if not self.has_exp and isinstance(other, (
-                categorial.Over, categorial.Under, categorial.Eval,
-                categorial.Coeval, categorial.Curry)):
-            return monoidal.Functor.__call__(self, other)
-        return super().__call__(other)
+    def __init__(self, ob_map, ar_map, **params):
+        cod = params.get("cod") or type(self).cod
+        if not issubclass(get_origin(cod), self.requires):
+            raise TypeError(
+                f"A functor from !L* needs a biclosed codomain, got {cod}.")
+        super().__init__(ob_map, ar_map, **params)
 
 
 class TermBase(bang.TermBase):
-    """ A kappa term of ``!L*``, see :class:`~discopy.bang.TermBase`. """
+    """
+    A kappa term of ``!L*``, see :class:`~discopy.linear.monoidal.TermBase`.
+    """
 
 
 class Variable(TermBase, bang.Variable):

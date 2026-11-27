@@ -16,10 +16,13 @@ does not compile yet:
 - `PROP`: it extends SymmetricCategory
 - `MarkovCategory`: it extends SymmetricCategory
 - `ComarkovCategory`: it extends SymmetricCategory
-- `ClosedCategory`: it extends BiclosedCategory, MarkovCategory
-- `BalancedCategory`: it extends TracedCategory
-- `RibbonCategory`: it extends PivotalCategory, BalancedCategory
-- `CompactCategory`: it extends RibbonCategory, SymmetricCategory
+- `ClosedCategory`: it extends BiclosedCategory, SymmetricCategory
+- `ClosedMarkovCategory`: it extends ClosedCategory, MarkovCategory
+- `BalancedCategory`: ob is not declared
+- `BalancedTracedCategory`: it extends BalancedCategory, TracedCategory
+- `RibbonCategory`: it extends PivotalCategory, BalancedTracedCategory
+- `GoISituation`: it extends LinearCategory, TracedCategory, SymmetricCategory
+- `CompactCategory`: it extends RibbonCategory, ClosedCategory
 - `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
 -/
 
@@ -283,6 +286,53 @@ structure ResiduatedMonoid.Laws (cat : ResiduatedMonoid Ob Hom) : Prop extends t
 structure ResiduatedMonoid.Functor (cat : ResiduatedMonoid Ob Hom) (cat' : ResiduatedMonoid Ob' Hom') extends toColouredMonoid : ColouredMonoid.Functor cat.toColouredMonoid cat'.toColouredMonoid where
   map_over : ∀ (f g : Hom), map (cat.over f g) = cat'.over (map f) (map g)
   map_under : ∀ (f g : Hom), map (cat.under f g) = cat'.under (map f) (map g)
+
+/-- `discopy.abc.ComonadCategory`: A comonad category is a `Category` with a comonad `bang`, with counit `dereliction` `!x -> x` and comultiplication `digging` `!x -> !!x`: the part of a `LinearCategory` that needs no tensor. `discopy.linear.cat` is the free one. -/
+structure ComonadCategory (Ob : Type u) (Hom : Type v) extends Category Ob Hom where
+  bang : Hom → Hom
+  bangedOb : Ob → Ob
+  dereliction : Ob → Hom
+  digging : Ob → Hom
+
+/-- The bang of an identity is the identity. -/
+def ComonadCategory.bang_identity (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (X : Ob), cat.bang (cat.id X) = cat.id (cat.bangedOb X)
+
+/-- The bang of a composition is the composition of the bangs. -/
+def ComonadCategory.bang_composition (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (f g : Hom), cat.dom f = A → cat.cod f = B → cat.dom g = B → cat.cod g = C → cat.bang (cat.comp f g) = cat.comp (cat.bang f) (cat.bang g)
+
+/-- The dereliction is natural. -/
+def ComonadCategory.dereliction_naturality (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.comp (cat.bang f) (cat.dereliction (cat.cod f)) = cat.comp (cat.dereliction (cat.dom f)) f
+
+/-- The digging is natural. -/
+def ComonadCategory.digging_naturality (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.comp (cat.bang f) (cat.digging (cat.cod f)) = cat.comp (cat.digging (cat.dom f)) (cat.bang (cat.bang f))
+
+/-- Digging then derelicting either bang is the identity. -/
+def ComonadCategory.comonad_counit (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (X : Ob), cat.comp (cat.digging X) (cat.dereliction (cat.bangedOb X)) = cat.id (cat.bangedOb X) ∧ cat.id (cat.bangedOb X) = cat.comp (cat.digging X) (cat.bang (cat.dereliction X))
+
+/-- Digging twice is digging either bang. -/
+def ComonadCategory.comonad_coassociativity (cat : ComonadCategory Ob Hom) : Prop :=
+  ∀ (X : Ob), cat.comp (cat.digging X) (cat.digging (cat.bangedOb X)) = cat.comp (cat.digging X) (cat.bang (cat.digging X))
+
+/-- The laws of `ComonadCategory`. -/
+structure ComonadCategory.Laws (cat : ComonadCategory Ob Hom) : Prop extends toCategory : Category.Laws cat.toCategory where
+  bang_identity : cat.bang_identity
+  bang_composition : cat.bang_composition
+  dereliction_naturality : cat.dereliction_naturality
+  digging_naturality : cat.digging_naturality
+  comonad_counit : cat.comonad_counit
+  comonad_coassociativity : cat.comonad_coassociativity
+
+/-- A functor of `ComonadCategory`: it preserves each of its operations. -/
+structure ComonadCategory.Functor (cat : ComonadCategory Ob Hom) (cat' : ComonadCategory Ob' Hom') extends toCategory : Category.Functor cat.toCategory cat'.toCategory where
+  map_bang : ∀ (f : Hom), map (cat.bang f) = cat'.bang (map f)
+  ob_bangedOb : ∀ (X : Ob), ob (cat.bangedOb X) = cat'.bangedOb (ob X)
+  map_dereliction : ∀ (X : Ob), map (cat.dereliction X) = cat'.dereliction (ob X)
+  map_digging : ∀ (X : Ob), map (cat.digging X) = cat'.digging (ob X)
 
 /-- `discopy.abc.Pregroup`: A pregroup is a residuated monoid where the left and right exponentials are given by tensoring with the chosen left and right duals for each object. -/
 structure Pregroup (Ob : Type u) (Hom : Type v) extends ResiduatedMonoid Ob Hom where

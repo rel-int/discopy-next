@@ -15,6 +15,13 @@ STATED = [
 UNDRAWN = {
     # No free category of diagrams is a groupoid.
     "abc.Groupoid.invertibility",
+    # No free category of diagrams is a GoI situation: none has a reflexive
+    # object.
+    *(f"abc.GoISituation.{law}" for law in (
+        "laxator_inverse", "colaxator_inverse", "laxator_unit_inverse",
+        "colaxator_unit_inverse", "bang_symmetry", "bang_trace",
+        "reflexive_tensor_retract", "reflexive_unit_retract",
+        "reflexive_bang_retract")),
 }
 
 
@@ -72,9 +79,9 @@ def test_dagger_swaps_the_boundary():
 
 
 def test_trace_operand_is_bracketed():
-    from discopy import symmetric
-    x = symmetric.Ty('x')
-    f = Bracketed[symmetric.Diagram](symmetric.Box('f', x @ x, x @ x))
+    from discopy import feedback
+    x = feedback.Ty('x')
+    f = Bracketed[feedback.Diagram](feedback.Box('f', x @ x, x @ x))
     traced = (f >> f).trace()
     assert traced.drawing.bracketing
     assert any(box.draw_as_bracket for box in traced.to_drawing().boxes)

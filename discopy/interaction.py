@@ -357,7 +357,9 @@ class Diagram[natural](
         diagrams by yet.
         """
         # pylint: disable-next=import-outside-toplevel  # they import this
-        from discopy import compact, symmetric
+        from discopy import compact
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy.feedback import symmetric
         return (symmetric.Diagram, compact.Diagram)
 
     ar = classproperty(lambda cls: cls)

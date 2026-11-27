@@ -38,7 +38,7 @@ def test_Nat_str_transparency():
 
 
 def test_LinearCategory_states_the_laws_of_a_linear_category():
-    from discopy import bang
+    from discopy.linear import monoidal as bang
     from discopy.abc import LinearCategory, MonoidalCategory
     from discopy.testable import Bang
 

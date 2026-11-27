@@ -23,12 +23,6 @@ Summary
     Permutation
     Copy
     Discard
-    Feedback
-    Feedforward
-    Trace
-    FollowedBy
-    Head
-    Tail
     Sum
     Functor
     Equation
@@ -99,8 +93,7 @@ from inspect import Parameter, Signature, signature
 from operator import index
 from typing import ClassVar, Self
 
-from discopy import (
-    cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
+from discopy import cat, symmetric, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
     ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
     Nat)
@@ -108,7 +101,7 @@ from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
-from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
+from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
@@ -169,21 +162,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
 
-    Note
-    ----
-    A Markov diagram is a feedback diagram whose wires carry a time step, so
-    that it is the syntax of streams, see :mod:`~discopy.stream`.
-
-    >>> x = Ty('x')
-    >>> zero = Box('0', Ty(), x.head)
-    >>> rand = Box('rand', Ty(), x)
-    >>> plus = Box('+', x @ x, x)
-    >>> walk = (rand.delay() @ x.delay() >> zero @ plus.delay()
-    ...         >> FollowedBy(x) >> Copy(x)).feedback()
-    >>> walk.draw(doctest="docs/_static/feedback/feedback-random-walk.svg")
-
-    .. image:: /_static/feedback/feedback-random-walk.svg
-        :align: center
+    See :mod:`~discopy.feedback.markov` for the syntax of streams.
     """
     copy_factory: ClassVar[type["Copy"]]
     discard_factory: ClassVar[type["Discard"]]
@@ -215,18 +194,16 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         """
-        The spiders of a Markov category: the copies, with one leg in, and
-        the traces of copies, with none, i.e. what tracing a copy back into
-        its own input encodes to as a hypergraph.
+        The spiders of a Markov category: the copies, with one leg in, see
+        :meth:`~discopy.feedback.markov.Diagram.spider_factory` for those with
+        none.
 
         >>> x = Ty('x')
-        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        >>> assert Diagram.spider_factory(1, 2, x) == Copy(x)
         """
-        if phase is not None or n_legs_in not in (0, 1):
+        if phase is not None or n_legs_in != 1:
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
-        if not n_legs_in:
-            return cls.copy(typ, n_legs_out + 1).trace(left=True)
         return cls.copy_factory(typ, n_legs_out)
 
     @classmethod
@@ -380,8 +357,8 @@ class Box(symmetric.Box, Diagram):
     >>> sample = Box('sample', p, x, is_deterministic=False)
     >>> assert sample != Box('sample', p, x)
     >>> sample
-    markov.Box('sample', feedback.Ty(feedback.Wire('p')), \
-feedback.Ty(feedback.Wire('x')), is_deterministic=False)
+    markov.Box('sample', monoidal.Ty(monoidal.Wire('p')), \
+monoidal.Ty(monoidal.Wire('x')), is_deterministic=False)
     >>> assert not sample.dagger().dagger().is_deterministic
 
     >>> f = Box('f', p, x)
@@ -551,11 +528,11 @@ class Function(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Function(x @ y, [1, 0, 0])
-        >>> assert f.delay() == Function((x @ y).delay(), [1, 0, 0])
+        >>> assert Function(*f.__getnewargs__()) == f
         """
         return self.dom, list(self.func)
 
@@ -617,11 +594,11 @@ class Function(Box):
         comarkov.
 
         >>> from discopy import closed
-        >>> closed.Copy(closed.Ty('x')).dagger()
+        >>> closed.markov.Copy(closed.markov.Ty('x')).dagger()
         Traceback (most recent call last):
             ...
-        discopy.utils.AxiomError: Copy(x) has no dagger: closed.Diagram \
-is not a dagger category.
+        discopy.utils.AxiomError: Copy(x) has no dagger: \
+closed.markov.Diagram is not a dagger category.
         """
         if not issubclass(self.ar, ComarkovCategory):
             raise AxiomError(messages.NOT_A_DAGGER.format(
@@ -904,14 +881,12 @@ class Functor(symmetric.Functor):
 Box.__init__.__signature__ = Signature([
     *list(signature(monoidal.Box.__init__).parameters.values())[:-1], *(
         param.replace(kind=Parameter.KEYWORD_ONLY) for init in (
-            cat.Box.__init__, feedback.Box.__init__, Box.__init__)
+            cat.Box.__init__, Box.__init__)
         for param in signature(init).parameters.values()
         if param.default is not Parameter.empty)])
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

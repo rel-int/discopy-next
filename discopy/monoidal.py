@@ -97,15 +97,16 @@ Traceback (most recent call last):
 ValueError: Expected exactly one output, got y @ z: a term has one.
 
 This loses no diagram where the category has products: a
-:class:`~discopy.closed.Pack` box turns any closed diagram into one with
-exactly one output, of :class:`~discopy.closed.Product` type. A closed diagram
-reads as a lambda term by default, see :meth:`~discopy.closed.Diagram.to_term`,
-and as a kappa term with :meth:`TermBase.from_diagram`.
+:class:`~discopy.closed.markov.Pack` box turns any closed diagram into one
+with exactly one output, of :class:`~discopy.closed.markov.Product` type. A
+closed diagram reads as a lambda term by default, see
+:meth:`~discopy.closed.markov.Diagram.to_term`, and as a kappa term with
+:meth:`TermBase.from_diagram`.
 
 >>> from discopy import closed
->>> X, Y, Z = map(closed.Ty, "XYZ")
->>> F, G = closed.Box('f', X, Y), closed.Box('g', X, Z)
->>> packed = F @ G >> closed.Pack(Y * Z)
+>>> X, Y, Z = map(closed.markov.Ty, "XYZ")
+>>> F, G = closed.markov.Box('f', X, Y), closed.markov.Box('g', X, Z)
+>>> packed = F @ G >> closed.markov.Pack(Y * Z)
 >>> assert len(packed.cod) == 1
 >>> print(TermBase.from_diagram(packed).normal_form())
 (X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
@@ -148,11 +149,11 @@ A term is drawn as its diagram:
 .. image:: /_static/monoidal/let.svg
     :align: center
 
-The modules above have terms of their own, down to :mod:`~discopy.biclosed`
-where they are lambda terms: a
+The modules above have terms of their own, down to
+:mod:`~discopy.closed.monoidal` where they are lambda terms: a
 :class:`symmetric.Kappa <discopy.symmetric.Kappa>` binds its variables in any
-order, a :class:`markov.Kappa <discopy.markov.Kappa>` need not use them
-and a :class:`~discopy.markov.Application` may use one twice.
+order, a :class:`markov.Kappa <discopy.markov.Kappa>` need not use them and a
+:class:`~discopy.markov.Application` may use one twice.
 """
 
 from __future__ import annotations
@@ -181,7 +182,7 @@ from discopy.testable import (
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
-    COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
+    COLOUR_DRAWING_ATTRIBUTES, DRAWING_DEFAULT, TRANSPARENT)
 from discopy.utils import (
     factory,
     factory_key,
@@ -254,7 +255,7 @@ def uncolour_state(state: dict) -> dict:
     """
     The pickled ``state`` of a wire or a type, with no colour as ``None``:
     a pickle from before ``None`` stood for no colour holds a
-    :class:`Colour` named :data:`discopy.config.TRANSPARENT` instead.
+    :class:`Colour` named :data:`~discopy.config.TRANSPARENT` instead.
     """
     for key in ('dom', 'cod'):
         colour = state.get(key)
@@ -1820,7 +1821,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         refused. Every box is a constant, structural ones included, e.g. a
         swap, and no wire is ever copied, discarded or crossed. Closed
         Markov diagrams read as lambda terms instead, see
-        :meth:`~discopy.closed.Diagram.to_term`.
+        :meth:`~discopy.closed.markov.Diagram.to_term`.
 
         Example
         -------
@@ -2450,7 +2451,7 @@ class Box(cat.Box, Diagram):
     color : str, optional
         The color to use when drawing the box, one of
         :code:`"transparent", "red", "green", "blue", "yellow", "black"` or any
-        other matplotlib colour, e.g. :data:`discopy.config.TRANSPARENT`
+        other matplotlib colour, e.g. :data:`~discopy.config.TRANSPARENT`
         for a spider drawn unfilled.
         Default is :code:`"black" if draw_as_spider else "transparent"`.
     shape : str, optional
@@ -2617,7 +2618,7 @@ class Box(cat.Box, Diagram):
     @property
     def frame_colour(self):
         """ The colour of the frame, the default of
-        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        :data:`~discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
         return vars(self).get(
             "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
 
@@ -2694,36 +2695,51 @@ class Box(cat.Box, Diagram):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
-            framed = [arg.framed() for arg in args]
+            # The dagger of a box daggers its args, which its drawing does as
+            # it reflects them with the box: draw them as they were.
+            framed = [(arg[::-1].to_drawing() if self.is_dagger else drawing)
+                      .framed() for arg, drawing in zip(self.args, args)]
             height = max(arg.height for arg in framed)
             nested = tuple(
                 arg.stretch(height - arg.height) for arg in framed)
-            width = sum(arg.width for arg in nested)
+            width = sum(arg.width for arg in nested)\
+                + DRAWING_DEFAULT["nested_margin"] * (len(nested) - 1)
+            # As wide a margin around the args as above and below them, and
+            # room for the label in its corner.
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
             box = Box(
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
-                min_width=max(label + height + .5,
+                min_width=max(height + 1, label,
                               getattr(self, "min_width", 0)),
                 height=max(width + 1, getattr(self, "height", 0)))
-            # The box is drawn slanted as its own variant, its args as theirs.
+            # The box has a corner cut as its own variant, its args as theirs.
             box.is_dagger = self.is_dagger
             for attr in ("is_transpose", "is_conjugate"):
                 setattr(box, attr, bool(getattr(self, attr, False)))
             return box.to_drawing()
-        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
-            name=self.drawing_name)
-        if self.draw_as_frame:
-            kwargs['draw_vertically'] = self.draw_vertically
-            kwargs['frame_colour'] = self.frame_colour
-        else:
+            name="" if self.draw_as_frame else self.drawing_name)
+        if not self.draw_as_frame:
             kwargs['draw_as_square'] = self.draw_as_square
-        return getattr(Drawing, method)(*args, **kwargs)
+            return Drawing.bubble(*args, **kwargs)
+        result = Drawing.frame(
+            *args, draw_vertically=self.draw_vertically,
+            frame_colour=self.frame_colour, min_width=text_width(
+                self.drawing_name) + .5 if self.drawing_name else 0,
+            **kwargs)
+        # Its top and bottom edges draw the corner cut off as for a box, and
+        # its label in the corner opposite, see Backend.draw_frame_corner.
+        corner = (0 if getattr(self, "is_conjugate", False) else
+                  1 if getattr(self, "is_transpose", False) else
+                  2 if self.is_dagger else 3)
+        for edge in (result.boxes[0], result.boxes[-1]):
+            edge.frame_corner, edge.frame_name = corner, self.drawing_name
+        return result
 
 
 class Sum(cat.Sum, Box):
@@ -3210,7 +3226,7 @@ class TermBase(cat.TermBase):
                  letters: Sequence[str | None]) -> cat.TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
-        :meth:`~discopy.biclosed.TermBase.generate` does: its inputs are
+        :meth:`~discopy.closed.monoidal.TermBase.generate` does: its inputs are
         bound by a kappa or left free, named ``v0, v1, ...``, and the
         variable bound at each level is named by the letter at that level,
         see :class:`Sampler`.

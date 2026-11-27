@@ -20,12 +20,6 @@ Summary
     Permutation
     Merge
     Noise
-    Feedback
-    Feedforward
-    Trace
-    FollowedBy
-    Head
-    Tail
     Functor
     TermBase
     Variable
@@ -74,13 +68,12 @@ from collections.abc import Sized
 from operator import index
 from typing import ClassVar
 
-from discopy import (
-    symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
+from discopy import symmetric, monoidal, cmap, hypergraph, messages, op
 from discopy.abc import (
     ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
     Nat)
 from discopy.cat import factory, kappa_calculus
-from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
+from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
@@ -259,11 +252,11 @@ class Cofunction(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Cofunction(x @ y, [1, 0, 0])
-        >>> assert f.delay() == Cofunction((x @ y).delay(), [1, 0, 0])
+        >>> assert Cofunction(*f.__getnewargs__()) == f
         """
         return self.cod, list(self.cofunc.inside)
 
@@ -589,8 +582,6 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

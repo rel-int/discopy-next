@@ -540,11 +540,13 @@ which to_drawing recomputes.
         The shift of one corner of each box drawn as a polygon when nothing
         else is asked for: :code:`0.125` when some box is a conjugate, a
         transpose or a dagger not drawn as a braid, :code:`0` otherwise,
-        counting the boxes of the drawings nested in its boxes.
+        counting the boxes of the drawings nested in its boxes and the frames
+        drawn around them, see :meth:`Backend.draw_frame_corner`.
         """
         return 0.125 * any(
             box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid) or (
+                box.is_dagger and not box.draw_as_braid) or getattr(
+                box, "frame_corner", 3) not in (None, 3) or (
                 any(nested.asymmetry()
                     for nested in getattr(box, "nested", None) or ()))
             for box in self.boxes)
@@ -1399,10 +1401,13 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "frame_corner", None) is not None:
+                # The edge of a frame is reflected with its corners.
+                vars(result).update(frame_corner=box.frame_corner ^ 1,
+                                    frame_name=box.frame_name)
             if getattr(box, "nested", None):
                 # The reflection of a transpose is a conjugate, and back.
                 vars(result).update(
-                    mirror_nested=not box.mirror_nested,
                     is_transpose=box.is_conjugate,
                     is_conjugate=box.is_transpose)
             return result
@@ -1675,8 +1680,12 @@ which to_drawing recomputes.
 
     def frame(self, *others: Drawing,
               dom=None, cod=None, name=None, draw_vertically=False,
-              frame_colour=None) -> Drawing:
+              frame_colour=None, min_width=0) -> Drawing:
         """
+        Draw a frame around ``self`` and ``others``, side by side or one on
+        top of the other when ``draw_vertically``, at least ``min_width``
+        wide, e.g. to leave room for a label drawn in one of its corners.
+
         >>> from discopy.monoidal import *
         >>> x, y = Ty('x'), Ty('y')
         >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
@@ -1709,8 +1718,12 @@ which to_drawing recomputes.
             ) if draw_vertically else dict(
                 height=max([arg.height for arg in args] + [0]))
         slots = tuple(arg.slot(colour, **params) for arg in args)
-        result = getattr(slots[0], method)(*slots[1:]).bubble(
+        inside = getattr(slots[0], method)(*slots[1:])
+        result = inside.bubble(
             dom, cod, name, draw_as_square=True, frame_sides=True)
+        if result.width < min_width:
+            result = inside.bubble(dom, cod, name, width=min_width,
+                                   draw_as_square=True, frame_sides=True)
         result.reposition_box_dom()
         result.reposition_box_cod()
         return result

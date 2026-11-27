@@ -1205,6 +1205,8 @@ class Backend(ABC):
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
+            if getattr(node.box, "frame_corner", None) is not None:
+                self.draw_frame_corner(graph.positions, node, **params)
             if node.box.draw_as_spider or node.box.draw_as_wires:
                 continue
             for attribute, method in drawing_methods:
@@ -1221,19 +1223,20 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        if box.nested is not None:
-            # Along its long sides a slant is hard to see: chop a corner off.
-            points = self.chop_corner(points, i, 2 * asymmetry)
-        else:
-            if box.is_conjugate or box.is_transpose:
-                asymmetry *= -1
-            points[i] = points[i].shift(x=asymmetry)
+        # The cut stops short of the wires, three quarters of the way.
+        wires = [positions[Node(kind, i=k, j=j, x=x)][0]
+                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)]
+                 for k, x in enumerate(xs)]
+        size = min([2 * asymmetry] + [
+            .75 * abs(x - points[i][0]) for x in wires])
+        corners, points = points, self.chop_corner(points, i, size)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
         label = positions[node]
         if box.nested is not None:
-            label = self.draw_nested(box, points, label, **params)
+            label = self.draw_nested(box, corners, corners[(i + 2) % 4],
+                                     **params)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *label,
@@ -1243,11 +1246,66 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
 
+    def draw_frame_corner(self, positions, node, **params):
+        """
+        Draws the corners of a frame on its top or bottom edge, i.e. the
+        opening or the closing of the bubble its ``box`` draws, as those of a
+        box: the ``frame_corner`` of :meth:`chop_corner` cut off, short of the
+        wires through the edge, and the label ``frame_name`` in the corner
+        opposite. The cut is a line across the corner, with the region
+        outside the frame painted over the corner of the frame.
+        """
+        box, j = node.box, node.j
+        top = self.has_boundary_sides(box.cod)
+        kind, sides = ("box_cod", box.cod) if top else ("box_dom", box.dom)
+        (left, _), (right, _) = (positions[Node(kind, i=k, j=j, x=sides[k])]
+                                 for k in (0, len(sides) - 1))
+        y = positions[node].y
+        through, kind_through = (box.dom, "box_dom") if top\
+            else (box.cod, "box_cod")
+        wires = [positions[Node(kind_through, i=k, j=j, x=x)].x
+                 for k, x in enumerate(through)]
+        corners = {0: (left, y), 1: (left, y), 2: (right, y), 3: (right, y)}
+        on_edge = (1, 2) if top else (0, 3)
+        inward = -1 if top else 1
+        cut, label = box.frame_corner, (box.frame_corner + 2) % 4
+        canvas = params.get('boundary_color')
+        outside = getattr(sides.inside[0].dom if cut < 2
+                          else sides.inside[-1].cod, "name", None) or (
+            "white" if canvas is None or self.is_transparent(canvas)
+            else canvas)
+        if cut in on_edge:
+            cx, cy = corners[cut]
+            dx = 1 if cut < 2 else -1
+            size = min([2 * params.get('asymmetry', 0), (right - left) / 2]
+                       + [.75 * abs(x - cx) for x in wires])
+            if size:
+                eps, a, b = .05, Point(cx + dx * size, cy), Point(
+                    cx, cy + inward * size)
+                self.draw_polygon(
+                    a, a.shift(y=-inward * eps),
+                    Point(cx - dx * eps, cy - inward * eps),
+                    b.shift(x=-dx * eps), b,
+                    facecolor=outside, edgecolor=TRANSPARENT)
+                self.draw_polygon(a, b, facecolor=TRANSPARENT)
+        if label in on_edge and box.frame_name\
+                and params.get('draw_box_labels', True):
+            lx, ly = corners[label]
+            dx = text_width(box.frame_name) / 2 + .125
+            inside = getattr(sides.inside[0].cod, "name", None)
+            self.draw_text(
+                box.frame_name, lx + (dx if label < 2 else -dx),
+                ly + inward * .25, ha='center', va='center',
+                color=self.readable_foreground(inside or "white"),
+                fontsize=params.get('fontsize', None),
+                adaptive=inside is None)
+
     @staticmethod
     def chop_corner(points, i, size):
         """
         A polygon with its ``i``-th corner cut off, ``size`` along both of
-        its sides, e.g. the box of a variant of a box with args.
+        its sides or half the shorter side, e.g. to tell a box from its
+        dagger, its transpose and its conjugate.
 
         >>> square = [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)]
         >>> Backend.chop_corner(square, 2, .25)[1:4]
@@ -1255,7 +1313,12 @@ class Backend(ABC):
         """
         if not size:
             return points
-        corner = points[i]
+        points = [Point(*point) for point in points]
+        corner, neighbours = points[i], (
+            points[i - 1], points[(i + 1) % len(points)])
+        lengths = [sqrt((p.x - corner.x) ** 2 + (p.y - corner.y) ** 2)
+                   for p in neighbours]
+        size = min(size, *(length / 2 for length in lengths))
 
         def towards(point):
             dx, dy = point.x - corner.x, point.y - corner.y
@@ -1264,39 +1327,44 @@ class Backend(ABC):
         return points[:i] + [towards(points[i - 1]), towards(
             points[(i + 1) % len(points)])] + points[i + 1:]
 
-    def draw_nested(self, box, corners, centre, **params):
+    def draw_nested(self, box, corners, corner, **params):
         """
         Draw the drawings nested in a box left to right, one under the other,
-        on a background of the box's ``frame_colour``, see
-        :class:`Transposed`, centred in the space right of the box's label,
-        and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of the background, a line separates each
-        from the next, so that no two regions meet without one. A reflected
-        drawing reflects them, the last on top, and a transposed box or a
-        conjugate turns them half way round, as it is turned itself.
+        each on a slot of the box's ``frame_colour``, see :class:`Transposed`,
+        centred in the box, and return the centre of the box's label, in the
+        given ``corner``: the one opposite its cut corner, i.e. its top left
+        but for its variants. Their wires plug into the edges of their slots,
+        with a margin of the box's colour between one and the next. They are
+        reflected, turned and reordered as the box is: a dagger reflects them
+        along the horizontal axis, the last on top, a conjugate along the
+        vertical one, and a transpose turns them half way round.
         """
-        nested = box.nested
-        width = sum(drawing.width for drawing in nested)
+        nested, margin = box.nested, DEFAULT["nested_margin"]
+        width = sum(drawing.width for drawing in nested)\
+            + margin * (len(nested) - 1)
         height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
-        start = left + (
-            text_width(box.drawing_name) + .25 if box.drawing_name else 0)
-        x, y = (start + right - height) / 2, centre[1] - width / 2
-        self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
-                          (x, y + width), facecolor=box.frame_colour)
-        turn = bool(box.is_transpose or box.is_conjugate)
-        flip, offset = box.mirror_nested != turn, 0
+        bottom, top = min(y for _, y in corners), max(y for _, y in corners)
+        x, y = (left + right - height) / 2, (bottom + top - width) / 2
+        # The reflection along the horizontal axis of a dagger, along the
+        # vertical one of a conjugate and along both, a half turn, of a
+        # transpose.
+        flip = not box.is_conjugate and bool(box.is_dagger or box.is_transpose)
+        turn, offset = bool(box.is_conjugate or box.is_transpose), 0
         for drawing in nested:
-            offset += drawing.width
-            origin = Point(x, y + offset - drawing.width if flip
-                           else y + width - offset)
-            Transposed(self, origin, drawing, flip=flip, reverse=turn)\
+            low = y + offset if flip else y + width - offset - drawing.width
+            self.draw_polygon(
+                (x, low), (x + height, low), (x + height, low + drawing.width),
+                (x, low + drawing.width), facecolor=box.frame_colour)
+            Transposed(self, Point(x, low), drawing, flip=flip, reverse=turn)\
                 .draw_drawing(drawing, **params)
-            if offset < width:
-                edge = y + offset if flip else y + width - offset
-                self.draw_bezier([Point(x + t * height / 3, edge)
-                                  for t in range(4)], adaptive=False)
-        return Point((left + start) / 2, centre[1])
+            offset += drawing.width + margin
+        # The label lies in the band between the slots and the box's side.
+        dx = text_width(box.drawing_name) / 2 + .125
+        dy = (top - bottom - width) / 4
+        (cx, cy) = corner
+        return Point(cx + (dx if cx == left else -dx),
+                     cy + (dy if cy == bottom else -dy))
 
     @staticmethod
     def triangle_corners(positions, node):
@@ -1679,6 +1747,11 @@ class Transposed(Backend):
             if not self.cod_is_after():
                 point = point.shift(y=2 * self.textpad)
             params = dict(params, verticalalignment="bottom")
+            # A label hangs along its wire, away from where it starts.
+            (x0, _), _ = self.compose((0, 0))
+            (x1, _), _ = self.compose((0, 1))
+            if x1 > x0:
+                params["horizontalalignment"] = "right"
         canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
@@ -1881,8 +1954,10 @@ class TikZ(Backend):
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west" if alignment == "top"\
-                else ", anchor=south west"
+            vertical = "north" if alignment == "top" else "south"
+            horizontal = "east" if params.get(
+                "horizontalalignment") == "right" else "west"
+            options += f", anchor={vertical} {horizontal}"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -2195,10 +2270,12 @@ class Typst(Backend):
         # Wire labels use va='top' (see draw_wire_label); park them to the
         # right of the wire like TikZ's ``anchor=west``, so the stroke does
         # not strike through the glyph.
+        side = "east" if params.get("horizontalalignment") == "right"\
+            else "west"
         if params.get("verticalalignment", "center") == "top":
-            extra["anchor"] = Str("west")
+            extra["anchor"] = Str(side)
         elif params.get("verticalalignment", "center") == "bottom":
-            extra["anchor"] = Str("south-west")
+            extra["anchor"] = Str(f"south-{side}")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)

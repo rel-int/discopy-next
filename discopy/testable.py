@@ -54,6 +54,7 @@ Summary
     R
     Delay
     Bang
+    Reflexive
     Over
     Under
     Repeat
@@ -533,13 +534,24 @@ class Bang[Coarse, Object](Constructor):
     :class:`Delay` reads the delay, so that a category whose bang is the
     identity reads each object as its own bang.
 
-    >>> from discopy.bang import Ty, Diagram
+    >>> from discopy.linear.monoidal import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
     """
     @staticmethod
     def form(*args):
         category, obj = args
         return category.id(obj).bang().dom
+
+
+class Reflexive[Coarse](Constructor):
+    """
+    The reflexive object of a :class:`~discopy.abc.GoISituation` ``Coarse`` in
+    a signature, i.e. ``Coarse.reflexive()``.
+    """
+    @staticmethod
+    def form(*args):
+        category, = args
+        return category.reflexive()
 
 
 class Over[Base, Exponent](Constructor):
@@ -747,7 +759,15 @@ class Declaration[**P, T](classmethod):
         return f"{factory_name(self.category)}.{self.name}"
 
     def __hash__(self):
-        return hash((self.function, self.category, self.name))
+        """
+        The hash of the name and the category's key, the same in every
+        interpreter: the function is compared but not hashed, and the
+        category is hashed by its :func:`factory_key`, the hash of a function
+        or of a class being its address, see #506.
+        """
+        category = None if self.category is None\
+            else factory_key(self.category)
+        return hash((category, self.name))
 
     def bind(self, category: type[T]) -> Self:
         """ Bind the declaration to a concrete category. """
@@ -975,8 +995,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``Diagram.yanking = BalancedCategory.yanking.modulo(
-        Diagram.to_hypergraph)`` in :mod:`~discopy.symmetric`.
+        ``Diagram.yanking = BalancedTracedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`~discopy.feedback.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -1302,7 +1322,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
 
         >>> from discopy.cat import Arrow, Box
         >>> from discopy.monoidal import Ty
-        >>> from discopy.biclosed import TermBase
+        >>> from discopy.closed.monoidal import TermBase
         >>> assert Arrow in Testable.enrolled() and Ty in Testable.enrolled()
         >>> assert Box not in Testable.enrolled()
         >>> from discopy.lambek.abstract.proofnet import ProofNet
@@ -1575,7 +1595,7 @@ class Equivalence(Testable):
 
     Example
     -------
-    >>> from discopy.biclosed import Ty, TermBase
+    >>> from discopy.closed.monoidal import Ty, TermBase
     >>> X = Ty("X")
     >>> f, g = (X << X)("f"), (X << X)("g")
     >>> terms = X(lambda x: f(x)), X(lambda y: f(y)), g

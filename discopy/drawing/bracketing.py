@@ -86,8 +86,8 @@ from discopy.utils import classproperty, factory, unbiased
 
 FREE_CATEGORIES = (
     "monoidal", "spacial", "feedback", "braided", "balanced", "symmetric",
-    "markov", "comarkov", "bang", "biclosed", "rigid", "pivotal", "ribbon",
-    "compact", "closed", "frobenius")
+    "markov", "comarkov", "linear.monoidal", "closed.monoidal", "rigid",
+    "pivotal", "ribbon", "compact", "closed.markov", "frobenius")
 """
 The modules whose ``Diagram`` is a free category an axiom is drawn in, from
 the most general, see :func:`free_category`.
@@ -385,13 +385,14 @@ def free_category(axiom: Axiom) -> type | None:
     name it uses that one of them has, see :func:`vocabulary`, :obj:`None`
     when there is none, e.g. for :meth:`~discopy.abc.Groupoid.invertibility`.
 
-    >>> from discopy.abc import Category, TracedCategory, BalancedCategory
+    >>> from discopy.abc import (
+    ...     Category, TracedCategory, BalancedTracedCategory)
     >>> print(free_category(Category.associativity).__module__)
     discopy.monoidal
     >>> print(free_category(TracedCategory.yanking).__module__)
-    discopy.symmetric
-    >>> print(free_category(BalancedCategory.yanking).__module__)
-    discopy.balanced
+    discopy.compact
+    >>> print(free_category(BalancedTracedCategory.yanking).__module__)
+    discopy.compact
     """
     if axiom.category is not None and axiom.category.__name__ == "Diagram":
         return axiom.category

@@ -168,7 +168,7 @@ a first-order diagram, a copy followed by five boxes (@fig:neural_block).
 
 ```python
 from discopy import closed
-from discopy.closed import Ty, Tuple, let
+from discopy.closed.markov import Ty, Tuple, let
 
 E = Ty("E")
 names = ("query", "key", "value", "mlp")
@@ -178,9 +178,9 @@ term = E(lambda x: let(Tuple(query(x), key(x), value(x)),
     lambda q, k, v: let(attention(Tuple(q, k, v)), lambda a: mlp(a))))
 assert term.cod == E >> E
 
-q, k, v, m = [closed.Box(name, E, E) for name in names]
-neural_block = closed.Diagram.copy(E, 3) >> q @ k @ v >> closed.Box(
-    "attention", E ** 3, E) >> m
+q, k, v, m = [closed.markov.Box(name, E, E) for name in names]
+neural_block = closed.markov.Diagram.copy(E, 3) >> q @ k @ v\
+    >> closed.markov.Box("attention", E ** 3, E) >> m
 ```
 
 #drawing("neural_block", caption: [
@@ -199,11 +199,11 @@ from discopy import python
 
 layers = {name: torch.nn.Linear(4, 4) for name in names}
 layers["attention"] = lambda q, k, v: torch.softmax(q @ k.T / 2, -1) @ v
-F = closed.Functor(
+F = closed.markov.Functor(
     {E: python.Ty(torch.Tensor)}, lambda c: python.Function(
         lambda: layers[c.name], python.Ty(), F(c.cod)),
     cod=python.Function)
-G = closed.Functor({E: x}, lambda f: Box(
+G = closed.markov.Functor({E: x}, lambda f: Box(
     f.name, G(f.dom), G(f.cod), module=layers[f.name]), cod=Network)
 tokens = torch.randn(3, 4)
 output = Module(G(neural_block))(tokens)

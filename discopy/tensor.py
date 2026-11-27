@@ -1414,9 +1414,16 @@ class Elementwise(Box):
         >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
         >>> assert f.bubble(data=np.array([1, 2])) == f.bubble(data=[1, 2])
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
+
+        The func is compared but not hashed, since the hash of a function is
+        its address: equal bubbles keep equal hashes, the same in every
+        interpreter, and two bubbles differing only by their func share one.
+
+        >>> assert f.bubble(func=abs) != f.bubble(func=round)
+        >>> assert hash(f.bubble(func=abs)) == hash(f.bubble(func=round))
         """
         args = tuple(f.setoid() for f in self.args)
-        return (factory_key(type(self)), self.func)\
+        return (factory_key(type(self)), _Unhashed(self.func))\
             + args + Box.setoid(self)
 
     def __repr__(self):
@@ -1454,6 +1461,22 @@ class Elementwise(Box):
                 func=Diff(Symbol("tmp"), self.func),
                 drawing_name=name.format(self.drawing_name, var))\
             @ self.arg.grad(var) >> Diagram.spiders(2, 1, self.cod)
+
+
+class _Unhashed:
+    """
+    A component of a setoid compared by equality and left out of the hash,
+    e.g. the func of an :class:`Elementwise`: the hash of a function is its
+    address, which a hash the same in every interpreter cannot hold, see #506.
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        return isinstance(other, _Unhashed) and self.value == other.value
+
+    def __hash__(self):
+        return 0
 
 
 class Diff:
@@ -1497,7 +1520,7 @@ class Diff:
             and (self.var, self.func) == (other.var, other.func)
 
     def __hash__(self):
-        return hash((self.var, self.func))
+        return hash(self.var)
 
     def __repr__(self):
         func = "" if self.func is None else f", {func_repr(self.func)}"

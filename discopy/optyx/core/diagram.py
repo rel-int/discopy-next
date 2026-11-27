@@ -284,6 +284,17 @@ class Mode(Ty):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.n})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'n': self.n}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        if 'n' in tree:
+            return cls(tree['n'])
+        # a monoidal tree, or an outdated one listing its objects
+        return cls(len(tree['inside'] if 'inside' in tree
+                       else tree['objects']))
+
 
 class Bit(Ty):
     """Qubit type interpreted as the two dimensional complext vector space"""
@@ -294,6 +305,9 @@ class Bit(Ty):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.n})"
+
+    to_tree = Mode.to_tree
+    from_tree = classmethod(Mode.from_tree.__func__)
 
 
 @factory
@@ -651,10 +665,10 @@ class Diagram(frobenius.Diagram):
                 cod=self.cod,
                 inside=self.inside,
             )
-        except TypeError:
+        except TypeError as error:
             raise NotImplementedError(
                 "Conversion to PyZX is not implemented for this diagram."
-            )
+            ) from error
         return zx_diagram.to_pyzx()
 
     def inflate(self, d):
@@ -824,6 +838,24 @@ class Box(frobenius.Box, Diagram):
             else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.array is not None:
+            array = self.array
+            if hasattr(array, "detach"):  # a PyTorch tensor, maybe on a GPU
+                array = array.detach().cpu()
+            tree['array'] = np.asarray(array).tolist()
+        if self.is_dagger is None:
+            tree['is_dagger'] = None
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Box:
+        box = super().from_tree(tree)
+        if 'array' in tree:
+            box.array = np.asarray(tree['array'])
+        return box
 
     @staticmethod
     def array_wire_dims(ty: Ty, dims: list[int] = None) -> list[int]:
@@ -1214,6 +1246,10 @@ class Scalar(Box):
         return f"{factory_name(type(self))}"\
             f"({format_number(self.scalar, exact=True)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> Scalar:
+        return cls(tree['data'])
+
     def to_path(self, dtype: type = complex):
         return path.Matrix[dtype]([], 0, 0, scalar=self.scalar)
 
@@ -1341,6 +1377,17 @@ class DualRail(Box):
             args += f"{', ' if args else ''}internal_state={state}"
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.internal_state is not None:
+            tree['internal_state'] = np.asarray(self.internal_state).tolist()
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> DualRail:
+        return cls(is_dagger=tree.get('is_dagger', False),
+                   internal_state=tree.get('internal_state'))
+
 
 class PhotonThresholdDetector(Box):
     """
@@ -1395,6 +1442,10 @@ class PhotonThresholdDetector(Box):
         dagger = "is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({dagger})"
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> PhotonThresholdDetector:
+        return cls(is_dagger=tree.get('is_dagger', False))
+
     def inflate(self, d):
         from discopy.optyx.core.zw import Add
         dgrm = Add(d) >> PhotonThresholdDetector()
@@ -1428,6 +1479,15 @@ class EmbeddingTensor(tensor.Box):
     def __repr__(self):
         return f"{factory_name(type(self))}"\
             f"({self.input_dim}, {self.output_dim})"
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'input_dim': self.input_dim,
+                'output_dim': self.output_dim}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> EmbeddingTensor:
+        return cls(tree['input_dim'], tree['output_dim'])
 
     def conjugate(self):
         return self
