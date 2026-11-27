@@ -30,4 +30,5 @@ next-coordinator's `new-worktree.sh` does it) plus `--trailer LINE`; the session
   `done` on someone's fresh claim or on an unclaimed box (`--filed` needs no claim).
 - `finish` needs a fragment added to `changelog.d/` since the merge base with `--base` (default
   `origin/main`), and every fragment the branch adds or edits named
-  `changelog.d/<slug>.<section>[.<n>].md`. `--no-changelog` (no user-facing change) only warns.
+  `changelog.d/<slug>.<section>[.<n>].md`, `<section>` one of `added`, `changed`, `deprecated`,
+  `removed`, `fixed`, `project`. `--no-changelog` (no user-facing change) only warns.
