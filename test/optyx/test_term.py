@@ -66,7 +66,8 @@ flip = Box("X", qubit, qubit, data=np.array([[0, 1], [1, 0]]))
     Laxator(), Contraction(qubit) >> flip.bang() @ Weakening(qubit)])
 def test_transparency(term):
     from numpy import array  # noqa: F401
-    from discopy import bang, monoidal, optyx  # noqa: F401
+    from discopy import monoidal, optyx
+    from discopy import linear  # noqa: F401
     assert eval(repr(term)) == term
 
 

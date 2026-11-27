@@ -405,7 +405,8 @@ def test_only_to_diagram_needs_the_structure():
 
 
 def test_explicit_trace_on_a_subclass():
-    from discopy import cmap, symmetric as sym
+    from discopy import cmap
+    from discopy.feedback import symmetric as sym
     from discopy.utils import factory
 
     @factory
@@ -427,7 +428,7 @@ def test_explicit_trace_on_a_subclass():
     assert f.to_hypergraph().trace().to_diagram() == Reduce(f, False)
 
     Recipe.trace_factory = sym.Trace
-    with raises(TypeError, match="Expected .*Recipe, got symmetric.Trace"):
+    with raises(TypeError, match="Expected .*Recipe, got feedback.symmetric.Trace"):
         cmap.CMap[Recipe].from_box(f).trace().to_diagram()
 
 
@@ -568,7 +569,7 @@ def test_trace():
 
 
 def test_make_causal_cuts_every_backward_wire_at_once():
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     x = symmetric.Ty("x")
     f, g = symmetric.Box("f", x @ x, x @ x), symmetric.Box("g", x, x)
     cmap = (f.to_map() >> g.to_map() @ x).trace(2)
@@ -581,6 +582,7 @@ def test_make_causal_cuts_every_backward_wire_at_once():
 def test_make_causal_cuts_only_the_wires_on_a_cycle():
     """ Beside a scalar loop, boxes merely out of order are reordered rather
     than traced, see B71 of #31. """
+    from discopy.feedback import symmetric
     x = symmetric.Ty("x")
     f, g = symmetric.Box("f", x, x), symmetric.Box("g", x, x)
     unordered = symmetric.CMap(x, x, (f, g), [3, 4, 5, 0, 1, 2])
@@ -932,6 +934,7 @@ def test_curry_is_wiring_only_when_the_category_is_compact():
 
 
 def test_closed_to_compact():
+    from discopy.feedback import closed
     x, y, z = map(closed.Ty, "xyz")
     f = closed.Box("f", x @ y, z)
 

@@ -64,8 +64,10 @@ category, with the empty parameter space:
 
 >>> assert Symmetric.id(x) == Symmetric.lift(Diagram.id(x))
 >>> assert Symmetric.swap(x, y) == Symmetric.lift(Diagram.swap(x, y))
->>> t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y), p)
->>> assert t.trace().dom == x and t.trace().param == p
+>>> from discopy.feedback import symmetric
+>>> a, b, c, r = map(symmetric.Ty, "abcr")
+>>> t = Traced(a @ b, c @ b, symmetric.Box('t', a @ b @ r, c @ b), r)
+>>> assert t.trace().dom == a and t.trace().param == r
 
 The construction preserves each level of the hierarchy below symmetric:
 :class:`Traced`, :class:`Markov`, :class:`Comarkov`, :class:`Closed`,
@@ -163,6 +165,8 @@ from typing import Self
 
 from discopy import (
     symmetric, markov, comarkov, closed, compact, frobenius, messages)
+from discopy.feedback import markov as feedback_markov
+from discopy.feedback import symmetric as traced
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
@@ -408,6 +412,7 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
+    category = traced.Diagram
     trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
         messages.PARA_REPARAM)
     trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
@@ -554,7 +559,7 @@ class Feedback(Markov, FeedbackCategory):
         messages.FREE_FEEDBACK)
     tightening = FeedbackCategory.tightening.failing(
         messages.FREE_FEEDBACK)
-    category = markov.Diagram
+    category = feedback_markov.Diagram
 
     def delay(self, n_steps: int = 1) -> Feedback:
         """

@@ -5,9 +5,9 @@ from discopy.balanced import *
 def test_repr():
     x = Ty('x')
     assert repr(Twist(Ty('x')))\
-        == "balanced.Twist(feedback.Ty(feedback.Wire('x')))"
+        == "balanced.Twist(monoidal.Ty(monoidal.Wire('x')))"
     assert repr(Twist(Ty('x')).dagger())\
-        == "balanced.Twist(feedback.Ty(feedback.Wire('x'))).dagger()"
+        == "balanced.Twist(monoidal.Ty(monoidal.Wire('x'))).dagger()"
 
 
 def test_double_rail():
@@ -162,18 +162,20 @@ def test_dual_rail_keeps_twist_dagger():
 def test_trace_to_braided():
     """B78 of #31: the dual rail of a trace is the trace of the doubled
     wires, a balanced diagram with no twist, at the symmetric level too."""
+    from discopy.feedback import balanced, symmetric
     for module in (balanced, symmetric):
         z = module.Ty('z')
         g = module.Box('g', z @ z, z @ z)
         rails = double_rail(z @ z)
         image = g.trace().to_braided()
         assert isinstance(image, balanced.Diagram)
-        assert image == Box('g', rails, rails).trace(n=2)
+        assert image == balanced.Box('g', rails, rails).trace(n=2)
 
 
 def test_dual_rail_delay():
     """The dual rail of a delay is the delay of the dual rail, its boxes
     being built from their arguments, as for twists and braids."""
+    from discopy.feedback.balanced import Braid, Twist, Ty
     x, y = Ty('x'), Ty('y')
     for diagram in [Twist(x).dagger(), Braid(x, y) >> Twist(y) @ x]:
         assert diagram.delay().to_braided() == diagram.to_braided().delay()

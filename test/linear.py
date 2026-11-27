@@ -1,7 +1,8 @@
 from pytest import raises
 
-from discopy import bang
-from discopy.bang import *
+from discopy import linear
+from discopy.linear import monoidal as bang
+from discopy.linear.monoidal import *
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -64,7 +65,8 @@ def test_structural_primitives_of_a_linear_category():
 def test_bang_reads_back():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
-    namespace = vars(bang) | dict(x=x, y=y, f=f, bang=bang)
+    from discopy import linear
+    namespace = vars(bang) | dict(x=x, y=y, f=f, linear=linear)
     for thing in (
             x.bang(), (x @ y).bang().bang(), Ty().bang(), f.bang(), (f >> f[::-1]).bang(), Bang(f).bang(),
             Dereliction(x @ y), Digging(x.bang()), Contraction(x),
@@ -82,6 +84,7 @@ def test_Functor_sends_the_bang_through_the_codomain():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
     F = Functor({x: y, y: x}, {f: f[::-1]})
+    assert isinstance(F, linear.cat.Functor)
     assert F(x.bang()) == y.bang() and F(f.bang()) == f[::-1].bang()
     assert F(Dereliction(x)) == Dereliction(y)
     assert F(Exchange(x, y, True)) == Exchange(y, x, True)
@@ -181,3 +184,16 @@ def test_functor_bangs_wires_through_banged():
     assert F(x.bang()) == Ty('b') @ x
     with raises(ValueError):
         Diagram.copy(x.bang(), -1)
+
+
+def test_cat_needs_no_tensor():
+    from discopy.linear import cat
+    x, y = cat.Ob('x'), cat.Ob('y')
+    f = cat.Box('f', x, y)
+    assert not hasattr(cat.Arrow, "tensor")
+    promotion = cat.Digging(x) >> f.bang().bang()
+    F = cat.Functor({x: y, y: x}, {f: f[::-1]})
+    assert F(promotion) == cat.Digging(y) >> f[::-1].bang().bang()
+    assert loads(dumps(promotion)) == promotion
+    with raises(AxiomError):
+        cat.Dereliction(x).dagger()

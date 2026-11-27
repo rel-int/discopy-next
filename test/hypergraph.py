@@ -145,7 +145,7 @@ def test_Hypergraph_make_causal_does_not_assume_topological_order():
 
 
 def test_Hypergraph_depth_counts_states_and_effects():
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     x = Ty('x')
     state, effect = Box('f', Ty(), x), Box('g', x, Ty())
     scalar, f = Box('s', Ty(), Ty()), Box('f', x, x)
@@ -404,7 +404,7 @@ def test_Hypergraph_simplify_tries_each_pair_of_boxes_once(monkeypatch):
 
 
 def test_simplify():
-    from discopy.markov import Box, Ty, Copy, Swap, Trace, Equation
+    from discopy.feedback.markov import Box, Ty, Copy, Swap, Trace, Equation
     C, T, P = map(Ty, "CTP")
     linear, param_linear, add, placeholder = (
         Box('linear', T @ P, T),
@@ -756,7 +756,7 @@ def test_Hypergraph_to_tree():
 
 
 def test_trace_keeps_the_offsets():
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     x, y = symmetric.Ty('x'), symmetric.Ty('y')
     f = symmetric.Box('f', x, x)
     s, t = symmetric.Box('s', symmetric.Ty(), x), symmetric.Box('t', symmetric.Ty(), y)
@@ -767,7 +767,7 @@ def test_trace_keeps_the_offsets():
 
 
 def test_trace_takes_the_keyword_form():
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     from discopy.utils import AxiomError
     x, y = symmetric.Ty('x'), symmetric.Ty('y')
     f = symmetric.Box('f', x @ y, x @ y).to_hypergraph()
@@ -1226,7 +1226,8 @@ def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
     category are atomic and the nest is the onion of ``n`` pairs. So taking
     them in one pass is the same term, not just the same morphism.
     """
-    from discopy import compact, comarkov, frobenius, markov, symmetric
+    from discopy import compact, frobenius
+    from discopy.feedback import comarkov, markov, symmetric
     for module in (symmetric, markov, comarkov, compact, frobenius):
         x, a = module.Ty('x'), module.Ty('a')
         for n in (1, 2, 3):

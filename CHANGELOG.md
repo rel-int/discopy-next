@@ -201,7 +201,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `digging`, lax monoidal with a `laxator`, each `!x` a comonoid by
   `contraction` and `weakening`, and an invertible `exchange` of `!x` with
   any object, its 28 laws as axioms.
-  `discopy.bang` is the free one, its own module above `monoidal`: `BangOb`,
+  `discopy.linear.monoidal` is the free one, beside `monoidal`: `BangOb`,
   the wire holding a type inside `x.bang()`, `Bang`, the bubble `f.bang()`,
   and the boxes `Dereliction`, `Digging`, `Contraction`, `Weakening`,
   `Exchange` and `Laxator`. A `Functor` sends them through the `bang` and the
@@ -209,14 +209,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own.
   `Diagram.copy` and `Diagram.discard` copy a banged wire by contraction
   and discard it by weakening, and raise on any other type, and
-  `Diagram.wiring` copies and exchanges banged wires. `bang.TermBase`,
+  `Diagram.wiring` copies and exchanges banged wires. `linear.monoidal.TermBase`,
   `Variable`, `Constant`, `Application` and `Kappa` are the kappa terms of
   `monoidal` where a banged variable is shared by contraction and, unused,
-  discarded by weakening, a `bang.Ty` applied to a function is a
-  `bang.Kappa` through its `term_factory`, with a box or without, and a box
+  discarded by weakening, a `linear.monoidal.Ty` applied to a function is a
+  `linear.monoidal.Kappa` through its `term_factory`, with a box or without, and a box
   called on terms is its constant applied to them, e.g. `f.bang()(x)`. The laws are declared failing on the free category. `optyx.Term`, in
   `optyx.term`, is a diagram of it on the dual-rail `qubit`, written with
-  `f.bang()` in the function syntax or as a kappa term of `bang`, and
+  `f.bang()` in the function syntax or as a kappa term of `linear.monoidal`, and
   `Term.to_channel` compiles it to an optical protocol, `!` as Fock space,
   but for `Digging`, `Laxator` and boxes on more than one qubit:
   a bang to the second quantisation of its unitary, the conjugate transpose
@@ -601,6 +601,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#458], [next#1]).
 
 ### Changed
+
+- `discopy.feedback` and `discopy.linear` are packages, see
+  `docs/adr/0012-feedback-and-linear-are-packages.md`. The levels with feedback
+  are `feedback.balanced`, `feedback.symmetric`, `feedback.markov`,
+  `feedback.comarkov` and `feedback.closed`; `discopy.balanced`, `symmetric`,
+  `markov`, `comarkov` and `closed` are no longer feedback or traced, their
+  wires carry no time step and their `Trace`, `Feedback`, `FollowedBy`,
+  `Head`, `Tail`, `Diagram.wait` and `closed.Timed` moved with no alias.
+  `abc.BalancedCategory` is no longer traced, `abc.BalancedTracedCategory`
+  states its yanking. `pivotal`, `ribbon`, `compact` and `frobenius` keep
+  their trace of cups and caps. `discopy.bang` is `discopy.linear.monoidal`,
+  with no alias, over `discopy.linear.cat`, the free `abc.ComonadCategory`,
+  i.e. bang, dereliction and digging with no tensor; contraction, weakening,
+  laxator and exchange stay in `linear.monoidal`. `abc.GoISituation` states a
+  symmetric traced bang and a reflexive object, with no free one. Feedback and linear
+  do not import each other. `Hypergraph.glue` is the trace of a symmetric
+  hypergraph with no condition on its category, which `plug` uses to rewrite
+  ([next#737]).
 
 - `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
   alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
@@ -1076,9 +1094,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and `to_tree`, and `proptest/corpus/zx.py` replays both `pickling` cells
   ([next#725]).
 
-- `bang.Diagram` declares `dagger_involution` and `dagger_contravariance`
+- `linear.monoidal.Diagram` declares `dagger_involution` and `dagger_contravariance`
   failing, since every structural box but the exchange has no dagger, and
-  `proptest/corpus/bang.py` replays them on the structural boxes its strategy
+  `proptest/corpus/linear.py` replays them on the structural boxes its strategy
   does not draw ([next#721]).
 
 - `docs/notebooks/optyx/readme_example.md`, the old optyx README, executes
@@ -2923,6 +2941,7 @@ for the changelog of `1.2.1` and earlier.
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
+[next#737]: https://github.com/rel-int/discopy-next/pull/737
 [next#746]: https://github.com/rel-int/discopy-next/pull/746
 [next#764]: https://github.com/rel-int/discopy-next/pull/764
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

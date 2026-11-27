@@ -44,7 +44,7 @@ We can define the Fibonacci sequence as a Markov diagram, which is a feedback
 diagram, interpreted in the category of streams of python types and functions.
 
 >>> from discopy import *
->>> from discopy.markov import *
+>>> from discopy.feedback.markov import *
 
 >>> X = Ty('X')
 >>> fby, wait = FollowedBy(X), Swap(X, X.d).feedback()
@@ -70,7 +70,7 @@ diagram, interpreted in the category of streams of python types and functions.
     :align: center
 
 >>> cod = stream.Stream[python.Function]
->>> F = markov.Functor(
+>>> F = Functor(
 ...     ob_map={X: int},
 ...     ar_map={zero: cod.singleton(python.Function(lambda: 0, (), int)),
 ...         one: cod.singleton(python.Function(lambda: 1, (), int)),
@@ -467,7 +467,7 @@ class Memory:  # pylint: disable=too-few-public-methods  # a subscript only
     box compares its class, so no box a user builds is read as one of them.
 
     >>> import pickle
-    >>> from discopy import stream, feedback
+    >>> from discopy import monoidal, stream
     >>> box = Memory[symmetric.Box](MEMORY, *2 * [symmetric.Ty('x')])
     >>> assert box != symmetric.Box(MEMORY, *2 * [symmetric.Ty('x')])
     >>> assert eval(repr(box)) == box == pickle.loads(pickle.dumps(box))

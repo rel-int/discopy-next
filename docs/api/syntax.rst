@@ -31,7 +31,7 @@ forgetful functors between the categories go the other way.
     comarkov
     closed
     biclosed
-    bang
+    linear
     rigid
     pivotal
     ribbon

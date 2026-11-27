@@ -54,6 +54,7 @@ Summary
     R
     Delay
     Bang
+    Reflexive
     Over
     Under
     Repeat
@@ -533,13 +534,24 @@ class Bang[Coarse, Object](Constructor):
     :class:`Delay` reads the delay, so that a category whose bang is the
     identity reads each object as its own bang.
 
-    >>> from discopy.bang import Ty, Diagram
+    >>> from discopy.linear.monoidal import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
     """
     @staticmethod
     def form(*args):
         category, obj = args
         return category.id(obj).bang().dom
+
+
+class Reflexive[Coarse](Constructor):
+    """
+    The reflexive object of a :class:`~discopy.abc.GoISituation` ``Coarse`` in
+    a signature, i.e. ``Coarse.reflexive()``.
+    """
+    @staticmethod
+    def form(*args):
+        category, = args
+        return category.reflexive()
 
 
 class Over[Base, Exponent](Constructor):
@@ -935,8 +947,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``Diagram.yanking = BalancedCategory.yanking.modulo(
-        Diagram.to_hypergraph)`` in :mod:`~discopy.symmetric`.
+        ``Diagram.yanking = BalancedTracedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`~discopy.feedback.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
