@@ -919,13 +919,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- Every remaining box of `optyx.photonic` writes and reads its own tree:
-  `Swap` from `left` and `right`, `Create` and `Select` from `photons`,
-  `Create` and `DualRail` with their `internal_states`, `Gate` from its
-  `array`, `Scalar`, `PhaseShiftDR` and `PhotonLoss` from their `data`,
-  `PhotonThresholdMeasurement` from its domain, and `NumOp` and `HadamardBS`
-  with no argument, so `loads(dumps(...))` round-trips across `optyx.photonic`
-  ([next#731]).
 - `quantum.tk.to_tk` drops destructively measured qubits when
   `Measure(override_bits=True)` overrides existing bits, so gates and
   measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
@@ -993,6 +986,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `monoidal.Functor.id(monoidal.Diagram)` on a box over `rigid.Ty('x')`, its
   images compose and a dict `ob_map` keyed on the type finds it
   ([next#703]).
+- Every remaining box of `optyx.photonic` writes and reads its own tree:
+  `Swap` from `left` and `right`, `Create` and `Select` from `photons`,
+  `Create` and `DualRail` with their `internal_states`, `Gate` from its
+  `array`, `Scalar`, `PhaseShiftDR` and `PhotonLoss` from their `data`,
+  `PhotonThresholdMeasurement` from its domain, and `NumOp` and `HadamardBS`
+  with no argument, so `loads(dumps(...))` round-trips across `optyx.photonic`
+  ([next#731]).
 
 - `optyx` channels and gates load their own tree: `channel.Measure`,
   `Encode` and `Discard` and their `photonic` and `qubits` subclasses from
