@@ -80,7 +80,7 @@ string is a map from positions to positions, a term of type
 ``String = Position >> Position``. A word is a constant of that type, the
 empty string is the identity ``Position(lambda x: x)`` and concatenation is
 composition, ``John.compose(seeks)`` for *John seeks*, see
-:meth:`~discopy.closed.TermBase.compose`: the paper writes it
+:meth:`~discopy.closed.markov.TermBase.compose`: the paper writes it
 ``lambda z. x (y z)`` with the first word applied last, here the first word
 is applied first, so a string reads its positions in order.
 
@@ -349,7 +349,7 @@ from discopy.lambek import categorial
 
 
 @factory
-class Ty(closed.Ty):
+class Ty(closed.markov.Ty):
     "An implicative type, the type of an abstract categorial grammar."
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
@@ -368,14 +368,14 @@ class Ty(closed.Ty):
         return cls.from_biclosed(old)
 
 
-class Exp(closed.Exp):
+class Exp(closed.markov.Exp):
     "An exponential object in an abstract categorial grammar."
 
     ob = Ty
 
 
 @factory
-class Diagram(closed.Diagram):
+class Diagram(closed.markov.Diagram):
     """
     An abstract diagram is a closed diagram with words as boxes, i.e. a
     derivation in an abstract categorial grammar.
@@ -470,31 +470,31 @@ class Diagram(closed.Diagram):
         return functor(diagram)
 
 
-class Box(closed.Box, Diagram):
+class Box(closed.markov.Box, Diagram):
     "An abstract box is a closed box in an abstract diagram."
 
 
-class Eval(closed.Eval, Box):
+class Eval(closed.markov.Eval, Box):
     "The evaluation of an exponential type."
 
 
-class Coeval(closed.Coeval, Box):
+class Coeval(closed.markov.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
 
 
-class Curry(closed.Curry, Box):
+class Curry(closed.markov.Curry, Box):
     "The currying of an abstract diagram."
 
 
-class Copy(closed.Copy, Box):
+class Copy(closed.markov.Copy, Box):
     "The copy of an abstract type, or its discard when ``n=0``."
 
 
-class Discard(closed.Discard, Copy):
+class Discard(closed.markov.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
-class Function(closed.Function, Box):
+class Function(closed.markov.Function, Box):
     """
     A markov function in an abstract diagram, which copies or discards, so
     that plumbing tensors into a function of this level rather than of
@@ -505,22 +505,22 @@ class Function(closed.Function, Box):
     """
 
 
-class Permutation(closed.Permutation, Box):
+class Permutation(closed.markov.Permutation, Box):
     "A permutation of abstract types."
 
 
 Function.register(Permutation)
 
 
-class Swap(Permutation, closed.Swap, Box):
+class Swap(Permutation, closed.markov.Swap, Box):
     "The symmetric swap of two abstract types."
 
 
-class Sum(closed.Sum, Box):
+class Sum(closed.markov.Sum, Box):
     "A formal sum of abstract diagrams."
 
 
-class Functor(closed.Functor):
+class Functor(closed.markov.Functor):
     """
     An abstract functor is a closed functor with abstract diagrams as domain.
 
@@ -562,7 +562,7 @@ class Lexicon(Functor):
     dom = cod = Diagram
 
     def parse(self, target, start: Ty, depth: int,
-              functor: closed.Functor) -> list[Term]:
+              functor: closed.markov.Functor) -> list[Term]:
         """
         The abstract terms of type ``start``, with constants nested at most
         ``depth`` deep, that the lexicon then ``functor`` send to ``target``:
@@ -614,7 +614,8 @@ class Lexicon(Functor):
         def applied(term, value, dom, cod, n):
             if dom == cod:
                 yield term, value
-            if len(dom) == 1 and isinstance(exp := dom.inside[0], closed.Exp):
+            if len(dom) == 1 and isinstance(
+                    exp := dom.inside[0], closed.markov.Exp):
                 if exp.exponent not in wires:
                     wires[exp.exponent] = len(functor(self(exp.exponent)))
                 for arg, arg_value in terms(exp.exponent, n - 1):
@@ -625,7 +626,8 @@ class Lexicon(Functor):
                 if value == target]
 
     @staticmethod
-    def productions(term: closed.Term, parent: closed.Term | None = None,
+    def productions(term: closed.markov.Term,
+                    parent: closed.markov.Term | None = None,
                     position: int = 0):
         """
         The productions of a derivation, i.e. of a term of constants applied
@@ -691,28 +693,28 @@ class Lexicon(Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, closed.TermBase):
+class TermBase(Box, closed.markov.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
-    strategy = classmethod(closed.TermBase.strategy.__func__)
+    strategy = classmethod(closed.markov.TermBase.strategy.__func__)
 
 
-class Constant(TermBase, closed.Constant):
+class Constant(TermBase, closed.markov.Constant):
     "A constant of the vocabulary of an abstract categorial grammar."
 
 
 Word = Constant
 
 
-class Variable(TermBase, closed.Variable):
+class Variable(TermBase, closed.markov.Variable):
     "A variable term in an abstract categorial grammar."
 
 
-class Application(TermBase, closed.Application):
+class Application(TermBase, closed.markov.Application):
     "The application of an abstract term to another."
 
 
-class Abstraction(TermBase, closed.Abstraction):
+class Abstraction(TermBase, closed.markov.Abstraction):
     "The abstraction of a variable in an abstract term."
 
 
@@ -737,7 +739,7 @@ Ty.abstraction_factory = Abstraction
 Hypergraph = hypergraph.Hypergraph[Diagram]
 for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
-    setattr(Hypergraph, law, vars(closed.Hypergraph)[law])
+    setattr(Hypergraph, law, vars(closed.markov.Hypergraph)[law])
 
 Position = Ty("o")
 """ The atomic type of positions in a string, an arbitrary atom. """
@@ -747,7 +749,7 @@ String = Position >> Position
 The type of strings, maps from positions to positions: a word is a constant
 of type ``String``, ``Position(lambda x: x)`` is the empty string and
 ``John.compose(seeks)`` their concatenation, see
-:meth:`~discopy.closed.TermBase.compose`.
+:meth:`~discopy.closed.markov.TermBase.compose`.
 """
 
 # pylint: disable-next=wrong-import-position  # proofnet imports this module

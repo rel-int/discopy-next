@@ -83,23 +83,23 @@ def test_comarkov():
 
 
 def test_closed():
-    a, b, c, P = map(closed.Ty, "abcP")
-    k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
-    assert Closed.ev(c, b).param == closed.Ty()
+    a, b, c, P = map(closed.markov.Ty, "abcP")
+    k = Closed(a @ b, c, closed.markov.Box('k', a @ b @ P, c), P)
+    assert Closed.ev(c, b).param == closed.markov.Ty()
     left, right = k.curry(left=True), k.curry(left=False)
     assert k.curry() == left
     assert k.curry(0) == k == k.curry(0, left=False)
     assert (left.dom, left.cod, left.param) == (a, c << b, P)
     assert (right.dom, right.cod, right.param) == (b, a >> c, P)
     assert left.inside\
-        == (a @ closed.Diagram.swap(P, b) >> k.inside).curry(left=True)
+        == (a @ closed.markov.Diagram.swap(P, b) >> k.inside).curry(left=True)
     with raises(ValueError):
-        Closed(a @ b, c, closed.Box('k', a @ b, c @ P), copar=P).curry()
+        Closed(a @ b, c, closed.markov.Box('k', a @ b, c @ P), copar=P).curry()
 
 
 def test_closed_curry_stays_in_the_domain():
-    a, b, c, P = map(closed.Ty, "abcP")
-    k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
+    a, b, c, P = map(closed.markov.Ty, "abcP")
+    k = Closed(a @ b, c, closed.markov.Box('k', a @ b @ P, c), P)
     for n, left in [(3, True), (3, False), (-1, True), (-1, False)]:
         with raises(ValueError, match="off a @ b"):
             k.curry(n, left=left)
@@ -191,11 +191,11 @@ def test_copar_python():
 
 def terms():
     m, X = Ty('m'), frobenius.Ty('x')
-    a, b, c, P = map(closed.Ty, "abcP")
+    a, b, c, P = map(closed.markov.Ty, "abcP")
     return (f, f >> g, f @ g, Symmetric.id(x),
             Symmetric(x, y, Box('t', x @ p, y @ m), p, m),
             Hypergraph.spiders(1, 2, X),
-            Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P))
+            Closed(a @ b, c, closed.markov.Box('k', a @ b @ P, c), P))
 
 
 def test_tree():

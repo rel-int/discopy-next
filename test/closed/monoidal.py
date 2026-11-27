@@ -1,9 +1,21 @@
 import sys
-from discopy.biclosed import *
-from discopy import biclosed, cat, monoidal
+from discopy.closed.monoidal import *
+from discopy import closed, cat, monoidal
 from discopy.testable import Related
 from discopy.utils import dumps, loads
 from pytest import mark, raises
+
+
+def loads_renamed(data: bytes):
+    """ Load a pickle of main, from before ``biclosed`` was renamed. """
+    import io
+    import pickle
+
+    class Unpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            return super().find_class(module.replace(
+                "discopy.biclosed", "discopy.closed.monoidal"), name)
+    return Unpickler(io.BytesIO(data)).load()
 
 
 def test_Over():
@@ -17,8 +29,8 @@ def test_Over():
     assert not isinstance((x << y).inside[0], Ty)
     assert (x << y).inside == (Over(x, y), )
     assert repr(Over(x, y))\
-        == "biclosed.Over(biclosed.Ty(biclosed.Wire('x')), "\
-           "biclosed.Ty(biclosed.Wire('y')))"
+        == "closed.monoidal.Over(closed.monoidal.Ty(closed.monoidal.Wire('x')), "\
+           "closed.monoidal.Ty(closed.monoidal.Wire('y')))"
     assert {Over(x, y): 42}[Over(x, y)] == 42
     assert Over(x, y) != Under(x, y)
 
@@ -38,8 +50,8 @@ def test_Under():
     assert not isinstance((x >> y).inside[0], Ty)
     assert (x >> y).inside == (Under(y, x), )
     assert repr(Under(x, y))\
-        == "biclosed.Under(biclosed.Ty(biclosed.Wire('x')), "\
-           "biclosed.Ty(biclosed.Wire('y')))"
+        == "closed.monoidal.Under(closed.monoidal.Ty(closed.monoidal.Wire('x')), "\
+           "closed.monoidal.Ty(closed.monoidal.Wire('y')))"
     assert {Under(x, y): 42}[Under(x, y)] == 42
     assert Under(x, y) != Over(x, y)
 
@@ -333,25 +345,25 @@ def test_deep_terms():
 
 def test_mapping_preserves_binding_and_lexical_boundaries():
     from discopy import closed
-    X, Y, Z = map(closed.Ty, "XYZ")
-    x, y = closed.Variable("v", X), closed.Variable("v", Y)
+    X, Y, Z = map(closed.markov.Ty, "XYZ")
+    x, y = closed.markov.Variable("v", X), closed.markov.Variable("v", Y)
     f = (X >> (Y >> X))("f")
     g = (Z >> (Z >> Z))("g")
-    F = closed.Functor({X: Z, Y: Z}, {f: g})
-    term = closed.Abstraction(x, f(x)(y))
-    assert closed.Functor.id()(term) == term
-    assert closed.Functor.id()(f(x)(y)) == f(x)(y)
+    F = closed.markov.Functor({X: Z, Y: Z}, {f: g})
+    term = closed.markov.Abstraction(x, f(x)(y))
+    assert closed.markov.Functor.id()(term) == term
+    assert closed.markov.Functor.id()(f(x)(y)) == f(x)(y)
     image = F(term)
     assert len(image.freevars) == 1 and image.dom == Z
     assert image.var != image.freevars[0]
     assert len(F(f(x)(y)).freevars) == 2
     a = X("a")
-    for bad in [closed.Variable("v", Z), closed.Box("bad", Z, Z)]:
+    for bad in [closed.markov.Variable("v", Z), closed.markov.Box("bad", Z, Z)]:
         with raises(AxiomError):
-            closed.Functor({X: Z}, {a: bad})(a)
-    unit = closed.Ty()
+            closed.markov.Functor({X: Z}, {a: bad})(a)
+    unit = closed.markov.Ty()
     with raises(AxiomError):
-        closed.Functor({X: unit}, {a: closed.Variable("v", unit)})(a)
+        closed.markov.Functor({X: unit}, {a: closed.markov.Variable("v", unit)})(a)
 
 
 def test_transparency():
@@ -362,15 +374,14 @@ def test_transparency():
                 curry(), curry(left=False), Constant('c', x), v, f(v),
                 v(g, left=True), x(lambda u: f(u)),
                 x(lambda u, left=True: u(g, left=True))]:
-        assert eval(repr(box), {"biclosed": biclosed, "monoidal": monoidal})\
+        assert eval(repr(box), {"closed": closed, "monoidal": monoidal})\
             == box
         assert loads(dumps(box)) == box
 
 
 def test_repr_of_constants_keeps_their_data():
-    from discopy import closed
-    env = {"biclosed": biclosed, "closed": closed}
-    for mod in (biclosed, closed):
+    env = {"closed": closed}
+    for mod in (closed.monoidal, closed.markov):
         x = mod.Ty('x')
         f, c = mod.Constant('f', x << x, data=1), mod.Constant('c', x, data=3)
         for term in (c, f(c)):
@@ -381,16 +392,15 @@ def test_Wire_reads_back_main():
     """ The objects of a biclosed type are biclosed wires, and the plain
     monoidal ones of dumps, pickles and printed text from before read back as
     such, in categorial types too. """
-    import pickle
     from discopy.lambek import categorial
     x = Ty('x')
     assert Ty(Wire('x')) == x == Ty(cat.Ob('x')) and type(x.inside[0]) is Wire
-    assert eval("biclosed.Ty(monoidal.Wire('x'))") == x
+    assert eval("closed.monoidal.Ty(monoidal.Wire('x'))") == x
     wire = '{"factory": "monoidal.Wire", "name": "x"}'
-    assert loads('{"factory": "biclosed.Ty", "inside": [' + wire + ']}') == x
+    assert loads('{"factory": "closed.monoidal.Ty", "inside": [' + wire + ']}') == x
     assert loads('{"factory": "lambek.categorial.Ty", "inside": ['
                  + wire + ']}') == categorial.Ty('x')
-    assert pickle.loads(
+    assert loads_renamed(
         b'\x80\x04\x95\xab\x00\x00\x00\x00\x00\x00\x00\x8c\x10discopy.bicl'
         b'osed\x94\x8c\x02Ty\x94\x93\x94)\x81\x94}\x94(\x8c\x03dom\x94\x8c'
         b'\x10discopy.monoidal\x94\x8c\x06Colour\x94\x93\x94)\x81\x94}\x94'
@@ -404,7 +414,7 @@ def test_Wire_reads_back_main():
     for atom in (monoidal.Wire('x', red, blue), rigid.Wire('x', z=1)):
         assert Ty(atom).inside == (atom, )
     with raises(TypeError):
-        closed.Ty(monoidal.Wire('x'))
+        closed.markov.Ty(monoidal.Wire('x'))
 
 
 def test_the_empty_type_of_a_colour_reads_back():
@@ -413,10 +423,10 @@ def test_the_empty_type_of_a_colour_reads_back():
     see #636. """
     black = monoidal.Colour('black')
     unit = Ty.id(black)
-    assert repr(unit) == "biclosed.Ty.id(monoidal.Colour('black'))"
-    assert eval(repr(unit), {'biclosed': biclosed, 'monoidal': monoidal})\
+    assert repr(unit) == "closed.monoidal.Ty.id(monoidal.Colour('black'))"
+    assert eval(repr(unit), {"closed": closed, "monoidal": monoidal})\
         == unit != Ty()
-    assert repr(Ty()) == "biclosed.Ty()"
+    assert repr(Ty()) == "closed.monoidal.Ty()"
 
 
 def test_rigid_type_is_biclosed():
@@ -424,7 +434,8 @@ def test_rigid_type_is_biclosed():
     from discopy import closed, rigid
     x, y = rigid.Ty('x'), rigid.Ty('y')
     f = rigid.Box('f', x, y)
-    assert f.to_rigid() == f and closed.Ty.from_biclosed(x) == closed.Ty('x')
+    assert f.to_rigid() == f
+    assert closed.markov.Ty.from_biclosed(x) == closed.markov.Ty('x')
     assert Functor.id(Diagram)(x) == x  # a type of a higher level, next#703
 
 
@@ -435,18 +446,18 @@ def test_pow_is_over():
     import json
     from discopy import rigid
     from discopy.lambek import categorial, pregroup
-    for module in (biclosed, rigid, pregroup, categorial):
+    for module in (closed.monoidal, rigid, pregroup, categorial):
         x, y = module.Ty('x'), module.Ty('y')
         assert x ** y == x << y
     x, y = Ty('x'), Ty('y')
     assert str(x ** y) == "(x << y)" and Ty(Exp(x, y)) == x ** y
 
     def atom(name):
-        return {"factory": "biclosed.Ty",
+        return {"factory": "closed.monoidal.Ty",
                 "inside": [{"factory": "monoidal.Wire", "name": name}]}
-    old = loads(json.dumps({"factory": "biclosed.Eval", "left": True, "x": {
-        "factory": "biclosed.Ty", "inside": [{
-            "factory": "biclosed.Exp", "base": atom("x"),
+    old = loads(json.dumps({"factory": "closed.monoidal.Eval", "left": True, "x": {
+        "factory": "closed.monoidal.Ty", "inside": [{
+            "factory": "closed.monoidal.Exp", "base": atom("x"),
             "exponent": atom("y")}]}}))
     F, g = Functor.id(Diagram), Box('g', x, x ** y)
     for diagram in (g @ y >> Eval(x ** y), g @ y >> old):
@@ -458,12 +469,11 @@ def test_pow_reads_back_main_at_its_level():
     built by hand or read back from a pickle of main, as is the name of its
     evaluation. """
     import base64
-    import pickle
     import zlib
     from discopy.lambek import categorial
     x, y = categorial.Ty('x'), categorial.Ty('y')
     assert categorial.Ty(Exp(x, y)) == x ** y == x << y
-    old = pickle.loads(zlib.decompress(base64.b64decode(
+    old = loads_renamed(zlib.decompress(base64.b64decode(
         "eNqNUktPwjAcBzbGUEB8oagHj8CBL6HcDCcTj6SldW3c1mUPsx1I5ADRpDfqd/Rj"
         "2LF1yQSNS5ol/f+ebd/0z69aZfvxPqLBnHnJ2AYOxC/jOQixxXwKbMEb9xRYPnA2"
         "w+ViwDXEHEEqvPaYiI0YLsViQKq8q/gOcxlFKc24YzaL/M0WwnUXOFjIH3Mxr9sA"
@@ -533,8 +543,7 @@ def test_Curry_of_no_wire_maps_as_its_argument():
 
 
 def test_term_inside_a_diagram_is_drawn_as_one_box():
-    from discopy import closed
-    for module in (biclosed, closed):
+    for module in (closed.monoidal, closed.markov):
         X, Y = module.Ty('X'), module.Ty('Y')
         g = (Y << X)('g')
         for term in (g(X('a')), X(lambda x: g(x))):
