@@ -633,7 +633,7 @@ class Sum(cat.Sum):
         """
         The factory a sum builds sums with, which fixes its ``dtype``, so
         that the ring survives every operation of
-        :class:`discopy.cat.Sum` — ``dagger``, ``then``, ``tensor``,
+        :class:`~discopy.cat.Sum` — ``dagger``, ``then``, ``tensor``,
         ``subs`` — including the ones that leave no term to read it from.
         """
         return lambda terms, dom=None, cod=None: type(self)(
@@ -642,10 +642,10 @@ class Sum(cat.Sum):
     def setoid(self):
         """
         A sum is faithfully described by its terms and its boundary, where
-        :meth:`discopy.cat.Sum.setoid` reads a singleton sum as its only
+        :meth:`~discopy.cat.Sum.setoid` reads a singleton sum as its only
         term: a :class:`Matrix` is not an arrow, so it has no setoid. A
         matrix is not hashable either, so neither is a sum: ``__hash__`` is
-        ``None`` rather than the :meth:`discopy.cat.Arrow.__hash__` that
+        ``None`` rather than the :meth:`~discopy.cat.Arrow.__hash__` that
         would raise on the terms.
 
         The ``dtype`` is part of it, as it is of a matrix's own equality,

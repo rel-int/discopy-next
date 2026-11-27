@@ -2,11 +2,11 @@
 The drawings of terms, i.e. with the brackets that say how they were built.
 
 A string diagram draws the value of a term, so that the two sides of an axiom
-of :mod:`discopy.abc` draw the same, e.g. ``(f >> g) >> h`` and
+of :mod:`~discopy.abc` draw the same, e.g. ``(f >> g) >> h`` and
 ``f >> (g >> h)``. A :class:`Bracketed` term of a free category is drawn with
-its :attr:`~discopy.drawing.drawing.Drawing.bracketing`: each operation puts
+its :attr:`~discopy.drawing.planegraph.Drawing.bracketing`: each operation puts
 every operand that is itself the result of an operation in a dotted
-:meth:`~discopy.drawing.drawing.Drawing.bracket`, a generator or an identity
+:meth:`~discopy.drawing.planegraph.Drawing.bracket`, a generator or an identity
 in none, and the term itself, i.e. its outermost operation, in none either.
 Each axiom thus draws itself from its
 :meth:`~discopy.testable.Declaration.generic` instance in its
@@ -80,7 +80,7 @@ from importlib import import_module
 
 from discopy import messages, monoidal
 from discopy.abc import Category, DaggerCategory, TracedCategory
-from discopy.drawing.drawing import Drawing
+from discopy.drawing.planegraph import Drawing
 from discopy.testable import Axiom, AxiomFailure, Equation, TestableGeneric
 from discopy.utils import classproperty, factory, unbiased
 
@@ -165,9 +165,9 @@ class Bracketed[free](TestableGeneric, DaggerCategory, TracedCategory):
     A term of the ``free`` category with its drawing, bracketed: its value is
     the arrow it evaluates to and its drawing that of the operations it was
     built with, each of which brackets its compound operands, see
-    :attr:`discopy.drawing.drawing.Drawing.bracketing`. Its identities and
+    :attr:`~discopy.drawing.planegraph.Drawing.bracketing`. Its identities and
     generators delegate to the free category and its operations to both, so
-    that an axiom of :mod:`discopy.abc` evaluated on it builds the drawing of
+    that an axiom of :mod:`~discopy.abc` evaluated on it builds the drawing of
     each of its sides.
 
     The operations draw as follows: :meth:`then` and :meth:`tensor` set their
@@ -290,7 +290,7 @@ class Bracketed[free](TestableGeneric, DaggerCategory, TracedCategory):
         """
         The identity of the free category, drawn longer than a box so that
         composing with it shows, e.g. in
-        :meth:`discopy.abc.Category.unitality`, rather than leaving the
+        :meth:`~discopy.abc.Category.unitality`, rather than leaving the
         drawing as it is.
 
         Parameters:
@@ -371,7 +371,8 @@ class Bracketed[free](TestableGeneric, DaggerCategory, TracedCategory):
         return self.drawing.relabel_nodes()
 
     def draw(self, **params):
-        """ Draw the term, see :meth:`discopy.drawing.drawing.Drawing.draw`.
+        """
+        Draw the term, see :meth:`~discopy.drawing.planegraph.Drawing.draw`.
         """
         return self.to_drawing().draw(**params)
 
@@ -382,7 +383,7 @@ def free_category(axiom: Axiom) -> type | None:
     is a ``Diagram``, else the first one of :data:`FREE_CATEGORIES` below the
     class stating it that does not declare it inapplicable and has every
     name it uses that one of them has, see :func:`vocabulary`, :obj:`None`
-    when there is none, e.g. for :meth:`discopy.abc.Groupoid.invertibility`.
+    when there is none, e.g. for :meth:`~discopy.abc.Groupoid.invertibility`.
 
     >>> from discopy.abc import Category, TracedCategory, BalancedCategory
     >>> print(free_category(Category.associativity).__module__)
@@ -430,7 +431,7 @@ def applies(axiom: Axiom) -> bool:
 
 def stated_axioms(category: type) -> dict[str, Axiom]:
     """
-    The axioms a class of :mod:`discopy.abc` states itself, rather than
+    The axioms a class of :mod:`~discopy.abc` states itself, rather than
     inherits, which :func:`equation` draws, bound to that class: those it
     declares inapplicable state nothing.
 
@@ -451,7 +452,7 @@ def equation(axiom: Axiom) -> Equation:
     :func:`free_category`, of which each argument becomes a
     :class:`Bracketed` term. A law the free category declares broken, e.g.
     because it is not quotiented by it, is drawn all the same, and one
-    between objects, e.g. :meth:`discopy.abc.PivotalCategory.self_dual`, as
+    between objects, e.g. :meth:`~discopy.abc.PivotalCategory.self_dual`, as
     the equation between their identities.
 
     Parameters:

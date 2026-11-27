@@ -59,7 +59,7 @@ inequality whose normalised violation by :math:`e` is exactly
 :math:`e^{SC}`.
 
 Quantum empirical models arise from local measurements on a state: the
-:class:`discopy.quantum.channel.Functor` sends the circuit
+:class:`~discopy.quantum.channel.Functor` sends the circuit
 ``state >> m_1 @ ... @ m_n`` of each context to the distribution
 ``F(state) >> F(m_1) @ ... @ F(m_n)``. They also arise from an optyx diagram
 with a classical input choosing the measurement of each party and a classical
@@ -723,10 +723,10 @@ class Model(Table):
         The empirical model on a Bell scenario of an optyx diagram with one
         classical input and some classical outputs for each party, the input
         choosing the measurement of the party and the outputs its outcome,
-        evaluated by :func:`discopy.optyx.contextuality.distributions`.
+        evaluated by :func:`~discopy.optyx.contextuality.distributions`.
 
         Parameters:
-            diagram : A :class:`discopy.optyx.channel.Diagram` with classical
+            diagram : A :class:`~discopy.optyx.channel.Diagram` with classical
                 domain and codomain.
             settings : The number of measurements of each party, or one
                 number for every party.

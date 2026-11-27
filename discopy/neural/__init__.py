@@ -2,29 +2,29 @@
 
 """
 ``discopy.neural`` interprets DisCoPy diagrams as neural networks:
-:mod:`discopy.neural.network` is the traced category of feedforward
+:mod:`~discopy.neural.network` is the traced category of feedforward
 networks, with lists of shapes :class:`Dims` as objects and layers as boxes,
-compiling to a function on tensors that :mod:`discopy.neural.torch` runs as
+compiling to a function on tensors that :mod:`~discopy.neural.torch` runs as
 a PyTorch module and ``jax.jit`` takes as it is, and to its reverse
 derivative, a lens whose ``put`` is backpropagation.
-:mod:`discopy.neural.propagation` is the sum-product algorithm as such a
+:mod:`~discopy.neural.propagation` is the sum-product algorithm as such a
 network with a trace, equal on a tree to the contraction of its tensors
 once it has run for as many rounds as the radius of the tree.
-:mod:`discopy.neural.signature` says what a generator of a source category
+:mod:`~discopy.neural.signature` says what a generator of a source category
 promises: its legs grouped into orbits, the symmetry each orbit carries, and
 the wirings drawn out of a family's combinatorics.
 
 The rest is recursive message passing, the networks of *Tiny Recursive
-Message Passing* (arXiv:2610.18649): :mod:`discopy.neural.wiring` reads the
+Message Passing* (arXiv:2610.18649): :mod:`~discopy.neural.wiring` reads the
 tables a network gathers along off a factor graph, and the blocks of a group
-action off a wiring invariant under it; :mod:`discopy.neural.cell` holds the
+action off a wiring invariant under it; :mod:`~discopy.neural.cell` holds the
 boxes, a site on every node and a Deep Sets unit on every factor;
-:mod:`discopy.neural.recursion` fires them in rounds, cycles and supervision
-steps with a detached prefix; :mod:`discopy.neural.lattice` and
-:mod:`discopy.neural.act` read them out by lattice deduction or by adaptive
-computation time, each with its trainer; :mod:`discopy.neural.train` holds
+:mod:`~discopy.neural.recursion` fires them in rounds, cycles and supervision
+steps with a detached prefix; :mod:`~discopy.neural.lattice` and
+:mod:`~discopy.neural.act` read them out by lattice deduction or by adaptive
+computation time, each with its trainer; :mod:`~discopy.neural.train` holds
 the optimiser, the schedule, the weight average and the per-sample clip;
-:mod:`discopy.neural.geometric` runs a network along the blocks of its
+:mod:`~discopy.neural.geometric` runs a network along the blocks of its
 symmetry group rather than along its tables.
 
 .. autosummary::
