@@ -9,14 +9,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- The notebook `docs/notebooks/constraint-satisfaction.md` presents *Tiny
-  Recursive Message Passing* (arXiv:2610.18649) on `discopy.csp` and
-  `discopy.neural`: `csp.sudoku`, `csp.queens`, `csp.cnf` and `csp.maze` as
-  hypergraph diagrams with the maze drawn in the plane, solution counting by
-  `Language.functor(int)`, arc consistency by `Language.propagate` and solution
-  checking by `Language.holds`, and the 9x9 Sudoku `PeerNet` (16,485
-  parameters) and `FactorNet` (16,543 parameters) wired from `csp.scopes` with
-  one untrained lattice step ([next#600]).
 - `discopy.inet`: interaction nets on flat port lists (`Symbol`, `Signature`,
   `Net`, `Rewriter`) and the symmetric interaction combinators `combinators`
   with optional labels on duplicators `δ`, checked against double-pushout
@@ -148,6 +140,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a small OCR model (`OCR`) that reads box names and wire types, then decoded
   in the least module it decodes in (`picture.decode_least`); with `train`,
   `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
+- The notebook `docs/notebooks/constraint-satisfaction.md` presents *Tiny
+  Recursive Message Passing* (arXiv:2610.18649) on `discopy.csp` and
+  `discopy.neural`: `csp.sudoku`, `csp.queens`, `csp.cnf` and `csp.maze` as
+  hypergraph diagrams with the maze drawn in the plane, solution counting by
+  `Language.functor(int)`, arc consistency by `Language.propagate` and solution
+  checking by `Language.holds`, and the 9x9 Sudoku `PeerNet` (16,485
+  parameters) and `FactorNet` (16,543 parameters) wired from `csp.scopes` with
+  one untrained lattice step ([next#600]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
