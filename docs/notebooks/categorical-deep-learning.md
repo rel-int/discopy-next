@@ -246,13 +246,15 @@ tied_in_time
 Over streams, `P` is a constant stream of types, and unrolling gives a network with one parameter, copied to every step:
 
 ```python {.marimo}
-P_always = stream.Ty(symmetric.Ty("P"))
+from discopy import markov as plain
+
+P_always = stream.Ty(plain.Ty("P"))
 to_streams = markov.Functor(
     ob_map=sequences | {P: P_always},
-    ar_map={weighted: stream.Stream[Diagram].sequence(
+    ar_map={weighted: stream.Stream[plain.Diagram].sequence(
         "mealy", sequences[I] @ P_always @ sequences[S].delay(),
         sequences[O] @ sequences[S])},
-    cod=stream.Stream[Diagram])
+    cod=stream.Stream[plain.Diagram])
 everywhere = to_streams(tied_in_time).unroll(2).now
 assert [str(x) for x in everywhere.dom] == ["I0", "P", "I1", "I2"]
 everywhere.foliation()
