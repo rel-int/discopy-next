@@ -172,10 +172,11 @@ class Functor(bang.Functor, categorial.Functor):
     TypeError: A functor from !L* needs a biclosed codomain, got ...
     """
     dom = cod = Diagram
+    requires = BiclosedCategory
 
     def __init__(self, ob_map, ar_map, **params):
         cod = params.get("cod") or type(self).cod
-        if not issubclass(get_origin(cod), BiclosedCategory):
+        if not issubclass(get_origin(cod), self.requires):
             raise TypeError(
                 f"A functor from !L* needs a biclosed codomain, got {cod}.")
         super().__init__(ob_map, ar_map, **params)

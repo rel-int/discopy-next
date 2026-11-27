@@ -75,3 +75,12 @@ def test_drawing_names_bang_under_exponentials():
     assert likes.cod.to_drawing().inside[0].name == "!(!(!N >> S) << N)"
     assert his.cod.to_drawing().inside[0].name == "(!(!N >> N) << N)"
     assert str(his.cod) == "((N.bang() >> N).bang() << N)"
+
+
+def test_hypergraph_of_a_reading():
+    for term in (strict, sloppy):
+        diagram = term.eval()
+        assert diagram.to_hypergraph().to_diagram()\
+            == diagram.to_hypergraph().to_diagram().to_hypergraph()\
+            .to_diagram()
+        assert diagram.to_hypergraph() == diagram.foliation().to_hypergraph()

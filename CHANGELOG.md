@@ -600,8 +600,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `compact.Diagram` are closed, with `x ⊸ y = x* @ y`: evaluation and currying
   stay cups and caps. `feedback.closed` is a package too, its
   `feedback.closed.markov` the `feedback.closed` module before, over
-  `closed.markov`. The old names keep no alias, and a tree or pickle saved
-  under them does not load ([next#743]).
+  `closed.markov`. A `lambek.modality.Functor` needs a biclosed codomain and
+  raises when constructed into any other, instead of sending exponentials
+  through `ob_map` at call time: into `Tensor`, compact hence closed, `N >> S`
+  is the internal hom and `Eval` a cup, and the strict and sloppy notebook,
+  which wants exponentials as generators, sends the underlying monoidal
+  diagram with a `monoidal.Functor`. The old names keep no alias, and a tree
+  or pickle saved under them does not load ([next#743]).
 
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
