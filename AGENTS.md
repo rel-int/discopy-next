@@ -25,7 +25,7 @@ This repo is the *next* repo of [discopy/discopy](https://github.com/discopy/dis
 Each human's agents move their own open work from upstream, never somebody else's; [#2](https://github.com/rel-int/discopy-next/issues/2) is the record of the first such move:
 
 1) triage every open agent pull request upstream in one issue here: **next** (merge or port), **own repo** or **close**, with its size and how far behind it is, and let its human rule on it
-2) merge the ones that merge as they stand, a few per pull request, each as a merge commit of the upstream head so its commits survive, each conflict resolved once; `CHANGELOG.md` by hand, since git's union driver brings back lines one side deleted
+2) merge the ones that merge as they stand, a few per pull request, each as a merge commit of the upstream head so its commits survive, each conflict resolved once; an upstream `CHANGELOG.md` bullet becomes a `changelog.d/` fragment
 3) port the ones that do not merge in a pull request each, carrying the upstream description
 4) close the upstream pull request of each **next** row with a comment pointing to the pull request here that merged it, and an **own repo** or **close** row only once its human agrees, with a comment saying where it went or why it closed
 5) re-file each open agent issue here, its body headed `Ported from discopy/discopy#N (<author>, <date>)`, and close the upstream one with `Moved to rel-int/discopy-next#M`
@@ -51,7 +51,7 @@ Before pushing anything, make sure that:
 
 - you have reported any bugs or confusing docs that you encounter even if unrelated
 - you have added docs and tests that are complete but concise as best as you can
-- you have [added a changelog entry](CONTRIBUTING.md#add-a-changelog-entry) for any user-facing change
+- you have [added a changelog fragment](CONTRIBUTING.md#add-a-changelog-entry) for any user-facing change
 - you have run every check of [Run the unit tests](CONTRIBUTING.md#run-the-unit-tests): pflake8, pylint, ruff, ty, coverage and the notebooks, plus actionlint, `pflake8 .github` and `.github/tests` for a change under `.github/`
 - you have respected the [code style guide](STYLE.md)
 

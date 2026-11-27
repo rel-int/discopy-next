@@ -523,54 +523,34 @@ def gate_notebooks(ctx):
     return "FAIL", "failed to execute: " + (failed[-1] if failed else what)
 
 
+FRAGMENT = re.compile(
+    r"changelog\.d/[a-z0-9][a-z0-9_-]*\."
+    r"(?:added|changed|deprecated|removed|fixed|project)(?:\.[0-9]+)?\.md")
+
+
 def gate_changelog(ctx):
-    path = ctx.root / "CHANGELOG.md"
-    raw = path.read_bytes()
-    lines = raw.decode("utf-8").splitlines()
-    conflict = [i + 1 for i, line in enumerate(lines)
-                if re.match(r"(<{7}|={7}|>{7})( |$)", line)]
+    names = [p for p in ctx.under("changelog.d/")
+             if p not in {"changelog.d/README.md",
+                          "changelog.d/template.md.jinja"}
+             and (ctx.root / p).exists()]
+    bad = [p for p in names if not FRAGMENT.fullmatch(p)]
+    base = set(git("ls-tree", "-r", "--name-only", ctx.base, "--",
+                   "changelog.d/", cwd=ctx.root).splitlines())
+    if bad:
+        return "FAIL", "not changelog.d/<slug>.<section>.md: " + capped(bad)
+    conflict = [p for p in names + ["CHANGELOG.md"] if re.search(
+        r"^(<{7}|={7}|>{7})( |$)", (ctx.root / p).read_text(
+            encoding="utf-8"), re.M)]
     if conflict:
-        return "FAIL", f"conflict marker at CHANGELOG.md:{conflict[0]}"
-    if b"\r\n" in raw and b"\r\n" not in subprocess.run(
-            ["git", "show", f"{ctx.base}:CHANGELOG.md"], cwd=ctx.root,
-            capture_output=True, check=False).stdout:
-        return "FAIL", "CRLF line endings, base has LF"
-    start = next((i for i, line in enumerate(lines)
-                  if line.startswith("## [Unreleased]")), None)
-    if start is None:
-        return "FAIL", "no '## [Unreleased]' heading"
-    end = next((i for i in range(start + 1, len(lines))
-                if lines[i].startswith("## [")), len(lines))
-    added = []
-    diff = git("diff", "-U0", ctx.base, "--", "CHANGELOG.md", cwd=ctx.root)
-    for hunk in re.finditer(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", diff,
-                            re.M):
-        first, count = int(hunk.group(1)), int(hunk.group(2) or 1)
-        added += [i for i in range(first - 1, first - 1 + count)
-                  if start < i < end and lines[i].strip()]
-    removed = [line[1:] for line in diff.splitlines()
-               if line.startswith("-") and not line.startswith("---")]
-    bullets = [i for i in added if lines[i].startswith("- ")]
-    if not added:
+        return "FAIL", f"conflict marker in {conflict[0]}"
+    names = [p for p in names if p not in base]
+    if not names:
         if ctx.under("discopy/"):
-            return "SKIP", ("no bullet added; discopy/ changed, add one if "
-                            "user-facing")
-        return "SKIP", "no bullet added"
-    text = " ".join(re.sub(r"`[^`]*`", "", lines[i]) for i in added)
-    refs = set(re.findall(r"\[([^\]\[]+)\](?![(:\[])", text))
-    defined = {m.group(1) for m in map(
-        re.compile(r"^\[([^\]]+)\]: \S").match, lines) if m}
-    missing = sorted(refs - defined)
-    what = plural(len(bullets), "bullet") if bullets else (
-        plural(len(added), "line") + " changed")
-    fact = f"{what}, refs {capped(sorted(refs)) or 'none'}"
-    if removed:
-        fact += f"; also removes {plural(len(removed), 'line')} of base's, " \
-            f"first: {removed[0][:60]}"
-    if missing:
-        return "FAIL", fact + "; no link definition for " + capped(
-            f"[{m}]" for m in missing)
-    return ("PASS" if bullets else "SKIP"), fact
+            return "SKIP", ("no fragment added; discopy/ changed, add one "
+                            "or label the PR no-changelog")
+        return "SKIP", "no fragment added"
+    return "PASS", plural(len(names), "fragment") + ": " + capped(
+        p[len("changelog.d/"):] for p in names)
 
 
 def main():
