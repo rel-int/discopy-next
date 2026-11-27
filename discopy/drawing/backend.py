@@ -415,6 +415,21 @@ def bezier_subcurve(points, t0, t1):
     return split(right, (t1 - t0) / (1 - t0))[0]
 
 
+def segment_crossing(a, b, c, d):
+    """
+    The parameters ``(s, t)`` at which the segment from ``a`` to ``b``
+    crosses the segment from ``c`` to ``d``, or ``None`` if they do not.
+    """
+    denominator = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0])
+    if not denominator:
+        return None
+    s = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0]))\
+        / denominator
+    t = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]))\
+        / denominator
+    return (s, t) if 0 <= s <= 1 and 0 <= t <= 1 else None
+
+
 def bezier(points, t):
     """
     The point at parameter ``t`` of a Bezier curve of any degree, by de
@@ -616,24 +631,98 @@ class Backend(ABC):
         outer = min(radius, RIBBON_FOLD_DEPTH)
         return outer, outer - ribbon
 
-    def fill_strand_band(
-            self, first: tuple[Point, Point], second: tuple[Point, Point],
-            middle, color, gap=0):
+    @staticmethod
+    def offset_strand(curve, distance, t0=0., t1=1., pieces=4, samples=32):
         """
-        Fills the band between the two parallel braid strands of a ribbon,
-        see :meth:`draw_dual_rail_braid`. A non-zero ``gap`` breaks the band
-        around the crossing, matching the broken strands, so the ribbon going
-        under is shadowed by the one going over.
+        The curve parallel to the cubic Bezier ``curve`` at ``distance`` to
+        its left, between the parameters ``t0`` and ``t1``, as cubic Beziers:
+        each piece of the curve moved along the normal at its ends, with its
+        tangents scaled by the speed of the parallel, one minus ``distance``
+        times the curvature. Where the curve turns tighter than ``distance``,
+        the parallel on the inside of the turn folds over itself: the fold,
+        found where a polyline of ``samples`` points crosses itself, is cut
+        out, as from the edge of a band of constant width, and each of the
+        spans left is drawn in ``pieces``.
         """
-        a, b = (self.braid_strand(*first, middle),
-                self.braid_strand(*second, middle))
+        def derivatives(t):
+            first = [3 * (
+                (1 - t) ** 2 * (curve[1][i] - curve[0][i])
+                + 2 * (1 - t) * t * (curve[2][i] - curve[1][i])
+                + t ** 2 * (curve[3][i] - curve[2][i])) for i in (0, 1)]
+            second = [6 * (
+                (1 - t) * (curve[2][i] - 2 * curve[1][i] + curve[0][i])
+                + t * (curve[3][i] - 2 * curve[2][i] + curve[1][i]))
+                for i in (0, 1)]
+            return first, second
+
+        def normal(t):
+            (dx, dy), _ = derivatives(t)
+            norm = sqrt(dx ** 2 + dy ** 2)
+            return -dy * distance / norm, dx * distance / norm
+
+        def speed(t):  # The speed of the parallel over that of the curve.
+            (dx, dy), (ddx, ddy) = derivatives(t)
+            return 1 - distance * (dx * ddy - dy * ddx) / sqrt(
+                dx ** 2 + dy ** 2) ** 3
+
+        def offset(t):
+            (x, y), (nx, ny) = bezier(curve, t), normal(t)
+            return Point(x + nx, y + ny)
+
+        ts = [t0 + (t1 - t0) * k / samples for k in range(samples + 1)]
+        points, spans, i = list(map(offset, ts)), [t0], 0
+        while i < samples:
+            for j in range(samples - 1, i + 1, -1):
+                crossing = segment_crossing(
+                    points[i], points[i + 1], points[j], points[j + 1])
+                if crossing is not None:
+                    spans += [ts[i] + crossing[0] * (ts[i + 1] - ts[i]),
+                              ts[j] + crossing[1] * (ts[j + 1] - ts[j])]
+                    i = j
+                    break
+            i += 1
+        result = []
+        for start, end in zip(spans[::2], spans[1::2] + [t1]):
+            for k in range(pieces):
+                a, b = (start + (end - start) * n / pieces for n in (k, k + 1))
+                piece = bezier_subcurve(curve, a, b)
+                start_point, end_point = offset(a), offset(b)
+                result.append([start_point, Point(*(
+                    start_point[i] + (piece[1][i] - piece[0][i]) * speed(a)
+                    for i in (0, 1))), Point(*(
+                        end_point[i] - (piece[3][i] - piece[2][i]) * speed(b)
+                        for i in (0, 1))), end_point])
+        return result
+
+    def ribbon_strand(self, rails, middle, gap=0):
+        """
+        The two rails of a ribbon crossing the horizontal line at height
+        ``middle``, as the pair of :meth:`offset_strand` on either side of
+        the :meth:`braid_strand` of its centre, one pair for each span left
+        by a non-zero ``gap`` around the crossing, so that the ribbon keeps
+        its width all the way across.
+        """
+        (source0, target0), (source1, target1) = rails
+        centre = self.braid_strand(
+            Point(*lerp(source0, source1, .5)),
+            Point(*lerp(target0, target1, .5)), middle)
+        half = (source1[0] - source0[0]) / 2
         spans = [(0, 1)] if not gap else [(0, 0.5 - gap), (0.5 + gap, 1)]
-        for t0, t1 in spans:
-            a_sub, b_sub = (
-                bezier_subcurve(a, t0, t1), bezier_subcurve(b, t0, t1))
-            self.draw_filled_shape(a_sub[0], [
-                ("curve", a_sub[1], a_sub[2], a_sub[3]), ("line", b_sub[3]),
-                ("curve", b_sub[2], b_sub[1], b_sub[0])], color)
+        return [(self.offset_strand(centre, half, t0, t1),
+                 self.offset_strand(centre, -half, t0, t1))
+                for t0, t1 in spans]
+
+    def fill_strand_band(self, first, second, color):
+        """
+        Fills the band between the two rails ``first`` and ``second`` of a
+        ribbon, given as lists of cubic Beziers, see :meth:`ribbon_strand`.
+        """
+        self.draw_filled_shape(first[0][0], [
+            step for piece in first
+            for step in [("line", piece[0]), ("curve", *piece[1:])]] + [
+            step for piece in reversed(second)
+            for step in [("line", piece[3]),
+                         ("curve", piece[2], piece[1], piece[0])]], color)
 
     def draw_braid_strand(self, source, target, middle, gap=0, adaptive=True):
         """
@@ -1425,14 +1514,14 @@ class Backend(ABC):
         over, under = (left, right) if box.is_dagger else (right, left)
         # Fill (and stroke) under first, then over: the band going under is
         # broken around the crossing so the one going over is clearly on top.
+        # The rails are parallel to the centre of their ribbon, not to each
+        # other's strand, so the band keeps its width across the crossing.
         for (ribbon, color), gap in [(under, 0.2), (over, 0)]:
-            if color is not None:  # Fill the band between the two strands.
-                self.fill_strand_band(
-                    ribbon[0], ribbon[1], y_middle, color, gap)
-        for (ribbon, color), gap in [(under, 0.2), (over, 0)]:
-            for source, target in ribbon:
-                self.draw_braid_strand(source, target, y_middle, gap,
-                                       adaptive=color is None)
+            for first, second in self.ribbon_strand(ribbon, y_middle, gap):
+                if color is not None:
+                    self.fill_strand_band(first, second, color)
+                for piece in first + second:
+                    self.draw_bezier(piece, adaptive=color is None)
 
     def draw_dual_rail_twist(self, positions, node, **params):
         """

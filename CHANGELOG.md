@@ -1002,6 +1002,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A ribbon keeps its width when it crosses another and round a trace: the
+  rails of a `balanced.DualRailBraid` run parallel to the centre of their
+  ribbon, cut where the inner one would fold over itself, and the trace of a
+  ribbon is drawn with the folds of `ribbon.DualRailCup` and
+  `ribbon.DualRailCap` ([next#744]).
 - `hash` of a `tensor.Elementwise`, a `tensor.Diff` and a
   `testable.Declaration` depends on no address, so it is the same in every
   interpreter with `PYTHONHASHSEED` fixed: the function each holds is compared

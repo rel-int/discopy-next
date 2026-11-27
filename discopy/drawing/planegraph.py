@@ -1378,18 +1378,22 @@ which to_drawing recomputes.
         """
         The trace of the last ``n`` wires, the first when ``left``, drawn as
         a cap, the drawing and a cup, the loop coming back along each wire
-        with its colours swapped. The wires of a ribbon are traced in one
-        loop, so that the ribbon keeps its width all the way round; other
-        wires one at a time, the last first.
+        with its colours swapped. The two rails of a ribbon are traced in one
+        loop, its cap and cup drawn as the constant-width folds of
+        :class:`~discopy.ribbon.DualRailCap` and
+        :class:`~discopy.ribbon.DualRailCup`, so that the ribbon keeps its
+        width all the way round; other wires one at a time, the last first.
         """
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self
         traced_dom = self.dom[:n] if left else self.dom[-n:]
         traced_cod = self.cod[:n] if left else self.cod[-n:]
-        if n > 1 and not any(
-                getattr(wire, "ribbon", None) for wire in traced_dom.inside):
-            return self.trace(left=left).trace(n=n - 1, left=left)
+        is_ribbon = any(
+            getattr(wire, "ribbon", None) for wire in traced_dom.inside)
+        step = 2 if is_ribbon else 1
+        if n > step:
+            return self.trace(step, left).trace(n - step, left)
         dom = self.dom[n:] if left else self.dom[:-n]
         cod = self.cod[n:] if left else self.cod[:-n]
         back = traced_dom.factory(
@@ -1397,10 +1401,11 @@ which to_drawing recomputes.
         cap_cod, cup_dom = (
             back @ traced_dom, back @ traced_cod) if left else (
             traced_dom @ back, traced_cod @ back)
-        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom),
-                  draw_as_wires=True).to_drawing()
-        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod,
-                  draw_as_wires=True).to_drawing()
+        fold = len(cap_cod) == 4 and is_ribbon
+        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom), draw_as_wires=not fold,
+                  draw_as_dual_rail_cup=fold).to_drawing()
+        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod, draw_as_wires=not fold,
+                  draw_as_dual_rail_cap=fold).to_drawing()
         return (
             cap @ dom >> back @ self >> cup @ cod if left
             else dom @ cap >> self @ back >> cod @ cup)
