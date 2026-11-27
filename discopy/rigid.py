@@ -164,7 +164,7 @@ from collections.abc import Callable
 
 from typing import Iterator, Self, ClassVar
 
-from discopy import cat, monoidal, biclosed, messages
+from discopy import cat, monoidal, closed, messages
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
 from discopy.testable import GENERATORS
@@ -289,7 +289,7 @@ class Wire(monoidal.Wire):
 
 
 @factory
-class Ty(Pregroup, biclosed.Ty):
+class Ty(Pregroup, closed.monoidal.Ty):
     """
     A rigid type is a biclosed type with rigid objects inside.
 
@@ -400,7 +400,7 @@ class Layer(monoidal.Layer):
 
 
 @factory
-class Diagram(biclosed.Diagram, RigidCategory):
+class Diagram(closed.monoidal.Diagram, RigidCategory):
     """
     A rigid diagram is a biclosed diagram
     with :class:`Cup` and :class:`Cap` boxes.
@@ -735,7 +735,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         messages.NOT_BOUNDARY_CONNECTED)
 
 
-class Box(biclosed.Box, Diagram):
+class Box(closed.monoidal.Box, Diagram):
     """
     A rigid box is a biclosed box in a rigid diagram.
 
@@ -754,7 +754,7 @@ class Box(biclosed.Box, Diagram):
     >>> assert f.r.l == f == f.l.r
     >>> assert f.l.l != f != f.r.r
     """
-    serialised_attrs = biclosed.Box.serialised_attrs + ("z", )
+    serialised_attrs = closed.monoidal.Box.serialised_attrs + ("z", )
     z = 0
 
     def __setstate__(self, state):
@@ -765,7 +765,7 @@ class Box(biclosed.Box, Diagram):
 
     def __init__(self, name: str, dom: Ty, cod: Ty, data=None, z=0, **params):
         self.z = z
-        biclosed.Box.__init__(self, name, dom, cod, data=data, **params)
+        closed.monoidal.Box.__init__(self, name, dom, cod, data=data, **params)
 
     def __str__(self):
         return cat.Box.__str__(self) if not self.z\
@@ -783,8 +783,8 @@ class Box(biclosed.Box, Diagram):
 
     def __repr__(self):
         if self.is_dagger:
-            return biclosed.Box.__repr__(self)
-        return biclosed.Box.__repr__(self)[:-1] + (
+            return closed.monoidal.Box.__repr__(self)
+        return closed.monoidal.Box.__repr__(self)[:-1] + (
             f', z={self.z})' if self.z else ')')
 
     def setoid(self):
@@ -869,7 +869,7 @@ class Box(biclosed.Box, Diagram):
         return result
 
 
-class Sum(biclosed.Sum, Box):
+class Sum(closed.monoidal.Sum, Box):
     """
     A rigid sum is a biclosed sum that can be transposed.
 
@@ -1001,7 +1001,7 @@ class Cap(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid caps have no dagger, use pivotal instead.")
 
 
-class Functor(biclosed.Functor):
+class Functor(closed.monoidal.Functor):
     """
     A rigid functor is a biclosed functor that preserves cups and caps.
 
@@ -1090,10 +1090,10 @@ def to_rigid(self):
         ob_map=lambda x: Ty(x.inside[0].name),
         ar_map=lambda f: Box(
             f.name, to_rigid(f.dom), to_rigid(f.cod), data=f.data),
-        dom=biclosed.Diagram, cod=Diagram)(self)
+        dom=closed.monoidal.Diagram, cod=Diagram)(self)
 
 
-biclosed.Diagram.to_rigid = to_rigid
+closed.monoidal.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
@@ -1103,8 +1103,8 @@ Diagram.functor_factory = Functor
 Id = Diagram.id
 
 
-class Equation(biclosed.Equation):
-    """ The :class:`biclosed.Equation` of rigid diagrams. """
+class Equation(closed.monoidal.Equation):
+    """ The :class:`closed.monoidal.Equation` of rigid diagrams. """
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

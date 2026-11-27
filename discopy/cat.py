@@ -103,20 +103,22 @@ let(f(a), lambda y: let(g(y), lambda z: h(z)))
 >>> assert statement.normal_form() == e(d(c(a)))
 >>> assert statement.eval() == arrow
 
-Every module of the hierarchy below :mod:`~discopy.biclosed` has terms of its
-own, each a variant of the kappa calculus: planar and linear in
-:mod:`~discopy.monoidal`, linear in :mod:`~discopy.symmetric`, with copy and
-discard in :mod:`~discopy.markov`. A module that adds no way to bind a
-variable, e.g. :mod:`~discopy.braided`, gets its terms from
-:func:`kappa_calculus`, with its structural boxes as constants. From
-:mod:`~discopy.biclosed` up, terms are those of the lambda calculus.
+Every module of the hierarchy below
+:mod:`closed.monoidal <discopy.closed.monoidal>` has terms of its own, each a
+variant of the kappa calculus: planar and linear in :mod:`~discopy.monoidal`,
+linear in :mod:`~discopy.symmetric`, with copy and discard in
+:mod:`~discopy.markov`. A module that adds no way to bind a variable, e.g.
+:mod:`~discopy.braided`, gets its terms from :func:`kappa_calculus`, with its
+structural boxes as constants. From
+:mod:`closed.monoidal <discopy.closed.monoidal>` up, terms are those of the
+lambda calculus.
 
 Every module up the hierarchy has terms of its own, subclasses of these
 which say what a context is: one variable in a category, a list of variables
 each used once and in order in a monoidal one, see
-:class:`~discopy.monoidal.TermBase`. Below :mod:`~discopy.biclosed`, which
-adds the abstraction of the lambda calculus, they are variants of the kappa
-calculus.
+:class:`~discopy.monoidal.TermBase`. Below
+:mod:`closed.monoidal <discopy.closed.monoidal>`, which adds the abstraction
+of the lambda calculus, they are variants of the kappa calculus.
 """
 
 from __future__ import annotations
@@ -202,7 +204,7 @@ class Ob(Serialisable["Ob"]):
         The kappa abstraction of a Python function from a variable of this
         type to a term, see :class:`Kappa`, as a type of a closed category
         applied to a function is a lambda abstraction, see
-        :class:`~discopy.biclosed.Ty`.
+        :class:`~discopy.closed.monoidal.Ty`.
 
         Parameters:
             function : The body, as a function of the variable.
@@ -1798,7 +1800,7 @@ class AlphaEquivalence(Equivalence):
     Terms with bound variables, an :class:`~discopy.testable.Equivalence` up
     to their names, see :meth:`alpha_eq`: the terms of the kappa calculus,
     see :class:`TermBase`, and those of the lambda calculus, see
-    :class:`biclosed.TermBase <discopy.biclosed.TermBase>`.
+    :class:`closed.monoidal.TermBase <discopy.closed.monoidal.TermBase>`.
 
     """
     def alpha_eq(self, *others: Term) -> bool:
@@ -2887,10 +2889,10 @@ def kappa_calculus(
     generated with its boxes and read its structural boxes, e.g. a braid,
     as constants like any other.
 
-    This is for the levels below :mod:`~discopy.biclosed`: from there up a
-    type applied to a Python function is a lambda abstraction, see
-    :class:`~discopy.biclosed.Ty`, and a diagram reads with the kappa terms
-    of the level it subclasses, e.g. a compact one with those of
+    This is for the levels below :mod:`~discopy.closed.monoidal`: from there up
+    a type applied to a Python function is a lambda abstraction, see
+    :class:`~discopy.closed.monoidal.Ty`, and a diagram reads with the kappa
+    terms of the level it subclasses, e.g. a compact one with those of
     :mod:`~discopy.symmetric`.
 
     Parameters:

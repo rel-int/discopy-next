@@ -3,7 +3,7 @@ import shutil
 import pytest
 from pytest import raises
 
-from discopy import closed, biclosed, comarkov, compact, symmetric
+from discopy import closed, comarkov, compact, symmetric
 from discopy.abc import DaggerCategory
 from discopy.python.finset import Permutation
 from discopy.utils import AxiomError
@@ -224,13 +224,13 @@ def test_diagram_to_map_structure_and_errors():
     bbox = balanced.Box("f", bx, by)
     assert bbox.to_map() == balanced.CMap.from_box(bbox)
 
-    cx, cy = map(closed.Ty, "xy")
-    ev = closed.Eval(cy << cx)
-    assert ev.to_map() == closed.CMap.ev(cy, cx)
+    cx, cy = map(closed.markov.Ty, "xy")
+    ev = closed.markov.Eval(cy << cx)
+    assert ev.to_map() == closed.markov.CMap.ev(cy, cx)
     assert ev.to_map().boxes == (ev, )
-    loop = closed.Box("f", cx, cx)
-    assert loop.to_map().trace() == closed.CMap(
-        closed.Ty(), closed.Ty(), (loop, ), (1, 0))
+    loop = closed.markov.Box("f", cx, cx)
+    assert loop.to_map().trace() == closed.markov.CMap(
+        closed.markov.Ty(), closed.markov.Ty(), (loop, ), (1, 0))
 
     mx = markov.Ty("x")
     copy = markov.Copy(mx, 2)
@@ -284,7 +284,7 @@ def test_diagram_to_map_structure_and_errors():
     t = monoidal.Box("t", monoidal.Ty(), monoidal.Ty())
     assert monoidal.CMap(
         monoidal.Ty(), monoidal.Ty(), (s, t), ()).to_diagram() == s >> t
-    for module in [closed, feedback, symmetric]:
+    for module in [closed.markov, feedback, symmetric]:
         x = module.Ty("x")
         f = module.Box("f", x, x)
         g = module.Box("g", x, x)
@@ -297,9 +297,9 @@ def test_diagram_to_map_structure_and_errors():
         feedback.CMap.cups(x, x)
     with raises(TypeError, match="Pregroup"):
         feedback.CMap.caps(x, x)
-    x, y = map(closed.Ty, "xy")
-    assert closed.CMap.ev(y, x).boxes == (
-        closed.CMap.category.ev(y, x), )
+    x, y = map(closed.markov.Ty, "xy")
+    assert closed.markov.CMap.ev(y, x).boxes == (
+        closed.markov.CMap.category.ev(y, x), )
 
     x = markov.Ty("x")
     assert markov.CMap.copy(x, 2).boxes == (
@@ -461,8 +461,9 @@ def test_unordered_boxes_are_reordered_on_downgrade():
     "module",
     [
         compact,
-        closed,
-        biclosed,
+        closed.markov,
+        closed.symmetric,
+        closed.monoidal,
     ]
 )
 def test_curry_uncurry_roundtrip(module):
@@ -703,7 +704,7 @@ def test_tensor():
     [
         symmetric,
         compact,
-        closed,
+        closed.markov,
     ]
 )
 def test_interchange(module):
@@ -789,10 +790,10 @@ def test_then_tensor():
 def test_euler_characteristic():
     from discopy import closed, compact
 
-    x, y = map(closed.Ty, "xy")
-    assert closed.CMap.id().is_planar
-    wire = closed.CMap.id(x)
-    box = closed.CMap.from_box(closed.Box("f", x, y))
+    x, y = map(closed.markov.Ty, "xy")
+    assert closed.markov.CMap.id().is_planar
+    wire = closed.markov.CMap.id(x)
+    box = closed.markov.CMap.from_box(closed.markov.Box("f", x, y))
     assert wire.faces == Permutation.from_cycles([(0,), (1,)], 2)
     assert wire.n_vertices == 1
     assert wire.n_edges == 1
@@ -912,7 +913,7 @@ def test_boxes_with_no_domain_decode_in_their_face():
 def test_curry_is_wiring_only_when_the_category_is_compact():
     from discopy import pivotal, rigid
 
-    for module in (biclosed, closed):
+    for module in (closed.monoidal, closed.symmetric, closed.markov):
         x, y, z = map(module.Ty, "xyz")
         f = module.Box("f", x @ y, z)
         curried = f.to_map().curry(left=False)
@@ -934,9 +935,9 @@ def test_curry_is_wiring_only_when_the_category_is_compact():
 
 
 def test_closed_to_compact():
-    from discopy.feedback import closed
-    x, y, z = map(closed.Ty, "xyz")
-    f = closed.Box("f", x @ y, z)
+    from discopy.feedback.closed.markov import Box, Coeval, Eval, Ty
+    x, y, z = map(Ty, "xyz")
+    f = Box("f", x @ y, z)
 
     for left in (True, False):
         source = f.to_map().curry(left=left).uncurry(left=left)
@@ -946,8 +947,8 @@ def test_closed_to_compact():
             .to_compact().to_map()
         assert result.boxes == (
             f,
-            closed.Coeval(exp, left=left),
-            closed.Eval(exp, left=left))
+            Coeval(exp, left=left),
+            Eval(exp, left=left))
 
 
 def test_from_glued_agrees_with_folding():
@@ -1161,7 +1162,7 @@ def test_CMap_to_tree():
         compact.CMap.caps(x, x.r) >> f.to_map() @ x.r,
         compact.CMap.id(x).trace(), f.to_map().trace(),
         symmetric.Swap(*map(symmetric.Ty, "xy")).to_map(),
-        closed.Box('f', closed.Ty('x'), closed.Ty('y')).to_map().curry()]
+        closed.markov.Box('f', closed.markov.Ty('x'), closed.markov.Ty('y')).to_map().curry()]
     for cmap in cmaps:
         loaded = loads(dumps(cmap))
         assert loaded == cmap and type(loaded) is type(cmap)

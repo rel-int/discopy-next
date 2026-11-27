@@ -215,8 +215,8 @@ class Diagram(monoidal.Diagram, cat.Arrow, LinearCategory):
         """
         The ``n`` copies of a banged wire ``!y``, by :class:`Contraction`, so
         that a term language sharing its variables with ``cod.copy`` and
-        ``cod.discard``, e.g. :class:`~discopy.closed.TermBase`, copies only
-        what linear logic lets it copy.
+        ``cod.discard``, e.g. :class:`~discopy.closed.markov.TermBase`, copies
+        only what linear logic lets it copy.
 
         Parameters:
             x : The banged wire to copy.

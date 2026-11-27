@@ -3,6 +3,16 @@
 """
 The free compact category, i.e. diagrams with swaps, cups and caps.
 
+A compact diagram is a symmetric closed diagram, see
+:mod:`~discopy.closed.symmetric`, with internal hom ``x ⊸ y = x* @ y``: its
+evaluation and currying are the cups and caps of :mod:`~discopy.rigid`.
+
+>>> x, y, z = map(Ty, "xyz")
+>>> f = Box('f', x @ y, z)
+>>> assert isinstance(f, closed.symmetric.Diagram)
+>>> assert f.curry() == x @ Cap(y, y.l) >> f @ y.l
+>>> assert Diagram.ev(z, y) == z @ Cup(y.l, y)
+
 Summary
 -------
 
@@ -69,7 +79,8 @@ from typing import ClassVar
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
 from discopy import (
-    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction)
+    symmetric, ribbon, pivotal, closed, feedback, cmap, hypergraph,
+    interaction)
 from discopy.abc import (
     BalancedTracedCategory, CompactCategory, DaggerMonoidalCategory,
     RigidCategory, SymmetricCategory, TracedCategory)
@@ -84,9 +95,9 @@ class Layer(symmetric.Layer, pivotal.Layer):
 
 
 @factory
-class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
+class Diagram(ribbon.Diagram, closed.symmetric.Diagram, CompactCategory):
     """
-    A compact diagram is a symmetric diagram and a ribbon diagram.
+    A compact diagram is a ribbon diagram and a symmetric closed diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -97,6 +108,7 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     snake_equations = CompactCategory.snake_equations
     transpose_contravariance = CompactCategory.transpose_contravariance
     pivotality = CompactCategory.pivotality
+    currying_symmetry = CompactCategory.currying_symmetry
     currying_left = CompactCategory.currying_left
     currying_right = CompactCategory.currying_right
     currying_eta_left = CompactCategory.currying_eta_left
@@ -120,6 +132,11 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     ob = Ty
     layer_factory = Layer
     trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
+
+
+for name in ("braid_factory", "twist_factory", "term_factory",
+             "dagger_monoidality"):
+    setattr(Diagram, name, vars(symmetric.Diagram)[name])
 
 
 class Box(symmetric.Box, ribbon.Box, Diagram):
