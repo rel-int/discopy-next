@@ -2,4 +2,4 @@
 
 - [x] Tooling: merge-main and checkboxes name the .<n> suffix; next-checks counts added fragments only and ignores README.md; workflow passes an exact no-changelog match; slug documented lowercase; own fragment says user-facing
 - [ ] Reply on cross-fork branch collisions and slug enforcement (declined, with reasons)
-- [ ] File the wording findings on migrated bullets as one issue, reply on each thread
+- [WIP] @T-e5f32d46-2026-11-27 19:28 File the wording findings on migrated bullets as one issue, reply on each thread
