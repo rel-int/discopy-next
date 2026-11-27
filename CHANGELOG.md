@@ -941,6 +941,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   different colours, rather than with zero width, e.g. around each term of
   an equation between coloured diagrams ([next#742]).
 
+- `optyx.channel.Diagram.from_tket` and `optyx.qubits.Circuit` convert a
+  `pytket.Circuit` to an open diagram on `qubit ** n @ bit ** m`, keeping its
+  unitary (global phase included) and routing non-adjacent gates and
+  measurements; `QubitChannel.from_discopy` gains `U1`, `Ry`, `CRy`, `CY`,
+  daggered gates, `Discard` and `Measure` ([next#296]).
+
+- Every remaining box of `optyx.qubits` loads its own tree: `Z` and `X` from
+  their boundary and `data`, `H` with no argument, `Scalar` from `data`,
+  `BitFlipError` and `DephasingError` from `prob`, `Ket` and `Bra` from
+  `value` and their boundary, and `QubitChannel` from `kraus` and `env`
+  ([next#731]).
+
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
   `monoidal.Functor.id(monoidal.Diagram)` on a box over `rigid.Ty('x')`, its
@@ -2610,6 +2622,7 @@ for the changelog of `1.2.1` and earlier.
 [next#293]: https://github.com/rel-int/discopy-next/issues/293
 [next#294]: https://github.com/rel-int/discopy-next/issues/294
 [next#295]: https://github.com/rel-int/discopy-next/issues/295
+[next#296]: https://github.com/rel-int/discopy-next/issues/296
 [next#297]: https://github.com/rel-int/discopy-next/issues/297
 [next#298]: https://github.com/rel-int/discopy-next/issues/298
 [next#299]: https://github.com/rel-int/discopy-next/issues/299
@@ -2802,6 +2815,7 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#703]: https://github.com/rel-int/discopy-next/issues/703
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#731]: https://github.com/rel-int/discopy-next/issues/731
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
