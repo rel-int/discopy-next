@@ -22,7 +22,7 @@ def hashable(value):
     A value as a hashable one, a list or an array as the tuple of its own
     hashable entries, so that a semantic attribute can go in a
     :meth:`setoid` without making the box unhashable, as an
-    unhashable :code:`data` makes a :class:`discopy.cat.Box`.
+    unhashable :code:`data` makes a :class:`~discopy.cat.Box`.
 
     Example
     -------

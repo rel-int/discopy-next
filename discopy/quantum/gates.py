@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Gates in a :class:`discopy.quantum.circuit.Circuit`.
+Gates in a :class:`~discopy.quantum.circuit.Circuit`.
 
 Summary
 -------
@@ -1034,8 +1034,9 @@ class Rotation(Parametrized, QuantumGate):
 
     def setoid(self):
         """
-        A rotation is given by its class, as a :class:`discopy.cat.Box` is,
-        and by the attributes of a :class:`discopy.tensor.Box`, its phase
+        A rotation is given by its class, as a
+        :class:`cat.Box <discopy.cat.Box>` is, and by the attributes of a
+        :class:`tensor.Box <discopy.tensor.Box>`, its phase
         compared exactly, as its representation prints it: only its string
         rounds it, for display.
 

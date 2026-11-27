@@ -3,7 +3,7 @@
 """
 ZX-calculus diagrams.
 
-The functor ``circuit2zx`` sends a :class:`discopy.quantum.circuit.Circuit`
+The functor ``circuit2zx`` sends a :class:`~discopy.quantum.circuit.Circuit`
 to a ZX diagram, each gate through :func:`gate2zx`.
 
 Summary
@@ -495,7 +495,7 @@ class Spider(tensor.Spider[complex], Box):
     @classmethod
     def from_tree(cls, tree: dict) -> "Spider":
         """
-        Decode the tree of :meth:`discopy.frobenius.Spider.to_tree`, whose
+        Decode the tree of :meth:`~discopy.frobenius.Spider.to_tree`, whose
         type is a qubit that the constructor supplies.
 
         >>> from discopy.utils import dumps, loads
@@ -922,7 +922,7 @@ class Hypergraph(hypergraph.Hypergraph):
     being a green one with a Hadamard on each leg, and its scalar is an
     exact :class:`Number`.
 
-    Composition is the pushout of :class:`discopy.hypergraph.Hypergraph`,
+    Composition is the pushout of :class:`~discopy.hypergraph.Hypergraph`,
     i.e. it fuses spiders and adds their phases, which this hypergraph keeps
     modulo a turn, and multiplies the scalars, as the tensor does, while the
     dagger conjugates the scalar. Green spiders are special, so that this is
@@ -998,7 +998,7 @@ class Hypergraph(hypergraph.Hypergraph):
     def keeps_scalar(self, result: Hypergraph) -> Hypergraph:
         """
         A hypergraph built from this one by a method of
-        :class:`discopy.hypergraph.Hypergraph`, which knows no scalar, with
+        :class:`~discopy.hypergraph.Hypergraph`, which knows no scalar, with
         the scalar of this one.
         """
         return result if result is self else result.scaled(self.scalar)
@@ -1030,7 +1030,7 @@ class Hypergraph(hypergraph.Hypergraph):
         The pushout complements of a match, each with the scalar of this
         hypergraph over that of the pattern, so that plugging the pattern
         back gives this hypergraph, see
-        :meth:`discopy.hypergraph.Hypergraph.complements`.
+        :meth:`~discopy.hypergraph.Hypergraph.complements`.
 
         >>> host = (H @ scalar(2)).to_hypergraph()
         >>> pattern = (H @ scalar(2 ** .5)).to_hypergraph()
@@ -1429,7 +1429,7 @@ def edges_of(locals_: dict[int, Local], u: int, v: int) -> list[int]:
 
 class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     """
-    A :class:`discopy.hypergraph.Rewriter` of a graph-like hypergraph with
+    A :class:`~discopy.hypergraph.Rewriter` of a graph-like hypergraph with
     the rules of the ``full_reduce`` of :cite:t:`KissingerWetering20`, one
     method each: each step is a pair of hypergraphs built for its match, the
     left side the neighbourhood it rewrites and the right side what replaces
@@ -1472,7 +1472,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                    match: hypergraph.Match) -> list[int]:
         """
         Rewrite a match in place, see
-        :meth:`discopy.hypergraph.Rewriter.substitute`, multiplying the scalar
+        :meth:`~discopy.hypergraph.Rewriter.substitute`, multiplying the scalar
         by that of ``right`` over that of ``left``.
         """
         self.scalar = self.scalar * right.scalar / left.scalar

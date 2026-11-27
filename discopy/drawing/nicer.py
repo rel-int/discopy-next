@@ -2,7 +2,7 @@
 How nice a drawing looks, as a score to maximise.
 
 A layout of a diagram is a choice of foliation, see
-:meth:`discopy.monoidal.Diagram.foliations`, and of its geometry. The
+:meth:`~discopy.monoidal.Diagram.foliations`, and of its geometry. The
 :func:`hand_score` of its drawing is a linear map of hand features, each a
 cost: the lower, the nicer. Its weights start equal, to be fitted by
 Bradley-Terry on the team's votes between two layouts, i.e.
@@ -59,7 +59,7 @@ from math import hypot, log
 from typing import TYPE_CHECKING, Callable, Sequence
 
 from discopy.drawing.backend import Backend
-from discopy.drawing.drawing import Drawing, Node, Point
+from discopy.drawing.planegraph import Drawing, Node, Point
 from discopy import messages
 from discopy.utils import text_width
 
@@ -238,7 +238,7 @@ def make_nicer(
         diagram : The diagram to draw nicer.
         score : The score to maximise, :func:`hand_score` by default.
         limit : The number of foliations to try, see
-            :meth:`discopy.monoidal.Diagram.foliations`.
+            :meth:`~discopy.monoidal.Diagram.foliations`.
 
     >>> from discopy.monoidal import Ty, Box
     >>> x = Ty('x')

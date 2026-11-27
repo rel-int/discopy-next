@@ -22,7 +22,7 @@ A quantum reservoir in the sense of Fujii and Nakajima
 of classical-quantum channels: a fixed ``unitary`` acts on ``memory``
 qubits kept between time steps together with ``inputs`` fresh qubits
 encoding each value of a time series. It is a monoidal stream
-:class:`discopy.stream.Stream` of circuits, :meth:`Reservoir.stream`, from
+:class:`~discopy.stream.Stream` of circuits, :meth:`Reservoir.stream`, from
 the input qubits to nothing with the memory as feedback, and a time series
 is the stream of state preparations :meth:`Reservoir.encoding` composed
 with it. Its slice at each time step is a channel from memory to memory

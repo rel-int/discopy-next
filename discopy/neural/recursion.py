@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Recursive message passing: the boxes of :mod:`discopy.neural.cell` fired in
-synchronous rounds along the tables of :mod:`discopy.neural.wiring`.
+Recursive message passing: the boxes of :mod:`~discopy.neural.cell` fired in
+synchronous rounds along the tables of :mod:`~discopy.neural.wiring`.
 
 A *round* fires every node once on what its ports hold and routes the
 beliefs it emits. A *cycle* is :attr:`Recursion.rounds` rounds followed by a
@@ -127,7 +127,7 @@ class Recursion(nn.Module):
     subclass defines together with :meth:`initial`.
 
     The heads read the answer trace: ``bce``, ``sm`` and ``conf`` are the
-    lattice heads of :mod:`discopy.neural.lattice`, ``sm`` alone the readout
+    lattice heads of :mod:`~discopy.neural.lattice`, ``sm`` alone the readout
     of :meth:`act_step`, and ``halt``, when the network halts, a
     :class:`~discopy.neural.cell.HaltHead`. A halting network runs its GRUs
     as :func:`~discopy.neural.cell.gru_cell`, which ``vmap`` can batch.
@@ -283,7 +283,7 @@ class Recursion(nn.Module):
     def heads(self, answer):
         """
         The three lattice heads read off the answer trace, as
-        :class:`discopy.neural.lattice.Heads`.
+        :class:`~discopy.neural.lattice.Heads`.
 
         Parameters:
             answer : The answer trace.
