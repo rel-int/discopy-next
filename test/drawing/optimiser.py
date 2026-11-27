@@ -76,7 +76,8 @@ def test_a_picture_has_no_dagger():
 def test_waypoints_are_drawn_as_curves(tmp_path):
     drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
     waypoints = [(u, v) for u, v in drawing.edges
-                 if "wire" in (u.kind, v.kind)]
+                 if "wire" in (u.kind, v.kind)
+                 and drawing.positions[u] != drawing.positions[v]]
     drawing.draw(path=str(tmp_path / "out.tikz"), to_tikz=True)
     assert (tmp_path / "out.tikz").read_text().count(
         ".. controls") == len(waypoints) > 0
@@ -164,6 +165,26 @@ def test_the_frame_holds_the_boxes():
     corners = drawing.framed().positions.values()
     assert max(p.x for p in corners) <= drawing.width
     assert max(p.y for p in corners) <= drawing.height
+
+
+def test_wires_alone_have_height():
+    for diagram in [monoidal.Id(Ty('x', 'y')), pivotal.Id(px)]:
+        drawing = to_drawing(diagram)
+        assert drawing.height == 1 == max(
+            p.y for p in drawing.positions.values())
+    drawing = to_pivotal_drawing(pivotal.Id(px))
+    assert drawing.height == max(p.y for p in drawing.positions.values()) > .5
+
+
+def test_a_crossing_between_samples_is_seen():
+    from discopy.drawing.optimiser import crosses, sample
+    curve = [np.array(p, float) for p in [(0, 0), (0, 6), (1, 0), (1, 0)]]
+    t = np.linspace(0, 1, 9)[:, None]
+    coarse = sum(w * p for w, p in zip(
+        [(1 - t) ** 3, 3 * t * (1 - t) ** 2, 3 * t ** 2 * (1 - t), t ** 3],
+        curve))
+    line = np.array([(-1, 2.65), (2, 2.65)])
+    assert not crosses(coarse, line) and crosses(sample(curve), line)
 
 
 def test_the_empty_diagram():

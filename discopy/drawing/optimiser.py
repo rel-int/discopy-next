@@ -127,7 +127,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from math import atan2, cos, hypot, sin
+from math import atan2, ceil, cos, hypot, sin, sqrt
 from itertools import count
 import networkx as nx
 import numpy as np
@@ -693,6 +693,8 @@ def to_drawing(diagram: monoidal.Diagram, **weights: float) -> Optimised:
         diagram : The diagram to draw.
         weights : The weights of :meth:`OpenQP.solve`.
     """
+    if not diagram.inside and diagram.dom:
+        return OpenQP.id(diagram.dom, height=1).solve(**weights)
     return OpenQP.functor(diagram.factory)(diagram).solve(**weights)
 
 
@@ -762,7 +764,10 @@ FRAME = .1
 """ How far a waypoint keeps from the top and the bottom of the frame. """
 
 SAMPLES = 8
-""" The points sampled on each segment of a wire to check a drawing. """
+""" The fewest points sampled on each segment of a wire to check it. """
+
+TOLERANCE = .02
+""" How far a wire strays at most from the polyline of its samples. """
 
 
 @dataclass
@@ -1004,13 +1009,10 @@ class PlanarMap:
         Whether no two wires cross or come closer than a tenth, no wire
         goes through a box, no two boxes overlap and everything is between
         the top and the bottom of the frame, each wire sampled along its
-        :meth:`curves`.
+        :meth:`curves` within the :data:`TOLERANCE`, so that two wires that
+        cross have samples closer than a tenth.
         """
-        t = np.linspace(0, 1, SAMPLES + 1)[:, None]
-        basis = [(1 - t) ** 3, 3 * t * (1 - t) ** 2, 3 * t ** 2 * (1 - t),
-                 t ** 3]
-        lines = [np.concatenate([sum(w * p for w, p in zip(basis, segment))
-                                 for segment in wire])
+        lines = [np.concatenate([sample(segment) for segment in wire])
                  for wire in self.curves(z)]
         height = z[self.offset("height")]
         everything = np.concatenate(lines + [
@@ -1308,6 +1310,21 @@ def position(drawing: Drawing, item) -> Point:
     if is_turn(item):
         return drawing.positions[item[0]]
     return drawing.positions[item]
+
+
+def sample(segment: tuple) -> np.ndarray:
+    """
+    Points along a cubic Bezier, so many that it strays from their polyline
+    by the :data:`TOLERANCE` at most: by ``3 L / (2 n ** 2)`` for ``n``
+    samples, where ``L`` is the length of its control polygon, which
+    bounds a sixth of its second derivative.
+    """
+    length = sum(np.linalg.norm(q - p) for p, q in zip(segment, segment[1:]))
+    n = max(SAMPLES, ceil(sqrt(1.5 * length / TOLERANCE)))
+    t = np.linspace(0, 1, n + 1)[:, None]
+    return sum(w * p for w, p in zip(
+        [(1 - t) ** 3, 3 * t * (1 - t) ** 2, 3 * t ** 2 * (1 - t), t ** 3],
+        segment))
 
 
 def crosses(first: np.ndarray, second: np.ndarray) -> bool:
