@@ -2,7 +2,7 @@
 
 - [x] matrix.Array: the array plumbing, sums and delay, declaring no category; Matrix and Tensor are siblings on it
 - [x] Tensor declares HypergraphCategory and DaggerMonoidalCategory, with its own braid, merge and basis
-- [ ] quantum.Channel on Array, dagger compact with copy and discard on classical wires, to_tensor an explicit doubling functor
+- [x] quantum.Channel on Array, dagger compact with copy and discard on classical wires, to_tensor an explicit doubling functor
 - [ ] peirce.alpha tests for Array rather than Matrix
 - [ ] requires on every functor class, checked at construction, call-time fallbacks deleted
 - [ ] Hypergraph and CMap, after the design thread T-d55d90a2 reports
