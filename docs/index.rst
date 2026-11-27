@@ -48,6 +48,7 @@ DisCoPy documentation
     notebooks/optyx/readme_example
     notebooks/optyx/fixpoints
     notebooks/optyx/feed_forward_example
+    notebooks/optyx/feedforward_ep
     notebooks/optyx/linear_logic
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
