@@ -453,16 +453,20 @@ class Create(Channel):
 
     def to_tree(self) -> dict:
         tree = {**super().to_tree(), 'photons': list(self.photons)}
-        if self.internal_states is not None:
+        states = self.internal_states
+        if isinstance(states, tuple):
             tree['internal_states'] = [
-                np.asarray(state).tolist() for state in self.internal_states]
+                np.asarray(state).tolist() for state in states]
+        elif states is not None:  # the state of a single photon
+            tree['internal_states'] = np.asarray(states).tolist()
         return tree
 
     @classmethod
     def from_tree(cls, tree: dict):
         states = tree.get('internal_states')
-        return cls(*tree['photons'], internal_states=None if states is None
-                   else tuple(states))
+        if states and isinstance(states[0], list):
+            states = tuple(states)
+        return cls(*tree['photons'], internal_states=states)
 
 
 class AbstractGate(Channel, ABC):

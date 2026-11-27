@@ -203,6 +203,7 @@ PHOTONIC_BOXES = [
     Create(1, 0, 2),
     Create(1, 0, 1, internal_states=([1, 0], [0, 1])),
     Create(1, 1, internal_states=(np.array([1, 0]), [0, 1j])),
+    Create(1, internal_states=[1, 0]),
     Gate([[0, 1], [1, 0]], 2, 2, "flip"),
     Gate([[1j, 0], [0, 1]], 2, 2, "P", data=(0.1, 0.2)),
     Gate([[1j, 0], [0, 1]], 2, 2, "P", data=(0.1, 0.2)).dagger(),
