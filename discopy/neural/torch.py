@@ -62,7 +62,7 @@ class Module(torch.nn.Module):
 
     Parameters:
         network : The feedforward network to run, or a parametric one, i.e.
-            a :class:`discopy.para.Symmetric` over :class:`Network`.
+            a :class:`~discopy.para.Symmetric` over :class:`Network`.
         weights : The initial weights of a parametric network, one tensor
             per leg of its parameter space, each held as a parameter.
 

@@ -2,11 +2,11 @@
 
 """
 The free comonad category, i.e. a category with a comonad ``!``, see
-:class:`discopy.abc.ComonadCategory`: the :class:`Bang` of an arrow, a box
+:class:`~discopy.abc.ComonadCategory`: the :class:`Bang` of an arrow, a box
 with the arrow as its arg, the :class:`Dereliction` ``!x -> x`` and the
 :class:`Digging` ``!x -> !!x``. It needs no tensor: the contraction, the
 weakening, the laxator and the exchange are those of
-:mod:`discopy.linear.monoidal`.
+:mod:`linear.monoidal <discopy.linear.monoidal>`.
 
 Summary
 -------
@@ -55,7 +55,7 @@ from discopy.utils import (
 
 class Ob(cat.Ob):
     """
-    An object with a bang, a :class:`discopy.cat.Ob` that may be banged.
+    An object with a bang, a :class:`~discopy.cat.Ob` that may be banged.
     """
     bang_factory: ClassVar[type[BangOb]]
 
@@ -126,9 +126,9 @@ Ob.bang_factory = BangOb
 @factory
 class Arrow(cat.Arrow, ComonadCategory):
     """
-    An arrow in the free comonad category: a :class:`discopy.cat.Arrow` with
+    An arrow in the free comonad category: a :class:`~discopy.cat.Arrow` with
     :class:`Bang` boxes and the :class:`Dereliction` and :class:`Digging`
-    boxes, see :class:`discopy.abc.ComonadCategory`.
+    boxes, see :class:`~discopy.abc.ComonadCategory`.
 
     Parameters:
         inside (tuple[Box, ...]) : The boxes inside the arrow.
@@ -251,7 +251,7 @@ class Structural(Box):
     def dagger(self):
         """
         A structural box has no dagger, but for the exchange of
-        :mod:`discopy.linear.monoidal`.
+        :mod:`linear.monoidal <discopy.linear.monoidal>`.
 
         >>> Dereliction(Ob('x')).dagger()
         Traceback (most recent call last):

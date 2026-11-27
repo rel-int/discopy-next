@@ -185,7 +185,7 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
         The trace of the last wire of a diagram, the first when ``left``, as
         a cap, the diagram and a cup: the :attr:`trace_factory` of a category
         whose trace is not a box of its own, e.g.
-        :class:`discopy.tensor.Diagram`.
+        :class:`~discopy.tensor.Diagram`.
 
         Parameters:
             diagram : The diagram to trace.
@@ -203,7 +203,7 @@ class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
     def open_traces(self) -> Diagram:
         """
         Send each :class:`Trace` to a cap, its argument and a cup, which is
-        what :meth:`discopy.abc.PivotalCategory.trace_duals` says it is, and
+        what :meth:`~discopy.abc.PivotalCategory.trace_duals` says it is, and
         open those inside the args of any other box, e.g. a delayed
         :class:`Feedback`, which stays a box.
 

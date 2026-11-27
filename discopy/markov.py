@@ -162,7 +162,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
 
-    See :mod:`discopy.feedback.markov` for the syntax of streams.
+    See :mod:`~discopy.feedback.markov` for the syntax of streams.
     """
     copy_factory: ClassVar[type["Copy"]]
     discard_factory: ClassVar[type["Discard"]]
@@ -180,11 +180,11 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
         """
         Sample Markov diagrams through their quotient: a hypergraph drawn
-        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        by :meth:`~discopy.hypergraph.Hypergraph.strategy` with at most
         ``fuel + 1`` boxes, besides the one balancing box that may close its
         boundary, and the spiders that the category supports, i.e.
         copies and discards here and every spider in a hypergraph category,
-        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        downgraded with :meth:`~discopy.hypergraph.Hypergraph.to_diagram`.
         """
         category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
         return category.strategy(
@@ -195,7 +195,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         """
         The spiders of a Markov category: the copies, with one leg in, see
-        :meth:`discopy.feedback.markov.Diagram.spider_factory` for those with
+        :meth:`~discopy.feedback.markov.Diagram.spider_factory` for those with
         none.
 
         >>> x = Ty('x')
@@ -249,7 +249,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         A native :class:`Function` box when the category has a matching
         function factory, its decomposition by
-        :meth:`discopy.abc.MarkovCategory.function` otherwise. A bijection
+        :meth:`~discopy.abc.MarkovCategory.function` otherwise. A bijection
         becomes :meth:`from_permutation`, the identity the identity diagram.
 
         Parameters:
@@ -276,8 +276,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
         """
         Deprecated: a Markov diagram has no merge, see
-        :meth:`discopy.comarkov.Diagram.merge`, which a diagram that is
-        also comarkov, e.g. :class:`discopy.frobenius.Diagram`, inherits.
+        :meth:`~discopy.comarkov.Diagram.merge`, which a diagram that is
+        also comarkov, e.g. :class:`~discopy.frobenius.Diagram`, inherits.
 
         Parameters:
             x : The type to merge.
@@ -424,7 +424,7 @@ monoidal.Ty(monoidal.Wire('x')), is_deterministic=False)
     def flagged(self, other: Box) -> Box:
         """
         Give a box built from this one the flags declared of this one, as the
-        rotations of a :class:`discopy.frobenius.Box` do.
+        rotations of a :class:`~discopy.frobenius.Box` do.
         """
         other.deterministic, other.affine = self.deterministic, self.affine
         return other
@@ -574,7 +574,7 @@ class Function(Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a function, see :func:`discopy.utils.dumps`.
+        Serialise a function, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -625,7 +625,7 @@ closed.markov.Diagram is not a dagger category.
         functions and types coalesces into the function on the disjoint
         union of their underlying :class:`finset.Function
         <discopy.python.finset.Function>`, from which point the layers are
-        those of an ordinary :meth:`discopy.monoidal.Diagram.tensor`.
+        those of an ordinary :meth:`~discopy.monoidal.Diagram.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Copy(x).tensor(y, Discard(x))\\
@@ -668,7 +668,7 @@ class Permutation(symmetric.Permutation, Box):
     """
     A permutation in a Markov category, i.e. a bijective :class:`Function`,
     registered as a virtual subclass so that it keeps the constructor of
-    :class:`discopy.symmetric.Permutation`.
+    :class:`~discopy.symmetric.Permutation`.
 
     Parameters:
         dom (monoidal.Ty) : The domain, i.e. the wires to permute.
@@ -911,7 +911,7 @@ class TermBase(symmetric.TermBase):
     """
     A term of a category with copies and discards, i.e. of the kappa
     calculus with contraction and weakening: a
-    :class:`discopy.symmetric.TermBase` where a variable occurs any number
+    :class:`~discopy.symmetric.TermBase` where a variable occurs any number
     of times. The context of a term is its distinct free variables in the
     order of their first occurrence: an :class:`Application` copies the
     ones its function and its argument share, a :class:`Kappa` discards
@@ -1076,7 +1076,7 @@ type Term = Variable | Constant | Application | Kappa
 class Sampler(symmetric.Sampler):
     """
     Samples a term of a category with copies and discards as a
-    :class:`discopy.symmetric.Sampler` does, each subterm using its
+    :class:`~discopy.symmetric.Sampler` does, each subterm using its
     variables in an order of its own, one of them twice or not at all.
 
     Example

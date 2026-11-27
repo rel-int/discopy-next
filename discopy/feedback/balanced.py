@@ -2,7 +2,7 @@
 
 """
 The free balanced feedback category, i.e. balanced diagrams with feedback,
-whose wires carry a time step, see :mod:`discopy.feedback`.
+whose wires carry a time step, see :mod:`~discopy.feedback`.
 
 Summary
 -------

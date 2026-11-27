@@ -20,31 +20,34 @@ other way. Each module is pictured by its characteristic generator or equation,
 drawn by the module itself: ``docs/architecture.py`` draws the pictures and writes the
 table.
 
+.. currentmodule:: discopy
+
 .. autosummary::
     :template: module.rst
     :toctree: ../_api
 
-    discopy.testable
-    discopy.abc
-    discopy.lean
-    discopy.cat
-    discopy.monoidal
-    discopy.spacial
-    discopy.braided
-    discopy.feedback
-    discopy.balanced
-    discopy.symmetric
-    discopy.markov
-    discopy.comarkov
-    discopy.closed
-    discopy.linear
-    discopy.rigid
-    discopy.pivotal
-    discopy.ribbon
-    discopy.compact
-    discopy.frobenius
-    discopy.hypergraph
-    discopy.cmap
+    testable
+    abc
+    lean
+    cat
+    monoidal
+    spacial
+    braided
+    feedback
+    balanced
+    symmetric
+    markov
+    comarkov
+    closed
+    linear
+    rigid
+    pivotal
+    ribbon
+    compact
+    frobenius
+    hypergraph
+    cmap
+    inet
 
 Utilities shared by every module: serialisation, factories and configuration.
 
@@ -52,5 +55,5 @@ Utilities shared by every module: serialisation, factories and configuration.
     :template: module.rst
     :toctree: ../_api
 
-    discopy.utils
-    discopy.config
+    utils
+    config

@@ -133,7 +133,7 @@ and feed the result into a controlled quantum gate.
 from typing import Callable, List
 import numpy as np
 from sympy import lambdify
-from discopy.utils import factory_name, rsubs
+from discopy.utils import factory_name, from_tree, rsubs
 from discopy.optyx import channel
 from discopy.optyx.core import (
     control,
@@ -229,6 +229,23 @@ class BitControlledGate(Channel):
             return self.control_gate.free_symbols\
                 | self.default_gate.free_symbols
 
+        def to_tree(self) -> dict:
+            tree = {'factory': factory_name(BitControlledGate),
+                    'control_gate': self.control_gate.to_tree(),
+                    'default_gate': self.default_gate.to_tree()}
+            if self.is_dagger:
+                tree['is_dagger'] = True
+            if self.classical:
+                tree['classical'] = True
+            return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(from_tree(tree['control_gate']),
+                   from_tree(tree['default_gate']),
+                   is_dagger=tree.get('is_dagger', False),
+                   classical=tree.get('classical', False))
+
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
             return cls._BitControlledSingleBox(
@@ -294,6 +311,11 @@ class BitControlledPhaseShift(Channel):
         return f"{factory_name(type(self))}({self.function!r}, "\
             f"{n_modes}, {n_control})"
 
+    def to_tree(self) -> dict:
+        raise TypeError(
+            f"{factory_name(type(self))} has no tree: its function is a "
+            "Python callable, which JSON cannot hold.")
+
 
 DiscardBit = lambda n: Discard(bit**n)  # noqa: E731
 DiscardMode = lambda n: Discard(mode**n)  # noqa: E731
@@ -303,6 +325,15 @@ class ClassicalBox(CQMap):
     """
     Base class for classical boxes.
     """
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'name': self.name,
+                'density_matrix': self.density_matrix.to_tree(),
+                'dom': self.dom.to_tree(), 'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['name'], from_tree(tree['density_matrix']),
+                   from_tree(tree['dom']), from_tree(tree['cod']))
 
 
 class Scalar(ClassicalBox):
@@ -322,6 +353,13 @@ class Scalar(ClassicalBox):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.value!r})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'value': self.value}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['value'])
+
 
 class Add(ClassicalBox):
     """
@@ -339,6 +377,13 @@ class Add(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'n': len(self.dom)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['n'])
 
 
 class Sub(ClassicalBox):
@@ -363,6 +408,14 @@ class Sub(ClassicalBox):
     def __repr__(self):
         return f"{factory_name(type(self))}()"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self))}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
+
 
 class Multiply(ClassicalBox):
     """
@@ -380,6 +433,9 @@ class Multiply(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class Divide(ClassicalBox):
@@ -400,6 +456,9 @@ class Divide(ClassicalBox):
     def __repr__(self):
         return f"{factory_name(type(self))}()"
 
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
+
 
 class Mod2(ClassicalBox):
     """
@@ -418,6 +477,9 @@ class Mod2(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class CopyN(ClassicalBox):
@@ -438,6 +500,13 @@ class CopyN(ClassicalBox):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.cod)})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'n': len(self.cod)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['n'])
+
 
 class SwapN(ClassicalBox):
     """
@@ -456,6 +525,9 @@ class SwapN(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class PostselectBit(ClassicalBox):
@@ -494,6 +566,13 @@ class PostselectBit(ClassicalBox):
         bits = ", ".join(map(repr, self.bits))
         return f"{factory_name(type(self))}({bits})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'bits': list(self.bits)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['bits'])
+
 
 class PostselectDigit(ClassicalBox):
     """
@@ -523,6 +602,14 @@ class PostselectDigit(ClassicalBox):
         digits = ", ".join(map(repr, self.digits))
         return f"{factory_name(type(self))}({digits})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'digits': list(self.digits)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['digits'])
+
 
 class Not(ClassicalBox):
     """
@@ -541,6 +628,9 @@ class Not(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class Xor(ClassicalBox):
@@ -562,6 +652,9 @@ class Xor(ClassicalBox):
         n = len(self.dom)
         return f"{factory_name(type(self))}({'' if n == 2 else n})"
 
+    to_tree = Add.to_tree
+    from_tree = classmethod(Add.from_tree.__func__)
+
 
 class And(ClassicalBox):
     """
@@ -581,6 +674,9 @@ class And(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({'' if self.n == 2 else self.n})"
+
+    to_tree = Add.to_tree
+    from_tree = classmethod(Add.from_tree.__func__)
 
 
 class CopyBit(ClassicalBox):
@@ -602,6 +698,9 @@ class CopyBit(ClassicalBox):
         n = len(self.cod)
         return f"{factory_name(type(self))}({'' if n == 2 else n})"
 
+    to_tree = CopyN.to_tree
+    from_tree = classmethod(CopyN.from_tree.__func__)
+
 
 class SwapBit(ClassicalBox):
     """
@@ -620,6 +719,9 @@ class SwapBit(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class Or(ClassicalBox):
@@ -640,6 +742,9 @@ class Or(ClassicalBox):
     def __repr__(self):
         n = len(self.dom)
         return f"{factory_name(type(self))}({'' if n == 2 else n})"
+
+    to_tree = Add.to_tree
+    from_tree = classmethod(Add.from_tree.__func__)
 
 
 # pylint: disable=invalid-name
@@ -663,6 +768,15 @@ class Z(ClassicalBox):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'n_legs_in': len(self.dom), 'n_legs_out': len(self.cod),
+                'phase': self.phase}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['n_legs_in'], tree['n_legs_out'], tree['phase'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(len(self.dom), len(self.cod), lambdify(
@@ -695,7 +809,8 @@ class X(ClassicalBox):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
 
-    lambdify, subs = Z.lambdify, Z.subs
+    lambdify, subs, to_tree = Z.lambdify, Z.subs, Z.to_tree
+    from_tree = classmethod(Z.from_tree.__func__)
 
 
 # pylint: disable=invalid-name
@@ -716,6 +831,9 @@ class H(ClassicalBox):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    to_tree = Sub.to_tree
+    from_tree = classmethod(Sub.from_tree.__func__)
 
 
 class ControlChannel(ClassicalBox):
@@ -767,6 +885,8 @@ class ClassicalFunction(ControlChannel):
         return f"{factory_name(type(self))}({self.function!r}, "\
             f"{self.dom!r}, {self.cod!r})"
 
+    to_tree = BitControlledPhaseShift.to_tree
+
 
 class BinaryMatrix(ControlChannel):
     """
@@ -800,6 +920,14 @@ class BinaryMatrix(ControlChannel):
         matrix = self.density_matrix.matrix.tolist()
         return f"{factory_name(type(self))}({matrix})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'matrix': self.density_matrix.matrix.tolist()}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['matrix'])
+
 
 class Digit(ClassicalBox):
     """
@@ -826,6 +954,14 @@ class Digit(ClassicalBox):
     def __repr__(self):
         photons = ", ".join(map(repr, self.photons))
         return f"{factory_name(type(self))}({photons})"
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'photons': list(self.photons)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['photons'])
 
 
 Bit = lambda *bits: PostselectBit(*bits).dagger()  # noqa: E731

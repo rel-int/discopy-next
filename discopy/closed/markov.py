@@ -6,7 +6,7 @@ products that are not strictly associative.
 Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
 with tuples, projections and ``let``, and reduced to Böhm trees by a
 :class:`Strategy`. Diagrams map to combinatorial maps, i.e.
-:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+:class:`~discopy.cmap.CMap`, with :meth:`~discopy.monoidal.Diagram.to_map`.
 
 Summary
 -------
@@ -63,8 +63,8 @@ Summary
 Axioms
 ------
 
-:meth:`discopy.closed.monoidal.Diagram.curry` and
-:meth:`discopy.abc.ClosedMonoidalCategory.uncurry` are inverses.
+:meth:`~discopy.closed.monoidal.Diagram.curry` and
+:meth:`~discopy.abc.ClosedMonoidalCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)
@@ -101,7 +101,7 @@ from discopy.utils import (
 class Wire(closed.symmetric.Wire):
     """
     A closed Markov object is a symmetric closed object, see
-    :class:`discopy.feedback.closed.markov.Wire` for one with a time step.
+    :class:`~discopy.feedback.closed.markov.Wire` for one with a time step.
     """
 
 

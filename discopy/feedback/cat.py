@@ -2,10 +2,10 @@
 
 """
 The free delay category, i.e. a category with an endofunctor ``delay``, see
-:class:`discopy.abc.DelayCategory`: an object and a box carry a time step,
+:class:`~discopy.abc.DelayCategory`: an object and a box carry a time step,
 the number of times they have been delayed, and the delay of an arrow is
 that of its boxes. It needs no tensor: the feedback is that of
-:mod:`discopy.feedback`.
+:mod:`~discopy.feedback`.
 
 Summary
 -------
@@ -110,7 +110,7 @@ class Ob(cat.Ob):
 @factory
 class Arrow(cat.Arrow, DelayCategory):
     """
-    An arrow in the free delay category, a :class:`discopy.cat.Arrow` whose
+    An arrow in the free delay category, a :class:`~discopy.cat.Arrow` whose
     delay is that of its boxes.
 
     Parameters:

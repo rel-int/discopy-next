@@ -2,7 +2,7 @@
 
 """
 The free symmetric feedback category, i.e. symmetric diagrams with feedback,
-whose wires carry a time step, see :mod:`discopy.feedback`. Their traces
+whose wires carry a time step, see :mod:`~discopy.feedback`. Their traces
 satisfy the axioms of a symmetric traced category, up to the hypergraph of
 each side: see :class:`Equation`.
 

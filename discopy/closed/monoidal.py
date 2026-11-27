@@ -451,7 +451,7 @@ class Diagram(monoidal.Diagram, ClosedMonoidalCategory):
         """
         Bend curry bubbles into coevaluation and feedback, which lands in
         :class:`CMap` as a biclosed category has no trace, see
-        :meth:`discopy.cmap.CMap.to_compact`.
+        :meth:`~discopy.cmap.CMap.to_compact`.
 
         Example
         -------
@@ -729,7 +729,7 @@ class Functor(monoidal.Functor):
     >>> assert F(f(x)) == F(f)(F(x))
 
     A :class:`CMap` has no terms, so a term is evaluated into it. Nor has a
-    :class:`discopy.hypergraph.Hypergraph`, nor even :meth:`Diagram.ev`, so a
+    :class:`~discopy.hypergraph.Hypergraph`, nor even :meth:`Diagram.ev`, so a
     term is sent there as the image of its diagram:
 
     >>> assert f(x).to_hypergraph() == f(x).eval().to_hypergraph()
@@ -865,7 +865,7 @@ class Normalising(Testable):
     """
     The laws of beta reduction, for terms with a ``normal_form`` reached by
     each of their :attr:`reduction_strategies`, e.g.
-    :class:`discopy.closed.markov.TermBase`.
+    :class:`~discopy.closed.markov.TermBase`.
     """
     reduction_strategies: ClassVar[tuple] = ()
 
@@ -896,7 +896,7 @@ class Normalising(Testable):
 class TermBase(Box, AlphaEquivalence):
     """
     A term in the internal language of biclosed categories, an
-    :class:`discopy.testable.Equivalence` up to the names of its bound
+    :class:`~discopy.testable.Equivalence` up to the names of its bound
     variables, see :meth:`alpha_eq`.
 
     Attributes:
@@ -1357,7 +1357,7 @@ class Sampler:
         counter : The numbers of the free variables and constants built.
         linear : Whether each bound variable occurs exactly once, in the
             order of the binders, as :mod:`biclosed` requires; a term of
-            :mod:`discopy.closed` may use one any number of times.
+            :mod:`~discopy.closed` may use one any number of times.
         constants : Whether a leaf or the head of a spine may be a
             constant, else a free variable, so that beta reduction reads a
             variable at every head, see :class:`Reducible`.
@@ -1558,7 +1558,7 @@ class Equation(monoidal.Equation):
 class AlphaEquation(cat.AlphaEquation, Equation):
     """
     An :class:`Equation` between terms which holds when they are
-    alpha-equivalent, see :meth:`discopy.cat.AlphaEquivalence.alpha_eq`.
+    alpha-equivalent, see :meth:`~discopy.cat.AlphaEquivalence.alpha_eq`.
 
     Example
     -------
