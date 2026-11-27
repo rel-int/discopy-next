@@ -588,6 +588,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `matrix.Array` holds what `Matrix`, `tensor.Tensor` and
+  `quantum.channel.Channel` share, the array, its `dtype`, sums, `map`,
+  `resolvent` and the identity `delay`, and declares no category. `Tensor`
+  is no longer a `Matrix` but its sibling, a `abc.HypergraphCategory` whose
+  `merge` and `basis` are its own rather than those of the direct sum, and
+  `Channel` is no longer a `Tensor` but a dagger `abc.CompactCategory`,
+  whose `copy` copies in the computational basis, decohering a quantum wire
+  it is discarded from, and whose `trace` takes a memory `mem=` alone, a
+  `CQ` type having no last wire. `Tensor.zero` and `Channel.__init__` give
+  way to `Array.shape` ([next#771]).
 - `discopy.feedback` and `discopy.linear` are packages, see
   `docs/adr/0012-feedback-and-linear-are-packages.md`. The levels with feedback
   are `feedback.balanced`, `feedback.symmetric`, `feedback.markov`,
@@ -2979,6 +2989,7 @@ for the changelog of `1.2.1` and earlier.
 [next#744]: https://github.com/rel-int/discopy-next/pull/744
 [next#746]: https://github.com/rel-int/discopy-next/pull/746
 [next#764]: https://github.com/rel-int/discopy-next/pull/764
+[next#771]: https://github.com/rel-int/discopy-next/pull/771
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

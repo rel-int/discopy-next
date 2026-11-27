@@ -43,10 +43,11 @@ Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 
 from __future__ import annotations
 
-from discopy import frobenius, tensor
+from discopy import frobenius, messages, tensor
 from discopy.cat import factory
 from discopy.frobenius import Box
-from discopy.matrix import backend
+from discopy.abc import CompactCategory, DaggerMonoidalCategory
+from discopy.matrix import Array, backend
 from discopy.quantum.circuit import Wire
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
@@ -169,9 +170,14 @@ def Q(dim=Dim(1)) -> CQ:
 
 
 @factory
-class Channel(Tensor):
+class Channel(Array, CompactCategory, DaggerMonoidalCategory):
     """
-    A channel is a tensor with :class:`CQ` types as ``dom`` and ``cod``.
+    A channel is an :class:`~discopy.matrix.Array` with :class:`CQ` types as
+    ``dom`` and ``cod``, a sibling of :class:`~discopy.tensor.Tensor` rather
+    than one: it is a dagger :class:`~discopy.abc.CompactCategory`, with
+    :meth:`copy` and :meth:`discard` on every wire but no merge, so not a
+    hypergraph category. Its composition, tensor and dagger are those of
+    the tensors it doubles to, see :meth:`to_tensor`.
 
     Parameters:
         array : The array of shape ``dom.to_dim() @ cod.to_dim()``
@@ -182,14 +188,34 @@ class Channel(Tensor):
     ob = CQ
     dtype = complex
 
-    def __init__(self, array, dom: CQ, cod: CQ):
-        assert_isinstance(dom, CQ)
-        assert_isinstance(cod, CQ)
-        super().__init__(array, dom.to_dim(), cod.to_dim())
-        self.dom, self.cod = dom, cod
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None: a channel is not enrolled in the property matrix. """
+        return ()
+
+    @classmethod
+    def shape(cls, dom: CQ, cod: CQ) -> tuple:
+        """
+        One axis for each classical factor and two for each quantum one, of
+        the domain then the codomain, see :meth:`CQ.to_dim`.
+
+        >>> assert Channel.shape(C(Dim(2)), Q(Dim(3))) == (2, 3, 3)
+        """
+        return dom.to_dim().inside + cod.to_dim().inside
 
     def to_tensor(self) -> Tensor:
-        """ The underlying tensor of a channel. """
+        """
+        The doubling functor from channels to tensors on arrows, as
+        :meth:`CQ.to_dim` is on objects: a classical wire goes to one wire
+        and a quantum wire to two, and the array is the same. It is
+        faithful and strict monoidal up to the interleaving of
+        :meth:`tensor`, and :meth:`then` and :meth:`dagger` compute through
+        it.
+
+        >>> f = Channel.double(Tensor[complex]([0, 1, 1, 0], Dim(2), Dim(2)))
+        >>> assert (f >> f).to_tensor() == f.to_tensor() >> f.to_tensor()
+        >>> assert f.dagger().to_tensor() == f.to_tensor().dagger()
+        """
         return Tensor[self.dtype](
             self.array, self.dom.to_dim(), self.cod.to_dim())
 
@@ -198,10 +224,8 @@ class Channel(Tensor):
         assert_isinstance(dom, CQ)
         return cls(Tensor[cls.dtype].id(dom.to_dim()).array, dom, dom)
 
-    def then(self, *others: Channel) -> Channel:
-        if len(others) != 1:
-            return super().then(*others)  # ty: ignore[invalid-return-type]
-        other, = others
+    @unbiased
+    def then(self, other: Channel) -> Channel:
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         array = (self.to_tensor() >> other.to_tensor()).array
@@ -251,13 +275,18 @@ class Channel(Tensor):
 
     @classmethod
     def swap(cls, left, right) -> Channel:
+        """ The swap of the classical and of the doubled quantum wires. """
         array = (Tensor.swap(left.classical, right.classical)
                  @ Tensor.swap(left.quantum, right.quantum)
                  @ Tensor.swap(left.quantum, right.quantum)).array
         return cls(array, left @ right, right @ left)
 
+    braid = swap
+
     @classmethod
     def permutation(cls, xs, doms) -> Channel:
+        """ The permutation of the classical and the doubled quantum wires.
+        """
         dom = cls.ob.unit().tensor(*doms)
         cod = cls.ob.unit().tensor(*(doms[i] for i in xs))
         array = (Tensor.permutation(xs, [x.classical for x in doms])
@@ -267,8 +296,88 @@ class Channel(Tensor):
 
     @classmethod
     def cups(cls, left, right):
+        """ The cups of the classical and the doubled quantum wires. """
         return cls.single(Tensor.cups(left.classical, right.classical))\
             @ cls.double(Tensor.cups(left.quantum, right.quantum))
+
+    @classmethod
+    def caps(cls, left, right):
+        """ The caps, the dagger of :meth:`cups`. """
+        return cls.cups(left, right).dagger()
+
+    @classmethod
+    def copy(cls, x: CQ, n: int = 2) -> Channel:
+        """
+        The ``n`` copies of ``x`` in the computational basis, i.e. the copy
+        spider on its classical wires and the doubling of the copy spider
+        on its quantum ones, with :meth:`discard` for no copy at all.
+
+        Copying a quantum wire is an isometry, not a unitary: it does not
+        clone a state, it copies its basis vectors, so that discarding a
+        copy decoheres the state that is left.
+
+        Parameters:
+            x : The type to copy.
+            n : The number of copies.
+
+        Example
+        -------
+        >>> bit, qubit = C(Dim(2)), Q(Dim(2))
+        >>> decohere = Channel.measure(Dim(2)) >> Channel.encode(Dim(2))
+        >>> assert Channel.copy(qubit) >> Channel.discard(qubit) @ qubit\\
+        ...     == decohere != Channel.id(qubit)
+        >>> assert Channel.copy(bit) >> Channel.discard(bit) @ bit\\
+        ...     == Channel.id(bit)
+
+        So the copy of a quantum wire is counital only up to decoherence,
+        and a channel is not a :class:`~discopy.abc.MarkovCategory`.
+        """
+        if not n:
+            return cls.discard(x)
+        return cls.single(Tensor[cls.dtype].copy(x.classical, n))\
+            @ cls.double(Tensor[cls.dtype].copy(x.quantum, n))
+
+    def trace(self, n: int | None = None, left=False, *,
+              dom: CQ | None = None, cod: CQ | None = None,
+              mem: CQ | None = None) -> Channel:
+        """
+        The trace of a channel over a memory ``mem``, as a cap, the channel
+        and a cup, in the keyword form of
+        :meth:`~discopy.abc.FeedbackCategory.feedback` alone: a
+        :class:`CQ` type is a classical and a quantum block rather than a
+        list of wires, so there are no last ``n`` wires to count. The memory
+        is the end of each block, the start when ``left``.
+
+        Parameters:
+            n : Not taken, there being no wires to count.
+            left : Whether the memory is the start of each block.
+            dom : Not taken, the domain is what the memory leaves.
+            cod : Not taken, the codomain is what the memory leaves.
+            mem : The memory to trace over.
+
+        Example
+        -------
+        >>> x = Q(Dim(2)) @ C(Dim(2))
+        >>> assert Channel.swap(x, x).trace(mem=x) == Channel.id(x)
+        >>> assert Channel.swap(x, x).trace(mem=x, left=True) == Channel.id(x)
+        >>> Channel.swap(x, x).trace(1)
+        Traceback (most recent call last):
+        ...
+        TypeError: A channel is traced over a CQ memory, not over 1 wires: \
+a CQ type has no last wire.
+        """
+        if mem is None or (n, dom, cod) != (None, None, None):
+            raise TypeError(messages.CHANNEL_TRACE.format(n))
+        dom, cod = (CQ(*(
+            dim[len(part):] if left else dim[:len(dim) - len(part)]
+            for dim, part in zip(
+                (typ.classical, typ.quantum), (mem.classical, mem.quantum))))
+            for typ in (self.dom, self.cod))
+        if left:
+            return self.caps(mem.r, mem) @ dom >> mem.r @ self\
+                >> self.cups(mem.r, mem) @ cod
+        return dom @ self.caps(mem, mem.r) >> self @ mem.r\
+            >> cod @ self.cups(mem, mem.r)
 
     @classmethod
     def measure(cls, dim: Dim, destructive=True) -> Channel:

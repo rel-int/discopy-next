@@ -286,3 +286,7 @@ WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."
 MIXED_DIRECTIONS = (
     "The args of {} are drawn in different directions, left to right and "
     "top to bottom: a bubble draws them all in one.")
+
+CHANNEL_TRACE = (
+    "A channel is traced over a CQ memory, not over {!r} wires: "
+    "a CQ type has no last wire.")

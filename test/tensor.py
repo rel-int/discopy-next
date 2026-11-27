@@ -908,7 +908,7 @@ def test_Functor_no_dtype_repr_and_algebraic_conjugate():
     from discopy.quantum.channel import Channel, Q
     F = Functor({frobenius.Ty('x'): 2}, {}, dtype=None)
     assert "dtype=None" in repr(F)
-    conjugate = Channel.id(Q(Dim(2))).conjugate(diagrammatic=False)
+    conjugate = Channel.id(Q(Dim(2))).conjugate()
     assert isinstance(conjugate, Channel)
 
 
