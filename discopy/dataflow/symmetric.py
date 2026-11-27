@@ -294,6 +294,11 @@ class Ty(feedback.Ty):
         return self.factory(*(x.tail for x in self.inside if x.tail))
 
 
+FLAGS = ("is_deterministic", "is_affine")
+""" The flags of a box that each box of its stream keeps, see
+:meth:`Diagram.to_stream`. """
+
+
 def up_to_streams(term):
     """
     A diagram up to its stream, i.e. the first steps of its
@@ -370,7 +375,8 @@ class Diagram(symmetric.Diagram, DaggerDataflowCategory):
         The stream of a dataflow diagram, in the :attr:`stream_factory` of
         the free category on its boxes: a wire ``x`` goes to the sequence
         ``x0, x1, ...``, or to ``x`` at each step when it is constant, and a
-        box ``f`` to the sequence ``f0, f1, ...``.
+        box ``f`` to the sequence ``f0, f1, ...`` with the :data:`FLAGS` of
+        ``f``.
 
         >>> x = Ty(Wire('x', is_constant=False))
         >>> f = Box('f', x, x)
@@ -387,7 +393,12 @@ class Diagram(symmetric.Diagram, DaggerDataflowCategory):
                 else cod.ob.sequence(wire.name)
 
         def ar(box):
-            return cod.sequence(str(box), functor(box.dom), functor(box.cod))
+            flags = {flag: getattr(box, flag) for flag in FLAGS
+                     if hasattr(cod.category.box_factory, flag)}
+            return cod.sequence(
+                str(box), functor(box.dom), functor(box.cod),
+                box_factory=lambda *args: cod.category.box_factory(
+                    *args, **flags))
 
         functor = self.functor_factory(ob, ar, dom=type(self), cod=cod)
         return functor(self)

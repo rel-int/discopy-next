@@ -85,3 +85,12 @@ def test_fibonacci():
 
     assert F(fib).unroll(9).now()[:10] == (0, 1, 1, 2, 3, 5, 8, 13, 21, 34)
 
+
+
+def test_to_stream_keeps_the_flags_of_a_box():
+    x = Ty(Wire('x', is_constant=False))
+    f = Box('f', x, x, is_deterministic=False, is_affine=False)
+    for step in (f.to_stream().now, f.to_stream().later.now):
+        assert (step.is_deterministic, step.is_affine) == (False, False)
+    assert symmetric.up_to_streams(f)\
+        != symmetric.up_to_streams(Box('f', x, x))
