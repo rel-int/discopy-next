@@ -6,8 +6,8 @@ from pytest import mark, raises, fixture
 
 from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx
 from discopy import abc, quantum
-from discopy.optyx.core.zx import *
-from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZBox, ZXBox
+from discopy.optyx.core.zx import (
+    SWAP, And, H, Or, Spider, X, Z, ZBox, ZXBox, ZXDiagram, scalar)
 from discopy.optyx.core import diagram
 from discopy.optyx import qubits
 from discopy.optyx.core.diagram import Diagram, Bit
@@ -308,3 +308,32 @@ def test_grad_of_a_composite_matches_central_differences():
         quotient = (array(composite(value + step))
                     - array(composite(value - step))) / (2 * step)
         assert np.allclose(gradient, quotient, atol=1e-4)
+
+
+ZX_BOXES = [
+    ZXBox("g", 1, 2),
+    ZXBox("g", 1, 2, array=np.arange(8).reshape(2, 2, 2) * 1j),
+    ZXBox("g", 1, 2, array=np.arange(8).reshape(2, 2, 2) * 1j).dagger(),
+    H,
+    Spider(1, 2, 0.5),
+    Z(1, 2, 0.25),
+    Z(1, 2, None),
+    X(2, 1, 0.5),
+    ZBox(1, 2, 0.5),
+    And(3),
+    And(3, is_dagger=True),
+    Or(2),
+    Or(2, is_dagger=True),
+]
+
+
+@mark.parametrize("box", ZX_BOXES, ids=repr)
+def test_a_zx_box_loads_its_own_tree(box):
+    from discopy.utils import dumps, loads
+    loaded = loads(dumps(box))
+    assert loaded == box
+    assert loaded.to_tree() == box.to_tree()
+    assert loaded.is_dagger is box.is_dagger
+    if box.array is not None:
+        assert np.allclose(loaded.array, box.array)
+    assert loads(dumps(box @ box)) == box @ box

@@ -1022,6 +1022,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   off `discopy.monoidal`, inside the syntax, and the docstring of
   `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
   ([next#732]).
+- `optyx.core.diagram`, `optyx.core.zx` and `optyx.classical` types and boxes
+  load their own tree (`Mode`, `Bit`, `Box` with `array` or `is_dagger=None`,
+  `Scalar`, `DualRail`, `PhotonThresholdDetector`, `EmbeddingTensor`, `zx.H`,
+  `Spider`, `And`, `Or` and the value-initialised `classical` boxes), while
+  `ClassicalFunction` and `BitControlledPhaseShift` raise `TypeError` on
+  `to_tree` since JSON cannot hold a Python callable ([next#731]).
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
