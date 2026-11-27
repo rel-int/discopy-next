@@ -813,3 +813,11 @@ def test_drawing_name_of_a_delayed_exponential():
     for level in (monoidal, symmetric, markov):
         x, y = level.Ty('x'), level.Ty('y')
         assert (x >> y).delay().to_drawing().inside[0].name == "(x >> y).d"
+
+
+def test_closed_markov_is_closed_symmetric():
+    from discopy.feedback.closed import markov, symmetric
+    x, y = markov.Ty('x'), markov.Ty('y')
+    swap = markov.Swap(x, y).delay()
+    assert isinstance(swap, symmetric.Swap) and isinstance(x, symmetric.Ty)
+    assert isinstance(markov.Box('f', x, y).curry(), symmetric.Diagram)
