@@ -171,7 +171,7 @@ def sum_product(factors, states: int) -> Network:
 
     Parameters:
         factors : The factor table, see
-            :func:`discopy.neural.wiring.table_of`, of any arities.
+            :func:`~discopy.neural.wiring.table_of`, of any arities.
         states : The number of states of a node, at least two.
 
     Note
@@ -227,7 +227,7 @@ def marginals(factors, *tensors) -> list:
 
     Parameters:
         factors : The factor table, see
-            :func:`discopy.neural.wiring.table_of`.
+            :func:`~discopy.neural.wiring.table_of`.
         tensors : The tensor of each factor, positive, one axis per node.
 
     Example
@@ -259,7 +259,7 @@ def eccentricities(factors) -> list[int]:
 
     Parameters:
         factors : The factor table, see
-            :func:`discopy.neural.wiring.table_of`, connected.
+            :func:`~discopy.neural.wiring.table_of`, connected.
 
     Example
     -------
@@ -294,7 +294,7 @@ def diameter(factors) -> int:
 
     Parameters:
         factors : The factor table, see
-            :func:`discopy.neural.wiring.table_of`, connected.
+            :func:`~discopy.neural.wiring.table_of`, connected.
 
     Example
     -------
@@ -315,7 +315,7 @@ def radius(factors) -> int:
 
     Parameters:
         factors : The factor table, see
-            :func:`discopy.neural.wiring.table_of`, connected.
+            :func:`~discopy.neural.wiring.table_of`, connected.
 
     Example
     -------

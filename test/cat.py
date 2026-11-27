@@ -432,11 +432,12 @@ def test_total_ordering():
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
     assert repr((f).bubble())\
-        == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
+        == "cat.Box('', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),))"
     assert str(f.bubble()) == "(f).bubble()"
     named = f.bubble(name="N", method="m")
-    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
-        " name='N', method='m')"
+    assert repr(named) == "cat.Box('N', cat.Ob('x'), cat.Ob('y'), "\
+        "args=(cat.Box('f', cat.Ob('x'), cat.Ob('y')),), method='m')"
     assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
     assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
     image = Functor.id()(f.bubble(data=42, is_dagger=True))
@@ -674,11 +675,7 @@ def box_classes():
 EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
     "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
-    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
-    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
-    "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
-    "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
     "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
     "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
@@ -693,11 +690,13 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
     "feedback.Box": 'c("f", x, y, data=v).delay()',
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
-    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
-    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
+    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False)',
+    "feedback.{markov,closed}.Box":
+    'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
     "lambek.cfg.Id": "c(x)",
@@ -706,26 +705,35 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "{rigid,frobenius}.Cup": "c(x, x.r)",
     "{rigid,frobenius}.Cap": "c(x, x.l)",
     "pivotal.Box": 'c("f", x, y, data=v).delay().r',
+    "feedback.{balanced,symmetric,comarkov}.Box": 'c("f", x, y, data=v).delay()',
     "lambek.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
-    "bang.Bang": "c(box(c, x, y, v))",
-    "bang.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
-    "bang.Exchange": "c(x, y, True)",
-    "bang.Laxator": "c(x, y)",
-    "biclosed.{Eval,Coeval}": "c(x << y)",
-    "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
-    "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
-    "biclosed.Constant": 'c("c", x, data=v)',
-    "{closed,lambek.categorial}.Constant {biclosed,closed}.Variable":
+    "linear.{cat,monoidal}.Bang": "c(box(c, x, y, v))",
+    "linear.cat.{Dereliction,Digging} "
+    "linear.monoidal.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "linear.monoidal.Exchange": "c(x, y, True)",
+    "linear.monoidal.Laxator": "c(x, y)",
+    "closed.monoidal.{Eval,Coeval}": "c(x << y)",
+    "closed.symmetric.{Eval,Coeval} closed.markov.{Eval,Coeval}": "c(x << y)",
+    "feedback.closed.markov.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "closed.{monoidal,symmetric,markov}.Curry":
+    "c(box(c, x @ y, x, v), 1, False)",
+    "feedback.closed.markov.Curry":
+    "c(box(c, x @ y, x, v), 1, False, time_step=1)",
+    "closed.monoidal.Constant": 'c("c", x, data=v)',
+    "{closed.markov,lambek.categorial}.Constant "
+    "closed.{monoidal,markov}.Variable":
     'c("c", x)',
-    "{biclosed,closed}.Application lambek.categorial.FA": "c(f, a)",
-    "{biclosed,closed,lambek.categorial}.Abstraction": "c(u, f(u))",
-    "closed.{Pack,Unpack}": "c(x * y, 1)",
-    "closed.Tuple": "c(a, u)",
-    "closed.Projection": "c(closed.Tuple(a, u), 1)",
-    "closed.Let": "c(closed.Tuple(a), [u], u)",
+    "closed.{monoidal,markov}.Application lambek.categorial.FA": "c(f, a)",
+    "{closed.monoidal,closed.markov,lambek.categorial}.Abstraction":
+    "c(u, f(u))",
+    "closed.markov.{Pack,Unpack}": "c(x * y)",
+    "feedback.closed.markov.{Pack,Unpack}": "c(x * y, 1)",
+    "closed.markov.Tuple": "c(a, u)",
+    "closed.markov.Projection": "c(closed.markov.Tuple(a, u), 1)",
+    "closed.markov.Let": "c(closed.markov.Tuple(a), [u], u)",
     "lambek.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
     "lambek.categorial.{FTR,BTR}": "c(y, a)",
     "lambek.categorial.TypeRaising": "c(y, a, y << (x >> y))",
@@ -740,7 +748,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "lambek.cfg.Rule": 'c(x @ y, x, "r")',
     "lambek.cfg.Word": 'c("w", x, y)',
     "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
-    "tensor.Bubble":
+    "{tensor,quantum.circuit,quantum.zx}.Elementwise":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
     "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
@@ -838,27 +846,30 @@ BROKEN = {
         "*.Cofunction": "it keeps its cofunc in an op",
         "*.Cospan": "it keeps left and right as legs",
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
-        "closed.{Pack,Unpack}": "it keeps its type delayed",
+        "{closed.markov,feedback.closed.markov}.{Pack,Unpack}":
+        "it is built from its type alone",
     },
     "dagger": {
         "*.{Constant,Variable,Abstraction,Application} "
-        "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
+        "closed.markov.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
-        "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
-        "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
+        "{closed.markov,markov,lambek.abstract,feedback.closed.markov,"
+        "feedback.markov}"
+        ".{Copy,Discard,Function} "
+        "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
+        "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "*.{Feedback,Feedforward,Trace}":
+        "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
     "subs": {
@@ -867,8 +878,9 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
-        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "a module has none",
+        "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",
     },
 }
@@ -903,7 +915,8 @@ def test_every_box(law):
 
 
 @pytest.mark.parametrize(
-    "module", ["symmetric", "feedback", "markov", "frobenius"])
+    "module", ["feedback.symmetric", "feedback", "feedback.markov",
+               "frobenius"])
 def test_rebuild_strict_init(module):
     """ A box whose constructor takes only some fields gets the others set,
     as main did, see #169. """
@@ -1010,7 +1023,10 @@ def test_term_normal_form():
     assert x(lambda a: closed(f(a))).normal_form()\
         == x(lambda a: g(f(a)))
     assert g.expand() == y(lambda x: g(x)) and a.expand() == a
-    for term in (statement, closed, g, a, h(g(f(a)))):
+    k = Constant(Box('k', x, x))
+    shadowed = x(lambda a: let(k(a), lambda a: k(a)))
+    assert shadowed.normal_form() == x(lambda a: k(k(a)))
+    for term in (statement, closed, g, a, h(g(f(a))), shadowed):
         assert TermBase.normal_form_completeness(term)
         assert TermBase.eta(term) and TermBase.reading(term)
         assert loads(dumps(term)) == term
@@ -1080,12 +1096,12 @@ def test_terms_of_a_level(level, structure):
 
 
 def test_terms_from_biclosed_up():
-    from discopy import biclosed, compact, symmetric
+    from discopy import closed, compact, symmetric
     x = compact.Ty('x')
     diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
     term = diagram.to_term()
     assert type(term) is symmetric.Kappa and term.eval() == diagram
-    assert type(x(lambda a: a)) is biclosed.Abstraction
+    assert type(x(lambda a: a)) is closed.monoidal.Abstraction
 
 
 def test_term_laws():
@@ -1113,3 +1129,21 @@ def test_term_laws():
     assert first.alpha_eq(second)
     assert Renamed[TermBase].checked_params() == ()
     assert Canonical[TermBase].checked_params() == ()
+
+
+def test_legacy_Bubble_tree():
+    """ A tree dumped before #560 fused bubbles into boxes still loads. """
+    from discopy import monoidal, rigid
+    from discopy.utils import from_tree
+    ob = {'factory': 'cat.Ob', 'name': 'x'}
+    f = {'factory': 'cat.Box', 'name': 'f', 'dom': ob, 'cod': ob}
+    tree = {'factory': 'cat.Bubble', 'arg': f, 'dom': ob, 'cod': ob}
+    assert from_tree(tree) == Box('f', Ob('x'), Ob('x')).bubble()
+    x = rigid.Ty('x')
+    g = rigid.Box('g', x, x).bubble(name="b").r
+    tree = g.to_tree() | {'factory': 'rigid.Bubble'}
+    assert from_tree(tree) == g
+    h = monoidal.Box('h', monoidal.Ty('x'), monoidal.Ty('y'))
+    tree = h.bubble().to_tree() | {'factory': 'monoidal.Bubble'}
+    del tree['name']
+    assert from_tree(tree) == h.bubble()

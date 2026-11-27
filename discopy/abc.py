@@ -6,18 +6,12 @@ the characteristic generator of its categorical structure as an
 ``abc.abstractmethod``, e.g. :class:`BraidedCategory` is a
 :class:`MonoidalCategory` with an abstract :meth:`BraidedCategory.braid`.
 
-.. raw:: html
-    :file: ../docs/api/architecture.html
-
-Software dependencies between modules go top-to-bottom, left-to-right and
-forgetful functors between categories go the other way.
-
-Each class also declares its :func:`discopy.testable.axiom` equations, which
+Each class also declares its :func:`~discopy.testable.axiom` equations, which
 every free category inherits along with the structure they axiomatise:
 :class:`Category` states the unitality and associativity of composition; a
 law quantifies over the type parameters of its signature, objects of the
 category, and over morphisms between them, see
-:class:`discopy.testable.Declaration`; a :class:`DaggerCategory`
+:class:`~discopy.testable.Declaration`; a :class:`DaggerCategory`
 adds the involution and contravariance of its dagger; a
 :class:`ColouredMonoid` inherits the first two as the unitality and
 associativity of its product, its composition; a :class:`Groupoid` is a
@@ -48,6 +42,7 @@ Summary
     TracedCategory
     ResiduatedMonoid
     BiclosedCategory
+    ComonadCategory
     LinearCategory
     Pregroup
     RigidCategory
@@ -59,19 +54,13 @@ Summary
     MarkovCategory
     ComarkovCategory
     ClosedCategory
+    ClosedMarkovCategory
     BalancedCategory
+    BalancedTracedCategory
     RibbonCategory
+    GoISituation
     CompactCategory
     HypergraphCategory
-
-.. admonition:: Functions
-
-    .. autosummary::
-        :template: function.rst
-        :nosignatures:
-        :toctree:
-
-        keyword_form
 """
 
 from __future__ import annotations
@@ -87,8 +76,8 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
-    Tensor, Testable, Under, Unit, Var, axiom, rule)
+    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R,
+    Reflexive, Repeat, Tensor, Testable, Under, Unit, Var, axiom, rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -126,7 +115,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         What the type parameters of the category stand for, in order: its
         objects ``C0`` and its arrows ``C1``, so that a sequent stated with
         them reads as one of the category it is bound to, see
-        :func:`discopy.testable.position`.
+        :func:`~discopy.testable.position`.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.typeparams() == (Ty, Diagram)
@@ -142,7 +131,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         A class that quotients its equations overrides this, e.g. by
         hypergraph isomorphism from symmetric categories on, so an axiom
         built with it is checked up to whatever quotient the category
-        defines — and :meth:`discopy.testable.Axiom.modulo` weakens it
+        defines — and :meth:`~discopy.testable.Axiom.modulo` weakens it
         further.
         """
         return Equation(*terms)
@@ -152,9 +141,9 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         """
         Construct an equation of objects, using strict equality by default,
         as :meth:`equation_factory` does of morphisms: what
-        :func:`discopy.testable.inhabits` checks the boundary of a term
+        :func:`~discopy.testable.inhabits` checks the boundary of a term
         with, so that a category whose objects compare only up to a
-        quotient, e.g. :class:`discopy.stream.Stream`, says which.
+        quotient, e.g. :class:`~discopy.stream.Stream`, says which.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.ob_equation(Ty('x'), Ty('x'))
@@ -253,7 +242,7 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
         """
         Whether the morphisms of the category have a dagger, true unless
         it depends on a parameter, as for
-        :class:`discopy.interaction.Diagram` over a category with none.
+        :class:`~discopy.interaction.Diagram` over a category with none.
         """
         return True
 
@@ -420,7 +409,7 @@ class Nat(Monoid["Nat"]):
     it off as a sequence of ``1``'s, e.g. ``Nat(3)[:1] == Nat(1)``.
 
     It is the sort of a law's number variable ``N: Nat`` too, see
-    :class:`discopy.testable.Declaration`, and :meth:`__index__` lets it stand
+    :class:`~discopy.testable.Declaration`, and :meth:`__index__` lets it stand
     wherever a number of copies or legs does, e.g. ``x ** Nat(2) == x @ x``
     and ``spiders(Nat(2), 1, x)``.
 
@@ -471,21 +460,21 @@ class Nat(Monoid["Nat"]):
         return type(self)(1)
 
     def to_tree(self) -> dict:
-        """ The tree of a natural number, see :func:`discopy.utils.dumps`. """
+        """ The tree of a natural number, see :func:`~discopy.utils.dumps`. """
         return {'factory': factory_name(type(self)), 'n': self.n}
 
     @classmethod
     def from_tree(cls, tree: dict) -> Nat:
-        """ The natural number of a tree, see :func:`discopy.utils.loads`. """
+        """ The natural number of a tree, see :func:`~discopy.utils.loads`. """
         return cls(tree['n'])
 
     @classmethod
     def strategy(cls, *, max_size=3, **_):
         """
         Generate natural numbers up to ``max_size``, so that a category
-        whose objects they are, e.g. :class:`discopy.matrix.Matrix`, and a
+        whose objects they are, e.g. :class:`~discopy.matrix.Matrix`, and a
         law with a number variable ``N: Nat`` quantify over them like any
-        other :class:`discopy.testable.Testable`.
+        other :class:`~discopy.testable.Testable`.
         """
         from hypothesis import strategies as st
 
@@ -500,7 +489,7 @@ class Nat(Monoid["Nat"]):
 
 
 Nat.canonical = Nat(2)
-""" The number of a law's :meth:`discopy.testable.Declaration.canonical`
+""" The number of a law's :meth:`~discopy.testable.Declaration.canonical`
 instance, the least that is neither the unit nor a single wire. """
 
 
@@ -514,15 +503,16 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
 
     A ``trace`` defined in a subclass, in the positional form
     ``trace(n, left)``, takes the keyword form ``trace(dom=, cod=, mem=)``
-    of :meth:`FeedbackCategory.feedback` too, through :func:`keyword_form`,
-    whether the subclass declares :class:`TracedCategory` or only has a
-    trace, as :class:`discopy.matrix.Matrix` and
-    :class:`discopy.hypergraph.Hypergraph` do.
+    of :meth:`FeedbackCategory.feedback` too, through
+    :meth:`FeedbackCategory.keyword_form`, whether the subclass declares
+    :class:`TracedCategory` or only has a trace, as
+    :class:`~discopy.matrix.Matrix` and :class:`~discopy.hypergraph.Hypergraph`
+    do: the hook is here so that it fires for those too.
     """
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if "trace" in vars(cls):
-            cls.trace = keyword_form(vars(cls)["trace"])
+            cls.trace = FeedbackCategory.keyword_form(vars(cls)["trace"])
 
     @abstractmethod
     def tensor(self, *others: C1) -> C1:
@@ -576,64 +566,54 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         """ Preservation of identities by tensor. """
         return cls.equation_factory(cls.id(x) @ cls.id(y), cls.id(x @ y))
 
+    @axiom
+    def tensor_associativity[
+            A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0], U: Obj[C0],
+            V: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D], h: Hom[C1, U, V]
+    ) -> Equation[Hom[C1, Tensor[A, C, U], Tensor[B, D, V]]]:
+        """ Associativity of the tensor of morphisms. """
+        return cls.equation_factory((f @ g) @ h, f @ (g @ h))
+
+    @axiom
+    def tensor_unit[A: Obj[C0], B: Obj[C0]](
+            cls, unit: Var[C0, Unit[C0]], f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ The unit object is a unit for the tensor of morphisms. """
+        return cls.equation_factory(unit @ f, f, f @ unit)
+
+    @axiom
+    def left_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, C]]]:
+        """ Whiskering on the left is a functor. """
+        return cls.equation_factory(x @ (f >> g), x @ f >> x @ g)
+
+    @axiom
+    def right_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, Tensor[A, X], Tensor[C, X]]]:
+        """ Whiskering on the right is a functor. """
+        return cls.equation_factory((f >> g) @ x, f @ x >> g @ x)
+
+    @axiom
+    def tensor_whiskering[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[A, C], Tensor[B, D]]]:
+        """
+        The tensor of two morphisms is the first whiskered by the domain of
+        the second, then the second whiskered by the codomain of the first:
+        with the laws above, those of a strict premonoidal category, which
+        unlike :meth:`bifunctoriality` hold of :mod:`~discopy.monoidal`.
+        """
+        return cls.equation_factory(f @ g, f @ g.dom >> f.cod @ g)
+
     @rule
     def mix[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
     ) -> Hom[C1, Tensor[A, C], Tensor[B, D]]:
         """ The mix rule: the tensor of two morphisms. """
         return f.tensor(g)
-
-    def split_memory(
-            self, n: int | None = None, left: bool = False, *,
-            dom: C0 | None = None, cod: C0 | None = None, mem: C0 | None = None
-            ) -> tuple[C0, C0, C0]:
-        """
-        The domain, codomain and memory of a feedback or a trace, read off
-        either form of :meth:`FeedbackCategory.feedback`: the memory is
-        ``mem``, or the objects of the codomain beside ``cod``, or the last
-        ``n`` objects of the codomain, the first when ``left``, one by
-        default; the domain and codomain default to what the memory leaves.
-        Each of them is cast into the type of the codomain, e.g. an integer
-        into the :class:`Nat` of a :class:`discopy.matrix.Matrix`.
-
-        Example
-        -------
-        >>> from discopy.feedback import Ty, Box
-        >>> x, y, m = map(Ty, "xym")
-        >>> f = Box('f', x @ m.delay(), y @ m)
-        >>> assert f.split_memory() == f.split_memory(mem=m) == (x, y, m)
-        >>> assert f.split_memory(cod=y) == f.split_memory(1) == (x, y, m)
-        """
-        if n is not None and (dom, cod, mem) != (None, None, None):
-            raise TypeError(messages.FEEDBACK_FORMS)
-        dom, cod, mem = (x if x is None else type(self.cod).cast(x)
-                         for x in (dom, cod, mem))
-        if mem is None:
-            size = len(self.cod) - len(cod) if cod is not None\
-                else 1 if n is None else n
-            if not 0 <= size <= len(self.cod):
-                raise ValueError(
-                    messages.NOT_SPLITTABLE.format(size, self.cod))
-            mem = self.cod[:size] if left\
-                else self.cod[len(self.cod) - size:]
-        size = len(mem)
-        if size > min(len(self.dom), len(self.cod)):
-            raise ValueError(messages.NOT_SPLITTABLE.format(size, self))
-        if dom is None:
-            dom = self.dom[size:] if left else self.dom[:len(self.dom) - size]
-        if cod is None:
-            cod = self.cod[size:] if left else self.cod[:len(self.cod) - size]
-        return dom, cod, mem
-
-    def memory_size(self, mem: C0) -> int:
-        """
-        The number of objects in a memory, as the positional form of
-        :meth:`FeedbackCategory.feedback` counts them, i.e. its length.
-
-        Parameters:
-            mem : The memory.
-        """
-        return len(mem)
 
 
 class DaggerMonoidalCategory[C0: ColouredMonoid, C1: DaggerMonoidalCategory](
@@ -666,7 +646,7 @@ class SpacialCategory[
     its right, see :cite:t:`Selinger10`. Its diagrams are planar up to the
     face each scalar lies in, i.e. a component that touches nothing else can
     be lifted out of the plane and put down anywhere, see
-    :meth:`discopy.cmap.CMap.match`.
+    :meth:`~discopy.cmap.CMap.match`.
     """
     @axiom
     def scalar_sliding[A: Obj[C0], B: Obj[C0]](
@@ -810,58 +790,113 @@ class FeedbackCategory[
         """ The feedback of a memory on the right. """
         return f.feedback(mem=mem)
 
+    def split_memory(
+            self, n: int | None = None, left: bool = False, *,
+            dom: C0 | None = None, cod: C0 | None = None, mem: C0 | None = None
+            ) -> tuple[C0, C0, C0]:
+        """
+        The domain, codomain and memory of a feedback or a trace, read off
+        either form of :meth:`FeedbackCategory.feedback`: the memory is
+        ``mem``, or the objects of the codomain beside ``cod``, or the last
+        ``n`` objects of the codomain, the first when ``left``, one by
+        default; the domain and codomain default to what the memory leaves.
+        Each of them is cast into the type of the codomain, e.g. an integer
+        into the :class:`Nat` of a :class:`~discopy.matrix.Matrix`.
 
-def keyword_form(trace: Callable) -> Callable:
-    """
-    A method in the positional form ``(n, left)``, e.g. a trace, that takes
-    the keyword form ``dom``, ``cod``, ``mem`` of
-    :meth:`FeedbackCategory.feedback` as well, the two forms exclusive: the
-    memory is read off the boundary with
-    :meth:`MonoidalCategory.split_memory`, checked to be what the codomain
-    feeds back and passed on as its :meth:`MonoidalCategory.memory_size`.
-    The domain is checked on the result, since the boundary takes in the
-    delay of the memory when the trace is the
-    :meth:`TracedCategory.feedback` of a category that labels the two apart,
-    e.g. a :class:`discopy.drawing.Drawing`. The positional form is split
-    too, so that an ``n`` the boundary cannot spare raises ``ValueError`` in
-    either form. A method that takes ``mem`` already is returned as it is,
-    so that a class wraps the trace it defines once, whichever trace that
-    one calls.
+        Example
+        -------
+        >>> from discopy.feedback import Ty, Box
+        >>> x, y, m = map(Ty, "xym")
+        >>> f = Box('f', x @ m.delay(), y @ m)
+        >>> assert f.split_memory() == f.split_memory(mem=m) == (x, y, m)
+        >>> assert f.split_memory(cod=y) == f.split_memory(1) == (x, y, m)
+        """
+        if n is not None and (dom, cod, mem) != (None, None, None):
+            raise TypeError(messages.FEEDBACK_FORMS)
+        dom, cod, mem = (x if x is None else type(self.cod).cast(x)
+                         for x in (dom, cod, mem))
+        if mem is None:
+            size = len(self.cod) - len(cod) if cod is not None\
+                else 1 if n is None else n
+            if not 0 <= size <= len(self.cod):
+                raise ValueError(
+                    messages.NOT_SPLITTABLE.format(size, self.cod))
+            mem = self.cod[:size] if left\
+                else self.cod[len(self.cod) - size:]
+        size = len(mem)
+        if size > min(len(self.dom), len(self.cod)):
+            raise ValueError(messages.NOT_SPLITTABLE.format(size, self))
+        if dom is None:
+            dom = self.dom[size:] if left else self.dom[:len(self.dom) - size]
+        if cod is None:
+            cod = self.cod[size:] if left else self.cod[:len(self.cod) - size]
+        return dom, cod, mem
 
-    Parameters:
-        trace : The method in its positional form.
+    def memory_size(self, mem: C0) -> int:
+        """
+        The number of objects in a memory, as the positional form of
+        :meth:`FeedbackCategory.feedback` counts them, i.e. its length.
 
-    Example
-    -------
-    >>> from discopy.matrix import Matrix
-    >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
-    >>> assert f.trace(mem=1) == f.trace() != f.trace(mem=1, left=True)
-    >>> assert keyword_form(Matrix.trace) is Matrix.trace
-    >>> f.trace(3)
-    Traceback (most recent call last):
-        ...
-    ValueError: Cannot split 3 atoms off Nat(2).
-    """
-    if "mem" in signature(trace).parameters:
-        return trace
+        Parameters:
+            mem : The memory.
+        """
+        return len(mem)
 
-    @wraps(trace)
-    def method(self, n: int | None = None, left: bool = False, *,
-               dom=None, cod=None, mem=None):
-        if (dom, cod, mem) == (None, None, None):
-            self.split_memory(n, left)
-            return trace(self, left=left) if n is None\
-                else trace(self, n, left)
-        dom, cod, mem = self.split_memory(
-            n, left, dom=dom, cod=cod, mem=mem)
-        if self.cod != (mem @ cod if left else cod @ mem):
-            raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
-        result = trace(self, self.memory_size(mem), left)
-        if result.dom != dom:
-            raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
-        return result
-    method.__signature__ = signature(method, follow_wrapped=False)
-    return method
+    @staticmethod
+    def keyword_form(trace: Callable) -> Callable:
+        """
+        A method in the positional form ``(n, left)``, e.g. a trace, that
+        takes the keyword form ``dom``, ``cod``, ``mem`` of :meth:`feedback`
+        as well, the two forms exclusive: the memory is read off the boundary
+        with :meth:`split_memory`, checked to be what the codomain feeds back
+        and passed on as its :meth:`memory_size`, those of
+        :class:`FeedbackCategory` when the class has none, e.g. a
+        :class:`~discopy.matrix.Matrix`. The domain is checked on the result,
+        since the boundary takes in the delay of the memory when the trace is
+        the :meth:`TracedCategory.feedback` of a category that labels the two
+        apart, e.g. a :class:`~discopy.drawing.Drawing`. The positional form is
+        split too, so that an ``n`` the boundary cannot spare raises
+        ``ValueError`` in either form. A method that takes ``mem`` already is
+        returned as it is, so that a class wraps the trace it defines once,
+        whichever trace that one calls.
+
+        Parameters:
+            trace : The method in its positional form.
+
+        Example
+        -------
+        >>> from discopy.matrix import Matrix
+        >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
+        >>> assert f.trace(mem=1) == f.trace() != f.trace(mem=1, left=True)
+        >>> assert FeedbackCategory.keyword_form(Matrix.trace) is Matrix.trace
+        >>> f.trace(3)
+        Traceback (most recent call last):
+            ...
+        ValueError: Cannot split 3 atoms off Nat(2).
+        """
+        if "mem" in signature(trace).parameters:
+            return trace
+
+        @wraps(trace)
+        def method(self, n: int | None = None, left: bool = False, *,
+                   dom=None, cod=None, mem=None):
+            split_memory, memory_size = (
+                getattr(type(self), name, getattr(FeedbackCategory, name))
+                for name in ("split_memory", "memory_size"))
+            if (dom, cod, mem) == (None, None, None):
+                split_memory(self, n, left)
+                return trace(self, left=left) if n is None\
+                    else trace(self, n, left)
+            dom, cod, mem = split_memory(
+                self, n, left, dom=dom, cod=cod, mem=mem)
+            if self.cod != (mem @ cod if left else cod @ mem):
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
+            result = trace(self, memory_size(self, mem), left)
+            if result.dom != dom:
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
+            return result
+        method.__signature__ = signature(method, follow_wrapped=False)
+        return method
 
 
 class TracedCategory[
@@ -871,11 +906,11 @@ class TracedCategory[
     the yanking axiom: its :meth:`feedback` is its :meth:`trace`, the partial
     trace of a morphism over some objects, and the trace of the swap of an
     object with itself is its identity, that of a braid its twist, see
-    :meth:`yanking`, :meth:`BalancedCategory.yanking` and
-    :cite:t:`JoyalEtAl96`. The free diagrams of :mod:`discopy.feedback` and the
-    levels below it, whose wires carry a time step, are traced on their
-    undelayed wires, the :class:`discopy.feedback.Trace` bubble being the
-    feedback over an undelayed memory.
+    :meth:`yanking`, :meth:`BalancedTracedCategory.yanking` and
+    :cite:t:`JoyalEtAl96`. The free diagrams of the :mod:`~discopy.feedback`
+    package, whose wires carry a time step, are traced on their undelayed
+    wires, the :class:`~discopy.feedback.Trace` bubble being the feedback over
+    an undelayed memory.
     """
     @abstractmethod
     def trace(self, n: int = 1, left: bool = False) -> C1:
@@ -883,7 +918,7 @@ class TracedCategory[
         The trace of a morphism, to be instantiated in its positional form,
         over the last ``n`` objects or the first when ``left``: it takes the
         keyword form ``dom``, ``cod``, ``mem`` of :meth:`feedback` as well,
-        see :func:`keyword_form`.
+        see :meth:`FeedbackCategory.keyword_form`.
 
         Tracing no object at all is the identity, i.e. the vanishing axiom
         ``f.trace(0) == f``, see `nLab
@@ -918,7 +953,7 @@ class TracedCategory[
         either side, the yanking axiom of a symmetric traced category: on a
         compact category it is Reidemeister move 1 for either trace. A
         braided one states it with its twist, see
-        :meth:`BalancedCategory.yanking`, and a planar one, which has no
+        :meth:`BalancedTracedCategory.yanking`, and a planar one, which has no
         swap, declares it inapplicable.
         """
         # pylint: disable-next=no-member  # stated where there is a swap
@@ -1208,28 +1243,12 @@ class BiclosedCategory[
         return cls.ev(base, exponent, left=False)
 
 
-class LinearCategory[
-        C0: ColouredMonoid, C1: LinearCategory](MonoidalCategory[C0, C1]):
+class ComonadCategory[C0, C1: ComonadCategory](Category[C0, C1]):
     """
-    A linear category is a :class:`MonoidalCategory` with a linear exponential
-    comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
-    nor closure, which none of its laws uses: a banged object is exchanged
-    with any other, the rule of the Lambek calculus with a relevant modality
-    !L* of :cite:t:`KanovichEtAl16`. :mod:`discopy.bang` is the free one.
-
-    * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
-      comultiplication :meth:`digging` ``!x -> !!x``,
-    * it is lax monoidal, with :meth:`laxator` ``!x @ !y -> !(x @ y)`` and
-      ``Ty() -> !Ty()``, the dereliction and the digging monoidal,
-    * each ``!x`` is a comonoid, with :meth:`contraction` ``!x -> !x @ !x``
-      and :meth:`weakening` ``!x -> Ty()``, natural and morphisms of
-      coalgebras, the digging a morphism of comonoids,
-    * the :meth:`exchange` ``!x @ y -> y @ !x`` is invertible, natural and
-      satisfies the hexagon: ``!x`` is central, which replaces the symmetry,
-      and the comonoid is cocommutative through it.
-
-    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
-    digging, then the bang of the arrow.
+    A comonad category is a :class:`Category` with a comonad :meth:`bang`,
+    with counit :meth:`dereliction` ``!x -> x`` and comultiplication
+    :meth:`digging` ``!x -> !!x``: the part of a :class:`LinearCategory`
+    that needs no tensor. :mod:`~discopy.linear.cat` is the free one.
     """
     @abstractmethod
     def bang(self: C1) -> C1:
@@ -1253,52 +1272,6 @@ class LinearCategory[
 
         Parameters:
             x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def contraction(cls, x: C0) -> C1:
-        """
-        The copy ``!x -> !x @ !x`` of a banged object, to be instantiated.
-
-        Parameters:
-            x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def weakening(cls, x: C0) -> C1:
-        """
-        The discard ``!x -> Ty()`` of a banged object, to be instantiated.
-
-        Parameters:
-            x : The object.
-        """
-
-    @classmethod
-    @abstractmethod
-    def exchange(cls, x: C0, y: C0, is_dagger: bool = False) -> C1:
-        """
-        The exchange ``!x @ y -> y @ !x`` of a banged object with another,
-        its inverse ``y @ !x -> !x @ y`` when ``is_dagger``, to be
-        instantiated.
-
-        Parameters:
-            x : The object that is banged.
-            y : The object it is exchanged with.
-            is_dagger : Whether to take the inverse.
-        """
-
-    @classmethod
-    @abstractmethod
-    def laxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
-        """
-        The laxator ``!x @ !y -> !(x @ y)`` of the bang, or its unit
-        ``Ty() -> !Ty()`` when given no object, to be instantiated.
-
-        Parameters:
-            x : The object on the left.
-            y : The object on the right.
         """
 
     @classmethod
@@ -1353,6 +1326,77 @@ class LinearCategory[
         digging = cls.digging(x)
         return cls.equation_factory(
             digging >> cls.digging(cls.banged(x)), digging >> digging.bang())
+
+
+class LinearCategory[
+        C0: ColouredMonoid, C1: LinearCategory](
+            MonoidalCategory[C0, C1], ComonadCategory[C0, C1]):
+    """
+    A linear category is a :class:`MonoidalCategory` with a linear exponential
+    comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
+    nor closure, which none of its laws uses: a banged object is exchanged
+    with any other, the rule of the Lambek calculus with a relevant modality
+    !L* of :cite:t:`KanovichEtAl16`. :mod:`~discopy.linear.monoidal` is the
+    free one.
+
+    * ``!`` is a comonad, see :class:`ComonadCategory`,
+    * it is lax monoidal, with :meth:`laxator` ``!x @ !y -> !(x @ y)`` and
+      ``Ty() -> !Ty()``, the dereliction and the digging monoidal,
+    * each ``!x`` is a comonoid, with :meth:`contraction` ``!x -> !x @ !x``
+      and :meth:`weakening` ``!x -> Ty()``, natural and morphisms of
+      coalgebras, the digging a morphism of comonoids,
+    * the :meth:`exchange` ``!x @ y -> y @ !x`` is invertible, natural and
+      satisfies the hexagon: ``!x`` is central, which replaces the symmetry,
+      and the comonoid is cocommutative through it.
+
+    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
+    digging, then the bang of the arrow.
+    """
+    @classmethod
+    @abstractmethod
+    def contraction(cls, x: C0) -> C1:
+        """
+        The copy ``!x -> !x @ !x`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def weakening(cls, x: C0) -> C1:
+        """
+        The discard ``!x -> Ty()`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def exchange(cls, x: C0, y: C0, is_dagger: bool = False) -> C1:
+        """
+        The exchange ``!x @ y -> y @ !x`` of a banged object with another,
+        its inverse ``y @ !x -> !x @ y`` when ``is_dagger``, to be
+        instantiated.
+
+        Parameters:
+            x : The object that is banged.
+            y : The object it is exchanged with.
+            is_dagger : Whether to take the inverse.
+        """
+
+    @classmethod
+    @abstractmethod
+    def laxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
+        """
+        The laxator ``!x @ !y -> !(x @ y)`` of the bang, or its unit
+        ``Ty() -> !Ty()`` when given no object, to be instantiated.
+
+        Parameters:
+            x : The object on the left.
+            y : The object on the right.
+        """
 
     @axiom
     def laxator_naturality[
@@ -1934,7 +1978,7 @@ class SymmetricCategory[
         The permutation of the atomic objects of ``dom`` by
         :meth:`permutation`, i.e. a composition of swaps unless the category
         writes it directly; a free category overrides it with a native box,
-        see :meth:`discopy.symmetric.Diagram.from_permutation`.
+        see :meth:`~discopy.symmetric.Diagram.from_permutation`.
         """
         return cls.permutation(perm, dom)  # ty: ignore[invalid-argument-type]
 
@@ -2069,7 +2113,7 @@ class MarkovCategory[
         ``i`` is a copy of ``doms[xs[i]]``: the copies of each object, as
         many as the outputs that read it, then the permutation that puts
         each copy in its place, see
-        :meth:`discopy.python.finset.Function.factorise`.
+        :meth:`~discopy.python.finset.Function.factorise`.
 
         Parameters:
             xs : The object of ``doms`` that each output reads.
@@ -2088,7 +2132,7 @@ class MarkovCategory[
         """
         The function on the atomic objects of ``dom`` by :meth:`function`;
         a free category overrides it with a native box, see
-        :meth:`discopy.markov.Diagram.from_function`.
+        :meth:`~discopy.markov.Diagram.from_function`.
         """
         return cls.function(func, [dom[i:i + 1] for i in range(len(dom))])
 
@@ -2205,7 +2249,7 @@ class ComarkovCategory[
         """
         The cofunction on the atomic objects of ``cod`` by
         :meth:`cofunction`; a free category overrides it with a native box,
-        see :meth:`discopy.comarkov.Diagram.from_cofunction`.
+        see :meth:`~discopy.comarkov.Diagram.from_cofunction`.
         """
         return cls.cofunction(cofunc, [cod[i:i + 1] for i in range(len(cod))])
 
@@ -2258,10 +2302,11 @@ class ComarkovCategory[
 
 class ClosedCategory[
         C0: ResiduatedMonoid, C1: ClosedCategory](
-            BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
+            BiclosedCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
-    A closed category is a symmetric :class:`BiclosedCategory`. We also assume
-    it comes with copy and discard so it is also a :class:`MarkovCategory`.
+    A closed category is a symmetric :class:`BiclosedCategory`, i.e. a
+    symmetric monoidal closed category, see :class:`ClosedMarkovCategory`
+    for one with copy and discard.
     """
 
     @axiom
@@ -2275,12 +2320,20 @@ class ClosedCategory[
             f.curry(n), (cls.swap(exponent, base) >> f).curry(n, left=False))
 
 
-class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
-        BraidedCategory[C0, C1], TracedCategory[C0, C1]):
+class ClosedMarkovCategory[
+        C0: ResiduatedMonoid, C1: ClosedMarkovCategory](
+            ClosedCategory[C0, C1], MarkovCategory[C0, C1]):
     """
-    A balanced category is a :class:`BraidedCategory` and a
-    :class:`TracedCategory` with a method :code:`twist` for the natural
-    automorphism :code:`x -> x`.
+    A closed Markov category is a :class:`ClosedCategory` with copy and
+    discard, i.e. which is also a :class:`MarkovCategory`.
+    """
+
+
+class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
+        BraidedCategory[C0, C1]):
+    """
+    A balanced category is a :class:`BraidedCategory` with a method
+    :code:`twist` for the natural automorphism :code:`x -> x`.
     """
     @classmethod
     @abstractmethod
@@ -2315,6 +2368,26 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         unit = cls.ob()
         return cls.equation_factory(cls.twist(unit), cls.id(unit))
 
+    @rule
+    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The twist of an atom. """
+        return cls.twist(x)
+
+    @rule
+    def inverse_twisting[X: Atom[C0]](
+            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The inverse of the twist of an atom. """
+        return cls.twist(x).dagger()
+
+
+class BalancedTracedCategory[
+        C0: ColouredMonoid, C1: BalancedTracedCategory](
+            BalancedCategory[C0, C1], TracedCategory[C0, C1]):
+    """
+    A balanced traced category is a :class:`BalancedCategory` and a
+    :class:`TracedCategory` whose yanking gives the twist, see
+    :cite:t:`JoyalEtAl96`.
+    """
     @axiom
     def yanking[X: Atom[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
@@ -2330,39 +2403,188 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
             cls.twist(x),
             braid.trace(mem=x))  # ty: ignore[unknown-argument]
 
-    @rule
-    def twisting[X: Atom[C0]](cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The twist of an atom. """
-        return cls.twist(x)
-
-    @rule
-    def inverse_twisting[X: Atom[C0]](
-            cls, x: Var[C0, X]) -> Hom[C1, X, X]:
-        """ The inverse of the twist of an atom. """
-        return cls.twist(x).dagger()
-
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
-        PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
+        PivotalCategory[C0, C1], BalancedTracedCategory[C0, C1]):
     """
     A ribbon category is a :class:`PivotalCategory` which is also a
     :class:`BalancedCategory`, i.e. where diagrams can draw knots and links:
-    it yanks as a balanced category does, with the braid a planar pivotal
-    category lacks.
+    it yanks as a balanced traced category does, with the braid a planar
+    pivotal category lacks.
     """
-    yanking = BalancedCategory.yanking
+    yanking = BalancedTracedCategory.yanking
+
+
+class GoISituation[C0: ColouredMonoid, C1: GoISituation](
+        LinearCategory[C0, C1], TracedCategory[C0, C1],
+        SymmetricCategory[C0, C1]):
+    """
+    A GoI situation :cite:p:`AbramskyEtAl02` is a traced symmetric monoidal
+    category with a traced symmetric monoidal functor ``T``, here the
+    :meth:`bang` of a :class:`LinearCategory` with its comonad and comonoid
+    equalities, and a :meth:`reflexive` object ``U``: reflexive in the sense
+    of Abramsky, Haghverdi and Scott, with ``U @ U``, the unit and ``TU`` as
+    retracts. There is no standard name for a category with such an object,
+    a C-monoid of Lambek and Scott being one object.
+
+    * ``T`` is strong symmetric monoidal, the :meth:`colaxator` inverting
+      the :meth:`laxator`, unit included, and sending the swap to the swap,
+      see :meth:`bang_symmetry`,
+    * ``T`` preserves the trace up to its monoidal structure, see
+      :meth:`bang_trace`,
+    * each of :meth:`reflexive_tensor`, :meth:`reflexive_unit` and
+      :meth:`reflexive_bang` is a section into ``U`` and a retraction out of
+      it, whose composite is the identity, see :meth:`retract`.
+
+    It is where :mod:`~discopy.linear` and :mod:`~discopy.feedback` meet,
+    neither of which imports the other: the geometry of interaction of
+    :mod:`~discopy.interaction`. No free GoI situation is implemented.
+    """
+    @classmethod
+    @abstractmethod
+    def colaxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
+        """
+        The inverse ``!(x @ y) -> !x @ !y`` of the :meth:`laxator`, or of its
+        unit when given no object, to be instantiated: ``T`` is strong
+        monoidal.
+
+        Parameters:
+            x : The object on the left.
+            y : The object on the right.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive(cls) -> C0:
+        """ The reflexive object ``U``, to be instantiated. """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_tensor(cls) -> tuple[C1, C1]:
+        """
+        The section ``U @ U -> U`` and the retraction ``U -> U @ U``, to be
+        instantiated.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_unit(cls) -> tuple[C1, C1]:
+        """
+        The section ``Ty() -> U`` and the retraction ``U -> Ty()``, to be
+        instantiated.
+        """
+
+    @classmethod
+    @abstractmethod
+    def reflexive_bang(cls) -> tuple[C1, C1]:
+        """
+        The section ``!U -> U`` and the retraction ``U -> !U``, to be
+        instantiated.
+        """
+
+    @classmethod
+    def retract(cls, section: C1, retraction: C1) -> Equation:
+        """
+        The section then the retraction is the identity on the domain of the
+        section, which is a retract of its codomain.
+
+        Parameters:
+            section : The morphism into the bigger object.
+            retraction : The morphism out of it.
+        """
+        return cls.equation_factory(
+            section >> retraction, cls.id(section.dom))
+
+    @axiom
+    def laxator_inverse[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Tensor[Bang[C1, X], Bang[C1, Y]]]]:
+        """ The colaxator is a retraction of the laxator. """
+        return cls.retract(cls.laxator(x, y), cls.colaxator(x, y))
+
+    @axiom
+    def colaxator_inverse[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Bang[C1, Tensor[X, Y]], Bang[C1, Tensor[X, Y]]]]:
+        """ The laxator is a retraction of the colaxator. """
+        return cls.retract(cls.colaxator(x, y), cls.laxator(x, y))
+
+    @axiom
+    def laxator_unit_inverse(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The unit of the colaxator is a retraction of the laxator's. """
+        return cls.retract(cls.laxator(), cls.colaxator())
+
+    @axiom
+    def colaxator_unit_inverse(cls) -> Equation[Hom[
+            C1, Bang[C1, Unit[C0]], Bang[C1, Unit[C0]]]]:
+        """ The unit of the laxator is a retraction of the colaxator's. """
+        return cls.retract(cls.colaxator(), cls.laxator())
+
+    @axiom
+    def bang_symmetry[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Bang[C1, Tensor[Y, X]]]]:
+        """ The bang is symmetric monoidal: it sends the swap to the swap. """
+        return cls.equation_factory(
+            cls.swap(cls.banged(x), cls.banged(y)) >> cls.laxator(y, x),
+            cls.laxator(x, y) >> cls.swap(x, y).bang())
+
+    @axiom
+    def bang_trace[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], dom: Var[C0, Γ],
+            cod: Var[C0, Δ], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, Bang[C1, Γ], Bang[C1, Δ]]]:
+        """
+        The bang of a trace is the trace over the bang of the memory of the
+        bang conjugated by the laxator, ``T`` being a traced functor. The
+        boundary is bound rather than sliced off ``f``, so that it holds of a
+        category whose objects are not lists, e.g. pairs in ``Int``.
+        """
+        inside = cls.laxator(dom, mem) >> f.bang() >> cls.colaxator(cod, mem)
+        return cls.equation_factory(
+            f.trace(
+                dom=dom, cod=cod, mem=mem  # ty: ignore[unknown-argument]
+            ).bang(),
+            inside.trace(
+                dom=cls.banged(dom), cod=cls.banged(cod),
+                mem=cls.banged(mem)))
+
+    @axiom
+    def reflexive_tensor_retract(cls) -> Equation[Hom[
+            C1, Tensor[Reflexive[C1], Reflexive[C1]],
+            Tensor[Reflexive[C1], Reflexive[C1]]]]:
+        """ ``U @ U`` is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_tensor())
+
+    @axiom
+    def reflexive_unit_retract(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The unit is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_unit())
+
+    @axiom
+    def reflexive_bang_retract(cls) -> Equation[Hom[
+            C1, Bang[C1, Reflexive[C1]], Bang[C1, Reflexive[C1]]]]:
+        """ ``!U`` is a retract of ``U``. """
+        return cls.retract(*cls.reflexive_bang())
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](
-        RibbonCategory[C0, C1], SymmetricCategory[C0, C1]):
+        RibbonCategory[C0, C1], ClosedCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
-    :class:`SymmetricCategory`, i.e. with cups, caps and swaps and where
-    the twist is the identity.
+    :class:`ClosedCategory`, i.e. with cups, caps and swaps and where
+    the twist is the identity. Its internal hom ``x ⊸ y`` is ``x* @ y``,
+    so that evaluation and currying are cups and caps, as in a
+    :class:`RigidCategory`.
     """
     @classmethod
     def twist(cls, dom: C0) -> C1:
         return cls.id(dom)
+
+    currying_symmetry = ClosedCategory.currying_symmetry.inapplicable(
+        messages.COMPACT_EXPONENTIALS)
 
     @axiom
     def reidemeister_1_cap[X: Obj[C0]](
@@ -2440,7 +2662,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """
         Merge the inputs into the ``apexes`` then copy them out, so that
         input ``i`` goes to ``apexes[left[i]]`` and output ``j`` reads
-        ``apexes[right[j]]``, see :class:`discopy.python.finset.Cospan`: the
+        ``apexes[right[j]]``, see :class:`~discopy.python.finset.Cospan`: the
         permutation that gathers the inputs of each object, one spider on
         each object, then the permutation that scatters its outputs.
 
@@ -2468,7 +2690,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """
         The cospan on the atomic objects of ``apex`` by :meth:`cospan`; a
         free category overrides it with a native box, see
-        :meth:`discopy.frobenius.Diagram.from_cospan`.
+        :meth:`~discopy.frobenius.Diagram.from_cospan`.
         """
         return cls.cospan(
             left, right, [apex[i:i + 1] for i in range(len(apex))])

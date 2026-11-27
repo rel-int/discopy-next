@@ -1,8 +1,10 @@
 """
-DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
-drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
-is sent by a functor; :mod:`discopy.drawing.backend` renders them with
-matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget` shows them as
+DisCoPy's drawing modules: :mod:`~discopy.drawing.planegraph` is the
+category of drawings, i.e. labeled graphs embedded in the plane, onto which
+every diagram is sent by a functor; :mod:`~discopy.drawing.optimiser` lays a
+diagram out by another, into open quadratic programs, and a pivotal one as a
+planar map with rotating boxes; :mod:`~discopy.drawing.backend` renders them
+with matplotlib, TikZ or Typst; :mod:`~discopy.drawing.widget` shows them as
 interactive anywidget widgets in notebooks.
 """
 
@@ -12,7 +14,7 @@ from PIL import Image
 from tempfile import TemporaryDirectory
 
 from discopy.utils import Node, Point
-from discopy.drawing import backend, drawing
+from discopy.drawing import backend, planegraph
 from discopy.drawing.backend import (
     Backend,
     TikZ,
@@ -23,7 +25,7 @@ from discopy.drawing.backend import (
     COLORS,
     SHAPES,
 )
-from discopy.drawing.drawing import (
+from discopy.drawing.planegraph import (
     Point,
     PlaneGraph,
     Drawing,
@@ -45,7 +47,7 @@ def __getattr__(name):
 def draw(diagram, **params):
     """
     Draws a diagram with matplotlib, or as TikZ code with ``to_tikz=True``,
-    see :func:`discopy.drawing.backend.draw`.
+    see :func:`~discopy.drawing.backend.draw`.
 
     Parameters
     ----------
@@ -88,20 +90,25 @@ def draw(diagram, **params):
         transpose and its conjugate are told apart, default is :code:`0.125`
         when some box is a conjugate, a transpose or a dagger not drawn as a
         braid, :code:`0` otherwise.
+    left_to_right : bool, optional
+        Whether to draw left to right, by default the
+        ``draw_left_to_right`` of the class of the diagram.
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().draw(**params)
 
 
 def from_picture(jpeg, config: dict):
     """
     The diagram a picture of it shows, read back by
-    :mod:`discopy.drawing.vision`: a pixel net says what each pixel is, a
+    :mod:`~discopy.drawing.vision`: a pixel net says what each pixel is, a
     small OCR model reads the name of each box and the type of each
     labelled wire, the module is the smallest in which it decodes from the
     one whose structural primitives and types appear, and
-    :func:`discopy.drawing.picture.decode` builds the diagram. It needs
+    :func:`~discopy.drawing.picture.decode` builds the diagram. It needs
     PyTorch and trained weights, see
-    :func:`discopy.drawing.vision.from_picture` for the ``config``.
+    :func:`~discopy.drawing.vision.from_picture` for the ``config``.
     """
     from discopy.drawing import vision
     return vision.from_picture(jpeg, config)
@@ -131,6 +138,8 @@ def to_typst(diagram, **params):
     >>> assert 'import "@preview/cetz' in source
     >>> assert 'bezier' in source or 'line' in source
     """
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     return diagram.to_drawing().to_typst(**params)
 
 
@@ -160,10 +169,13 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    params.setdefault("left_to_right", getattr(
+        type(diagram), "draw_left_to_right", False))
     if 'figsize' not in params:
+        attrs = ("width", "height")
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
-            for attr in ("width", "height"))
+            for attr in (attrs[::-1] if params["left_to_right"] else attrs))
     with TemporaryDirectory() as directory:
         for i, _diagram in enumerate(steps):
             tmp_path = os.path.join(directory, f'{i}.png')

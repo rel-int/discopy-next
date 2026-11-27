@@ -122,7 +122,7 @@ def test_copy_serialisation():
     for box in (Copy(x), Copy(x, 3), Discard(x)):
         assert loads(dumps(box)) == box
     assert loads(dumps(Copy(x) >> Discard(x) @ x)) == Copy(x) >> Discard(x) @ x
-    assert repr(Copy(x, 3)) == "markov.Copy(feedback.Ty(feedback.Wire('x')), 3)"
+    assert repr(Copy(x, 3)) == "markov.Copy(monoidal.Ty(monoidal.Wire('x')), 3)"
     tree = dumps(comarkov.Merge(x, 3)).replace("comarkov.Merge", "markov.Merge")
     with warns(DeprecationWarning):
         assert loads(tree) == comarkov.Merge(x, 3)
@@ -211,6 +211,8 @@ def test_from_callable():
 
 
 def test_stream_Diagram_repr():
+    from discopy.feedback.markov import (
+        Box, Copy, Diagram, Feedback, FollowedBy, Swap, Ty)
     x = Ty('x')
     plus = Box('plus', x @ x, x)
     zero = Box('zero', Ty(), x.head)
@@ -224,6 +226,7 @@ def test_stream_Diagram_repr():
 
 
 def test_functor_python_stream():
+    from discopy.feedback.markov import Box, Diagram, Functor, Ty
     x = Ty('x')
     zero, wait = Box('zero', Ty(), x), Diagram.wait(x)
     F = Functor(
@@ -234,6 +237,7 @@ def test_functor_python_stream():
 
 
 def test_walk():
+    from discopy.feedback.markov import Box, Diagram, FollowedBy, Functor, Ty
     rng = Random(420)
     X, fby = Ty('X'), FollowedBy(Ty('X'))
     zero, rand, plus = Box('0', Ty(), X), Box('rand', Ty(), X), Box('+', X @ X, X)
@@ -257,6 +261,8 @@ def test_walk():
 
 
 def test_fibonacci():
+    from discopy.feedback.markov import (
+        Box, Copy, Diagram, Equation, FollowedBy, Functor, Swap, Ty)
     X = Ty('X')
     fby, wait = FollowedBy(X), Swap(X, X.d).feedback()
     zero, one = Box('0', Ty(), X), Box('1', Ty(), X)
@@ -288,6 +294,7 @@ def test_fibonacci():
 
 
 def test_Permutation_delay():
+    from discopy.feedback.markov import Permutation, Swap, Ty
     x, y, z = map(Ty, "xyz")
     perm = Permutation(x @ y @ z, [2, 0, 1])
     assert perm.delay() == Permutation((x @ y @ z).delay(), [2, 0, 1])
@@ -297,6 +304,7 @@ def test_Permutation_delay():
 
 
 def test_Discard_delay():
+    from discopy.feedback.markov import Diagram, Discard, Ty
     x = Ty('x')
     discard = Diagram.copy(x, n=0)
     assert isinstance(discard, Diagram) and isinstance(discard, Discard)
@@ -305,6 +313,7 @@ def test_Discard_delay():
 
 
 def test_delayed_Copy_pickle():
+    from discopy.feedback.markov import Copy, Discard, Ty
     from pickle import dumps, loads
     x = Ty('x')
     for box in (Copy(x), Discard(x), Copy(x).delay(), Discard(x).delay()):
@@ -374,7 +383,7 @@ def test_Box_flags():
     assert Box('sample', p, x) != sample
     assert hash(sample) == hash(Box('sample', p, x, is_deterministic=False))
     assert repr(Box('f', p, x)) == "markov.Box('f', "\
-        "feedback.Ty(feedback.Wire('p')), feedback.Ty(feedback.Wire('x')))"
+        "monoidal.Ty(monoidal.Wire('p')), monoidal.Ty(monoidal.Wire('x')))"
     for box in (sample, condition, sample.dagger(), sample @ condition):
         assert eval(repr(box)) == box
         assert loads(dumps(box)) == box == pickle.loads(pickle.dumps(box))
@@ -417,7 +426,7 @@ def test_Box_flags_cooperate():
     assert sample.r.l == sample and sample.r.flags() == sample.flags()
     assert eval(repr(sample), {
         'Word': Word, 'lambek': lambek, 'rigid': rigid}) == sample
-    constant = closed.Constant('c', closed.Ty('x'))
+    constant = closed.markov.Constant('c', closed.markov.Ty('x'))
     assert loads(dumps(constant)) == constant
     t = tensor.Box('t', d, d, data=[[1, 2j], [3, 4]])
     assert np.allclose(t.r.dagger().eval().array, t.r.eval().dagger().array)
@@ -473,7 +482,7 @@ def test_Bubble_flags_subs():
 def test_Box_signature():
     sig = signature(Box)
     assert list(sig.parameters) == [
-        "name", "dom", "cod", "data", "is_dagger", "time_step",
+        "name", "dom", "cod", "data", "is_dagger", "args", "method",
         "is_deterministic", "is_affine"]
     x = Ty('x')
     box = Box('f', x, x, **{

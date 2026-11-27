@@ -3,7 +3,7 @@
 """
 ZX-calculus diagrams.
 
-The functor ``circuit2zx`` sends a :class:`discopy.quantum.circuit.Circuit`
+The functor ``circuit2zx`` sends a :class:`~discopy.quantum.circuit.Circuit`
 to a ZX diagram, each gate through :func:`gate2zx`.
 
 Summary
@@ -17,7 +17,7 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
+    Elementwise
     Permutation
     Swap
     Spider
@@ -53,7 +53,7 @@ from fractions import Fraction
 from functools import reduce
 from heapq import heappop, heappush
 from itertools import combinations
-from math import pi
+from math import isfinite, pi
 from operator import index
 from typing import ClassVar, NamedTuple
 
@@ -357,7 +357,28 @@ class Box(tensor.Box[complex], Diagram):
         name (str) : The name of the box.
         dom (rigid.Nat) : The domain of the box, i.e. its input.
         cod (rigid.Nat) : The codomain of the box, i.e. its output.
+        is_dagger (bool | None) : Whether the box is a dagger, ``None`` when
+            it is self-adjoint, as :data:`H` is.
+
+    Example
+    -------
+    >>> import pickle
+    >>> from discopy.utils import dumps, loads
+    >>> assert H.dagger() is H and eval(repr(H)) == H
+    >>> assert pickle.loads(pickle.dumps(H)) == loads(dumps(H)) == H
     """
+    def dagger(self):
+        return self if self.is_dagger is None else super().dagger()
+
+    def __repr__(self):
+        if self.is_dagger is None:
+            return super().__repr__()[:-1] + ", is_dagger=None)"
+        return super().__repr__()
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        return tree if self.is_dagger is not None else tree | {
+            "is_dagger": None}
 
 
 class Sum(tensor.Sum[complex], Box):
@@ -371,10 +392,10 @@ class Sum(tensor.Sum[complex], Box):
     """
 
 
-class Bubble(tensor.Bubble[complex], Box):
+class Elementwise(tensor.Elementwise[complex], Box):
     """
-    A ZX bubble is a tensor bubble in a ZX diagram, which differentiates as
-    a ZX box does.
+    A ZX elementwise box is a tensor one in a ZX diagram, which
+    differentiates as a ZX box does.
 
     >>> bubble = Z(1, 1).bubble()
     >>> assert (bubble >> Z(1, 1)).eval() == bubble.eval()
@@ -424,13 +445,29 @@ class Spider(tensor.Spider[complex], Box):
     """
     basis = ((1, 0), (0, 1))
 
+    @staticmethod
+    def format_phase(phase) -> str:
+        """
+        Format a phase for :meth:`__str__`: a :class:`Fraction` as its ratio
+        ``p/q`` when the float it evaluates to has a decimal string that reads
+        back as the same fraction, e.g. ``1/4`` or ``1/10``, and as
+        ``Fraction(p, q)`` otherwise, so that it reads back.
+        """
+        if isinstance(phase, Fraction):
+            try:
+                exact = Fraction(str(float(phase))) == phase
+            except OverflowError:
+                exact = phase.denominator == 1
+            return str(phase) if exact else repr(phase)
+        return str(phase)
+
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         super().__init__(
             n_legs_in, n_legs_out,
             Nat(1), phase)  # ty: ignore[invalid-argument-type]
         factory_str = type(self).__name__
-        phase_str = f", {self.phase}" if self.phase else ""
+        phase_str = f", {self.format_phase(self.phase)}" if self.phase else ""
         self.name = f"{factory_str}({n_legs_in}, {n_legs_out}{phase_str})"
         if not isinstance(self, Z):
             self.deterministic = self.affine = False
@@ -441,7 +478,7 @@ class Spider(tensor.Spider[complex], Box):
     def __setstate__(self, state):
         if "_name" in state and state["_name"] == type(self).__name__:
             phase = state.get("_data", None)
-            phase_str = f', {phase}' if phase else ''
+            phase_str = f', {self.format_phase(phase)}' if phase else ''
             state["_name"] = (
                 type(self).__name__ +
                 f"({state['_dom'].n}, {state['_cod'].n}{phase_str})"
@@ -451,12 +488,15 @@ class Spider(tensor.Spider[complex], Box):
             self.deterministic = self.affine = False
 
     def __repr__(self):
-        return str(self).replace(type(self).__name__, factory_name(type(self)))
+        phase_str = (f", {format_number(self.phase, exact=True)}"
+                     if self.phase else "")
+        return f"{factory_name(type(self))}("\
+            f"{len(self.dom)}, {len(self.cod)}{phase_str})"
 
     @classmethod
     def from_tree(cls, tree: dict) -> "Spider":
         """
-        Decode the tree of :meth:`discopy.frobenius.Spider.to_tree`, whose
+        Decode the tree of :meth:`~discopy.frobenius.Spider.to_tree`, whose
         type is a qubit that the constructor supplies.
 
         >>> from discopy.utils import dumps, loads
@@ -561,7 +601,7 @@ class Scalar(Box):
         self.drawing_name = format_number(data)
 
     def __str__(self):
-        return f"scalar({format_number(self.data)})"
+        return f"scalar({format_number(self.data, exact=True)})"
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\
@@ -645,8 +685,7 @@ circuit2zx = quantum.circuit.Functor(
     dom=Circuit, cod=Diagram)
 
 H = Box('H', Nat(1), Nat(1), data=[x / 2 ** .5 for x in (1, 1, 1, -1)],
-        is_deterministic=False, is_affine=False)
-H.dagger = lambda: H  # ty: ignore[invalid-assignment]
+        is_deterministic=False, is_affine=False, is_dagger=None)
 H.draw_as_spider = True
 H.drawing_name, H.tikzstyle_name, = '', 'H'
 H.color, H.shape = "yellow", "rectangle"
@@ -654,13 +693,19 @@ H.color, H.shape = "yellow", "rectangle"
 SWAP = Swap(Nat(1), Nat(1))
 Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
-Diagram.bubble_factory = Bubble
+Diagram.elementwise_factory = Elementwise
 Diagram.permutation_factory = Permutation
 Id = Diagram.id
 
 
 def turn(phase) -> complex:
-    """ The root of unity ``exp(2j * pi * phase)`` of a phase in turns. """
+    """
+    The root of unity ``exp(2j * pi * phase)`` of a phase in turns, exact on
+    the quarter-turns.
+    """
+    turns = (phase % 1) * 4
+    if turns in (0, 1, 2, 3):
+        return complex((1, 1j, -1, -1j)[int(turns)])
     return cmath.exp(2j * pi * phase)
 
 
@@ -878,7 +923,7 @@ class Hypergraph(hypergraph.Hypergraph):
     being a green one with a Hadamard on each leg, and its scalar is an
     exact :class:`Number`.
 
-    Composition is the pushout of :class:`discopy.hypergraph.Hypergraph`,
+    Composition is the pushout of :class:`~discopy.hypergraph.Hypergraph`,
     i.e. it fuses spiders and adds their phases, which this hypergraph keeps
     modulo a turn, and multiplies the scalars, as the tensor does, while the
     dagger conjugates the scalar. Green spiders are special, so that this is
@@ -899,7 +944,7 @@ class Hypergraph(hypergraph.Hypergraph):
     The phases of the hypergraph go back to spiders:
 
     >>> print((Z(1, 2, .25) >> Z(2, 1, .25)).to_hypergraph())
-    Z(1, 1, 0.5)
+    Z(1, 1, 1/2)
 
     The :class:`Scalar` boxes of a diagram are its scalar:
 
@@ -954,7 +999,7 @@ class Hypergraph(hypergraph.Hypergraph):
     def keeps_scalar(self, result: Hypergraph) -> Hypergraph:
         """
         A hypergraph built from this one by a method of
-        :class:`discopy.hypergraph.Hypergraph`, which knows no scalar, with
+        :class:`~discopy.hypergraph.Hypergraph`, which knows no scalar, with
         the scalar of this one.
         """
         return result if result is self else result.scaled(self.scalar)
@@ -972,8 +1017,8 @@ class Hypergraph(hypergraph.Hypergraph):
     def dagger(self) -> Hypergraph:
         return super().dagger().scaled(self.scalar.conjugate())
 
-    def trace(self, n=1, left=False) -> Hypergraph:
-        return self.keeps_scalar(super().trace(n, left))
+    def glue(self, n=1, left=False) -> Hypergraph:
+        return self.keeps_scalar(super().glue(n, left))
 
     def interchange(self, i: int, j: int) -> Hypergraph:
         return self.keeps_scalar(super().interchange(i, j))
@@ -986,7 +1031,7 @@ class Hypergraph(hypergraph.Hypergraph):
         The pushout complements of a match, each with the scalar of this
         hypergraph over that of the pattern, so that plugging the pattern
         back gives this hypergraph, see
-        :meth:`discopy.hypergraph.Hypergraph.complements`.
+        :meth:`~discopy.hypergraph.Hypergraph.complements`.
 
         >>> host = (H @ scalar(2)).to_hypergraph()
         >>> pattern = (H @ scalar(2 ** .5)).to_hypergraph()
@@ -1045,13 +1090,87 @@ class Hypergraph(hypergraph.Hypergraph):
         H >> H >> Nat(1) @ scalar(2)
         """
         result, number = super().to_diagram(), complex(self.scalar)
+        real = float(number.real)
+        real = int(real) if isfinite(real) and int(real) == real else real
         return result if self.scalar == ONE\
-            else result @ Scalar(number.real if not number.imag else number)
+            else result @ Scalar(real if not number.imag else number)
 
     @staticmethod
     def reduce_phase(phase):
-        """ A phase modulo a turn, unless it is symbolic. """
-        return phase if getattr(phase, "free_symbols", None) else phase % 1
+        """
+        A phase modulo a turn as an exact :class:`Fraction`, unless it is
+        symbolic or non-finite.
+        """
+        if getattr(phase, "free_symbols", None):
+            return phase
+        if isinstance(phase, (int, Fraction)):
+            return Fraction(phase) % 1 or 0
+        if isinstance(phase, float) and isfinite(phase):
+            return Fraction(str(phase)) % 1 or 0
+        return phase % 1
+
+    phases_drawn = (
+        0, Fraction(1, 2), Fraction(1, 4), Fraction(3, 4),
+        Fraction(1, 8), Fraction(1, 3), Fraction(2, 3), Fraction(1, 10))
+    """ The spider phases :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(  # pylint: disable=arguments-differ,too-many-arguments
+            # a terminal strategy declares exactly its keyword-only bounds
+            cls, *, dom=None, cod=None, min_leaves=None, max_leaves=4,
+            max_scalars=1):
+        """
+        Generate graph-like ZX hypergraphs: green spiders wired by
+        :meth:`~discopy.hypergraph.Hypergraph.draw_any` with Hadamard
+        :data:`H` boxes (so a spider behind Hadamards on its legs is red),
+        rational phases in :attr:`phases_drawn` and a Clifford or zero
+        :class:`Number` scalar.
+
+        Parameters:
+            dom : The domain, sampled from :meth:`~discopy.rigid.Nat.strategy`
+                if ``None``.
+            cod : The codomain, sampled from
+                :meth:`~discopy.rigid.Nat.strategy` if ``None``.
+            min_leaves : The minimum number of :data:`H` boxes.
+            max_leaves : The maximum number of :data:`H` boxes.
+            max_scalars : The maximum number of zero-legged spiders, one
+                by default.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> graph = find(
+        ...     Hypergraph.strategy(dom=Nat(2), cod=Nat(1)),
+        ...     lambda g: g.boxes and any(g.phases) and g.scalar != ONE)
+        >>> assert (graph.dom, graph.cod) == (Nat(2), Nat(1))
+        >>> assert set(graph.boxes) == {H}
+        """
+        from hypothesis import strategies as st
+
+        min_boxes = min_leaves or 0
+        max_scalars = 1 if max_scalars is None else max_scalars
+
+        @st.composite
+        def hypergraphs(draw):
+            domain = draw(cls.ob.strategy()) if dom is None else dom
+            codomain = draw(cls.ob.strategy()) if cod is None else cod
+            n_boxes = draw(st.integers(min_boxes, max(min_boxes, max_leaves)))
+            _, _, _, wires, spider_types = cls.draw_any(
+                draw, st.just(Nat(1)), dom=domain, cod=codomain,
+                n_boxes=n_boxes)
+            n_scalars = max(0, draw(st.integers(0, max_scalars + 2)) - 2)
+            spider_types += n_scalars * [Nat(1)]
+            phases = [
+                draw(st.sampled_from(cls.phases_drawn)) for _ in spider_types]
+            power2 = draw(st.sampled_from((0, 1, -1, 2, -2)))
+            quarter = Fraction(draw(st.integers(0, 3)), 4)
+            number = Number(factor=0) if draw(st.integers(0, 7)) == 7\
+                else Number(power2, quarter)
+            return cls(
+                domain, codomain, n_boxes * (H, ), wires, spider_types,
+                phases=phases, scalar=number)
+
+        return hypergraphs()
 
     @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
@@ -1311,7 +1430,7 @@ def edges_of(locals_: dict[int, Local], u: int, v: int) -> list[int]:
 
 class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     """
-    A :class:`discopy.hypergraph.Rewriter` of a graph-like hypergraph with
+    A :class:`~discopy.hypergraph.Rewriter` of a graph-like hypergraph with
     the rules of the ``full_reduce`` of :cite:t:`KissingerWetering20`, one
     method each: each step is a pair of hypergraphs built for its match, the
     left side the neighbourhood it rewrites and the right side what replaces
@@ -1354,7 +1473,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                    match: hypergraph.Match) -> list[int]:
         """
         Rewrite a match in place, see
-        :meth:`discopy.hypergraph.Rewriter.substitute`, multiplying the scalar
+        :meth:`~discopy.hypergraph.Rewriter.substitute`, multiplying the scalar
         by that of ``right`` over that of ``left``.
         """
         self.scalar = self.scalar * right.scalar / left.scalar
@@ -1988,3 +2107,6 @@ class Agenda:
 
 
 Diagram.hypergraph_factory = Hypergraph
+
+
+Bubble = Elementwise.from_args

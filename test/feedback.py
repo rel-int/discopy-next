@@ -43,7 +43,8 @@ def test_delayed_Box_to_tree():
 
 
 def test_delay_keeps_the_attributes_of_a_box():
-    from discopy import frobenius, markov
+    from discopy import frobenius
+    from discopy.feedback import markov
     x = markov.Ty('x')
     sample = markov.Box('sample', x, x, is_deterministic=False)
     F = markov.Functor({x: x}, {sample: markov.Box('g', x, x)})
@@ -75,7 +76,7 @@ def test_Head_Tail_FollowedBy_to_tree():
 
 def test_Head_Tail_dagger():
     from itertools import product
-    from discopy import markov
+    from discopy.feedback import markov
     x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
     f, g = Box('f', x, y), Box('g', y, x)
     h = markov.Box('h', markov.Ty('x'), markov.Ty('y'))
@@ -156,7 +157,7 @@ def test_Sum():
 
 def test_trace_serialisation():
     from discopy.utils import dumps, loads
-    from discopy import symmetric
+    from discopy.feedback import symmetric
     f = Box('f', 'x', 'x')
     for trace in (f.trace(), f.trace(left=True)):
         assert loads(dumps(trace)) == trace
@@ -246,7 +247,7 @@ def test_traced_category_feedback_is_its_trace():
 def test_every_trace_takes_the_keyword_form():
     from inspect import signature
     from discopy import ribbon
-    from discopy.abc import keyword_form
+    from discopy.abc import FeedbackCategory
     from discopy.matrix import Matrix
     from discopy.python import Function
 
@@ -258,7 +259,7 @@ def test_every_trace_takes_the_keyword_form():
                   ribbon.Diagram.trace, Diagram.trace):
         assert list(signature(trace).parameters)\
             == ["self", "n", "left", "dom", "cod", "mem"]
-        assert keyword_form(trace) is trace
+        assert FeedbackCategory.keyword_form(trace) is trace
     f = Sub([[1, 1], [0, 0]], 2, 2)
     assert f.trace(mem=1) == f.trace() == Sub([[1]], 1, 1)
     assert f.trace(mem=1, left=True) == f.trace(left=True) == Sub([[0]], 1, 1)
@@ -271,7 +272,8 @@ def test_every_trace_takes_the_keyword_form():
 
 
 def test_yanking():
-    from discopy import balanced, compact, lens, para, pivotal, symmetric
+    from discopy import compact, lens, para, pivotal
+    from discopy.feedback import balanced, symmetric
     from discopy.abc import Nat, PivotalCategory
     from discopy.matrix import Matrix
     from discopy.testable import AxiomFailure
@@ -296,7 +298,8 @@ def test_yanking():
 
 
 def test_types_without_wires_are_their_own_delay():
-    from discopy import frobenius, monoidal, pivotal, rigid, symmetric
+    from discopy import frobenius, monoidal, pivotal, rigid
+    from discopy.feedback import symmetric
     from discopy.neural.network import Dims
     for x in (monoidal.Nat(2), rigid.Nat(2), Nat(2), symmetric.Nat(2),
               pivotal.Nat(2), frobenius.Nat(2), monoidal.Dim(2, 3),
@@ -355,7 +358,8 @@ def test_delayed_pivotal_diagrams():
 
 
 def test_time_stepped_wires_below_feedback():
-    from discopy import markov, pivotal, frobenius
+    from discopy import pivotal, frobenius
+    from discopy.feedback import markov
     x = markov.Ty('x')
     assert x.delay() != x and x.delay().inside[0].time_step == 1
     f = markov.Box('f', x @ x.delay(), x @ x)
@@ -381,14 +385,12 @@ def test_FollowedBy_delay():
 
 def test_generated_boxes_at_every_level():
     import pickle
-    from discopy import (
-        balanced, closed, comarkov, compact, frobenius, markov, pivotal,
-        ribbon, symmetric)
-    from discopy.lambek import abstract
+    from discopy import compact, frobenius, pivotal, ribbon
+    from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
-                   compact, frobenius, closed, abstract, network):
+                   compact, frobenius, closed.markov, network):
         diagram = getattr(module, "Diagram", getattr(module, "Network", None))
         for name in ("Feedback", "Trace", "FollowedBy", "Head", "Tail"):
             cls = getattr(module, name)
@@ -448,24 +450,24 @@ def test_heads_of_pivotal_types():
 
 
 def test_structural_boxes_have_no_time_step():
-    from discopy import closed, markov
+    from discopy.feedback import closed, markov
     from discopy.quantum.gates import CX, Copy, Match
     assert Copy().delay(2).time_step == Match().delay(2).time_step == 2
     assert Copy().delay(2).reset() == Copy()
-    x, y = closed.Ty('x'), closed.Ty('y')
+    x, y = closed.markov.Ty('x'), closed.markov.Ty('y')
     copy = markov.Copy(x).delay(42)
     assert copy.time_step is None and copy.dom == x.delay(42)
     assert copy.reset() == copy and str(copy) == "Copy(x.delay(42))"
     assert Box('f', x, x).delay(42).time_step == 42
-    assert closed.Eval(x << y).delay(2).time_step == 2
-    assert closed.Eval(x << y).delay(2).reset() == closed.Eval(x << y)
+    ev = closed.markov.Eval(x << y)
+    assert ev.delay(2).time_step == 2 and ev.delay(2).reset() == ev
     assert CX.delay(2).time_step == 2 and CX.delay(2).reset() == CX
 
 
 def test_structural_boxes_delay_through_their_arguments():
     import pickle
-    from discopy import (
-        balanced, comarkov, frobenius, markov, pivotal, symmetric)
+    from discopy import frobenius, pivotal
+    from discopy.feedback import balanced, comarkov, markov, symmetric
     x, y = symmetric.Ty('x'), symmetric.Ty('y')
     for box, delayed in (
             (symmetric.Swap(x, y), symmetric.Swap(x.d, y.d)),
@@ -502,12 +504,11 @@ def test_structural_boxes():
 
 def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
     import pickle
-    from discopy import (
-        balanced, closed, comarkov, compact, feedback, frobenius, markov,
-        pivotal, ribbon, symmetric)
+    from discopy import compact, feedback, frobenius, pivotal, ribbon
+    from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.utils import dumps, loads
     modules = (feedback, balanced, symmetric, markov, comarkov, pivotal,
-               ribbon, compact, frobenius, closed)
+               ribbon, compact, frobenius, closed.markov)
     namespace = {module.__name__.split('.')[-1]: module for module in modules}
     for module in modules:
         x, y = module.Ty('x'), module.Ty('y')
@@ -520,7 +521,7 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
         assert delayed.args == (f, ) and (delayed.dom, delayed.cod) == (
             x.d, y.d)
         assert delayed.reset() == bubble and delayed != f.delay().bubble()
-        assert delayed == module.Bubble(f, time_step=1)
+        assert delayed == module.Bubble(f, time_step=1) == f.bubble(time_step=1)
         assert bubble.delay(2) == delayed.delay()
         assert delayed.dagger() == bubble.dagger().delay()
         assert (bubble >> h).delay() == delayed >> h.delay()
@@ -557,3 +558,135 @@ def test_Ty_has_canonical_instances():
     for law in Ty.axioms.values():
         if law.name != "str_transparency":  # a canonical wire is coloured
             assert law.canonical(), law
+
+
+def test_to_compact():
+    from discopy.feedback.closed.markov import Box, Coeval, Curry, Ty
+    w, x, y, z = map(Ty, "wxyz")
+    f = Box("f", x @ y, z)
+
+    for left in (True, False):
+        source = f.curry(left=left)
+        target = source.to_compact()
+        expected = (f >> Coeval(source.cod, left=left)).trace(
+            left=not left)
+        assert target == expected
+        assert (target.dom, target.cod) == (source.dom, source.cod)
+
+    h = Box("h", w @ x @ y, z)
+    for left in (True, False):
+        source = h.curry(n=2, left=left)
+        assert source.to_compact() == (
+            h >> Coeval(source.cod, left=left)).trace(
+                n=2, left=not left)
+
+    g = Box("g", z << y, x)
+    assert (f.curry() >> g).to_compact() == f.curry().to_compact() >>\
+        g.to_compact()
+
+    nested = f.curry().curry().to_compact().to_map()
+    assert sum(isinstance(box, Coeval) for box in nested.boxes) == 2
+    assert not any(isinstance(box, Curry) for box in nested.boxes)
+
+
+def test_delay_types():
+    from discopy.feedback.closed.markov import Product, Ty, Unitype
+    from discopy.utils import dumps, loads
+    U = Ty(Unitype())
+    x, y = Ty('x'), Ty('y')
+    for typ in (x, x << y, y >> x, x ** y, x * y, x.product(y, x),
+                Ty(Product()), U):
+        delayed = typ.delay()
+        assert delayed != typ and delayed.delay(-1) == typ == delayed.tail
+        assert delayed.delay(2) == typ.delay(3) and delayed.head == Ty()
+        assert typ.head.delay().head == Ty() and typ.d.d == typ.delay(2)
+        assert eval(repr(delayed), Ty.environment()) == delayed
+        assert loads(dumps(delayed)) == delayed
+        assert hash(delayed) == hash(typ.delay().delay(-1).delay())
+    assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
+    assert (x << y).delay() != x.delay() << y.delay()
+    assert (y >> x).delay() != y.delay() >> x.delay()
+    assert (x ** y).delay() != x.delay() ** y.delay()
+    assert (x * y).delay() != x.delay() * y.delay()
+    assert (x << y).delay().inside[0].base == x
+    assert str((x << y).delay()) == "(y >> x).d"
+    assert str((x * y).delay(4)) == "(x * y).delay(4)"
+
+
+def test_delay_diagrams():
+    from discopy.drawing import Drawing
+    from discopy.feedback.closed.markov import (
+        Box, Copy, Diagram, Discard, Functor, Pack, Ty, Unpack)
+    from discopy.utils import dumps, loads
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    diagrams = [
+        f.curry(), f.curry(left=False), Diagram.ev(z, y),
+        Diagram.ev(z, y, left=False), Diagram.ev(z, y).dagger(),
+        Pack(x * y), Unpack(x * y), Copy(x) >> x @ Discard(x)]
+    for diagram in diagrams:
+        delayed = diagram.delay()
+        assert (delayed.dom, delayed.cod) == (
+            diagram.dom.delay(), diagram.cod.delay())
+        assert Diagram(delayed.inside, delayed.dom, delayed.cod) == delayed
+        assert delayed != diagram and delayed.delay(-1) == diagram
+        assert delayed.delay(2) == diagram.delay(3)
+        assert loads(dumps(delayed)) == delayed
+        assert Functor.id(Diagram)(delayed) == delayed
+        assert delayed.to_compact() == diagram.to_compact().delay()
+        assert delayed.to_drawing().dom == Drawing.id(delayed.dom).dom
+        for box in delayed.boxes:
+            assert eval(repr(box), Diagram.environment()) == box
+    assert Diagram.ev(z, y).delay().dagger()\
+        == Diagram.ev(z, y).dagger().delay()
+    assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
+    assert f.curry().delay().arg == f
+
+
+def test_Curry_of_no_wire_maps_as_its_argument():
+    from discopy.feedback.closed.markov import Box, Curry, Diagram, Functor, Ty
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        for curry, arg in [(Curry(f, 0, left), f),
+                           (Curry(f, 0, left).delay(), f.delay())]:
+            assert Functor.id(Diagram)(curry) == arg
+            assert curry.to_compact() == arg.to_compact()
+            assert curry.to_drawing() == arg.to_drawing()
+
+
+def test_foliation_with_traces_and_permutations():
+    from discopy.feedback.symmetric import (
+        Box, Diagram, Equation, Permutation, Swap, Ty)
+    from discopy import tensor
+    x, y = Ty('x'), Ty('y')
+    f, g, h = Box('f', x @ x, x @ x), Box('g', y @ x @ x, x), Box('h', x, x)
+    F = tensor.Functor(
+        {x: 2, y: 3},
+        {f: list(range(16)), g: list(range(24)), h: [1, 2, 3, 4]},
+        dom=Diagram)
+    for diagram in [
+            f.trace() @ h,
+            h @ f.trace(left=True) >> Swap(x, x),
+            Permutation(x @ y @ x, [1, 2, 0]) >> g,
+            Swap(x, y) @ x >> y @ f.trace() @ x >> y @ h @ h]:
+        foliated = diagram.foliation()
+        assert foliated.boxes == diagram.boxes
+        assert Equation(foliated, diagram)
+        assert F(foliated) == F(diagram)
+    assert len((f.trace() @ h).foliation()) == 1
+
+
+def test_foliation_idempotence():
+    """ States keep their offsets and plumbing composes, whatever the
+    number of boxes in a layer. """
+    from discopy.feedback.symmetric import (
+        Box, Diagram, Equation, Layer, Swap, Trace, Ty)
+    x, y = Ty('x'), Ty('y')
+    s, t, u = Box('s', Ty(), x), Box('t', Ty(), y), Box('u', Ty(), x)
+    f, g = Box('f', Ty(), x @ x @ x), Box('g', x, x)
+    traced = Trace(Diagram((Layer(x, f), ), x, x @ x @ x @ x), left=False)
+    for diagram in (s @ t @ u, s @ g @ u, s @ t >> Swap(x, y), traced):
+        foliated = diagram.foliation()
+        assert Equation(diagram, foliated)
+        assert foliated.foliation() == foliated

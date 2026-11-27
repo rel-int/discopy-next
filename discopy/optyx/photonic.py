@@ -255,7 +255,7 @@ import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
 from discopy.matrix import repr_nonfinite
-from discopy.utils import factory_name
+from discopy.utils import factory_name, from_tree
 from discopy.matrix import asarray, backend, is_field
 
 from discopy.optyx import channel
@@ -300,6 +300,13 @@ class Select(Channel):
         args = ", ".join(map(repr, self.photons))
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), 'photons': list(self.photons)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['photons'])
+
     def to_path(self, dtype=complex) -> path.Matrix:
         array = np.eye(len(self.photons))
         return path.Matrix[dtype](
@@ -323,6 +330,10 @@ class Scalar(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.scalar!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def subs(self, *args):
         data = rsubs(self.scalar, *args)
@@ -351,6 +362,11 @@ class Encode(EncodeChannel):
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class Discard(DiscardChannel):
     """
@@ -362,6 +378,11 @@ class Discard(DiscardChannel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
 
 
 class PhotonThresholdMeasurement(Channel):
@@ -382,6 +403,11 @@ class PhotonThresholdMeasurement(Channel):
         n = "" if len(self.cod) == 1 else repr(len(self.cod))
         return f"{factory_name(type(self))}({n})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
+
 
 class NumberResolvingMeasurement(Measure):
     """
@@ -393,6 +419,11 @@ class NumberResolvingMeasurement(Measure):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        """ Decode a box of the length of its domain. """
+        return cls(len(from_tree(tree['dom'])))
 
 
 class Create(Channel):
@@ -419,6 +450,23 @@ class Create(Channel):
         if self.internal_states is not None:
             args += f", internal_states={listed(self.internal_states)}"
         return f"{factory_name(type(self))}({args})"
+
+    def to_tree(self) -> dict:
+        tree = {**super().to_tree(), 'photons': list(self.photons)}
+        states = self.internal_states
+        if isinstance(states, tuple):
+            tree['internal_states'] = [
+                np.asarray(state).tolist() for state in states]
+        elif states is not None:  # the state of a single photon
+            tree['internal_states'] = np.asarray(states).tolist()
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states')
+        if states and isinstance(states[0], list):
+            states = tuple(states)
+        return cls(*tree['photons'], internal_states=states)
 
 
 class AbstractGate(Channel, ABC):
@@ -452,6 +500,22 @@ class AbstractGate(Channel, ABC):
     def _normal_form(self, dom, cod):
         return matrix_to_zw(self.array.reshape(dom, cod),
                             dense=self.backend != "numpy")
+
+    def to_tree(self) -> dict:
+        """
+        The tree of a gate: its parameters are its data, and the flags
+        :code:`is_gate_dagger` and :code:`is_conj` are written when set.
+
+        >>> from discopy.utils import dumps, loads
+        >>> for gate in (Phase(.2), BBS(.1, is_conj=True),
+        ...              TBS(.3, is_gate_dagger=True), MZI(.1, .2)):
+        ...     assert loads(dumps(gate)) == gate
+        """
+        tree = super().to_tree()
+        for flag in ("is_gate_dagger", "is_conj"):
+            if getattr(self, flag, False):
+                tree[flag] = True
+        return tree
 
     @cached_property
     def array(self):
@@ -497,7 +561,7 @@ class AbstractGate(Channel, ABC):
     @property
     def backend(self):
         """
-        The name of the :func:`discopy.matrix.backend` the array is computed
+        The name of the :func:`~discopy.matrix.backend` the array is computed
         in: that of the first parameter held by an array, e.g. a JAX tracer
         after :meth:`lambdify`, NumPy otherwise.
         """
@@ -564,6 +628,19 @@ class Gate(AbstractGate):
         return f"{factory_name(type(self))}({array}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), 'array': self.array.tolist()}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(
+            tree['array'],
+            len(from_tree(tree['dom'])),
+            len(from_tree(tree['cod'])),
+            tree['name'],
+            data=tree.get('data'),
+        )
+
     def lambdify(self, *symbols, **kwargs):
         if not self.free_symbols & set(symbols):
             return lambda *xs: self
@@ -623,6 +700,10 @@ class Phase(AbstractGate):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.angle!r})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
+
     def _compute_array(self):
         module = self.module
         return [module.exp(2 * np.pi * 1j * self.angle)]
@@ -666,6 +747,11 @@ class NumOp(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}()"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
 
 
 class BBS(AbstractGate):
@@ -732,6 +818,10 @@ class BBS(AbstractGate):
     def __repr__(self):
         is_conj = ", is_conj=True" if self.is_conj else ""
         return f"{factory_name(type(self))}({self.bias!r}{is_conj})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'], tree.get('is_conj', False))
 
     def _compute_array(self):
         module = self.module
@@ -811,6 +901,11 @@ class TBS(AbstractGate):
             ("is_gate_dagger", self.is_gate_dagger),
             ("is_conj", self.is_conj)] if value)
         return f"{factory_name(type(self))}({self.theta!r}{flags})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'], *(
+            tree.get(flag, False) for flag in ("is_gate_dagger", "is_conj")))
 
     @cached_property
     def global_phase(self):
@@ -928,6 +1023,11 @@ class MZI(AbstractGate):
         return f"{factory_name(type(self))}"\
             f"({self.theta!r}, {self.phi!r}{flags})"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(*tree['data'], *(
+            tree.get(flag, False) for flag in ("is_gate_dagger", "is_conj")))
+
     @cached_property
     def global_phase(self):
         """
@@ -1041,6 +1141,11 @@ class HadamardBS(Gate):
     def __repr__(self):
         return f"{factory_name(type(self))}()"
 
+    @classmethod
+    def from_tree(cls, tree: dict):
+        del tree
+        return cls()
+
 
 class DualRail(Channel):
     """
@@ -1062,6 +1167,19 @@ class DualRail(Channel):
             args += f", internal_states={listed(self.internal_states)}"
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.internal_states is not None:
+            tree['internal_states'] = [
+                np.asarray(state).tolist() for state in self.internal_states]
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        states = tree.get('internal_states')
+        return cls(len(from_tree(tree['dom'])),
+                   None if states is None else tuple(states))
+
 
 class PhaseShiftDR(Channel):
     """
@@ -1078,6 +1196,10 @@ class PhaseShiftDR(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.phase!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
@@ -1219,6 +1341,17 @@ class Swap(channel.Permutation):
         super().__init__(self.left @ self.right, [
             *range(left, left + right), *range(left)])
 
+    def __getnewargs__(self):
+        return len(self.left), len(self.right)
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'left': len(self.left), 'right': len(self.right)}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['left'], tree['right'])
+
     def dagger(self):
         return type(self)(len(self.right), len(self.left))
 
@@ -1277,6 +1410,10 @@ class PhotonLoss(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.p_survive!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['data'])
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(

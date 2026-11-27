@@ -7,9 +7,9 @@ A monoidal category is spacial when a scalar ``s : Ty() -> Ty()`` slides
 past every morphism, ``s @ f == f @ s``, see :cite:t:`Selinger10`. Since a
 scalar can cross any wire, a component of a diagram that touches nothing
 else lies in no face in particular: the map of a spacial diagram is the
-diagram up to the axioms, see :class:`discopy.cmap.CMap`, so that rewriting
-it with :meth:`discopy.cmap.CMap.rewrite` is sound whether or not it is
-connected. Over :mod:`discopy.monoidal`, a host must be connected.
+diagram up to the axioms, see :class:`~discopy.cmap.CMap`, so that rewriting
+it with :meth:`~discopy.cmap.CMap.rewrite` is sound whether or not it is
+connected. Over :mod:`~discopy.monoidal`, a host must be connected.
 
 Summary
 -------
@@ -22,7 +22,6 @@ Summary
     Diagram
     Box
     Sum
-    Bubble
     Functor
     TermBase
     Variable
@@ -95,12 +94,6 @@ class Sum(monoidal.Sum, Box):
     """
 
 
-class Bubble(monoidal.Bubble, Box):
-    """
-    A spacial bubble is a monoidal bubble and a spacial box.
-    """
-
-
 class Functor(monoidal.Functor):
     """
     A spacial functor is a monoidal functor between spacial categories.
@@ -121,7 +114,6 @@ class Equation(monoidal.Equation):
 
 Diagram.box_factory = Box
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -130,3 +122,6 @@ Id = Diagram.id
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

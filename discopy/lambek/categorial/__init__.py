@@ -36,7 +36,6 @@ Summary
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition
-    Bubble
     Functor
     CMap
 
@@ -61,7 +60,7 @@ Summary
 
         bobcat
 
-:mod:`discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
+:mod:`~discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
 extra installs, so it is not imported here: import it on its own.
 """
 
@@ -70,7 +69,7 @@ from __future__ import annotations
 import re
 from typing import ClassVar
 
-from discopy import biclosed, cmap, messages
+from discopy import closed, cmap, messages
 from discopy.abc import ClosedCategory
 from discopy.cat import factory
 from discopy.lambek import thue
@@ -85,7 +84,7 @@ from discopy.utils import (
 
 
 @factory
-class Ty(biclosed.Ty):
+class Ty(closed.monoidal.Ty):
     "Base class for categorial grammar types."
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
@@ -94,20 +93,20 @@ class Ty(biclosed.Ty):
     under_factory: ClassVar[type["Under"]]
 
 
-class Over(biclosed.Over):
+class Over(closed.monoidal.Over):
     "Categorial grammar type ``base << exponent``."
 
     ob = Ty
 
 
-class Under(biclosed.Under):
+class Under(closed.monoidal.Under):
     "Categorial grammar type ``exponent >> base``."
 
     ob = Ty
 
 
 @factory
-class Diagram(biclosed.Diagram):
+class Diagram(closed.monoidal.Diagram):
     """
     A categorial diagram is a biclosed diagram with rules and words as boxes.
     """
@@ -163,7 +162,7 @@ class Diagram(biclosed.Diagram):
         return BackwardCrossedComposition(middle << left, middle >> right)
 
 
-class Box(biclosed.Box, Diagram):
+class Box(closed.monoidal.Box, Diagram):
     """
     A categorial box is a grammar rule in a categorial diagram.
     """
@@ -176,35 +175,27 @@ class Word(thue.Word, Box):
 
     Parameters:
         name (str) : The name of the word.
-        cod (biclosed.Ty) : The grammatical type of the word.
-        dom (biclosed.Ty) : An optional domain for the word, empty by default.
+        cod (closed.monoidal.Ty) : The grammatical type of the word.
+        dom (closed.monoidal.Ty) :
+            An optional domain for the word, empty by default.
     """
 
 
-class Eval(biclosed.Eval, Box):
+class Eval(closed.monoidal.Eval, Box):
     """
     Evaluation box in a categorial grammar.
     """
 
 
-class Coeval(biclosed.Coeval, Box):
+class Coeval(closed.monoidal.Coeval, Box):
     """
     Coevaluation box in a categorial grammar, the dagger of an evaluation.
     """
 
 
-class Curry(biclosed.Curry, Box):
+class Curry(closed.monoidal.Curry, Box):
     """
     The currying of a categorial diagram.
-    """
-
-
-class Bubble(biclosed.Bubble, Box):
-    """
-    A categorial bubble is a biclosed bubble and a categorial box.
-
-    >>> N = Ty('N')
-    >>> assert (Box('f', N, N).bubble() >> Box('g', N, N)).cod == N
     """
 
 
@@ -240,7 +231,7 @@ class BackwardCrossedComposition(BinaryBoxConstructor, Box):
         BinaryBoxConstructor.__init__(self, left, right)
 
 
-class Functor(biclosed.Functor):
+class Functor(closed.monoidal.Functor):
     """
     A categorial functor is a biclosed functor with a predefined mapping
     for categorial rules.
@@ -270,7 +261,7 @@ class Functor(biclosed.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Box, closed.monoidal.TermBase):
     """
     A term in the internal language of a categorial grammar.
     """
@@ -283,77 +274,80 @@ class TermBase(Box, biclosed.TermBase):
     def to_abstract(self):
         """
         The abstract term of a categorial term, dropping planarity,
-        see :meth:`discopy.lambek.abstract.Diagram.from_categorial`.
+        see :meth:`~discopy.lambek.abstract.Diagram.from_categorial`.
         """
         from discopy.lambek.abstract import Diagram
         return Diagram.from_categorial(self)
 
 
-class Constant(TermBase, biclosed.Constant):
+class Constant(TermBase, closed.monoidal.Constant):
     serialised_attrs = ("name", "cod")
 
     def __init__(self, name: str, cod: Ty):
-        biclosed.Constant.__init__(self, name, cod)
+        closed.monoidal.Constant.__init__(self, name, cod)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     def simplify(self):
         return self
 
 
-class Variable(TermBase, biclosed.Variable):
-    serialised_attrs = biclosed.Variable.serialised_attrs
+class Variable(TermBase, closed.monoidal.Variable):
+    serialised_attrs = closed.monoidal.Variable.serialised_attrs
 
     def simplify(self):
         return self
 
 
-class Abstraction(TermBase, biclosed.Abstraction):
-    serialised_attrs = biclosed.Abstraction.serialised_attrs
+class Abstraction(TermBase, closed.monoidal.Abstraction):
+    serialised_attrs = closed.monoidal.Abstraction.serialised_attrs
     var: Variable
     body: Term
     left: bool = False
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
-        biclosed.Abstraction.__init__(self, var, body, left)
+        closed.monoidal.Abstraction.__init__(self, var, body, left)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     def simplify(self):
         return Abstraction(self.var, self.body.simplify(), self.left)
 
 
-class FA(TermBase, biclosed.Application):
+class FA(TermBase, closed.monoidal.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
-    serialised_attrs = ("func", "args")
+    serialised_attrs = ("function", "argument")
 
-    def __init__(self, func, args):
-        biclosed.Application.__init__(self, func, args, left=False)
+    def __init__(self, function, argument):
+        closed.monoidal.Application.__init__(
+            self, function, argument, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])))
+        return cls(*cls.subtrees(tree))
 
     def simplify(self):
-        return self.func.simplify()(self.args.simplify())
+        return self.function.simplify()(self.argument.simplify())
 
 
-class BA(TermBase, biclosed.Application):
+class BA(TermBase, closed.monoidal.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
-    serialised_attrs = ("args", "func")
+    serialised_attrs = ("argument", "function")
 
-    def __init__(self, args, func):
-        biclosed.Application.__init__(self, func, args, left=True)
+    def __init__(self, argument, function):
+        closed.monoidal.Application.__init__(
+            self, function, argument, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['args'], tree['func'])))
+        return cls(*cls.subtrees(tree)[::-1])
 
     def simplify(self):
-        return self.args.simplify()(self.func.simplify(), left=True)
+        return self.argument.simplify()(self.function.simplify(), left=True)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.args!r}, {self.func!r})"
+        return factory_name(type(self))\
+            + f"({self.argument!r}, {self.function!r})"
 
 
 class TypeRaising(TermBase):
@@ -461,7 +455,7 @@ class BinaryTerm(TermBase):
     def setoid(self):
         """
         Binary terms are equal when their kinds and sides are, see
-        :meth:`discopy.biclosed.Application.setoid`.
+        :meth:`~discopy.closed.monoidal.Application.setoid`.
         """
         return factory_key(type(self)), self.left, self.right
 
@@ -728,7 +722,6 @@ def parse(sentence, k: int = 1, goal: Ty | None = None
 Id = Diagram.id
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.curry_factory = Curry
-Diagram.bubble_factory = Bubble
 Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable
@@ -738,3 +731,6 @@ Ty.application_factory =\
 Ty.abstraction_factory = Abstraction
 
 Ty.over_factory, Ty.under_factory = Over, Under
+
+
+Bubble = Box.from_args

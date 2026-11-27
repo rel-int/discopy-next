@@ -10,6 +10,8 @@ lambek
     thue
     cfg
     categorial
+    modality
     pregroup
     dependency
     abstract
+    tokenise

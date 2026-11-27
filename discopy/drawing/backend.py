@@ -36,6 +36,7 @@ from math import sqrt
 import os
 import pathlib
 import re
+from types import SimpleNamespace
 from xml.etree import ElementTree
 
 from typing import TYPE_CHECKING
@@ -54,6 +55,7 @@ from PIL import Image, ImageSequence
 
 from discopy import config
 from discopy.drawing import Node, Point
+from discopy.utils import text_width
 from discopy.drawing.typst_ast import (
     Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
     Import, RawText, Str, TypstNode, latex_math)
@@ -108,6 +110,9 @@ def draw(graph: Drawing, **params):
         return Typst(**params).draw(graph, **params).output(
             path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
+    left_to_right = params.get('left_to_right', False)
+    width, height = (graph.height, graph.width) if left_to_right\
+        else (graph.width, graph.height)
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
         if colours:
@@ -118,14 +123,18 @@ def draw(graph: Drawing, **params):
             margin_inches = DEFAULT['legend_margin']
             extra = legend_inches + margin_inches
             fig_width = params['figsize'][0] if 'figsize' in params\
-                else (graph.width or 1)
+                else (width or 1)
             if 'figsize' in params:
                 params['figsize'] = (fig_width + extra, params['figsize'][1])
-            space = params.get('legend_space', extra * graph.width / fig_width)
-            graph = graph.make_space(
-                space, graph.width, exclusive=True, copy=True)
+            space = params.get('legend_space', extra * width / fig_width)
+            if left_to_right:  # The physical right of a transposed drawing.
+                width += space
+            else:
+                graph = graph.make_space(
+                    space, graph.width, exclusive=True, copy=True)
+                width = graph.width
     figsize = params.get('figsize', None if aspect == 'auto' else (
-        graph.width or 1, graph.height or 1))
+        width or 1, height or 1))
     backend = params.get('backend', None) or (
         TikZ(use_tikzstyles=params.get('use_tikzstyles', None))
         if params.get('to_tikz', False)
@@ -136,11 +145,14 @@ def draw(graph: Drawing, **params):
     max_v = max(graph.height, graph.width, 0.01)
     params['nodesize'] = round(params.get('nodesize', 1.) / sqrt(max_v), 3)
 
-    backend.draw_boundary(graph, **params)
-    backend.draw_regions(graph, **params)
-    backend.draw_wires(graph, **params)
-    backend.draw_boxes(graph, **params)
-    backend.draw_spiders(graph, **params)
+    if left_to_right:
+        backend.draw_boundary(
+            SimpleNamespace(width=width, height=height), **params)
+        canvas = Transposed(backend, Point(0, 0), graph)
+    else:
+        canvas = backend
+        canvas.draw_boundary(graph, **params)
+    canvas.draw_drawing(graph, **params)
     if params.get('legend', False):
         backend.draw_legend(graph, **params)
 
@@ -148,7 +160,7 @@ def draw(graph: Drawing, **params):
         params.get('path', None), params.get('doctest', None))
     return backend.output(
         path=path,
-        baseline=graph.height / 2 or .5,
+        baseline=height / 2 or .5,
         tikz_options=params.get('tikz_options', None),
         show=params.get('show', True), aspect=aspect,
         margins=params.get('margins', DEFAULT['margins']),
@@ -581,7 +593,7 @@ class Backend(ABC):
         """
         Draws a half circle (or ellipse if ``depth`` differs from the radius)
         from ``(left, centre)`` to ``(right, centre)`` with vertical sides up
-        to ``end``, e.g. the fold of a :class:`discopy.ribbon.DualRailCup`,
+        to ``end``, e.g. the fold of a :class:`~discopy.ribbon.DualRailCup`,
         see :meth:`half_circle_beziers`.
         """
         if end != centre:
@@ -659,6 +671,13 @@ class Backend(ABC):
             (0, 0), (x, 0), (x, y), (0, y),
             facecolor=boundary_color, edgecolor=boundary_color)
 
+    def draw_drawing(self, graph, **params):
+        """ Draw the regions, wires, boxes and spiders of a drawing. """
+        self.draw_regions(graph, **params)
+        self.draw_wires(graph, **params)
+        self.draw_boxes(graph, **params)
+        self.draw_spiders(graph, **params)
+
     def draw_regions(self, graph, **params):
         """
         Draw coloured 0-cell regions, e.g. the background of a
@@ -686,6 +705,9 @@ class Backend(ABC):
         types = [graph.dom, graph.cod]
         for box in graph.boxes:
             types += [box.dom, box.cod]
+            for nested in getattr(box, "nested", None) or ():
+                for name, colour in Backend.region_colours(nested).items():
+                    colours.setdefault(name, colour)
         for typ in types:
             candidates = [getattr(typ, "dom", None), getattr(typ, "cod", None)]
             for obj in getattr(typ, "inside", ()):
@@ -919,7 +941,7 @@ class Backend(ABC):
         when it is dark, see :meth:`Matplotlib.dark_gid`.
         """
         draw_label_anyway = params.get('draw_box_labels', True) and getattr(
-            x, "always_draw_label", False)
+            x.inside[0], "always_draw_label", False) and str(x.inside[0])
         if not params.get('wire_labels', True) and not draw_label_anyway:
             return
         if getattr(x.inside[0], "skip_label", False):
@@ -931,13 +953,18 @@ class Backend(ABC):
         i += pad_i
         j -= pad_j
         fontsize = params.get('fontsize_types', params.get('fontsize', None))
-        background = getattr(x, "cod", None)
+        background = self.label_background(x)
         adaptive = background is None
         color = self.readable_foreground(
             "white" if adaptive else background.name)
         self.draw_text(
             label, i, j, verticalalignment='top', fontsize=fontsize,
             color=color, adaptive=adaptive)
+
+    @staticmethod
+    def label_background(typ):
+        """ The region a wire label is drawn on, the one to its right. """
+        return getattr(typ, "cod", None)
 
     @staticmethod
     def has_boundary_sides(typ):
@@ -965,6 +992,14 @@ class Backend(ABC):
         return typ is not None and getattr(
             typ.inside[0], "frame_boundary", False)
 
+    @staticmethod
+    def same_colour_on_both_sides(typ):
+        """ Whether the regions on either side of a wire have one colour. """
+        if typ is None or not typ.inside:
+            return True
+        x = typ.inside[0]
+        return str(getattr(x, "dom", None)) == str(getattr(x, "cod", None))
+
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
         for node in graph.nodes:
@@ -977,9 +1012,12 @@ class Backend(ABC):
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
-            # The sides of a frame are drawn with zero width.
-            is_frame_boundary = self.is_frame_boundary(source)\
-                or self.is_frame_boundary(target)
+            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
+            # The sides of a frame are drawn with zero width only between two
+            # regions of the same colour, e.g. the slot of an equation's term.
+            is_frame_boundary = (self.is_frame_boundary(source)
+                                 or self.is_frame_boundary(target))\
+                and self.same_colour_on_both_sides(typ)
             if source.kind in ["dom", "box_cod"]:
                 self.draw_wire_label(source.x, *source_position, **params)
             if source_position == target_position:
@@ -988,7 +1026,6 @@ class Backend(ABC):
                    for n in (source, target)):
                 continue  # crossings are drawn on their own
             bend_out, bend_in = source.kind == "box", target.kind == "box"
-            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),
@@ -1008,7 +1045,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cup(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCup` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCup` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cup is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1032,7 +1069,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cap(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCap` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCap` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cap is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1075,11 +1112,11 @@ class Backend(ABC):
         """
         The nodes joined by each rail of a dual rail box, as
         :meth:`crossing_wires` gives the strands of a crossing: a
-        :class:`discopy.balanced.DualRailBraid` sends the ribbon of inputs
+        :class:`~discopy.balanced.DualRailBraid` sends the ribbon of inputs
         ``(0, 1)`` to outputs ``(2, 3)`` and vice-versa, a
-        :class:`discopy.balanced.DualRailTwist` sends each rail back to its
-        own position, a :class:`discopy.ribbon.DualRailCup` (resp.
-        :class:`discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
+        :class:`~discopy.balanced.DualRailTwist` sends each rail back to its
+        own position, a :class:`~discopy.ribbon.DualRailCup` (resp.
+        :class:`~discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
         onto ``3`` and ``1`` onto ``2``, see :meth:`draw_dual_rail_braid`,
         :meth:`draw_dual_rail_twist`, :meth:`draw_dual_rail_cup` and
         :meth:`draw_dual_rail_cap`.
@@ -1139,6 +1176,8 @@ class Backend(ABC):
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
+            if getattr(node.box, "frame_corner", None) is not None:
+                self.draw_frame_corner(graph.positions, node, **params)
             if node.box.draw_as_spider or node.box.draw_as_wires:
                 continue
             for attribute, method in drawing_methods:
@@ -1155,20 +1194,148 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        if box.is_conjugate or box.is_transpose:
-            asymmetry *= -1
-        points[i] = points[i].shift(x=asymmetry)
+        # The cut stops short of the wires, three quarters of the way.
+        wires = [positions[Node(kind, i=k, j=j, x=x)][0]
+                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)]
+                 for k, x in enumerate(xs)]
+        size = min([2 * asymmetry] + [
+            .75 * abs(x - points[i][0]) for x in wires])
+        corners, points = points, self.chop_corner(points, i, size)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
+        label = positions[node]
+        if box.nested is not None:
+            label = self.draw_nested(box, corners, corners[(i + 2) % 4],
+                                     **params)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
-            self.draw_text(box.drawing_name, *positions[node],
+            self.draw_text(box.drawing_name, *label,
                            ha='center', va='center',
                            color=self.readable_foreground(
                                "white" if adaptive else box.color),
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
+
+    def draw_frame_corner(self, positions, node, **params):
+        """
+        Draws the corners of a frame on its top or bottom edge, i.e. the
+        opening or the closing of the bubble its ``box`` draws, as those of a
+        box: the ``frame_corner`` of :meth:`chop_corner` cut off, short of the
+        wires through the edge, and the label ``frame_name`` in the corner
+        opposite. The cut is a line across the corner, with the region
+        outside the frame painted over the corner of the frame.
+        """
+        box, j = node.box, node.j
+        top = self.has_boundary_sides(box.cod)
+        kind, sides = ("box_cod", box.cod) if top else ("box_dom", box.dom)
+        (left, _), (right, _) = (positions[Node(kind, i=k, j=j, x=sides[k])]
+                                 for k in (0, len(sides) - 1))
+        y = positions[node].y
+        through, kind_through = (box.dom, "box_dom") if top\
+            else (box.cod, "box_cod")
+        wires = [positions[Node(kind_through, i=k, j=j, x=x)].x
+                 for k, x in enumerate(through)]
+        corners = {0: (left, y), 1: (left, y), 2: (right, y), 3: (right, y)}
+        on_edge = (1, 2) if top else (0, 3)
+        inward = -1 if top else 1
+        cut, label = box.frame_corner, (box.frame_corner + 2) % 4
+        canvas = params.get('boundary_color')
+        outside = getattr(sides.inside[0].dom if cut < 2
+                          else sides.inside[-1].cod, "name", None) or (
+            "white" if canvas is None or self.is_transparent(canvas)
+            else canvas)
+        if cut in on_edge:
+            cx, cy = corners[cut]
+            dx = 1 if cut < 2 else -1
+            size = min([2 * params.get('asymmetry', 0), (right - left) / 2]
+                       + [.75 * abs(x - cx) for x in wires])
+            if size:
+                eps, a, b = .05, Point(cx + dx * size, cy), Point(
+                    cx, cy + inward * size)
+                self.draw_polygon(
+                    a, a.shift(y=-inward * eps),
+                    Point(cx - dx * eps, cy - inward * eps),
+                    b.shift(x=-dx * eps), b,
+                    facecolor=outside, edgecolor=TRANSPARENT)
+                self.draw_polygon(a, b, facecolor=TRANSPARENT)
+        if label in on_edge and box.frame_name\
+                and params.get('draw_box_labels', True):
+            lx, ly = corners[label]
+            dx = text_width(box.frame_name) / 2 + .125
+            inside = getattr(sides.inside[0].cod, "name", None)
+            self.draw_text(
+                box.frame_name, lx + (dx if label < 2 else -dx),
+                ly + inward * .25, ha='center', va='center',
+                color=self.readable_foreground(inside or "white"),
+                fontsize=params.get('fontsize', None),
+                adaptive=inside is None)
+
+    @staticmethod
+    def chop_corner(points, i, size):
+        """
+        A polygon with its ``i``-th corner cut off, ``size`` along both of
+        its sides or half the shorter side, e.g. to tell a box from its
+        dagger, its transpose and its conjugate.
+
+        >>> square = [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)]
+        >>> Backend.chop_corner(square, 2, .25)[1:4]
+        [Point(x=0, y=1), Point(x=0.75, y=1.0), Point(x=1.0, y=0.75)]
+        """
+        if not size:
+            return points
+        points = [Point(*point) for point in points]
+        corner, neighbours = points[i], (
+            points[i - 1], points[(i + 1) % len(points)])
+        lengths = [sqrt((p.x - corner.x) ** 2 + (p.y - corner.y) ** 2)
+                   for p in neighbours]
+        size = min(size, *(length / 2 for length in lengths))
+
+        def towards(point):
+            dx, dy = point.x - corner.x, point.y - corner.y
+            length = sqrt(dx * dx + dy * dy)
+            return corner.shift(x=dx * size / length, y=dy * size / length)
+        return points[:i] + [towards(points[i - 1]), towards(
+            points[(i + 1) % len(points)])] + points[i + 1:]
+
+    def draw_nested(self, box, corners, corner, **params):
+        """
+        Draw the drawings nested in a box left to right, one under the other,
+        each on a slot of the box's ``frame_colour``, see :class:`Transposed`,
+        centred in the box, and return the centre of the box's label, in the
+        given ``corner``: the one opposite its cut corner, i.e. its top left
+        but for its variants. Their wires plug into the edges of their slots,
+        with a margin of the box's colour between one and the next. They are
+        reflected, turned and reordered as the box is: a dagger reflects them
+        along the horizontal axis, the last on top, a conjugate along the
+        vertical one, and a transpose turns them half way round.
+        """
+        nested, margin = box.nested, DEFAULT["nested_margin"]
+        width = sum(drawing.width for drawing in nested)\
+            + margin * (len(nested) - 1)
+        height = max(drawing.height for drawing in nested)
+        left, right = min(x for x, _ in corners), max(x for x, _ in corners)
+        bottom, top = min(y for _, y in corners), max(y for _, y in corners)
+        x, y = (left + right - height) / 2, (bottom + top - width) / 2
+        # The reflection along the horizontal axis of a dagger, along the
+        # vertical one of a conjugate and along both, a half turn, of a
+        # transpose.
+        flip = not box.is_conjugate and bool(box.is_dagger or box.is_transpose)
+        turn, offset = bool(box.is_conjugate or box.is_transpose), 0
+        for drawing in nested:
+            low = y + offset if flip else y + width - offset - drawing.width
+            self.draw_polygon(
+                (x, low), (x + height, low), (x + height, low + drawing.width),
+                (x, low + drawing.width), facecolor=box.frame_colour)
+            Transposed(self, Point(x, low), drawing, flip=flip, reverse=turn)\
+                .draw_drawing(drawing, **params)
+            offset += drawing.width + margin
+        # The label lies in the band between the slots and the box's side.
+        dx = text_width(box.drawing_name) / 2 + .125
+        dy = (top - bottom - width) / 4
+        (cx, cy) = corner
+        return Point(cx + (dx if cx == left else -dx),
+                     cy + (dy if cy == bottom else -dy))
 
     @staticmethod
     def triangle_corners(positions, node):
@@ -1216,7 +1383,7 @@ class Backend(ABC):
             Point(x, apex) for x in reversed(tips)]
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Discard` box. """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         for i in range(len(box.dom)):
@@ -1231,7 +1398,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -1243,7 +1410,7 @@ class Backend(ABC):
 
     def draw_dual_rail_braid(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailBraid`, i.e. the two ribbons
+        Draws a :class:`~discopy.balanced.DualRailBraid`, i.e. the two ribbons
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1269,7 +1436,7 @@ class Backend(ABC):
 
     def draw_dual_rail_twist(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailTwist`, i.e. the two rails of
+        Draws a :class:`~discopy.balanced.DualRailTwist`, i.e. the two rails of
         a ribbon crossing each other twice in quick succession.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1342,7 +1509,7 @@ class Backend(ABC):
                                    adaptive=color is None)
 
     def draw_brakets(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Ket` box. """
+        """ Draws a :class:`~discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
         is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
@@ -1364,7 +1531,7 @@ class Backend(ABC):
                 fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
+        """ Draws a :class:`~discopy.quantum.gates.Controlled` gate. """
         box, j = node.box, node.j
         distance = box.distance
         c_size = len(box.controlled.dom)
@@ -1450,6 +1617,157 @@ class Backend(ABC):
             nodesize=params.get("nodesize", 1), adaptive=True)
 
 
+class Transposed(Backend):
+    """
+    A backend that draws left to right on another one, through the
+    reflection along the anti-diagonal of a drawing :math:`w \\times h`
+
+    .. math::
+
+        (x, y) \\mapsto (h - y, w - x)
+
+    which takes its domain to the left, its codomain to the right and its
+    first wire to the top, then moves it to ``origin``. Wires, regions and
+    boxes are Beziers and polygons, whose image under an affine map is the
+    curve of the images of their control points, so the layout of the
+    drawing is kept as it is and only its picture is transposed. Labels stay
+    upright, and drawing on a transposed backend transposes back.
+
+    Parameters:
+        parent : The backend to draw on.
+        origin : The bottom left corner of the transposed drawing.
+        graph : The drawing, for its width and height.
+        flip : Whether to reflect the transposed drawing along the
+            horizontal axis too, e.g. inside a reflected box.
+        reverse : Whether to reflect it along the vertical axis too, so
+            that it goes from right to left, e.g. with ``flip`` it is turned
+            half way round inside a transposed box.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> (Box('f', Ty(), x) >> Box('g', x, x @ x)).draw(
+    ...     left_to_right=True,
+    ...     doctest="docs/_static/drawing/left-to-right.svg")
+
+    .. image:: /_static/drawing/left-to-right.svg
+        :align: center
+    """
+    def __init__(self, parent: Backend, origin: Point, graph: Drawing,
+                 flip=False, reverse=False):
+        self.parent, self.origin, self.flip = parent, origin, flip
+        self.reverse = reverse
+        self.textpad, self.lift = DEFAULT["textpad"][0], False
+        self.width, self.height = graph.width, graph.height
+        super().__init__()
+
+    def map(self, point) -> Point:
+        """ The image of a point of the drawing on the parent backend. """
+        x, y = point
+        return Point(self.origin.x + (y if self.reverse else self.height - y),
+                     self.origin.y + (x if self.flip else self.width - x))
+
+    def draw_boundary(self, graph, *args, **params):
+        self.parent.draw_boundary(
+            SimpleNamespace(width=self.height, height=self.width),
+            *args, **params)
+
+    @property
+    def turns(self) -> int:
+        """ The number of transpositions this backend draws through, two of
+        which cancel out, e.g. top-to-bottom args in a left-to-right box. """
+        return 1 + getattr(self.parent, "turns", 0)
+
+    def compose(self, point) -> tuple[Point, Backend]:
+        """ The image of a point through every transposition drawn through,
+        and the backend they draw on. """
+        point, canvas = self.map(point), self.parent
+        while isinstance(canvas, Transposed):
+            point, canvas = canvas.map(point), canvas.parent
+        return point, canvas
+
+    def cod_is_after(self) -> bool:
+        """ Whether the region right of a wire, its ``cod``, ends up above
+        it on the page, or right of it when the turns cancel out. """
+        (x0, y0), _ = self.compose((0, 0))
+        (x1, y1), _ = self.compose((1, 0))
+        return (y1 > y0) if self.turns % 2 else (x1 > x0)
+
+    def label_background(self, typ):
+        """ The region a wire label lies on: the side of its wire it is
+        lifted to, else its ``cod`` as when no turn is drawn through. """
+        return getattr(typ, "cod" if self.cod_is_after() or not self.lift
+                       else "dom", None)
+
+    def draw_wire_label(self, x, i, j, **params):
+        self.textpad = params.get("textpad", DEFAULT["textpad"])[0]
+        # The name of a bubble labels its left side, which turns into its
+        # top or, reflected, its bottom: it stays inside, the side of its cod.
+        is_name = getattr(x.inside[0], "always_draw_label", False)
+        self.lift = self.turns % 2 and (
+            not is_name or self.cod_is_after())
+        super().draw_wire_label(x, i, j, **params)
+
+    def draw_text(self, text, i, j, **params):
+        point, canvas = self.compose((i, j))
+        if params.get("verticalalignment") == "top" and self.lift:
+            # A wire label hangs below its point, a textpad off its wire:
+            # stand it on a point the textpad above the wire instead, so
+            # that each backend lifts it by its own font size.
+            if not self.cod_is_after():
+                point = point.shift(y=2 * self.textpad)
+            params = dict(params, verticalalignment="bottom")
+            # A label hangs along its wire, away from where it starts.
+            (x0, _), _ = self.compose((0, 0))
+            (x1, _), _ = self.compose((0, 1))
+            if x1 > x0:
+                params["horizontalalignment"] = "right"
+        canvas.draw_text(text, *point, **params)
+
+    def draw_node(self, i, j, **params):
+        self.parent.draw_node(*self.map((i, j)), **params)
+
+    def draw_polygon(self, *points, **params):
+        self.parent.draw_polygon(*map(self.map, points), **params)
+
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def draw_wire(self, source, target, bend_out=False, bend_in=False,
+                  style=None, linewidth=None, adaptive=True):
+        """ Draw the curve :class:`Matplotlib` draws, as a cubic Bezier,
+        since other backends bend wires vertically. """
+        if linewidth == 0:
+            return
+        if style is not None:  # e.g. the arrow of a measure, straight
+            self.parent.draw_wire(
+                self.map(source), self.map(target), style=style,
+                linewidth=linewidth, adaptive=adaptive)
+            return
+        source, target = Point(*source), Point(*target)
+        middle = Point(target.x, source.y) if bend_out\
+            else Point(source.x, target.y)
+        self.draw_bezier(self.cubic([source, middle, target]), adaptive)
+
+    def draw_bezier(self, points, adaptive=True):
+        self.parent.draw_bezier(list(map(self.map, points)), adaptive)
+
+    def draw_filled_shape(self, start, steps, color):
+        self.parent.draw_filled_shape(self.map(start), [
+            (kind, *map(self.map, points)) for kind, *points in steps], color)
+
+    def draw_region_cell(self, left, right, facecolor):
+        self.parent.draw_region_cell(
+            list(map(self.map, left)), list(map(self.map, right)), facecolor)
+
+    def draw_spiders(self, graph, draw_box_labels=True, **params):
+        self.parent.draw_spiders(graph.relabel_nodes(positions={
+            node: self.map(point) for node, point in graph.positions.items()
+        }), draw_box_labels, **params)
+
+    def output(self, path=None, show=True, **params):
+        return self.parent.output(path, show, **params)
+
+
 class TikZ(Backend):
     """ Tikz drawing backend. """
     #: The size in points of the label of a box, and of a wire one size down.
@@ -1460,7 +1778,7 @@ class TikZ(Backend):
         """
         The length of one unit of a drawing, at which the label of a box fits
         it: the layout measures a label at twelve points in inches, see
-        :func:`discopy.utils.text_width`, and TikZ sets it at
+        :func:`~discopy.utils.text_width`, and TikZ sets it at
         :attr:`LABEL_SIZE` points.
 
         >>> TikZ.unit()
@@ -1600,13 +1918,17 @@ class TikZ(Backend):
         fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
         """
-        is_wire_label = params.get("verticalalignment", "center") == "top"
+        alignment = params.get("verticalalignment", "center")
+        is_wire_label = alignment in ("top", "bottom")
         options = "style=none" + (
             ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west"
+            vertical = "north" if alignment == "top" else "south"
+            horizontal = "east" if params.get(
+                "horizontalalignment") == "right" else "west"
+            options += f", anchor={vertical} {horizontal}"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -1860,11 +2182,10 @@ class Typst(Backend):
         """
         max_v = max(graph.height, graph.width, 0.01)
         self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
-        self.draw_boundary(graph, **params)
-        self.draw_regions(graph, **params)
-        self.draw_wires(graph, **params)
-        self.draw_boxes(graph, **params)
-        self.draw_spiders(graph, **params)
+        canvas = Transposed(self, Point(0, 0), graph)\
+            if params.get("left_to_right", False) else self
+        canvas.draw_boundary(graph, **params)
+        canvas.draw_drawing(graph, **params)
         return self
 
     @staticmethod
@@ -1920,8 +2241,12 @@ class Typst(Backend):
         # Wire labels use va='top' (see draw_wire_label); park them to the
         # right of the wire like TikZ's ``anchor=west``, so the stroke does
         # not strike through the glyph.
+        side = "east" if params.get("horizontalalignment") == "right"\
+            else "west"
         if params.get("verticalalignment", "center") == "top":
-            extra["anchor"] = Str("west")
+            extra["anchor"] = Str(side)
+        elif params.get("verticalalignment", "center") == "bottom":
+            extra["anchor"] = Str(f"south-{side}")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)
@@ -2067,7 +2392,7 @@ class Typst(Backend):
         matplotlib draws it: a square, a triangle pointing up or down, a
         plus sign in its colour or else a disc. Nothing when its colour is
         transparent: such a spider is just its label, e.g. the symbol of an
-        :class:`discopy.monoidal.Equation`.
+        :class:`~discopy.monoidal.Equation`.
 
         >>> from discopy.frobenius import Ty, Spider
         >>> spider = Spider(1, 1, Ty('x'))
@@ -2353,7 +2678,7 @@ class Matplotlib(Backend):
         Draws the spiders, grouped by shape and by whether they adapt to a
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
-        its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+        its label, e.g. the symbol of an :class:`~discopy.monoidal.Equation`,
         which leaves no patch on a coloured page. The labels are drawn at
         ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """

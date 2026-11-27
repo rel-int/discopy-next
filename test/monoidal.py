@@ -558,15 +558,16 @@ def test_Bubble_dagger():
 def test_Bubble_every_level():
     from discopy import (
         spacial, feedback, braided, balanced, symmetric, markov, comarkov,
-        biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
+        closed, rigid, pivotal, ribbon, compact, frobenius)
     from discopy.lambek import pregroup, categorial, abstract
     for module in (
             spacial, feedback, braided, balanced, symmetric, markov,
-            comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
-            frobenius, pregroup, categorial, abstract):
-        assert module.Diagram.bubble_factory is module.Bubble, module
+            comarkov, closed.monoidal, closed.symmetric, closed.markov,
+            rigid, pivotal, ribbon, compact, frobenius, pregroup, categorial,
+            abstract):
         x, y = module.Ty('x'), module.Ty('y')
         bubble = module.Box('f', x, y).bubble(name="N")
+        assert type(bubble) is module.Box and bubble.args, module
         diagram = bubble >> module.Box('h', y, y)
         assert isinstance(diagram, module.Diagram) and diagram.cod == y
         assert module.Functor.id(module.Diagram)(diagram) == diagram
@@ -582,7 +583,7 @@ def test_Bubble_data():
     named = f.bubble(name="b", method="frame")
     for b in (from_tree(named.to_tree()), loads(dumps(named))):
         assert b == named and (b.name, b.method) == ("b", "frame")
-    assert "method" not in bubble.to_tree() and "name" not in bubble.to_tree()
+    assert "method" not in bubble.to_tree() and not bubble.to_tree()["name"]
     from discopy import monoidal
     assert (eval(repr(bubble)).data, eval(repr(bubble)).is_dagger) == (42, True)
 
@@ -594,8 +595,6 @@ def test_Bubble_identity_Functor():
     image = Functor.id(Diagram)(bubble)
     assert image == bubble and (image.drawing_name, image.draw_as_frame)\
         == ("L", True) and (image.data, image.is_dagger) == (42, True)
-    empty = Bubble(dom=Ty('x'), cod=Ty('y'))
-    assert Functor.id(Diagram)(empty) == empty
 
 
 def test_Box_globularity():
@@ -1219,8 +1218,7 @@ def test_box_factory():
     circuits and the networks. """
     from discopy import (
         cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
-        pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
-        tensor)
+        pivotal, ribbon, closed, compact, frobenius, feedback, tensor)
     from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
@@ -1229,8 +1227,9 @@ def test_box_factory():
     assert network.Network.box_factory is network.Box
     for module in (
             monoidal, braided, balanced, symmetric, traced, markov, rigid,
-            pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
-            tensor, categorial, abstract, pregroup, zx):
+            pivotal, ribbon, closed.monoidal, closed.symmetric,
+            closed.markov, compact, frobenius, feedback, tensor, categorial,
+            abstract, pregroup, zx):
         assert module.Diagram.box_factory is module.Box, module
 
 
@@ -1339,13 +1338,13 @@ def test_one_output():
 
 
 def test_pack():
-    X, Y, Z = map(closed.Ty, "XYZ")
-    left, right = closed.Box('f', X, Y), closed.Box('g', X, Z)
+    X, Y, Z = map(closed.markov.Ty, "XYZ")
+    left, right = closed.markov.Box('f', X, Y), closed.markov.Box('g', X, Z)
     with raises(ValueError):
         TermBase.from_diagram(left @ right)
-    diagram = left @ right >> closed.Pack(Y * Z)
+    diagram = left @ right >> closed.markov.Pack(Y * Z)
     term = TermBase.from_diagram(diagram)
-    assert term.eval() == diagram and term.category is closed.Diagram
+    assert term.eval() == diagram and term.category is closed.markov.Diagram
     assert str(term.normal_form())\
         == "(X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))"
 
@@ -1547,3 +1546,32 @@ def test_laws():
     term = find(TermBase.strategy(), lambda term: term.stack and "let" in str(
         term))
     assert all(law(term) for law in laws)
+
+
+def test_Functor_reads_a_higher_level_type_as_itself():
+    """ A functor of a lower level than the types of a box reads each of them
+    as itself, so that its images compose and a dict keyed on the type finds
+    it (next#703). """
+    from discopy import rigid, symmetric
+    for x in (rigid.Ty('x'), symmetric.Ty('x')):
+        f, F = Box('f', x, x), Functor.id(Diagram)
+        assert F(x) == x and F(f).dom == F(f.dom) and F(f >> f) == f >> f
+        assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
+    G = rigid.Functor({rigid.Ty('y'): rigid.Ty('z')}, {})
+    F = Functor(lambda _: G(rigid.Wire('y')), {})  # G reads its own level
+    assert F(Ty('x')) == rigid.Ty('z')
+
+
+def test_box_with_args_keeps_its_drawing_name():
+    f = Box('f', Ty('x'), Ty('x'))
+    bubble = f.bubble(drawing_name="g")
+    assert bubble[::-1].drawing_name == "g"
+    assert bubble[::-1][::-1].drawing_name == "g"
+    assert bubble.rebuild(drawing_name="").drawing_name == ""
+
+
+def test_rebuild_keeps_a_name_derived_from_new_data():
+    from pytest import importorskip
+    phi = importorskip("sympy.abc").phi
+    from discopy.quantum.zx import Scalar
+    assert Scalar(phi).lambdify(phi)(2).drawing_name == Scalar(2).drawing_name

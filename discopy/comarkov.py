@@ -20,11 +20,6 @@ Summary
     Permutation
     Merge
     Noise
-    Feedback
-    Trace
-    FollowedBy
-    Head
-    Tail
     Functor
     TermBase
     Variable
@@ -73,11 +68,12 @@ from collections.abc import Sized
 from operator import index
 from typing import ClassVar
 
-from discopy import (
-    symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy import symmetric, monoidal, cmap, hypergraph, messages, op
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
 from discopy.cat import factory, kappa_calculus
-from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
+from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
@@ -89,7 +85,7 @@ class Layer(symmetric.Layer):
     """
     A tensor product of generators and non-empty plumbing, where plumbing is
     a type when it is the identity and a :class:`Cofunction` otherwise, i.e.
-    merges, noise and permutations, the dual of :class:`discopy.markov.Layer`.
+    merges, noise and permutations, the dual of :class:`~discopy.markov.Layer`.
 
     Parameters:
         inside : Generators and plumbing, with at least one generator or one
@@ -121,6 +117,12 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
 
     map_agreement = monoidal.Diagram.map_agreement.failing(
         messages.MAP_HAS_NO_SPIDERS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.COMARKOV_HAS_NO_DAGGER)
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
@@ -157,7 +159,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         """
         A native :class:`Cofunction` box when the category has a matching
         cofunction factory, its decomposition by
-        :meth:`discopy.abc.ComarkovCategory.cofunction` otherwise. A
+        :meth:`~discopy.abc.ComarkovCategory.cofunction` otherwise. A
         bijection becomes the permutation that undoes it, see
         :meth:`from_permutation`, the identity the identity diagram.
 
@@ -202,7 +204,7 @@ class Cofunction(Box):
     a cofunction holds an arrow of :class:`op.Comarkov[finset.Function]
     <discopy.op.Comarkov>`, the free comarkov category on one object.
 
-    It is the formal reverse of :class:`discopy.markov.Function` with the
+    It is the formal reverse of :class:`~discopy.markov.Function` with the
     same arguments, which is its dagger in a category that is both. A
     :class:`Layer` stores it as plumbing rather than as a generator. A
     bijection constructs a :class:`Permutation`, a cofunction onto one wire
@@ -250,11 +252,11 @@ class Cofunction(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Cofunction(x @ y, [1, 0, 0])
-        >>> assert f.delay() == Cofunction((x @ y).delay(), [1, 0, 0])
+        >>> assert Cofunction(*f.__getnewargs__()) == f
         """
         return self.cod, list(self.cofunc.inside)
 
@@ -295,7 +297,7 @@ class Cofunction(Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a cofunction, see :func:`discopy.utils.dumps`.
+        Serialise a cofunction, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -342,7 +344,7 @@ is not a dagger category.
     def tensor(self, *others):
         """
         Tensoring plumbing with plumbing gives one wider cofunction, the
-        dual of :meth:`discopy.markov.Function.tensor`.
+        dual of :meth:`~discopy.markov.Function.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Merge(x).tensor(y, Noise(x))\\
@@ -388,7 +390,7 @@ class Permutation(symmetric.Permutation, Box):
     """
     A permutation in a comarkov category, i.e. a bijective
     :class:`Cofunction`, registered as a virtual subclass so that it keeps
-    the constructor of :class:`discopy.symmetric.Permutation`: input ``i``
+    the constructor of :class:`~discopy.symmetric.Permutation`: input ``i``
     goes to the output that reads it.
 
     Parameters:
@@ -496,7 +498,7 @@ class Noise(Merge):
     """
     The noise on an atomic type :code:`x`, i.e. the merge of no copy: the
     state every object of a comarkov category carries, dual to the effect
-    :class:`discopy.markov.Discard` every object of a Markov category
+    :class:`~discopy.markov.Discard` every object of a Markov category
     carries. "The time reversal of a causal theory is eternal noise"
     (toumix, 2026-10-17).
 
@@ -529,12 +531,6 @@ class Sum(symmetric.Sum, Box):
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
-    """
-
-
-class Bubble(symmetric.Bubble, Box):
-    """
-    A comarkov bubble is a symmetric bubble and a comarkov box.
     """
 
 
@@ -586,8 +582,6 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -597,7 +591,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.noise_factory = Noise
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -609,3 +602,6 @@ class Equation(symmetric.Equation):
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
     Diagram)
 Term = Variable | Constant | Application | Kappa
+
+
+Bubble = Box.from_args

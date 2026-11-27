@@ -307,3 +307,32 @@ def test_str_transparency_of_a_rotated_box():
         assert box.atoms()[0] == f
         assert Diagram.str_transparency(box)
     assert Diagram.str_transparency(f.l @ f.r >> x.l @ f.r[::-1])
+
+
+def test_rotations_of_a_box_with_args_keep_its_drawing_name():
+    from discopy import rigid
+    x = rigid.Ty('x')
+    W = rigid.Box('f', x, x).bubble(drawing_name="W")
+    for box in (W.r, W.l, W.r.l, W.l.r, W.r[::-1]):
+        assert box.drawing_name == "W"
+
+
+def test_rotations_of_a_box_with_args_turn_its_args():
+    from discopy import rigid
+    x, y = rigid.Ty('x'), rigid.Ty('y')
+    f, g = rigid.Box('f', x, y), rigid.Box('g', y, x)
+
+    def W(dom, cod, *args):
+        return rigid.Box('W', dom, cod, args=args, drawing_name="W")
+    # Drawn as the half turn of its picture: its args turned, in reverse.
+    for turned, args in [(W(x, y, f, g).r, (g.r, f.r)),
+                         (W(x, y, f, g).l, (g.l, f.l)),
+                         (W(x, y, f, g).r.r, (f.r.r, g.r.r))]:
+        assert turned.args == (f, g)
+        assert turned.to_drawing() == W(turned.dom, turned.cod, *args)\
+            .to_drawing()
+    # An arg that cannot turn, e.g. a monoidal box, is drawn as it is.
+    from discopy import monoidal
+    arg = monoidal.Box('f', 'x', 'x')
+    turned = W(x, x, arg).r
+    assert turned.to_drawing() == W(turned.dom, turned.cod, arg).to_drawing()

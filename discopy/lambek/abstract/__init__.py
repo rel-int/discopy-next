@@ -26,13 +26,7 @@ Summary
     Function
     Permutation
     Swap
-    Feedback
-    Trace
-    FollowedBy
-    Head
-    Tail
     Sum
-    Bubble
     Functor
     Lexicon
     TermBase
@@ -54,8 +48,8 @@ Summary
         proofnet
         neural
 
-:mod:`discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
-and is imported here. :mod:`discopy.lambek.abstract.neural` needs PyTorch,
+:mod:`~discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
+and is imported here. :mod:`~discopy.lambek.abstract.neural` needs PyTorch,
 which the ``lambek`` extra installs, so it is not: import it on its own.
 
 Vocabularies and lexicons
@@ -86,7 +80,7 @@ string is a map from positions to positions, a term of type
 ``String = Position >> Position``. A word is a constant of that type, the
 empty string is the identity ``Position(lambda x: x)`` and concatenation is
 composition, ``John.compose(seeks)`` for *John seeks*, see
-:meth:`discopy.closed.TermBase.compose`: the paper writes it
+:meth:`~discopy.closed.markov.TermBase.compose`: the paper writes it
 ``lambda z. x (y z)`` with the first word applied last, here the first word
 is applied first, so a string reads its positions in order.
 
@@ -143,7 +137,7 @@ Categorial grammars
 -------------------
 
 A categorial grammar is a vocabulary of its own, a planar one: a lexicon out
-of it is a :class:`discopy.lambek.categorial.Functor` into abstract terms,
+of it is a :class:`~discopy.lambek.categorial.Functor` into abstract terms,
 sending each atom to a type and each word to a term of the image of its type,
 its strings written per word like every lexicon of the paper.
 :meth:`Diagram.from_categorial` forgets planarity instead, collapsing left and
@@ -201,41 +195,65 @@ adjoint of a forgetful functor, rather than an adjective on a noun:
 DisCoPy diagrams are the arrows of the free monoidal category
 
 The Lean side is Montague's, with Lean as its logic: ``e`` a Lean term, ``t``
-a Lean proposition and ``k`` a Lean structure, the model of ``lean/``. A noun
-phrase is a quantifier, *the free* ``k`` *category* is ``Diagram.k S`` and it
-contributes its universal property, *the arrows of* ``C`` are ``C.Hom`` and
-*are* is an equation:
+a Lean proposition and ``k`` a Lean structure, the model of ``discolean/``.
+A noun phrase holds of two predicates, a weak and a strong one, and a
+determiner picks one of them, the weak one for a bare noun and the strong one
+for *the*. *Are* is the embedding of its subject into its object
+for a bare plural object, *diagrams are arrows of* ``C``, and an equation for
+a definite one, *diagrams are the arrows of* ``C``: *the* takes all of them.
+*The free* ``k`` *category* is ``Diagram.k S``, *free* contributes that a
+functor out of it extends any map of generators and *the* that the extension
+is unique, which is what makes the free category unique:
 
 >>> k = Ty("k")
 >>> StrictMonoidal, StrictPremonoidal = k("StrictMonoidal"), k(
 ...     "StrictPremonoidal")
 >>> diagram, hom, free = e("diagram"), (e >> e)("hom"), (k >> e)("free")
->>> universal, eq = (k >> (e >> t))("universal"), (e >> (e >> t))("eq")
+>>> lift, unique = (k >> (e >> t))("lift"), (k >> (e >> t))("unique")
+>>> eq, embeds = (e >> (e >> t))("eq"), (e >> (e >> t))("embeds")
 >>> and_ = (t >> (t >> t))("and")
+>>> Determiner = Predicate >> (Predicate >> Predicate)
+>>> Phrase = Predicate >> (Predicate >> t)
+>>> Noun = Determiner >> Phrase
+>>> def noun(term):
+...     return Determiner(lambda D: Predicate(lambda P: Predicate(
+...         lambda R: term(D, P, R))))
+>>> def free_category(x, D, P, R):
+...     extends = lift(x)(free(x))
+...     return D(e(lambda c: and_(P(c))(extends)))(e(lambda c: and_(
+...         and_(R(c))(extends))(unique(x)(c))))(free(x))
+>>> def arrows(X, D, P, R):
+...     arrow = e(lambda c: D(P)(R)(hom(c)))
+...     return X(arrow)(arrow)
+>>> def are(O, X):
+...     predicate = e(lambda x: O(e(lambda y: embeds(x)(y)))(
+...         e(lambda y: eq(y)(x))))
+...     return X(predicate)(predicate)
 >>> to_lean = Lexicon(
-...     ob_map={a: k, n: Quantifier, np: Quantifier, s: t},
+...     ob_map={a: k, n: Noun, np: Phrase, s: t},
 ...     ar_map={MONOIDAL: StrictMonoidal, PREMONOIDAL: StrictPremonoidal,
-...             FREE: k(lambda x: Predicate(lambda P: and_(P(free(x)))(
-...                 universal(x)(free(x))))),
-...             DIAGRAMS: Predicate(lambda P: P(diagram)),
-...             DISCOPY: Quantifier(lambda X: X),
-...             ARROWS: Quantifier(lambda X: Predicate(
-...                 lambda P: X(e(lambda c: P(hom(c)))))),
-...             THE: Quantifier(lambda X: X),
-...             BARE: Quantifier(lambda X: X),
-...             ARE: Quantifier(lambda O: Quantifier(lambda X: X(e(
-...                 lambda x: O(e(lambda y: eq(y)(x)))))))})
+...             FREE: k(lambda x: noun(
+...                 lambda D, P, R: free_category(x, D, P, R))),
+...             DIAGRAMS: noun(lambda D, P, R: D(P)(R)(diagram)),
+...             DISCOPY: Noun(lambda N: N),
+...             ARROWS: Phrase(lambda X: noun(
+...                 lambda D, P, R: arrows(X, D, P, R))),
+...             THE: Noun(lambda N: N(Predicate(
+...                 lambda P: Predicate(lambda R: R)))),
+...             BARE: Noun(lambda N: N(Predicate(
+...                 lambda P: Predicate(lambda R: P)))),
+...             ARE: Phrase(lambda O: Phrase(lambda X: are(O, X)))})
 
-``Quantifier`` was ``(e >> t) >> t``, so ``Predicate(lambda P: ...)`` binds a
-predicate. A functor into :class:`discopy.python.Function` prints the Lean,
+``Predicate`` was ``e >> t``, so ``Predicate(lambda P: ...)`` binds a
+predicate. A functor into :class:`~discopy.python.Function` prints the Lean,
 evaluating the lambdas as it goes:
 
->>> UNIVERSAL = '''(∀ (C : {k}) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
+>>> LIFT = '''(∀ (C : {k}) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
 ...     (∀ b, C.dom (ar b) = C.prod ((S.dom b).map ob)) →
 ...     (∀ b, C.cod (ar b) = C.prod ((S.cod b).map ob)) →
 ...     ∃ F : Functor ({c}) C,
-...       (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b)
-...   ∧ ∀ (C : {k}) (F G : Functor ({c}) C),
+...       (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b)'''
+>>> UNIQUE = '''∀ (C : {k}) (F G : Functor ({c}) C),
 ...     (∀ x, F.ob [x] = G.ob [x]) →
 ...     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G'''
 >>> lean = Functor({e: str, t: str, k: str}, {
@@ -244,8 +262,10 @@ evaluating the lambdas as it goes:
 ...     diagram: lambda: "Diagram S",
 ...     hom: lambda: lambda c: f"({c}).Hom",
 ...     free: lambda: lambda x: f"Diagram.{x[6:].lower()} S",
-...     universal: lambda: lambda x: lambda c: UNIVERSAL.format(k=x, c=c),
+...     lift: lambda: lambda x: lambda c: LIFT.format(k=x, c=c),
+...     unique: lambda: lambda x: lambda c: UNIQUE.format(k=x, c=c),
 ...     eq: lambda: lambda x: lambda y: f"{x} = {y}",
+...     embeds: lambda: lambda x: lambda y: f"Nonempty ({x} ↪ {y})",
 ...     and_: lambda: lambda p: lambda q: f"{p}\\n  ∧ {q}"}, cod=Function)
 >>> print(lean(to_lean(sentence(MONOIDAL)))())
 (Diagram.monoidal S).Hom = Diagram S
@@ -258,11 +278,12 @@ evaluating the lambdas as it goes:
     (∀ x, F.ob [x] = G.ob [x]) →
     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
 
-That statement does not elaborate: ``lean/`` has no ``StrictMonoidal``, and its
-``not_monoidal`` says why, two boxes side by side are two diagrams, as the
-tensor of diagrams does the first one first. DisCoPy diagrams are the arrows
-of the free *premonoidal* category, which ``lean/Statements/English.lean``
-proves in the words the grammar prints:
+That statement does not elaborate: ``discolean/`` has no ``StrictMonoidal``,
+and its ``not_monoidal`` says why, two boxes side by side are two diagrams, as
+the tensor of diagrams does the first one first. DisCoPy diagrams are the
+arrows of the free *premonoidal* category, which
+``discolean/DisCoLean/Statements/English.lean`` proves in the words the
+grammar prints:
 
 >>> print(*words(english(sentence(PREMONOIDAL)))()([]))
 DisCoPy diagrams are the arrows of the free premonoidal category
@@ -276,19 +297,59 @@ DisCoPy diagrams are the arrows of the free premonoidal category
   ∧ ∀ (C : StrictPremonoidal) (F G : Functor (Diagram.premonoidal S) C),
     (∀ x, F.ob [x] = G.ob [x]) →
     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
+
+From Lean to English
+--------------------
+
+The same two lexicons read the other way explain a Lean statement in English:
+parse it with the Lean side, :meth:`Lexicon.parse`, and print its parses with
+the English side. Lean picks the articles of the object, *the arrows of the
+free* category being an equation and a uniqueness, but not that of the
+subject, *diagrams* being ``Diagram S`` either way, and it has nothing for
+*DisCoPy*, which goes to the identity, so that a statement has as many
+readings as the depth lets that word repeat:
+
+>>> theorem = lean(to_lean(sentence(PREMONOIDAL)))()
+>>> readings = to_lean.parse(theorem, s, 6, lean)
+>>> explanations = [" ".join(words(english(r))()([])) for r in readings]
+>>> len(explanations)
+8
+>>> print(explanations[0])
+the diagrams are the arrows of the free premonoidal category
+
+:meth:`Lexicon.likelihood` picks one, the most likely under a model of
+derivations counted in a treebank, here the one sentence about monoidal
+categories: it has seen *DisCoPy* once after a bare noun and never after
+itself, nor *the* in the subject, and never *premonoidal*, which every
+reading shares.
+
+>>> treebank = [sentence(MONOIDAL)]
+>>> best = max(readings, key=lambda r: to_lean.likelihood(r, treebank))
+>>> print(*words(english(best))()([]))
+DisCoPy diagrams are the arrows of the free premonoidal category
+
+Only the kind tells the statements apart, so the one Lean refutes reads back
+as the same paraphrases with *monoidal*:
+
+>>> refuted = lean(to_lean(sentence(MONOIDAL)))()
+>>> assert sorted(" ".join(words(english(r))()([]))
+...               for r in to_lean.parse(refuted, s, 6, lean)) == sorted(
+...     x.replace("premonoidal", "monoidal") for x in explanations)
 """
 
 from __future__ import annotations
 
+from collections import Counter
+from math import log
 from typing import ClassVar
 
-from discopy import closed, feedback, cmap, hypergraph
+from discopy import closed, cmap, hypergraph
 from discopy.cat import factory
 from discopy.lambek import categorial
 
 
 @factory
-class Ty(closed.Ty):
+class Ty(closed.markov.Ty):
     "An implicative type, the type of an abstract categorial grammar."
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
@@ -307,14 +368,14 @@ class Ty(closed.Ty):
         return cls.from_biclosed(old)
 
 
-class Exp(closed.Exp):
+class Exp(closed.markov.Exp):
     "An exponential object in an abstract categorial grammar."
 
     ob = Ty
 
 
 @factory
-class Diagram(closed.Diagram):
+class Diagram(closed.markov.Diagram):
     """
     An abstract diagram is a closed diagram with words as boxes, i.e. a
     derivation in an abstract categorial grammar.
@@ -337,7 +398,6 @@ class Diagram(closed.Diagram):
     curry_factory: ClassVar[type["Curry"]]
     eval_factory: ClassVar[type["Eval"]]
     coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
     discard_factory: ClassVar[type["Discard"]]
     sum_factory: ClassVar[type["Sum"]]
     ob = Ty
@@ -410,66 +470,57 @@ class Diagram(closed.Diagram):
         return functor(diagram)
 
 
-class Box(closed.Box, Diagram):
+class Box(closed.markov.Box, Diagram):
     "An abstract box is a closed box in an abstract diagram."
 
 
-class Eval(closed.Eval, Box):
+class Eval(closed.markov.Eval, Box):
     "The evaluation of an exponential type."
 
 
-class Coeval(closed.Coeval, Box):
+class Coeval(closed.markov.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
 
 
-class Curry(closed.Curry, Box):
+class Curry(closed.markov.Curry, Box):
     "The currying of an abstract diagram."
 
 
-class Copy(closed.Copy, Box):
+class Copy(closed.markov.Copy, Box):
     "The copy of an abstract type, or its discard when ``n=0``."
 
 
-class Discard(closed.Discard, Copy):
+class Discard(closed.markov.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
-class Function(closed.Function, Box):
+class Function(closed.markov.Function, Box):
     """
     A markov function in an abstract diagram, which copies or discards, so
     that plumbing tensors into a function of this level rather than of
-    :mod:`discopy.closed`.
+    :mod:`~discopy.closed`.
 
     >>> x = Ty('x')
     >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x
     """
 
 
-class Permutation(closed.Permutation, Box):
+class Permutation(closed.markov.Permutation, Box):
     "A permutation of abstract types."
 
 
 Function.register(Permutation)
 
 
-class Swap(Permutation, closed.Swap, Box):
+class Swap(Permutation, closed.markov.Swap, Box):
     "The symmetric swap of two abstract types."
 
 
-class Sum(closed.Sum, Box):
+class Sum(closed.markov.Sum, Box):
     "A formal sum of abstract diagrams."
 
 
-class Bubble(closed.Bubble, Box):
-    """
-    An abstract bubble is a closed bubble and an abstract box.
-
-    >>> A = Ty('A')
-    >>> assert (Box('f', A, A).bubble() >> Box('g', A, A)).cod == A
-    """
-
-
-class Functor(closed.Functor):
+class Functor(closed.markov.Functor):
     """
     An abstract functor is a closed functor with abstract diagrams as domain.
 
@@ -510,40 +561,166 @@ class Lexicon(Functor):
     """
     dom = cod = Diagram
 
+    def parse(self, target, start: Ty, depth: int,
+              functor: closed.markov.Functor) -> list[Term]:
+        """
+        The abstract terms of type ``start``, with constants nested at most
+        ``depth`` deep, that the lexicon then ``functor`` send to ``target``:
+        parsing inverts a lexicon, and gives a list since a lexicon need not
+        be injective, de Groote's section 5.
+
+        The terms are generated from the constants of the lexicon, its
+        ``ar_map`` being a mapping, and evaluated bottom up: ``functor`` sends
+        the image of each constant to a :class:`~discopy.python.Function` once,
+        and the value of an application is the application of their values,
+        since a functor preserves it, unpacked when the argument is several
+        wires. The terms are constants applied to such terms, with no
+        abstraction: a higher-order lexicon, e.g. a tree-adjoining grammar
+        with an argument ``lambda x: B(x)(C)``, has parses it does not find.
+
+        Parameters:
+            target : The value to parse, e.g. a string.
+            start : The abstract type of the terms, e.g. sentences.
+            depth : The largest number of nested constants.
+            functor : A functor into :class:`~discopy.python.Function`.
+
+        Example
+        -------
+        >>> from discopy.python import Function
+        >>> n, s, e, t = map(Ty, "nset")
+        >>> bank, shore, visit = n("bank"), n("shore"), (n >> s)("visit")
+        >>> RIVER, VISIT = e("RIVER"), (e >> t)("VISIT")
+        >>> semantics = Lexicon(ob_map={n: e, s: t}, ar_map={
+        ...     bank: RIVER, shore: RIVER, visit: VISIT})
+        >>> show = Functor({e: str, t: str}, {
+        ...     RIVER: lambda: "river", VISIT: lambda: lambda x: f"visit {x}"},
+        ...     cod=Function)
+        >>> print(*semantics.parse("visit river", s, 2, show), sep="\\n")
+        visit(bank)
+        visit(shore)
+        """
+        values = {constant: functor(self(constant))()
+                  for constant in self.ar_map.mapping}
+        language: dict[tuple[Ty, int], list] = {}
+        wires: dict[Ty, int] = {}
+
+        def terms(cod, n):
+            if (cod, n) not in language:
+                language[cod, n] = [] if n <= 0 else [
+                    pair for constant, value in values.items()
+                    for pair in applied(constant, value, constant.cod, cod, n)]
+            return language[cod, n]
+
+        def applied(term, value, dom, cod, n):
+            if dom == cod:
+                yield term, value
+            if len(dom) == 1 and isinstance(
+                    exp := dom.inside[0], closed.markov.Exp):
+                if exp.exponent not in wires:
+                    wires[exp.exponent] = len(functor(self(exp.exponent)))
+                for arg, arg_value in terms(exp.exponent, n - 1):
+                    yield from applied(term(arg), value(
+                        *arg_value) if wires[exp.exponent] != 1
+                        else value(arg_value), exp.base, cod, n)
+        return [term for term, value in terms(start, depth)
+                if value == target]
+
+    @staticmethod
+    def productions(term: closed.markov.Term,
+                    parent: closed.markov.Term | None = None,
+                    position: int = 0):
+        """
+        The productions of a derivation, i.e. of a term of constants applied
+        to such terms: for each constant, its parent, its position among the
+        arguments of the parent and itself, the root having no parent.
+
+        Parameters:
+            term : The derivation.
+            parent : The constant the term is an argument of.
+            position : Its position among the arguments of the parent.
+
+        Example
+        -------
+        >>> n, s = Ty("n"), Ty("s")
+        >>> Alice, sleeps = n("Alice"), (n >> s)("sleeps")
+        >>> assert list(Lexicon.productions(sleeps(Alice))) == [
+        ...     (None, 0, sleeps), (sleeps, 0, Alice)]
+        """
+        args = []
+        while isinstance(term, Application):
+            term, args = term.function, [term.argument] + args
+        yield parent, position, term
+        for i, arg in enumerate(args):
+            yield from Lexicon.productions(arg, term, i)
+
+    def likelihood(self, term: Term, treebank: list[Term],
+                   smoothing: float = 0.1) -> float:
+        """
+        The log-likelihood of a derivation, where each argument of a constant
+        is headed by a constant with a probability given by the parent and
+        the position, i.e. a probabilistic grammar of the derivations of the
+        lexicon, estimated by counting in a treebank with Lidstone smoothing
+        over the constants of the lexicon. Conditioning on the parent is what
+        makes a word likely once and unlikely after itself, which a weight
+        per constant cannot.
+
+        Parameters:
+            term : The derivation, see :meth:`productions`.
+            treebank : The derivations to count.
+            smoothing : The count added to every production.
+
+        Example
+        -------
+        >>> n, s = Ty("n"), Ty("s")
+        >>> Alice, Bob, sleeps = n("Alice"), n("Bob"), (n >> s)("sleeps")
+        >>> lexicon = Lexicon({n: n, s: s}, {Alice: Alice, Bob: Bob,
+        ...                                 sleeps: sleeps})
+        >>> treebank = [sleeps(Alice), sleeps(Alice), sleeps(Bob)]
+        >>> assert lexicon.likelihood(sleeps(Alice), treebank)\\
+        ...     > lexicon.likelihood(sleeps(Bob), treebank)
+        """
+        counts = Counter(production for derivation in treebank
+                         for production in self.productions(derivation))
+        totals = Counter((parent, position)
+                         for parent, position, _ in counts.elements())
+        size = len(self.ar_map.mapping)
+        return sum(
+            log((counts[parent, position, head] + smoothing)
+                / (totals[parent, position] + smoothing * size))
+            for parent, position, head in self.productions(term))
+
 
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, closed.TermBase):
+class TermBase(Box, closed.markov.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
-    strategy = classmethod(closed.TermBase.strategy.__func__)
+    strategy = classmethod(closed.markov.TermBase.strategy.__func__)
 
 
-class Constant(TermBase, closed.Constant):
+class Constant(TermBase, closed.markov.Constant):
     "A constant of the vocabulary of an abstract categorial grammar."
 
 
 Word = Constant
 
 
-class Variable(TermBase, closed.Variable):
+class Variable(TermBase, closed.markov.Variable):
     "A variable term in an abstract categorial grammar."
 
 
-class Application(TermBase, closed.Application):
+class Application(TermBase, closed.markov.Application):
     "The application of an abstract term to another."
 
 
-class Abstraction(TermBase, closed.Abstraction):
+class Abstraction(TermBase, closed.markov.Abstraction):
     "The abstraction of a variable in an abstract term."
 
 
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function
@@ -554,13 +731,15 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
 Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Hypergraph = hypergraph.Hypergraph[Diagram]
+for law in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(Hypergraph, law, vars(closed.markov.Hypergraph)[law])
 
 Position = Ty("o")
 """ The atomic type of positions in a string, an arbitrary atom. """
@@ -570,8 +749,11 @@ String = Position >> Position
 The type of strings, maps from positions to positions: a word is a constant
 of type ``String``, ``Position(lambda x: x)`` is the empty string and
 ``John.compose(seeks)`` their concatenation, see
-:meth:`discopy.closed.TermBase.compose`.
+:meth:`~discopy.closed.markov.TermBase.compose`.
 """
 
 # pylint: disable-next=wrong-import-position  # proofnet imports this module
 from discopy.lambek.abstract import proofnet  # noqa: E402
+
+
+Bubble = Box.from_args

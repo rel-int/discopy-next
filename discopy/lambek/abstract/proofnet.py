@@ -126,7 +126,7 @@ from typing import Self
 
 import numpy as np
 
-from discopy import biclosed
+from discopy import closed
 from discopy.testable import Equation, Testable, axiom
 from discopy.lambek.abstract import (
     Ty, Constant, Variable, Application, Abstraction, Term, TermBase)
@@ -567,7 +567,8 @@ class ProofNet(Testable):
                 bound = [("wire", next(wires)) for _ in ports(term.var.cod)]
                 return bound + visit(term.body, scope | {term.var: bound})
             if isinstance(term, Application):
-                func, args = visit(term.func, scope), visit(term.args, scope)
+                func = visit(term.function, scope)
+                args = visit(term.argument, scope)
                 edges.extend(zip(func, args))
                 return func[len(args):]
             if isinstance(term, Variable):
@@ -704,17 +705,19 @@ class ProofNet(Testable):
     def strategy(cls, **params):
         """
         Generate the nets of closed linear terms, sampled with no free
-        variables, see :class:`discopy.biclosed.Sampler`.
+        variables, see :class:`~discopy.closed.monoidal.Sampler`.
 
         Parameters:
-            params : Passed to :meth:`discopy.biclosed.TermBase.shapes`.
+            params : Passed to
+                :meth:`~discopy.closed.monoidal.TermBase.shapes`.
         """
         from hypothesis import strategies as st
 
         def net(shape, letters):
             cod, choices, types = shape
-            sampler = biclosed.Sampler(TermBase, iter(choices), types, letters)
-            term = sampler.term(cod, biclosed.Constraints(extra=False))
+            sampler = closed.monoidal.Sampler(
+                TermBase, iter(choices), types, letters)
+            term = sampler.term(cod, closed.monoidal.Constraints(extra=False))
             return cls.from_term(term)  # ty: ignore[invalid-argument-type]
         return st.builds(net, TermBase.shapes(**params), TermBase.namings())
 

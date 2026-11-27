@@ -23,13 +23,7 @@ Summary
     Permutation
     Copy
     Discard
-    Feedback
-    Trace
-    FollowedBy
-    Head
-    Tail
     Sum
-    Bubble
     Functor
     Equation
     TermBase
@@ -99,14 +93,15 @@ from inspect import Parameter, Signature, signature
 from operator import index
 from typing import ClassVar, Self
 
-from discopy import (
-    cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy import cat, symmetric, monoidal, cmap, hypergraph, messages
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
+    Nat)
 from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
-from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
+from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
@@ -167,36 +162,29 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
 
-    Note
-    ----
-    A Markov diagram is a feedback diagram whose wires carry a time step, so
-    that it is the syntax of streams, see :mod:`discopy.stream`.
-
-    >>> x = Ty('x')
-    >>> zero = Box('0', Ty(), x.head)
-    >>> rand = Box('rand', Ty(), x)
-    >>> plus = Box('+', x @ x, x)
-    >>> walk = (rand.delay() @ x.delay() >> zero @ plus.delay()
-    ...         >> FollowedBy(x) >> Copy(x)).feedback()
-    >>> walk.draw(doctest="docs/_static/feedback/feedback-random-walk.svg")
-
-    .. image:: /_static/feedback/feedback-random-walk.svg
-        :align: center
+    See :mod:`~discopy.feedback.markov` for the syntax of streams.
     """
     copy_factory: ClassVar[type["Copy"]]
     discard_factory: ClassVar[type["Discard"]]
     function_factory: ClassVar[type["Function"]]
     layer_factory = Layer
 
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.MARKOV_HAS_NO_DAGGER)
+
     @classmethod
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
         """
         Sample Markov diagrams through their quotient: a hypergraph drawn
-        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        by :meth:`~discopy.hypergraph.Hypergraph.strategy` with at most
         ``fuel + 1`` boxes, besides the one balancing box that may close its
         boundary, and the spiders that the category supports, i.e.
         copies and discards here and every spider in a hypergraph category,
-        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        downgraded with :meth:`~discopy.hypergraph.Hypergraph.to_diagram`.
         """
         category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
         return category.strategy(
@@ -206,18 +194,16 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         """
-        The spiders of a Markov category: the copies, with one leg in, and
-        the traces of copies, with none, i.e. what tracing a copy back into
-        its own input encodes to as a hypergraph.
+        The spiders of a Markov category: the copies, with one leg in, see
+        :meth:`~discopy.feedback.markov.Diagram.spider_factory` for those with
+        none.
 
         >>> x = Ty('x')
-        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        >>> assert Diagram.spider_factory(1, 2, x) == Copy(x)
         """
-        if phase is not None or n_legs_in not in (0, 1):
+        if phase is not None or n_legs_in != 1:
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
-        if not n_legs_in:
-            return cls.copy(typ, n_legs_out + 1).trace(left=True)
         return cls.copy_factory(typ, n_legs_out)
 
     @classmethod
@@ -263,7 +249,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         A native :class:`Function` box when the category has a matching
         function factory, its decomposition by
-        :meth:`discopy.abc.MarkovCategory.function` otherwise. A bijection
+        :meth:`~discopy.abc.MarkovCategory.function` otherwise. A bijection
         becomes :meth:`from_permutation`, the identity the identity diagram.
 
         Parameters:
@@ -290,8 +276,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
         """
         Deprecated: a Markov diagram has no merge, see
-        :meth:`discopy.comarkov.Diagram.merge`, which a diagram that is
-        also comarkov, e.g. :class:`discopy.frobenius.Diagram`, inherits.
+        :meth:`~discopy.comarkov.Diagram.merge`, which a diagram that is
+        also comarkov, e.g. :class:`~discopy.frobenius.Diagram`, inherits.
 
         Parameters:
             x : The type to merge.
@@ -371,8 +357,8 @@ class Box(symmetric.Box, Diagram):
     >>> sample = Box('sample', p, x, is_deterministic=False)
     >>> assert sample != Box('sample', p, x)
     >>> sample
-    markov.Box('sample', feedback.Ty(feedback.Wire('p')), \
-feedback.Ty(feedback.Wire('x')), is_deterministic=False)
+    markov.Box('sample', monoidal.Ty(monoidal.Wire('p')), \
+monoidal.Ty(monoidal.Wire('x')), is_deterministic=False)
     >>> assert not sample.dagger().dagger().is_deterministic
 
     >>> f = Box('f', p, x)
@@ -438,7 +424,7 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
     def flagged(self, other: Box) -> Box:
         """
         Give a box built from this one the flags declared of this one, as the
-        rotations of a :class:`discopy.frobenius.Box` do.
+        rotations of a :class:`~discopy.frobenius.Box` do.
         """
         other.deterministic, other.affine = self.deterministic, self.affine
         return other
@@ -542,11 +528,11 @@ class Function(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Function(x @ y, [1, 0, 0])
-        >>> assert f.delay() == Function((x @ y).delay(), [1, 0, 0])
+        >>> assert Function(*f.__getnewargs__()) == f
         """
         return self.dom, list(self.func)
 
@@ -588,7 +574,7 @@ class Function(Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a function, see :func:`discopy.utils.dumps`.
+        Serialise a function, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -608,11 +594,11 @@ class Function(Box):
         comarkov.
 
         >>> from discopy import closed
-        >>> closed.Copy(closed.Ty('x')).dagger()
+        >>> closed.markov.Copy(closed.markov.Ty('x')).dagger()
         Traceback (most recent call last):
             ...
-        discopy.utils.AxiomError: Copy(x) has no dagger: closed.Diagram \
-is not a dagger category.
+        discopy.utils.AxiomError: Copy(x) has no dagger: \
+closed.markov.Diagram is not a dagger category.
         """
         if not issubclass(self.ar, ComarkovCategory):
             raise AxiomError(messages.NOT_A_DAGGER.format(
@@ -639,7 +625,7 @@ is not a dagger category.
         functions and types coalesces into the function on the disjoint
         union of their underlying :class:`finset.Function
         <discopy.python.finset.Function>`, from which point the layers are
-        those of an ordinary :meth:`discopy.monoidal.Diagram.tensor`.
+        those of an ordinary :meth:`~discopy.monoidal.Diagram.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Copy(x).tensor(y, Discard(x))\\
@@ -682,7 +668,7 @@ class Permutation(symmetric.Permutation, Box):
     """
     A permutation in a Markov category, i.e. a bijective :class:`Function`,
     registered as a virtual subclass so that it keeps the constructor of
-    :class:`discopy.symmetric.Permutation`.
+    :class:`~discopy.symmetric.Permutation`.
 
     Parameters:
         dom (monoidal.Ty) : The domain, i.e. the wires to permute.
@@ -837,54 +823,6 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
-class Bubble(symmetric.Bubble, Box):
-    """
-    A markov bubble is a symmetric bubble and a markov box: a total function
-    unless it says otherwise, whatever its args, and it keeps what it says
-    through dagger, substitution, rotation and markov functors.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        is_deterministic : Whether copying commutes with the bubble.
-        is_affine : Whether discarding commutes with the bubble.
-        kwargs : Passed to :class:`symmetric.Bubble`.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> sample = Box('sample', x, x, is_deterministic=False)
-    >>> noisy = sample.bubble(is_deterministic=False)
-    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
-    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
-    >>> assert Functor.id(Diagram)(noisy) == noisy
-    """
-    serialised_attrs = symmetric.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.deterministic, self.affine = is_deterministic, is_affine
-
-    def __repr__(self):
-        flags = "".join(f", {name}=False" for name in self.flags())
-        return super().__repr__()[:-1] + flags + ")" if flags\
-            else super().__repr__()
-
-    def setoid(self):
-        return super().setoid() + (self.deterministic, self.affine)
-
-    def to_tree(self) -> dict:
-        return {**super().to_tree(), **self.flags()}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        result = super().from_tree(tree)
-        result.deterministic = tree.get("is_deterministic", True)
-        result.affine = tree.get("is_affine", True)
-        return result
-
-
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -934,7 +872,8 @@ class Functor(symmetric.Functor):
             return function(  # ty: ignore[invalid-argument-type]
                 other.func, list(map(self, other.dom)))
         result = super().__call__(other)
-        if isinstance(other, Bubble) and isinstance(result, Bubble):
+        if isinstance(other, Box) and other.args\
+                and isinstance(result, Box) and result.args:
             return other.flagged(result)
         return result
 
@@ -942,14 +881,12 @@ class Functor(symmetric.Functor):
 Box.__init__.__signature__ = Signature([
     *list(signature(monoidal.Box.__init__).parameters.values())[:-1], *(
         param.replace(kind=Parameter.KEYWORD_ONLY) for init in (
-            cat.Box.__init__, feedback.Box.__init__, Box.__init__)
+            cat.Box.__init__, Box.__init__)
         for param in signature(init).parameters.values()
         if param.default is not Parameter.empty)])
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -959,7 +896,6 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
@@ -975,7 +911,7 @@ class TermBase(symmetric.TermBase):
     """
     A term of a category with copies and discards, i.e. of the kappa
     calculus with contraction and weakening: a
-    :class:`discopy.symmetric.TermBase` where a variable occurs any number
+    :class:`~discopy.symmetric.TermBase` where a variable occurs any number
     of times. The context of a term is its distinct free variables in the
     order of their first occurrence: an :class:`Application` copies the
     ones its function and its argument share, a :class:`Kappa` discards
@@ -1140,7 +1076,7 @@ type Term = Variable | Constant | Application | Kappa
 class Sampler(symmetric.Sampler):
     """
     Samples a term of a category with copies and discards as a
-    :class:`discopy.symmetric.Sampler` does, each subterm using its
+    :class:`~discopy.symmetric.Sampler` does, each subterm using its
     variables in an order of its own, one of them twice or not at all.
 
     Example
@@ -1164,3 +1100,6 @@ TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+
+
+Bubble = Box.from_args

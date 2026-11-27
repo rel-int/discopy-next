@@ -20,7 +20,6 @@ Exit codes: 0 done, 1 refused or failed, 2 the box was claimed by someone else m
 """
 
 import argparse
-import collections
 import datetime
 import difflib
 import os
@@ -35,9 +34,13 @@ STAMP = re.compile(
     r"^@(\S+?)(?:-(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?Z?)?(?=\s|$) ?(.*)$"
 )
 FILED = re.compile(r", filed as (?:[\w./-]*)#\d+\s*$")
-BULLET = re.compile(r"^[-*] ")
-REF = re.compile(r"\[((?:[\w.-]+)?#\d+)\](?![(:])")
-DEF = re.compile(r"^\[(([\w.-]*)#(\d+))\]:\s", re.M)
+FRAGMENTS = "changelog.d/"
+SECTIONS = ("added", "changed", "deprecated", "removed", "fixed", "project")
+FRAGMENT = re.compile(
+    r"changelog\.d/[a-z0-9][a-z0-9_-]*\.(?:%s)(?:\.[0-9]+)?\.md"
+    % "|".join(SECTIONS)
+)
+NOT_FRAGMENTS = {"changelog.d/template.md.jinja"}
 REJECTED = re.compile(
     r"^ ! \[rejected\].*\((?:fetch first|non-fast-forward)\)", re.M
 )
@@ -218,33 +221,7 @@ def read_todo(required=True):
         return f.read()
 
 
-def changelog_bullets(text):
-    match = re.search(
-        r"^## \[Unreleased\]\r?\n(.*?)(?=^## \[|\Z)", text, re.M | re.S
-    )
-    bullets = []
-    for line in (match.group(1) if match else "").splitlines():
-        if BULLET.match(line):
-            bullets.append(line)
-        elif bullets and line.startswith(" ") and line.strip():
-            bullets[-1] += "\n" + line
-    return bullets
-
-
-def show(ref, path):
-    result = git("show", f"{ref}:{path}", check=False)
-    return result.stdout if result.returncode == 0 else ""
-
-
-def out_of_order(prev, number, after):
-    if prev is not None and after is not None and prev > after:
-        return not (prev < number or number < after)
-    return (prev is not None and prev > number) or (
-        after is not None and number > after
-    )
-
-
-def check_changelog(base, need_bullet):
+def check_changelog(base, need_fragment):
     if git(
         "rev-parse", "--verify", "-q", f"{base}^{{commit}}", check=False
     ).returncode:
@@ -254,50 +231,35 @@ def check_changelog(base, need_bullet):
     mb = git("merge-base", "HEAD", base, check=False).stdout.strip()
     if not mb:
         raise Refused(f"HEAD and {base} have no merge base")
-    head = show("HEAD", "CHANGELOG.md")
-    olds = [show(mb, "CHANGELOG.md"), show(base, "CHANGELOG.md")]
-    old_bullets = {b for old in olds for b in changelog_bullets(old)}
-    added = [b for b in changelog_bullets(head) if b not in old_bullets]
+    changes = [
+        line.split("\t", 1)
+        for line in git(
+            "diff", "--name-status", "--no-renames", mb, "HEAD", "--",
+            FRAGMENTS,
+        ).stdout.splitlines()
+        if line.strip()
+    ]
+    added = [
+        path for status, path in changes
+        if status == "A" and FRAGMENT.fullmatch(path)
+    ]
     problems, warnings = [], []
+    for status, path in changes:
+        if (status != "D" and path not in NOT_FRAGMENTS
+                and not FRAGMENT.fullmatch(path)):
+            problems.append(
+                f"{path} is not {FRAGMENTS}<slug>.<section>.md, <section> one"
+                f" of {', '.join(SECTIONS)}"
+            )
     if not added:
-        message = (
-            f"CHANGELOG.md adds no bullet under ## [Unreleased] since {mb[:8]}"
-        )
-        (problems if need_bullet else warnings).append(
+        message = f"no fragment added to {FRAGMENTS} since {mb[:8]}"
+        (problems if need_fragment else warnings).append(
             message
-            + ("" if need_bullet else " (--no-changelog: not user-facing)")
+            + ("" if need_fragment else " (--no-changelog: not user-facing)")
         )
-    defs = DEF.findall(head)
-    names = {d[0] for d in defs}
-    for bullet in added:
-        for ref in REF.findall(bullet):
-            if ref not in names:
-                problems.append(
-                    f"[{ref}] has no link definition (e.g. `[{ref}]: https://…`)"
-                )
-    old_counts = [collections.Counter(d[0] for d in DEF.findall(old))
-                  for old in olds]
-    old_names = {name for counts in old_counts for name in counts}
-    counts = collections.Counter(d[0] for d in defs)
-    for name, count in counts.items():
-        if count > max(1, *(c[name] for c in old_counts)):
-            problems.append(f"[{name}] is defined twice")
-    by_kind = {}
-    for name, kind, number in defs:
-        by_kind.setdefault(kind, []).append((int(number), name))
-    for kind, items in by_kind.items():
-        numbers = [n for n, _ in items]
-        for i, (number, name) in enumerate(items):
-            prev = numbers[i - 1] if i else None
-            after = numbers[i + 1] if i + 1 < len(items) else None
-            if name not in old_names and out_of_order(prev, number, after):
-                problems.append(
-                    f"link [{name}] is out of number order among the [{kind}#N]"
-                    " definitions"
-                )
-    if git("status", "--porcelain", "--", "CHANGELOG.md").stdout.strip():
+    if git("status", "--porcelain", "--", FRAGMENTS).stdout.strip():
         warnings.append(
-            "CHANGELOG.md has uncommitted changes: only HEAD's file was checked"
+            f"{FRAGMENTS} has uncommitted changes: only HEAD's tree was checked"
         )
     return added, problems, warnings
 
@@ -655,11 +617,9 @@ def cmd_finish(args):
             print("warning: " + w)
         if problems:
             raise Refused(
-                "CHANGELOG.md:\n" + "\n".join("  " + p for p in problems)
+                "changelog:\n" + "\n".join("  " + p for p in problems)
             )
-        print(
-            f"changelog: {len(added)} new bullet(s), every link defined and in order"
-        )
+        print(f"changelog: {len(added)} new fragment(s), each named well")
         filed = any(todo.filed(n) for n in range(1, len(todo.boxes) + 1))
         subject = args.message or (
             "Delete TODO.md: every point is [x]"

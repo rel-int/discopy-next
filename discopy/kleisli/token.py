@@ -21,7 +21,7 @@ is a position in the term together with the environment it reads its
 variables from and the stack of what is left to do, and it travels in two
 directions: :class:`Down` into a subterm still to be evaluated, :class:`Up`
 out of one carrying a :obj:`Value`. One transition is a channel in
-:mod:`discopy.kleisli.additive`, from an entry plus the two directions to an
+:mod:`~discopy.kleisli.additive`, from an entry plus the two directions to an
 exit plus the two directions
 
 .. math::
@@ -58,7 +58,7 @@ bias? Draw the bias from a prior, score it by the likelihood of the data
 and return it, the abstraction that ignores its argument being the
 sequencing ``let _ = score(...) in p``.
 
->>> from discopy.closed import Ty
+>>> from discopy.closed.markov import Ty
 >>> from discopy.kleisli.monad import Subdistribution
 >>> R, U = Ty("R"), Ty("U")
 >>> sample, star = R("sample"), U("*")
@@ -129,7 +129,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from discopy.abc import NamedGeneric
-from discopy.closed import (
+from discopy.closed.markov import (
     Abstraction, Application, Constant, TermBase, Variable)
 from discopy.kleisli.additive import Channel, Tagged
 from discopy.kleisli.monad import Monad
@@ -240,7 +240,7 @@ def lookup(env: tuple, variable: Variable) -> Value:
 
     Example
     -------
-    >>> from discopy.closed import Ty, Variable
+    >>> from discopy.closed.markov import Ty, Variable
     >>> x = Variable("x", Ty("X"))
     >>> assert lookup(((x, 42), (x, 0)), x) == 42
     >>> lookup((), x)
@@ -322,7 +322,7 @@ class Machine[monad](NamedGeneric):
     An abstraction evaluates to a closure and applying one substitutes,
     which takes no effect at all:
 
-    >>> from discopy.closed import Ty
+    >>> from discopy.closed.markov import Ty
     >>> from discopy.kleisli.monad import Maybe
     >>> X = Ty("X")
     >>> identity, c = X(lambda x: x), X("c")
@@ -378,7 +378,7 @@ class Machine[monad](NamedGeneric):
     def bind(self, values, resume: Callable):
         """
         Feed every value of a monadic value into ``resume``, i.e. the
-        Kleisli composition of :mod:`discopy.kleisli.channel` written for a
+        Kleisli composition of :mod:`~discopy.kleisli.channel` written for a
         monadic value rather than a channel.
 
         Parameters:
@@ -406,7 +406,7 @@ class Machine[monad](NamedGeneric):
         term, env, stack = token.term, token.env, token.stack
         if isinstance(term, Application):
             return self.inject(
-                Down(term.func, env, (Arg(term.args, env), ) + stack))
+                Down(term.function, env, (Arg(term.argument, env), ) + stack))
         if isinstance(term, Abstraction):
             return self.inject(Up(Closure(term, env), stack))
         if isinstance(term, Variable):

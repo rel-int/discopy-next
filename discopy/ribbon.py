@@ -18,12 +18,12 @@ Summary
     Braid
     Twist
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
     Tail
     Sum
-    Bubble
     Functor
     DualRail
     DualRailBraid
@@ -169,7 +169,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
                 the diagram as is, i.e. without doubling it into dual rails.
             colour : The name of the colour filling the inside of each ribbon
                 (or a function from object to colour name), see
-                :func:`discopy.balanced.double_rail`.
+                :func:`~discopy.balanced.double_rail`.
 
         Example
         -------
@@ -243,7 +243,7 @@ class DualRailBraid(balanced.DualRailBraid, Box):
 
     See also
     --------
-    :class:`discopy.balanced.DualRailBraid`
+    :class:`~discopy.balanced.DualRailBraid`
     """
 
     def rotate(self, left=False):
@@ -257,7 +257,7 @@ class DualRailTwist(balanced.DualRailTwist, Box):
 
     See also
     --------
-    :class:`discopy.balanced.DualRailTwist`
+    :class:`~discopy.balanced.DualRailTwist`
     """
 
     def rotate(self, left=False):
@@ -383,12 +383,6 @@ class Sum(rigid.Sum, feedback.Sum, Box):
     """
 
 
-class Bubble(pivotal.Bubble, balanced.Bubble, Box):
-    """
-    A ribbon bubble is a pivotal and balanced bubble and a ribbon box.
-    """
-
-
 class Functor(pivotal.Functor, balanced.Functor):
     """
     A ribbon functor is both a pivotal functor and a balanced functor.
@@ -410,7 +404,7 @@ class Functor(pivotal.Functor, balanced.Functor):
 class DualRail(balanced.DualRail, Functor):
     """
     The functor sending a ribbon diagram to its dual rail encoding, extending
-    :class:`discopy.balanced.DualRail` with the folding of :class:`Cup` and
+    :class:`~discopy.balanced.DualRail` with the folding of :class:`Cup` and
     :class:`Cap` into a single box each and the doubling of a generator into a
     box on the rails of its ribbons.
 
@@ -429,9 +423,9 @@ class DualRail(balanced.DualRail, Functor):
             return DualRailCap(self(other.cod[:1]), self(other.cod[1:]))
         if isinstance(other, (Braid, Twist)):
             return super().__call__(other)  # A single dual rail box crossing.
-        if isinstance(other, Box) and not other.time_step and not isinstance(
-                other, (Sum, Bubble, feedback.Feedback, feedback.FollowedBy,
-                        feedback.Head, feedback.Tail)):
+        if isinstance(other, Box) and not other.time_step\
+                and not other.args and not isinstance(
+                    other, (Sum, feedback.FollowedBy)):
             # A generator is doubled into a box on the rails of its ribbons;
             # self doubles its domain and codomain per object.
             return Box(other.name, self(other.dom), self(other.cod),
@@ -439,14 +433,13 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 
 Id = Diagram.id
@@ -454,3 +447,6 @@ Id = Diagram.id
 
 class Equation(pivotal.Equation):
     """ The :class:`pivotal.Equation` of ribbon diagrams. """
+
+
+Bubble = Box.from_args

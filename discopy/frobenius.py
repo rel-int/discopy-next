@@ -5,7 +5,7 @@ The free symmetric category with a supply of spiders, also known as special
 commutative Frobenius algebras.
 
 Diagrams in the free hypergraph category are faithfully encoded as
-:class:`discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
+:class:`~discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
 
 Summary
 -------
@@ -30,9 +30,9 @@ Summary
     Permutation
     Swap
     Spider
-    Bubble
     Sum
     Feedback
+    Feedforward
     Trace
     FollowedBy
     Head
@@ -90,7 +90,8 @@ from typing import ClassVar, Self
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
     hypergraph, symmetric)
-from discopy.abc import HypergraphCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, HypergraphCategory)
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
@@ -103,14 +104,27 @@ class Wire(pivotal.Wire):
     A frobenius object is a self-dual pivotal object: its adjoints are the
     object itself the other way round, from its codomain to its domain.
 
+    It has one winding, so its winding number is read modulo one, i.e. it is
+    always zero.
+
     Parameters:
         name : The name of the object.
+        z : The winding number, zero up to its one winding.
 
     >>> from discopy.monoidal import Colour
     >>> x = Wire('x', dom=Colour('a'), cod=Colour('b'))
     >>> assert x.l == x.r and (x.l.dom, x.l.cod) == (x.cod, x.dom)
     >>> assert x.l.l == x and Wire('y').l == Wire('y')
+    >>> assert Wire('y', 1) == Wire('y') and Wire('y', 1).l.l == Wire('y')
     """
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.z %= len(self.windings)
+
+    def __init__(self, *args, **params):
+        super().__init__(*args, **params)
+        self.z %= len(self.windings)
+
     @property
     def l(self) -> Self:
         """ The object the other way round, from its codomain to its domain.
@@ -185,7 +199,7 @@ class Layer(compact.Layer):
     between cospans and generators.
 
     A category below frobenius whose spiders are not its own cospans, e.g.
-    :mod:`discopy.tensor`, keeps them as generators, and only its
+    :mod:`~discopy.tensor`, keeps them as generators, and only its
     permutations as plumbing.
 
     Parameters:
@@ -229,17 +243,20 @@ class Diagram(
     cap_factory: ClassVar[type["Cap"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
-    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
     layer_factory = Layer
+
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
         """
         A native :class:`Cospan` box when the category has a matching
         cospan factory, its decomposition by
-        :meth:`discopy.abc.HypergraphCategory.cospan` otherwise. A bijection
+        :meth:`~discopy.abc.HypergraphCategory.cospan` otherwise. A bijection
         becomes :meth:`from_permutation`, the identity the identity diagram.
 
         Parameters:
@@ -394,8 +411,8 @@ class Cospan(Box):
     arrow of the free hypergraph category on one object, see
     :cite:t:`Lack04`. A point that no leg reaches is a spider with no legs.
 
-    It is the :class:`discopy.comarkov.Cofunction` ``left`` into its apex
-    then the :class:`discopy.markov.Function` ``right`` out of it, i.e. its
+    It is the :class:`~discopy.comarkov.Cofunction` ``left`` into its apex
+    then the :class:`~discopy.markov.Function` ``right`` out of it, i.e. its
     merges then its copies. A :class:`Layer` stores it as plumbing. A
     bijection constructs a :class:`Permutation`, a cospan with one point a
     :class:`Spider`, see :meth:`Diagram.from_cospan`, and the points are
@@ -454,11 +471,11 @@ class Cospan(Box):
 
     def __getnewargs__(self):
         """
-        The arguments of :meth:`__new__`, which a pickle and a delay read.
+        The arguments of :meth:`__new__`, which a pickle reads.
 
         >>> x, y = map(Ty, "xy")
         >>> f = Cospan(x @ y, [0, 1, 0], [1, 1])
-        >>> assert f.delay() == Cospan((x @ y).delay(), [0, 1, 0], [1, 1])
+        >>> assert Cospan(*f.__getnewargs__()) == f
         """
         return self.apex, self.legs.left, self.legs.right
 
@@ -528,7 +545,7 @@ class Cospan(Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a cospan, see :func:`discopy.utils.dumps`.
+        Serialise a cospan, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -579,7 +596,7 @@ class Cospan(Box):
         Tensoring plumbing with plumbing gives one wider cospan, a run of
         cospans and types coalescing into the disjoint union of their
         apexes, from which point the layers are those of an ordinary
-        :meth:`discopy.monoidal.Diagram.tensor`.
+        :meth:`~discopy.monoidal.Diagram.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Spider(1, 0, x).tensor(y, Cup(x, x))\\
@@ -775,10 +792,11 @@ class Spider(Box):
             self.affine = len(self.dom) == 1 and not self.phase
 
     def __getnewargs__(self):
-        """ The arguments of the constructor, which a pickle and a delay read.
+        """ The arguments of the constructor, which a pickle reads.
 
         >>> x = Ty('x')
-        >>> assert Spider(1, 2, x, .5).delay() == Spider(1, 2, x.delay(), .5)
+        >>> spider = Spider(1, 2, x, .5)
+        >>> assert Spider(*spider.__getnewargs__()) == spider
         """
         return (
             len(self.dom), len(self.cod), self.typ, self.phase, self.is_dagger)
@@ -819,7 +837,7 @@ class Spider(Box):
         flags, is the spider with its legs swapped. A phased spider is a
         generator: its dagger keeps its phase and is marked as a dagger, so
         that any phase has one, a functor maps it to the dagger of its image,
-        and negating a phase is left to :mod:`discopy.quantum.zx`, where
+        and negating a phase is left to :mod:`~discopy.quantum.zx`, where
         phases form a group.
 
         >>> x = Ty('x')
@@ -869,19 +887,6 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Bubble(compact.Bubble, markov.Bubble, comarkov.Bubble, Box):
-    """
-    A Frobenius bubble is a compact, Markov and comarkov bubble and a
-    frobenius box, which keeps its flags as it rotates.
-
-    >>> x = Ty('x')
-    >>> noisy = Box('f', x, x).bubble(is_deterministic=False)
-    >>> assert noisy.r.l == noisy and not noisy.r.l.is_deterministic
-    """
-    serialised_attrs = compact.Bubble.serialised_attrs + (
-        "is_deterministic", "is_affine")
-
-
 class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
     """
     A Frobenius sum is a sum of Frobenius diagrams.
@@ -900,7 +905,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     A spider with no phase is the Frobenius structure, mapped to the spiders
     of the codomain; a spider with a phase is a generator, mapped by
     ``ar_map`` like any box, e.g. the Z and X spiders of
-    :mod:`discopy.quantum.zx`.
+    :mod:`~discopy.quantum.zx`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) :
@@ -918,7 +923,8 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
         if isinstance(other, Cospan)\
                 and not isinstance(other, symmetric.Permutation):
             return self(other.to_spiders())
-        if isinstance(other, (markov.Copy, Bubble)):
+        if isinstance(other, markov.Copy)\
+                or isinstance(other, Box) and other.args:
             return markov.Functor.__call__(self, other)
         if isinstance(other, comarkov.Merge):
             return comarkov.Functor.__call__(self, other)
@@ -1001,8 +1007,10 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
-    Diagram, Box)
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+    feedback.structural_boxes(Diagram, Box)
+for name in ("map_agreement", "term_factory"):
+    setattr(Diagram, name, vars(markov.Diagram)[name])
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
@@ -1010,7 +1018,6 @@ Diagram.swap_factory = Swap
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.permutation_factory = Permutation
 Diagram.cospan_factory = Cospan
-Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
@@ -1026,3 +1033,6 @@ class Equation(compact.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args

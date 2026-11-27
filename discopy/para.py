@@ -64,8 +64,10 @@ category, with the empty parameter space:
 
 >>> assert Symmetric.id(x) == Symmetric.lift(Diagram.id(x))
 >>> assert Symmetric.swap(x, y) == Symmetric.lift(Diagram.swap(x, y))
->>> t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y), p)
->>> assert t.trace().dom == x and t.trace().param == p
+>>> from discopy.feedback import symmetric
+>>> a, b, c, r = map(symmetric.Ty, "abcr")
+>>> t = Traced(a @ b, c @ b, symmetric.Box('t', a @ b @ r, c @ b), r)
+>>> assert t.trace().dom == a and t.trace().param == r
 
 The construction preserves each level of the hierarchy below symmetric:
 :class:`Traced`, :class:`Markov`, :class:`Comarkov`, :class:`Closed`,
@@ -81,8 +83,8 @@ while the operations on morphisms swap the parameters out of the way,
 the same as :meth:`Traced.trace`:
 
 >>> from discopy import closed
->>> a, b, c, P = map(closed.Ty, "abcP")
->>> k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
+>>> a, b, c, P = map(closed.markov.Ty, "abcP")
+>>> k = Closed(a @ b, c, closed.markov.Box('k', a @ b @ P, c), P)
 >>> assert k.curry(left=True).cod == c << b
 >>> assert k.curry(left=False).cod == a >> c
 
@@ -137,7 +139,7 @@ fixed `s` through, `w` reading the state `v` wrote:
 >>> assert state.dom == x @ s and state.cod == z @ s
 
 Iterating a map on its own memory is the feedback operator of
-:mod:`discopy.feedback`, which :mod:`discopy.stream` unrolls by chaining
+:mod:`~discopy.feedback`, which :mod:`~discopy.stream` unrolls by chaining
 the memory from one time step to the next.
 
 Example
@@ -163,9 +165,12 @@ from typing import Self
 
 from discopy import (
     symmetric, markov, comarkov, closed, compact, frobenius, messages)
+from discopy.feedback import markov as feedback_markov
+from discopy.feedback import symmetric as traced
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
-    ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
+    ClosedCategory, ClosedMarkovCategory, ComarkovCategory, CompactCategory,
+    FeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, factory_name,
@@ -408,6 +413,7 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
+    category = traced.Diagram
     trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
         messages.PARA_REPARAM)
     trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
@@ -475,7 +481,7 @@ class Comarkov(Symmetric, ComarkovCategory):
         return cls.lift(cls.category.merge(x, n))
 
 
-class Closed(Markov, ClosedCategory):
+class Closed(Markov, ClosedMarkovCategory):
     """
     Parametric maps over a closed underlying `category` form a closed
     category, currying with the parameters swapped out of the way.
@@ -494,7 +500,7 @@ class Closed(Markov, ClosedCategory):
         .failing(messages.FREE_CURRY)
     currying_symmetry = ClosedCategory.currying_symmetry.failing(
         messages.FREE_CURRY)
-    category = closed.Diagram
+    category = closed.markov.Diagram
 
     @classmethod
     def ev(cls, base: Symmetric.ob, exponent: Symmetric.ob, left: bool = True
@@ -522,8 +528,8 @@ class Closed(Markov, ClosedCategory):
         Currying no object is the identity, as for every other curry.
 
         >>> from discopy import closed
-        >>> a, P = closed.Ty('a'), closed.Ty('P')
-        >>> k = Closed(a, a, closed.Box('k', a @ P, a), P)
+        >>> a, P = closed.markov.Ty('a'), closed.markov.Ty('P')
+        >>> k = Closed(a, a, closed.markov.Box('k', a @ P, a), P)
         >>> assert k.curry(0) == k == k.curry(0, left=False)
         """
         if n < 0 or n > len(self.dom):
@@ -554,7 +560,7 @@ class Feedback(Markov, FeedbackCategory):
         messages.FREE_FEEDBACK)
     tightening = FeedbackCategory.tightening.failing(
         messages.FREE_FEEDBACK)
-    category = markov.Diagram
+    category = feedback_markov.Diagram
 
     def delay(self, n_steps: int = 1) -> Feedback:
         """
@@ -573,7 +579,7 @@ class Feedback(Markov, FeedbackCategory):
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`, in either
-        form of :meth:`discopy.abc.FeedbackCategory.feedback`.
+        form of :meth:`~discopy.abc.FeedbackCategory.feedback`.
 
         Parameters:
             n : The number of objects to feed back.

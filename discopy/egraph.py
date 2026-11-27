@@ -8,7 +8,7 @@ with sharing being a cartesian diagram, i.e. one whose boxes are total
 functions with one output each. An :class:`EGraph` over a copy-discard
 category is the same data structure with boxes of any arity that need not be
 cartesian: a diagram with sharing, i.e. a left-monogamous acyclic
-:class:`discopy.hypergraph.Hypergraph` whose boxes are the e-nodes, with an
+:class:`~discopy.hypergraph.Hypergraph` whose boxes are the e-nodes, with an
 equivalence on its spiders whose classes are the e-classes. We call it an
 e-graph, a monoidal e-graph or an e-hypergraph alike, egg's e-graphs being
 those over cartesian diagrams. A **section** chooses a producer for each
@@ -132,7 +132,7 @@ from typing import TYPE_CHECKING, Self, SupportsIndex
 from networkx import DiGraph
 from networkx.algorithms.isomorphism import is_isomorphic
 
-from discopy import feedback, markov, messages, monoidal
+from discopy import markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory, Nat
 from discopy.testable import (
     GENERATORS, Equation, Hom, Obj, Serialisable, TestableGeneric, Var,
@@ -219,18 +219,17 @@ def ast_size(_box) -> int:
     return 1
 
 
-class Join(feedback.Bubble, markov.Box):
+class Join(markov.Box):
     """
     The join of parallel diagrams, an e-box of the string diagrams of a
     semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
     a slot for each term. It is deterministic when it has one term, which is,
-    and affine when every term is, discarding being idempotent. It delays as
-    a feedback bubble does, its terms staying as they are inside.
+    and affine when every term is, discarding being idempotent.
 
     Parameters:
-        terms : The diagrams joined, with the same domain and codomain, that
-            of the join at time step zero.
-        params : Passed to :class:`feedback.Bubble`, e.g. by :meth:`dagger`.
+        terms : The diagrams joined, with the same domain and codomain.
+        params : Passed to :meth:`markov.Box.from_args`, e.g. by
+            :meth:`dagger`.
 
     Example
     -------
@@ -245,19 +244,24 @@ class Join(feedback.Bubble, markov.Box):
     (x @ f >> h) + (x @ g >> h)
     """
     is_id_on_objects = True
+    serialised_attrs = (
+        "*args", "dom", "cod", "name", "is_dagger", "data")
 
-    def __init__(self, *terms, **params):
+    def __init__(self, *terms, dom=None, cod=None, name="", **params):
+        terms = tuple(params.pop("args", ())) or terms
+        dom, cod = (
+            given if given is not None else self.common(terms, attr)
+            for attr, given in [("dom", dom), ("cod", cod)])
         params.pop("method", None)
-        super().__init__(*terms, method="join", **params)
+        markov.Box.__init__(self, name, dom, cod, args=terms, method="join",
+                            **params)
         for term in terms:
-            assert_isparallel(
-                self, term.delay(self.time_step) if self.time_step else term)
+            assert_isparallel(self, term)
         self.deterministic = len(terms) == 1 and terms[0].is_deterministic
         self.affine = all(term.is_affine for term in terms)
 
     def __str__(self):
-        return f"Join({', '.join(map(str, self.args))})"\
-            + feedback.str_delayed(self.time_step)
+        return f"Join({', '.join(map(str, self.args))})"
 
 
 def distribute(diagram: monoidal.Diagram) -> markov.Sum:
@@ -726,7 +730,7 @@ class EGraph[category](
     """
     An e-graph over a copy-discard ``category``, i.e. a monoidal e-graph or
     e-hypergraph, equal to another up to renaming its spiders, see
-    :mod:`discopy.egraph`.
+    :mod:`~discopy.egraph`.
 
     Parameters:
         graph : A left-monogamous acyclic hypergraph, its boxes the e-nodes.

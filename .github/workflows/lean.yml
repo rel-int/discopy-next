@@ -5,7 +5,11 @@ on:
     branches: [main]
   pull_request:
     paths:
-    - lean/**
+    - discolean/**
+    - discopy/abc.py
+    - discopy/lean.py
+    - discopy/testable.py
+    - discopy/lambek/abstract/**
     - discopy/egraph.py
     - benchmark/test_egraph.py
     - benchmark/config.py
@@ -29,29 +33,34 @@ concurrency:
 jobs:
   lean:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
     - name: Install Lean
-      # The toolchain of lean/lean-toolchain, from the release it names.
+      # The toolchain of discolean/lean-toolchain, from the release it names.
       env:
         VERSION: 4.35.0
         SHA256: 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d
         RELEASES: https://github.com/leanprover/lean4/releases/download
       run: |
-        grep -qx "leanprover/lean4:v$VERSION" lean/lean-toolchain
+        grep -qx "leanprover/lean4:v$VERSION" discolean/lean-toolchain
         curl -fsSL -o "$RUNNER_TEMP/lean.tar.zst" \
           "$RELEASES/v$VERSION/lean-$VERSION-linux.tar.zst"
         echo "$SHA256  $RUNNER_TEMP/lean.tar.zst" | sha256sum --check
         tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
         echo "$RUNNER_TEMP/lean-$VERSION-linux/bin" >> "$GITHUB_PATH"
+    - name: Fetch Mathlib and its build cache
+      # The revision of discolean/lake-manifest.json, its oleans from the
+      # cache Mathlib publishes, so that only the package itself is built.
+      working-directory: discolean
+      run: lake exe cache get
     - name: Build the proofs and the oracle
-      working-directory: lean
+      working-directory: discolean
       run: lake build
     - name: Audit the axioms
-      working-directory: lean
+      working-directory: discolean
       run: lake env lean Audit.lean
     - uses: ./.github/actions/setup
       with:
@@ -61,5 +70,5 @@ jobs:
         ORACLE_EXAMPLES: 2000
         ORACLE_SEEDS: 0
       run: |
-        test -x lean/.lake/build/bin/oracle
-        uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s
+        test -x discolean/.lake/build/bin/oracle
+        uv run pytest discolean/test_oracle.py discolean/test_premonoidal.py -s

@@ -949,10 +949,10 @@ def test_Bubble_data():
 
 
 def test_Bubble_time_step():
-    from discopy.quantum.circuit import Bubble, qubit
+    from discopy.quantum.circuit import Elementwise, qubit
     from discopy.quantum.gates import X
     delayed = X.bubble().delay()
-    undelayed = Bubble(X, dom=qubit.d, cod=qubit.d)
+    undelayed = Elementwise(X, dom=qubit.d, cod=qubit.d)
     assert delayed.reset() == X.bubble() != undelayed.reset()
     assert delayed != undelayed and len({delayed, undelayed}) == 2
 
@@ -1009,7 +1009,7 @@ def test_grad_of_named_bubble_reads_back():
     for diff in (tensor.Diff(x), tensor.Diff(tmp, abs)):
         assert eval(repr(diff)) == diff
     chain = next(box for box in bubble.grad(x).boxes
-                 if isinstance(box, Bubble) and box.func != Bubble.func)
+                 if isinstance(box, Elementwise) and box.func != Elementwise.func)
     assert repr(chain.func) == "tensor.Diff(tmp, abs)"
 
 
@@ -1121,6 +1121,20 @@ def test_Functor_counts_the_4x4_sudoku():
              for values in itertools.product(range(n * n), repeat=n * n)]
     F = Functor({x: n * n}, {box: array}, dtype=int)
     assert F(graph) == Tensor[int]([288], Dim(1), Dim(1))
+
+
+def test_Functor_contracts_a_cmap_past_the_operand_size():
+    """ Every box of the ladder on 22 vertices has size 64 and every
+    pairwise step at least 256, so NumPy's default greedy bound forbids
+    them all and raises ``iterator is too large`` on the 33 wires. """
+    d = Dim(4)
+    bits = [(7 * i + 3) % 2 for i in range(64)]
+    u, v = Box[int]('u', d, d @ d, bits), Box[int]('v', d @ d, d, bits)
+    rung = u @ d >> d @ v
+    ladder = rung.then(*(10 * [rung])).trace(n=2)
+    step = rung.eval().array.reshape(16, 16)
+    expected = int(np.trace(np.linalg.matrix_power(step, 11)))
+    assert int(ladder.eval()) == int(ladder.to_map().eval()) == expected
 
 
 def test_Functor_contracts_another_hypergraph_through_its_diagram():

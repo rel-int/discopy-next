@@ -7,7 +7,7 @@ from pytest import raises
 
 from discopy import feedback
 from discopy.quantum import zx
-from discopy.biclosed import *
+from discopy.closed.monoidal import *
 from discopy.hypergraph import Functor, Hypergraph
 from discopy.python import Function, Ty, exp
 from discopy.utils import AxiomError

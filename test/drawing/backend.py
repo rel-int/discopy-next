@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from pytest import mark, raises
 
+from discopy.config import DRAWING_DEFAULT
 from discopy.drawing.backend import TikZ
 from discopy.monoidal import Ty, Box
 from discopy.braided import Braid
@@ -671,3 +672,573 @@ def test_typst_draws_the_symbol_of_an_equation_as_its_label_alone():
     assert 'text("=", fill: rgb("#000000")' in source
     assert "circle(" not in source
     assert compiled(source, format="svg")
+
+
+def test_left_to_right_follows_the_category_and_keeps_arrows(tmp_path):
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.quantum.circuit import Measure
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    f = Primitive('f', x, x)
+    body = f >> Primitive('g', x, x @ x)
+    assert body.to_svg() == body.to_svg(left_to_right=True)\
+        != body.to_svg(left_to_right=False)
+    assert Bubble(f[::-1], dom=x, cod=x).to_drawing().asymmetry() == 0.125
+
+    path = tmp_path / "measure.tikz"
+    Measure().draw(to_tikz=True, left_to_right=True, path=str(path))
+    assert "->" in path.read_text()
+
+
+def test_bubble_of_args_drawn_in_different_directions():
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty('x')
+    with raises(ValueError):
+        Bubble(Box('f', x, x), Primitive('g', x, x)).to_drawing()
+
+
+def test_bubble_of_coloured_args_drawn_in_another_direction():
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    bubble = Bubble(Primitive('f', x, x), Primitive('g', x, x))
+    assert len(bubble.to_drawing().boxes[0].nested) == 2
+
+
+def test_left_to_right_labels_legend_and_dagger():
+    from discopy.config import BOX_DRAWING_ATTRIBUTES
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory, text_width
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    name = 'a very long function name'
+    x = Ty(Wire('x', Colour('red'), Colour('blue')))
+    long = Primitive(name, x, x).to_drawing()
+    assert long.height >= text_width(name) + 1 > 1 == long.width
+    assert sorted(Backend.region_colours(
+        Bubble(Primitive('f', x, x), dom=Ty(), cod=Ty()).to_drawing())
+    ) == ['blue', 'red']
+    spider = Primitive(name, x, x, draw_as_spider=True).to_drawing()
+    assert spider.height == 1
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.heights = {}
+
+        def draw_text(self, text, i, j, **params):
+            self.heights[text] = j
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    y = Ty('y')
+    bubble = Bubble(
+        Primitive('f', y, y), Primitive('g', y, y), frame_colour="red")
+    assert bubble.dagger().frame_colour == "red"
+    default = BOX_DRAWING_ATTRIBUTES['frame_colour']
+    BOX_DRAWING_ATTRIBUTES['frame_colour'] = lambda _: "blue"
+    try:
+        assert Bubble(Primitive('f', y, y)).frame_colour == "blue"
+    finally:
+        BOX_DRAWING_ATTRIBUTES['frame_colour'] = default
+    up, down = Recorder(), Recorder()
+    bubble.to_drawing().draw(backend=up)
+    bubble.to_drawing().dagger().draw(backend=down)
+    assert up.heights['f'] > up.heights['g']
+    assert down.heights['f'] < down.heights['g']
+
+
+def test_bubble_drawn_in_another_direction_fits_its_framed_args():
+    from discopy.ribbon import DualRailCup, Ty as RTy
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    x = RTy('x')
+    arg = DualRailCup(x @ x, x.r @ x.r)
+    drawing = Across.from_args(arg, dom=Ty(), cod=Ty()).to_drawing()
+    nested, = drawing.boxes[0].nested
+    framed = arg.to_drawing().framed()
+    assert framed.width != arg.to_drawing().width
+    assert nested.width == framed.width
+    assert drawing.height >= nested.width + 1
+
+
+def test_left_to_right_args_have_a_margin_and_labels_lifted():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.beziers, self.labels, self.slots = [], [], []
+
+        def draw_polygon(self, *points, **params):
+            if params.get("facecolor") == "red":
+                self.slots.append(sorted({y for _, y in points}))
+
+        def draw_bezier(self, points, adaptive=True):
+            self.beziers.append(([tuple(p) for p in points], adaptive))
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append(j)
+            else:
+                self.boxes[text] = j
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    Recorder.boxes = {}
+    x = Ty('x')
+    recorder = Recorder()
+    Bubble(Primitive('f', x, x), Primitive('g', x, x),
+           frame_colour="red").draw(backend=recorder)
+    (g_low, g_high), (f_low, f_high) = sorted(recorder.slots)
+    assert g_low < recorder.boxes['g'] < g_high < f_low
+    assert f_low < recorder.boxes['f'] < f_high
+
+    recorder = Recorder()
+    (Primitive('f', x, x) >> Primitive('g', x, x)).draw(backend=recorder)
+    wire_y = recorder.beziers[0][0][0][1]
+    assert recorder.labels and all(j > wire_y for j in recorder.labels)
+
+
+def test_left_to_right_label_padding_and_contrast():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wire_y = [], None
+
+        def draw_bezier(self, points, adaptive=True):
+            self.wire_y = points[0][1]
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((j, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Primitive('f', x, x).draw(backend=recorder, textpad=(.5, .0625))
+    assert recorder.labels
+    for j, color in recorder.labels:
+        assert j >= recorder.wire_y + .5 - 1e-9
+        assert color == "black"
+
+
+def test_left_to_right_labels_above_wires_in_a_daggered_box():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wires = [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            if len({y for _, y in points}) == 1:
+                self.wires.append(points[0][1])
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((j, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    bubble = Bubble(Primitive('f', x, x), dom=Ty(), cod=Ty())
+    recorder = Recorder()
+    bubble.to_drawing().dagger().draw(backend=recorder)
+    assert recorder.labels
+    for j, color in recorder.labels:
+        assert any(j - .125 <= y < j for y in recorder.wires)
+        assert color == "white"
+
+
+def test_labels_of_args_turned_back_top_to_bottom():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Wire
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.labels, self.wires = [], []
+
+        def draw_bezier(self, points, adaptive=True):
+            if len({x for x, _ in points}) == 1:
+                self.wires.append(points[0][0])
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.labels.append((i, params["color"]))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    Across.from_args(Box('f', x, x), dom=Ty(), cod=Ty()).draw(
+        backend=recorder)
+    assert recorder.labels and recorder.wires
+    for i, color in recorder.labels:
+        assert any(0 < i - wire <= .125 for wire in recorder.wires)
+        assert color == "white"
+
+
+def test_label_contrast_through_three_turns_reflected_outside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Bubble, Colour, Diagram, Wire
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Across(Box):
+        draw_left_to_right = True
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.colours = []
+
+        def draw_text(self, text, i, j, **params):
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.colours.append(params["color"])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty(Wire('x', Colour('white'), Colour('black')))
+    recorder = Recorder()
+    inside = Across.from_args(Bubble(Primitive('f', x, x)))
+    Bubble(inside).to_drawing().dagger().draw(backend=recorder)
+    assert recorder.colours and set(recorder.colours) == {"white"}
+
+
+def test_left_to_right_labels_stand_on_their_point_in_tikz(tmp_path):
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    path = tmp_path / "ltr.tikz"
+    Primitive('f', Ty('x'), Ty('x')).draw(
+        to_tikz=True, fontsize_types=2, path=str(path))
+    tikz = path.read_text()
+    assert "anchor=south west" in tikz and "anchor=north west" not in tikz
+
+
+def test_label_contrast_through_two_turns_reflected():
+    from types import SimpleNamespace
+    from discopy.drawing.backend import Matplotlib, Point, Transposed
+
+    graph = SimpleNamespace(width=1, height=1)
+    outside = Transposed(Matplotlib(), Point(0, 0), graph)
+    inside = Transposed(outside, Point(0, 0), graph, flip=True)
+    assert inside.turns == 2 and not inside.cod_is_after()
+    typ = SimpleNamespace(dom="white", cod="black")
+    assert inside.label_background(typ) == "black"
+
+
+def test_frame_name_drawn_without_wire_labels():
+    from discopy.drawing.backend import Backend
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts = []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.append(text)
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    recorder = Recorder()
+    Box('f', x, x).bubble(
+        dom=x, cod=x, drawing_name="g", draw_as_frame=True
+    ).draw(backend=recorder, wire_labels=False)
+    assert "g" in recorder.texts and "x" not in recorder.texts
+
+
+def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts, self.frames = {}, []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = (j, params.get("verticalalignment"))
+
+        def draw_polygon(self, *points, **params):
+            self.frames.append([y for _, y in points])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    frame = Primitive('W', Ty(), n, args=(
+        Primitive('y', Ty(), n), Primitive('x', Ty(), n)), drawing_name="W",
+        draw_as_frame=True, draw_vertically=True)
+    for dagger in (False, True):
+        recorder = Recorder()
+        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        (drawing.dagger() if dagger else drawing).draw(backend=recorder)
+        (j, _), (_, alignment) = recorder.texts["W"], recorder.texts["n"]
+        bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
+        assert bottom < j < top
+        assert alignment == "bottom"  # Above its wire, reflected or not.
+
+
+def test_frame_sides_have_an_edge_between_two_colours():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Wire
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.widths = []
+
+        def draw_wire(self, source, target, *args, **params):
+            self.widths.append(params.get("linewidth"))
+
+        def draw_text(self, text, i, j, **params):
+            pass
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    framed, recorder = Recorder(), Recorder()
+    Box('f', x, x).bubble(dom=x, cod=x, draw_as_frame=True).draw(
+        backend=framed)
+    assert framed.widths and 0 not in framed.widths
+    Box('f', x, x).to_drawing().slot(None).draw(backend=recorder)
+    assert 0 in recorder.widths
+    coloured = Ty(Wire('x', Colour('red'), Colour('blue')))
+    coloured_slot = Recorder()
+    Box('f', coloured, coloured).to_drawing().slot(None).draw(
+        backend=coloured_slot)
+    assert 0 not in coloured_slot.widths
+
+
+def test_left_to_right_args_in_the_variants_of_a_box():
+    from discopy import pivotal
+    from discopy.drawing.backend import Backend
+    from discopy.utils import Point, factory
+
+    @factory
+    class Body(pivotal.Diagram):
+        draw_left_to_right = True
+
+    class Primitive(pivotal.Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.polygons, self.texts, self.alignments = [], {}, []
+
+        def draw_polygon(self, *points, **params):
+            self.polygons.append((points, params.get("facecolor")))
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.setdefault(text, []).append(Point(i, j))
+            if params.get("verticalalignment") in ("top", "bottom"):
+                self.alignments.append(params.get("horizontalalignment"))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x, y = pivotal.Ty('x'), pivotal.Ty('y')
+    f, g = Primitive('f', x, y), Primitive('g', y, x)
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W",
+                    color="green", frame_colour="red")
+    chopped = {}
+    for name, diagram in [("W", W), ("dagger", W[::-1]),
+                          ("transpose", W.r), ("conjugate", W[::-1].r),
+                          ("reflected", W.r.to_drawing().dagger())]:
+        recorder = Recorder()
+        diagram.draw(backend=recorder, asymmetry=.25)
+        outline, = (p for p, c in recorder.polygons if c == "green")
+        top, bottom = sorted(  # One slot for each arg, with a margin.
+            (max(y for _, y in p), min(y for _, y in p))
+            for p, c in recorder.polygons if c == "red")[::-1]
+        margin = DRAWING_DEFAULT["nested_margin"]
+        assert abs(top[1] - bottom[0] - margin) < 1e-9
+        xs, ys = [p[0] for p in outline], [p[1] for p in outline]
+        chopped[name] = next(
+            (cx == max(xs), cy == max(ys))
+            for cx in (min(xs), max(xs)) for cy in (min(ys), max(ys))
+            if (cx, cy) not in outline)
+        (label, ) = recorder.texts["W"]  # In the corner opposite the cut.
+        assert ((label.x > (min(xs) + max(xs)) / 2),
+                (label.y > (min(ys) + max(ys)) / 2)) == tuple(
+            not side for side in chopped[name])
+        slot_xs = [x for p, c in recorder.polygons if c == "red"
+                   for x, _ in p]
+        assert abs((min(slot_xs) - min(xs)) - (max(xs) - max(slot_xs))) < 1e-9
+        (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
+        turned = name in ("transpose", "conjugate", "reflected")
+        # The args are reflected or turned with the box: a reflection along
+        # the horizontal axis, alone or in a half turn, puts the last on top.
+        assert (f_at.y < g_at.y) == (name in ("dagger", "transpose"))
+        f_input = min(  # The label of the wire into f, as it was drawn in W.
+            recorder.texts["x"],
+            key=lambda p: abs(p.y - f_at.y))
+        assert (f_input.x > f_at.x) == turned
+        # A label hangs along its wire: from its end on the right if turned.
+        # Each of the four nested wires, not those outside, is turned.
+        assert recorder.alignments.count("right") == 4 * turned
+    assert chopped == {  # Whether the corner cut off is right, top.
+        "W": (True, False), "dagger": (True, True),
+        "transpose": (False, True), "conjugate": (False, False),
+        "reflected": (False, False)}
+
+
+def test_frame_has_the_corner_of_its_variant_cut():
+    from discopy import pivotal
+    from discopy.drawing.backend import Backend
+    from discopy.utils import Point
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.polygons, self.texts, self.fills = [], {}, []
+
+        def draw_polygon(self, *points, **params):
+            self.polygons.append(points)
+            if len(points) == 5 and params.get("edgecolor") == "none":
+                self.fills.append(params["facecolor"])  # The corner patch.
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.setdefault(text, []).append(Point(i, j))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x, y = pivotal.Ty('x'), pivotal.Ty('y')
+    f, g = pivotal.Box('f', x, y), pivotal.Box('g', y, x)
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W",
+                    draw_as_frame=True)
+    chopped, labelled = {}, {}
+    for name, diagram in [("W", W), ("dagger", W[::-1]),
+                          ("transpose", W.r), ("conjugate", W[::-1].r),
+                          ("reflected", W.r.to_drawing().dagger())]:
+        recorder = Recorder()
+        diagram.draw(backend=recorder, asymmetry=.25)
+        points = [p for ps in recorder.polygons for p in ps]
+        middle = Point(*((min(p[k] for p in points) + max(
+            p[k] for p in points)) / 2 for k in (0, 1)))
+        (a, b), = (ps for ps in recorder.polygons if len(ps) == 2)
+        chopped[name] = ((a.x + b.x) / 2 > middle.x,
+                         (a.y + b.y) / 2 > middle.y)
+        (label, ), = [recorder.texts["W"]]
+        labelled[name] = (label.x > middle.x, label.y > middle.y)
+    assert chopped == {  # Whether the corner cut off is right, top.
+        "W": (True, False), "dagger": (True, True),
+        "transpose": (False, True), "conjugate": (False, False),
+        "reflected": (False, False)}
+    assert labelled == {  # The label in the corner opposite the cut.
+        name: (not right, not top) for name, (right, top) in chopped.items()}
+    from discopy.utils import text_width
+    name = "a_label_much_much_wider_than_its_frame"
+    recorder = Recorder()
+    pivotal.Box('W', x, y, args=(f, ), drawing_name=name, draw_as_frame=True
+                ).draw(backend=recorder, asymmetry=.25)
+    xs = [p[0] for ps in recorder.polygons for p in ps]
+    (label, ), = [recorder.texts[name]]
+    assert min(xs) < label.x - text_width(name) / 2
+    assert label.x + text_width(name) / 2 < max(xs)
+    # The corner cut off is painted as the canvas behind the frame.
+    recorder = Recorder()
+    W.draw(backend=recorder, asymmetry=.25, boundary_color="black")
+    assert recorder.fills == ["black"]
