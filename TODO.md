@@ -15,7 +15,7 @@
 > > **cubic-dev-ai** on `discopy/linear/symmetric.py:64`: P2: Give this diagram a permutation-aware `term_factory`; abstraction currently rejects out-of-order variable use before `crossing` can emit the swap.
 > >
 
-- [WIP] @T-7f2f8ff8-2026-11-27 20:08 compact.py:193 compact.Swap is a ribbon.Braid again
+- [x] compact.py:193 compact.Swap is a ribbon.Braid again, filed as #775
 - [x] compact.py:214 delayed compact boxes through traced.Functor: check, answer
 - [x] feedback/cat.py:234 Arrow.generator_factory is feedback.cat.Box
 - [x] feedback/cat.py:97 a delayed bubble prints its reset bubble, delayed
