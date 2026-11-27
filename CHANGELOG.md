@@ -9,8 +9,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `quantum.zx.Hypergraph.strategy` draws Hadamard boxes, rational phases
-  and Clifford or zero `Number` scalars ([next#43]).
 - `discopy.inet`: interaction nets on flat port lists (`Symbol`, `Signature`,
   `Net`, `Rewriter`) and the symmetric interaction combinators `combinators`
   with optional labels on duplicators `δ`, checked against double-pushout
@@ -52,6 +50,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `cat.TermBase` are proved on nameless terms, and a planar linear term of
   `monoidal` evaluates to a diagram of its context, which a diagram with one
   output reads back from, box for box ([next#705]).
+- `quantum.zx.Hypergraph.strategy` draws Hadamard boxes, rational phases
+  and Clifford or zero `Number` scalars ([next#43]).
 
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
@@ -921,14 +921,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- `quantum.zx.Hypergraph` keeps spider phases as exact `Fraction`s modulo a
-  turn (decimal floats included, so `dagger` is an involution on
-  `Z(1, 1, 0.1)`), `turn` is exact on the quarter-turns so Clifford scalars
-  round-trip through `to_diagram`, `zx.Spider` writes non-dyadic `Fraction`
-  phases as `Fraction(p, q)` in `__str__` (keeping `p/q` for dyadic ones) and
-  exact phases in `__repr__`, and `zx.Scalar.__str__` formats its number
-  without rounding, with regression cases in `proptest/corpus/zx.py`
-  ([next#718]).
 - `quantum.tk.to_tk` drops destructively measured qubits when
   `Measure(override_bits=True)` overrides existing bits, so gates and
   measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
@@ -966,6 +958,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
   and a transpose or a conjugate turns its args half way round with it
   ([next#745]).
+- `quantum.zx.Hypergraph` keeps spider phases as exact `Fraction`s modulo a
+  turn (decimal floats included, so `dagger` is an involution on
+  `Z(1, 1, 0.1)`), `turn` is exact on the quarter-turns so Clifford scalars
+  round-trip through `to_diagram`, `zx.Spider` writes non-dyadic `Fraction`
+  phases as `Fraction(p, q)` in `__str__` (keeping `p/q` for dyadic ones) and
+  exact phases in `__repr__`, and `zx.Scalar.__str__` formats its number
+  without rounding, with regression cases in `proptest/corpus/zx.py`
+  ([next#718]).
 
 - A kappa term of `discopy.bang` copies, exchanges and discards its banged
   variables with the boxes of the domain of the functor that evaluates it,
