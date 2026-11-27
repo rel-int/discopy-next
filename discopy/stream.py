@@ -417,7 +417,7 @@ def up_to_steps(term: "Ty | Stream"):
     the underlying category.
 
     This is the relation a law of streams is read with, see
-    :meth:`Stream.equation_factory`. Equality on a stream is intensional,
+    :meth:`Stream.Equation`. Equality on a stream is intensional,
     see :class:`Ty`, so a law stated with `==` would be false of any two
     terms built separately and say nothing about the law. It is what the
     module docstring states by hand with its own ``eq_up_to_n``, with the
@@ -518,9 +518,9 @@ def up_to_memory(term: Stream):
     >>> assert up_to_memory(f @ h) != up_to_memory(h @ f)
     """
     category = type(term).category
-    if getattr(category, "box_factory", None) is None:
+    if getattr(category, "Box", None) is None:
         return up_to_steps(term)
-    box = Memory[category.box_factory]
+    box = Memory[category.Box]
     unrolled = term.unroll(STEPS)
     now, unit = unrolled.now, category.ob()
     n_dom = len(now.dom) - len(unrolled.mem_dom)
@@ -588,14 +588,14 @@ class Stream[category](FeedbackCategory, TestableGeneric):
 
     So a law of a feedback category is read on streams up to a finite number
     of steps, which is what :func:`up_to_steps` computes and
-    :meth:`equation_factory` compares.
+    :meth:`Equation` compares.
     """
     @classmethod
     def checked_params(cls) -> tuple:
         """
         The underlying category, so that the property matrix checks streams
         over it: a law is read up to :data:`STEPS` steps, see
-        :meth:`equation_factory`, a boundary too, see :meth:`ob_equation`,
+        :meth:`Equation`, a boundary too, see :meth:`ob_equation`,
         and the three laws whose sides feed back the same memory in another
         order up to a permutation of it, see :func:`up_to_memory`
         (`#533 <https://github.com/rel-int/discopy-next/issues/533>`_).
@@ -633,7 +633,7 @@ class Stream[category](FeedbackCategory, TestableGeneric):
         return testable.Equation(*objects, up_to=steps)
 
     @classmethod
-    def equation_factory(cls, *terms: Stream) -> testable.Equation:
+    def Equation(cls, *terms: Stream) -> testable.Equation:
         """
         The equation of a law, compared up to :data:`STEPS` steps of each
         term, see :func:`up_to_steps`: `==` on a stream is intensional, so
@@ -642,8 +642,8 @@ class Stream[category](FeedbackCategory, TestableGeneric):
 
         >>> x, y = map(Ty.sequence, "xy")
         >>> f = Stream.sequence('f', x, y)
-        >>> assert Stream.equation_factory(f @ Stream.id(), f)
-        >>> assert not Stream.equation_factory(f, Stream.id(x))
+        >>> assert Stream.Equation(f @ Stream.id(), f)
+        >>> assert not Stream.Equation(f, Stream.id(x))
         """
         return testable.Equation(*terms, up_to=up_to_steps)
 
@@ -758,7 +758,7 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
         if mem is None:
             mem = Ty[cls.category.ob]()  # ty: ignore[invalid-type-form]
         if box_factory is None:
-            box_factory = cls.category.box_factory
+            box_factory = cls.category.Box
         now = box_factory(
             f"{name}{n_steps}", dom.now @ mem.now, cod.now @ mem.later.now)
         return cls(now, dom, cod, mem, _later=lambda: cls.sequence(

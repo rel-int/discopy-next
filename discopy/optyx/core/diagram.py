@@ -208,14 +208,14 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
+    compact, feedback, monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
 from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import export, AxiomError, factory_name, from_tree
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
 from discopy.optyx.utils.misc import (
@@ -264,7 +264,7 @@ class Ty(frobenius.Ty):
     mirroring :class:`~discopy.monoidal.PRO`.
     """
 
-    generator_factory = Ob
+    Atom = Ob
 
     def __eq__(self, other):
         return isinstance(other, Ty) and self.inside == other.inside\
@@ -320,18 +320,18 @@ class Diagram(frobenius.Diagram):
     __pow__ = monoidal.Ty.__pow__
 
     @classmethod
-    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+    def Cup(cls, left: Ty, right: Ty) -> Spider:
         """
         The cup of an optyx type is its spider with two legs in, as in any
         frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
         and :meth:`trace` bends its wires with both, so the cap comes out as
-        the spider with two legs out and `cap_factory` is never reached.
+        the spider with two legs out and `Cap` is never reached.
 
         >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
         >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
         """
         left.assert_isadjoint(right)
-        return cls.spider_factory(2, 0, left)
+        return cls.Spider(2, 0, left)
 
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
@@ -410,7 +410,7 @@ class Diagram(frobenius.Diagram):
         >>> assert delay.unroll(1, state=False, effect=False) \\
         ...     == wait.unroll(1)
         """
-        return self.feedback_factory(
+        return self.Feedback(
             self, dom=dom, cod=cod, mem=mem, state=state, effect=effect)
 
     def boundary(self):
@@ -430,7 +430,7 @@ class Diagram(frobenius.Diagram):
         """
         def loops(inside):
             for box in inside.boxes:
-                if isinstance(box, self.feedback_factory):
+                if isinstance(box, self.Feedback):
                     yield box
                     yield from loops(box.arg)
 
@@ -489,7 +489,7 @@ class Diagram(frobenius.Diagram):
 
         def to_stream(inside):
             def ar_map(box):
-                if not isinstance(box, self.feedback_factory):
+                if not isinstance(box, self.Feedback):
                     return box
                 inner = to_stream(box.arg)
                 return stream_factory(
@@ -526,7 +526,7 @@ class Diagram(frobenius.Diagram):
         >>> wait = step.feedback()
         >>> assert wait.one_step() == step
         >>> from discopy.optyx.core.zw import Create
-        >>> assert wait.feedback_factory(step, state=Create(1)).one_step()\\
+        >>> assert wait.Feedback(step, state=Create(1)).one_step()\\
         ...     == step
         """
         return self.unroll(0, state=False, effect=False)
@@ -549,7 +549,7 @@ class Diagram(frobenius.Diagram):
             return sum(box.crossings for box in diagram.boxes
                        if isinstance(box, Permutation))
 
-        graph = self.hypergraph_factory[self.factory]
+        graph = self.Hypergraph[self.factory]
         candidates = [self, graph.from_diagram(self).to_diagram()]
         try:
             candidates.append(
@@ -1065,13 +1065,14 @@ class Spider(frobenius.Spider, Box):
         )
 
 
-class Sum(symmetric.Sum, Box):
+@Diagram.extend
+class Sum(symmetric.Diagram.Sum, Box):
     """
     Formal sum of optyx diagrams
     """
 
     def conjugate(self):
-        return self.sum_factory(
+        return self.Sum(
             tuple(term.conjugate() for term in self.terms),
             self.dom, self.cod)
 
@@ -1130,10 +1131,11 @@ class Sum(symmetric.Sum, Box):
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         return sum(term.grad(var, **params) for term in self.terms)
 
 
+@Diagram.extend
 class Permutation(frobenius.Permutation, Box):
     """
     Permutation of the wires of an optyx diagram, the plumbing that a layer
@@ -1184,6 +1186,7 @@ class Permutation(frobenius.Permutation, Box):
             Dim(*[int(dim) for dim in input_dims]), self.perm)
 
 
+@Diagram.extend
 class Swap(Permutation, frobenius.Swap, Box):
     """Swap in optyx diagram"""
 
@@ -1205,7 +1208,8 @@ class Swap(Permutation, frobenius.Swap, Box):
     def truncation(
         self, input_dims: list[int] = None, output_dims: list[int] = None
     ) -> tensor.Box:
-        return tensor.Swap(Dim(int(input_dims[0])), Dim(int(input_dims[1])))
+        return tensor.Diagram.Swap(
+            Dim(int(input_dims[0])), Dim(int(input_dims[1])))
 
 
 class Scalar(Box):
@@ -1535,6 +1539,7 @@ def truncation_tensor(
     return tensor
 
 
+@Diagram.extend
 class Feedback(Box):
     """
     A feedback loop connecting the last `mem` outputs of `arg`
@@ -1689,6 +1694,7 @@ class Feedback(Box):
         return self.arg.to_drawing().trace(len(self.mem))
 
 
+@Diagram.extend
 class Functor(frobenius.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
@@ -1709,6 +1715,7 @@ class Functor(frobenius.Functor):
         return super().__call__(other)
 
 
+@Diagram.slot
 class Hypergraph(hypergraph.Hypergraph):
     """
     A hypergraph whose functor keeps spiders as boxes: `bit` carries two
@@ -1723,11 +1730,10 @@ class Hypergraph(hypergraph.Hypergraph):
 bit = Bit(1)
 mode = Mode(1)
 
-Diagram.hypergraph_factory = Hypergraph
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
-Diagram.permutation_factory = Permutation
+Diagram.Spider = Spider
 Diagram.ob = Ty
-Diagram.sum_factory = Sum
-Diagram.feedback_factory = Feedback
-Diagram.functor_factory = Functor
 Id = Diagram.id
+
+Diagram.Box, Diagram.DualRail = frobenius.Box, compact.DualRail
+
+export(__name__)

@@ -235,7 +235,7 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import export, AxiomError, factory_name, from_tree
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -373,7 +373,7 @@ def truncation_errors(block, injection, creations, max_truncation: int):
 class Ty(frobenius.Ty):
     """Classical and quantum types."""
 
-    generator_factory = Ob
+    Atom = Ob
 
     def single(self):
         """Returns the diagram.Ty obtained by mapping
@@ -440,16 +440,16 @@ class Diagram(frobenius.Diagram):
     __pow__ = monoidal.Ty.__pow__
 
     @classmethod
-    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+    def Cup(cls, left: Ty, right: Ty) -> Spider:
         """
         The cup of a channel type is its spider with two legs in and the
-        cap its dagger, see :meth:`diagram.Diagram.cup_factory`.
+        cap its dagger, see :meth:`diagram.Diagram.Cup`.
 
         >>> assert Diagram.cups(qubit, qubit) == Spider(2, 0, qubit)
         >>> assert Diagram.caps(qmode, qmode) == Spider(0, 2, qmode)
         """
         left.assert_isadjoint(right)
-        return cls.spider_factory(2, 0, left)
+        return cls.Spider(2, 0, left)
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
@@ -487,7 +487,7 @@ class Diagram(frobenius.Diagram):
         The result composes with any other channel diagram and is
         unrolled by :meth:`unroll`.
         """
-        return self.feedback_factory(
+        return self.Feedback(
             self, dom=dom, cod=cod, mem=mem, state=state, effect=effect)
 
     # pylint: disable=too-many-arguments
@@ -1846,7 +1846,7 @@ class Channel(Diagram, frobenius.Box):
         """
         # pylint: disable=unused-argument  # the signature of Diagram.grad
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         raise NotImplementedError(
             f"{type(self).__name__} does not support grad")
 
@@ -1882,7 +1882,8 @@ class Spider(frobenius.Spider, Channel):
         self.env = diagram.Ty()
 
 
-class Sum(symmetric.Sum, Diagram):
+@Diagram.extend
+class Sum(symmetric.Diagram.Sum, Diagram):
     """
     Formal sum of optyx channel diagrams
     """
@@ -1907,11 +1908,11 @@ class Sum(symmetric.Sum, Diagram):
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         return sum(term.grad(var, **params) for term in self.terms)
 
     def get_kraus(self):
-        return diagram.Diagram.sum_factory(
+        return diagram.Diagram.Sum(
             [term.get_kraus() for term in self.terms],
             self.dom.single(), self.cod.single())
 
@@ -1994,6 +1995,7 @@ class CQMap(Diagram, frobenius.Box):
         )
 
 
+@Diagram.extend
 class Permutation(frobenius.Permutation, Channel):
     """
     Permutation of the wires of a channel diagram: plumbing, with no Kraus
@@ -2020,6 +2022,7 @@ class Permutation(frobenius.Permutation, Channel):
         return type(self)(self.cod, self.perm.dagger())
 
 
+@Diagram.extend
 class Swap(Permutation, frobenius.Swap, Channel):
     def __init__(self, left, right):
         frobenius.Swap.__init__(self, left, right)
@@ -2027,6 +2030,7 @@ class Swap(Permutation, frobenius.Swap, Channel):
     dagger = frobenius.Swap.dagger
 
 
+@Diagram.extend
 class Feedback(Diagram, frobenius.Box):
     """
     A feedback loop connecting the last `mem` outputs of a channel diagram
@@ -2349,6 +2353,7 @@ class Observable(CQMap):
         return value.real if np.isclose(value.imag, 0) else value
 
 
+@Diagram.extend
 class Functor(frobenius.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
@@ -2369,6 +2374,7 @@ class Functor(frobenius.Functor):
         return super().__call__(other)
 
 
+@Diagram.slot
 class Hypergraph(hypergraph.Hypergraph):  # pragma: no cover
     functor = Functor
 
@@ -2382,10 +2388,7 @@ Scalar = lambda s: Channel(  # noqa: E731
 )
 
 
-Diagram.spider_factory = Spider
-Diagram.hypergraph_factory = Hypergraph
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Diagram.sum_factory = Sum
-Diagram.feedback_factory = Feedback
-Diagram.functor_factory = Functor
+Diagram.Spider = Spider
+Diagram.Box = frobenius.Box
+
+export(__name__)

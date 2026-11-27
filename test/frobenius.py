@@ -253,9 +253,9 @@ def test_Layer_with_Cospan():
     assert Diagram.from_function([1, 0, 0], x @ y)\
         == Cospan(x @ y, [0, 1], [1, 0, 0])
     d = tensor.Dim(2)
-    assert not tensor.Diagram.layer_factory.is_plumbing_box(
+    assert not tensor.Diagram.Layer.is_plumbing_box(
         tensor.Spider(1, 2, d))
-    assert tensor.Diagram.layer_factory.is_plumbing_box(tensor.Swap(d, d))
+    assert tensor.Diagram.Layer.is_plumbing_box(tensor.Swap(d, d))
     assert not Layer.is_plumbing_box(Spider(1, 1, x, .5))
 
 

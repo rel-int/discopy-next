@@ -137,6 +137,7 @@ from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
+    export,
     AxiomError, factory, factory_key, factory_name, from_tree,
     resolve_factory, unbiased)
 import discopy.matrix as underlying
@@ -206,7 +207,7 @@ class Matrix(underlying.Matrix):
     """
 
     dtype = complex
-    sum_factory: ClassVar[type["Sum"]]
+    Sum: ClassVar[type["Sum"]]
 
     def __new__(
         cls,
@@ -246,12 +247,12 @@ class Matrix(underlying.Matrix):
             and fields(self) == fields(other) and super().__eq__(other)
 
     @classmethod
-    def zero(cls, dom: int | Nat, cod: int | Nat) -> Sum:
+    def zero(cls, dom: int | Nat, cod: int | Nat) -> "Sum":
         """The formal zero, i.e. the empty :class:`Sum` over ``cls.dtype``."""
-        return cls.sum_factory((), dom, cod, cls.dtype)
+        return cls.Sum((), dom, cod, cls.dtype)
 
-    def __add__(self, other: Matrix | Sum) -> Sum:
-        return self.sum_factory((self, )) + other
+    def __add__(self, other: "Matrix | Sum") -> "Sum":
+        return self.Sum((self, )) + other
 
     @property
     def net_photons(self) -> int:
@@ -270,10 +271,10 @@ class Matrix(underlying.Matrix):
         return underlying.Matrix[self.dtype](self.array, self.udom, self.ucod)
 
     @unbiased
-    def then(self, other: Matrix | Sum) -> Matrix | Sum:
+    def then(self, other: "Matrix | Sum") -> "Matrix | Sum":
         """Sequential composition of QPath matrices"""
         if isinstance(other, Sum):
-            return self.sum_factory((self, )).then(other)
+            return self.Sum((self, )).then(other)
         assert_iscomposable(self, other)
         M = underlying.Matrix[self.dtype]
         left, right = len(self.selections), len(other.creations)
@@ -297,10 +298,10 @@ class Matrix(underlying.Matrix):
         )
 
     @unbiased
-    def tensor(self, other: Matrix | Sum) -> Matrix | Sum:
+    def tensor(self, other: "Matrix | Sum") -> "Matrix | Sum":
         """Parallel composition of QPath matrices"""
         if isinstance(other, Sum):
-            return self.sum_factory((self, )).tensor(other)
+            return self.Sum((self, )).tensor(other)
         M = underlying.Matrix[self.dtype]
         a, b = len(self.creations), len(other.creations)
         c, d = len(self.selections), len(other.selections)
@@ -585,6 +586,7 @@ class Matrix(underlying.Matrix):
         return np.allclose(np.eye(m.shape[0]), m.dot(m.conj().T))
 
 
+@Matrix.slot
 class Sum(cat.Sum):
     """
     A formal sum of :class:`Matrix` with the same number of modes in and out,
@@ -629,7 +631,7 @@ class Sum(cat.Sum):
         super().__init__(terms, dom, cod)
 
     @property
-    def sum_factory(self) -> Callable[..., Sum]:
+    def Sum(self) -> Callable[..., Sum]:
         """
         The factory a sum builds sums with, which fixes its ``dtype``, so
         that the ring survives every operation of
@@ -676,8 +678,8 @@ class Sum(cat.Sum):
     def tensor(self, other: Matrix | Sum) -> Sum:
         """ The tensor of sums distributes over the sum. """
         other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        return self.sum_factory(
+            else self.Sum((other, ))
+        return self.Sum(
             tuple(f.tensor(g) for f in self.terms for g in other.terms),
             self.dom @ other.dom, self.cod @ other.cod)
 
@@ -786,4 +788,4 @@ class Probabilities(underlying.Matrix):
         )
 
 
-Matrix.sum_factory = Sum
+export(__name__)

@@ -35,7 +35,7 @@ def test_daggers_cancel(circ, value):
 
 @pytest.mark.parametrize("circ", param_circuits)
 def test_zero_grad(circ):
-    assert circ.grad(theta) == Diagram.sum_factory((), circ.dom, circ.cod)
+    assert circ.grad(theta) == Diagram.Sum((), circ.dom, circ.cod)
 
 
 @pytest.mark.parametrize("circ, value", product(param_circuits, values[1:]))

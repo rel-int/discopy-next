@@ -92,12 +92,12 @@ cap becomes a ribbon folding back.
 
 from typing import ClassVar
 
-from discopy import rigid, pivotal, balanced, feedback
+from discopy import pivotal, balanced, feedback
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
     Ty, Nat)
-from discopy.utils import from_tree
+from discopy.utils import export, from_tree
 
 
 @factory
@@ -110,14 +110,14 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    braid_factory: ClassVar[type["Braid"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    twist_factory: ClassVar[type["Twist"]]
-    sum_factory: ClassVar[type["Sum"]]
-    dual_rail_factory: ClassVar[type["DualRail"]]
+    Box: ClassVar[type["pivotal.Box"]]
+    Braid: ClassVar[type["Braid"]]
+    Functor: ClassVar[type["Functor"]]
+    Cup: ClassVar[type["pivotal.Cup"]]
+    Cap: ClassVar[type["pivotal.Cap"]]
+    Twist: ClassVar[type["Twist"]]
+    Sum: ClassVar[type["pivotal.Sum"]]
+    DualRail: ClassVar[type["DualRail"]]
 
     def trace(self, n=1, left=False):
         """
@@ -152,9 +152,9 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
             raise ValueError(f'A cup joins two distinct wires, got {x, y}.')
         x, y = min(x, y), max(x, y)
         for i in range(x, y - 1):
-            braid = self.braid_factory(self.cod[i], self.cod[i + 1])
+            braid = self.Braid(self.cod[i], self.cod[i + 1])
             self = self >> self.cod[:i] @ braid @ self.cod[i + 2:]
-        cup = self.cup_factory(self.cod[y - 1], self.cod[y])
+        cup = self.Cup(self.cod[y - 1], self.cod[y])
         return self >> self.cod[:y - 1] @ cup @ self.cod[y + 1:]
 
     def to_ribbons(self, width: float | None = None, colour="gray"):
@@ -182,38 +182,8 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         return self.to_braided(width, colour)
 
 
-class Box(pivotal.Box, balanced.Box, Diagram):
-    """
-    A ribbon box is a pivotal and balanced box in a ribbon diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (pivotal.Ty) : The domain of the box, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Cup(pivotal.Cup, Box):
-    """
-    A ribbon cup is a pivotal cup in a ribbon diagram.
-
-    Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
-    """
-
-
-class Cap(pivotal.Cap, Box):
-    """
-    A ribbon cap is a pivotal cap in a ribbon diagram.
-
-    Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
-    """
-
-
-class Braid(balanced.Braid, Box):
+@Diagram.extend
+class Braid(balanced.Diagram.Braid, Diagram.Box):
     """
     A ribbon braid is a balanced braid in a ribbon diagram.
 
@@ -237,7 +207,7 @@ class Braid(balanced.Braid, Box):
         return type(self)(*self.cod.r, is_dagger=self.is_dagger)
 
 
-class DualRailBraid(balanced.DualRailBraid, Box):
+class DualRailBraid(balanced.DualRailBraid, Diagram.Box):
     """
     The crossing of two ribbons in the dual rail encoding of a ribbon swap.
 
@@ -251,7 +221,7 @@ class DualRailBraid(balanced.DualRailBraid, Box):
         return type(self)(self.left.r, self.right.r, self.is_dagger)
 
 
-class DualRailTwist(balanced.DualRailTwist, Box):
+class DualRailTwist(balanced.DualRailTwist, Diagram.Box):
     """
     The twist of a ribbon in the dual rail encoding of a ribbon twist.
 
@@ -265,7 +235,7 @@ class DualRailTwist(balanced.DualRailTwist, Box):
         return type(self)(self.dom.r, self.is_dagger)
 
 
-class DualRailCup(Box):
+class DualRailCup(Diagram.Box):
     """
     A cup joining two ribbons in the dual rail encoding, drawn as a single
     constant-width fold. It is only used by :meth:`Diagram.to_ribbons`.
@@ -280,7 +250,7 @@ class DualRailCup(Box):
     def __init__(self, left, right, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
-        Box.__init__(
+        Diagram.Box.__init__(
             self, name, left @ right, type(left)(),
             is_dagger=is_dagger, draw_as_dual_rail_cup=True)
 
@@ -316,7 +286,7 @@ class DualRailCup(Box):
         return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
-class DualRailCap(Box):
+class DualRailCap(Diagram.Box):
     """
     A cap joining two ribbons in the dual rail encoding, see
     :class:`DualRailCup`.
@@ -327,7 +297,7 @@ class DualRailCap(Box):
     def __init__(self, left, right, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
-        Box.__init__(
+        Diagram.Box.__init__(
             self, name, type(left)(), left @ right,
             is_dagger=is_dagger, draw_as_dual_rail_cap=True)
 
@@ -358,7 +328,8 @@ class DualRailCap(Box):
         return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
-class Twist(balanced.Twist, Box):
+@Diagram.extend
+class Twist(balanced.Twist, Diagram.Box):
     """
     Balanced twist in a ribbon category.
 
@@ -372,17 +343,7 @@ class Twist(balanced.Twist, Box):
         return type(self)(self.dom.r, self.is_dagger)
 
 
-class Sum(rigid.Sum, feedback.Sum, Box):
-    """
-    A ribbon sum is a sum of ribbon diagrams.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Functor(pivotal.Functor, balanced.Functor):
     """
     A ribbon functor is both a pivotal functor and a balanced functor.
@@ -401,6 +362,7 @@ class Functor(pivotal.Functor, balanced.Functor):
         return pivotal.Functor.__call__(self, other)
 
 
+@Diagram.extend
 class DualRail(balanced.DualRail, Functor):
     """
     The functor sending a ribbon diagram to its dual rail encoding, extending
@@ -413,34 +375,25 @@ class DualRail(balanced.DualRail, Functor):
     :meth:`Diagram.to_ribbons`
     """
     cod = Diagram
-    dual_rail_twist_factory = DualRailTwist
-    dual_rail_braid_factory = DualRailBraid
+    DualRailTwist = DualRailTwist
+    DualRailBraid = DualRailBraid
 
     def __call__(self, other):
-        if isinstance(other, Cup):
+        if isinstance(other, Diagram.Cup):
             return DualRailCup(self(other.dom[:1]), self(other.dom[1:]))
-        if isinstance(other, Cap):
+        if isinstance(other, Diagram.Cap):
             return DualRailCap(self(other.cod[:1]), self(other.cod[1:]))
         if isinstance(other, (Braid, Twist)):
             return super().__call__(other)  # A single dual rail box crossing.
-        if isinstance(other, Box) and not other.time_step\
+        if isinstance(other, Diagram.Box) and not other.time_step\
                 and not other.args and not isinstance(
-                    other, (Sum, feedback.FollowedBy)):
+                    other, (Diagram.Sum, feedback.FollowedBy)):
             # A generator is doubled into a box on the rails of its ribbons;
             # self doubles its domain and codomain per object.
-            return Box(other.name, self(other.dom), self(other.cod),
-                       is_dagger=other.is_dagger)
+            return Diagram.Box(other.name, self(other.dom), self(other.cod),
+                               is_dagger=other.is_dagger)
         return super().__call__(other)
 
-
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.twist_factory = Twist
-Diagram.sum_factory = Sum
-Diagram.dual_rail_factory = DualRail
 
 Id = Diagram.id
 
@@ -449,4 +402,6 @@ class Equation(pivotal.Equation):
     """ The :class:`pivotal.Equation` of ribbon diagrams. """
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

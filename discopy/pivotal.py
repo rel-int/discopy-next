@@ -73,7 +73,7 @@ from discopy import cat, cmap, messages, rigid, feedback
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
 from discopy.cat import factory
-from discopy.utils import deprecated_alias
+from discopy.utils import export, deprecated_alias
 
 
 class Wire(feedback.Wire, rigid.Wire):
@@ -128,7 +128,7 @@ class Ty(rigid.Ty, feedback.Ty):
     Parameters:
         inside (Wire) : The objects inside the type.
     """
-    generator_factory = Wire
+    Atom = Wire
 
 
 @factory
@@ -166,13 +166,13 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
     trace_superposing_left = PivotalCategory.trace_superposing_left
     trace_superposing_right = PivotalCategory.trace_superposing_right
 
-    sum_factory: ClassVar[type["Sum"]]
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
+    Sum: ClassVar[type["rigid.Sum"]]
+    Box: ClassVar[type["Box"]]
+    Functor: ClassVar[type["rigid.Functor"]]
+    Cup: ClassVar[type["Cup"]]
+    Cap: ClassVar[type["Cap"]]
     ob = Ty
-    layer_factory = Layer
+    Layer = Layer
 
     def dagger(self):
         """
@@ -215,7 +215,7 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         return self.rotate().dagger()
 
     @classmethod
-    def trace_factory(cls, diagram: Diagram, left=False):
+    def Trace(cls, diagram: Diagram, left=False):
         """
         The trace of a pivotal diagram is its pre- and post-composition with
         cups and caps to form a feedback loop.
@@ -227,12 +227,12 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         traced_wire = diagram.dom[:1] if left else diagram.dom[-1:]
         dom, cod = (diagram.dom[1:], diagram.cod[1:]) if left\
             else (diagram.dom[:-1], diagram.cod[:-1])
-        return cls.cap_factory(traced_wire.r, traced_wire) @ dom\
+        return cls.Cap(traced_wire.r, traced_wire) @ dom\
             >> traced_wire.r @ diagram\
-            >> cls.cup_factory(traced_wire.r, traced_wire) @ cod if left\
-            else dom @ cls.cap_factory(traced_wire, traced_wire.r)\
+            >> cls.Cup(traced_wire.r, traced_wire) @ cod if left\
+            else dom @ cls.Cap(traced_wire, traced_wire.r)\
             >> diagram @ traced_wire.r\
-            >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
+            >> cod @ cls.Cup(traced_wire, traced_wire.r)
 
     dagger_involution = DaggerCategory.dagger_involution
     dagger_involution_rigid = DaggerCategory.dagger_involution.weaken(
@@ -255,6 +255,7 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+@Diagram.extend
 class Box(rigid.Box, feedback.Box, Diagram):
     """
     A pivotal box is a rigid box in a pivotal diagram.
@@ -300,6 +301,7 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+@Diagram.extend
 class Cup(rigid.Cup, Box):
     """
     A pivotal cup is a rigid cup of pivotal types.
@@ -311,10 +313,11 @@ class Cup(rigid.Cup, Box):
 
     def dagger(self) -> Cap:
         """ The dagger of a pivotal cup. """
-        return self.cap_factory(self.left, self.right)
+        return self.Cap(self.left, self.right)
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+@Diagram.extend
 class Cap(rigid.Cap, Box):
     """
     A pivotal cap is a rigid cap of pivotal types.
@@ -326,40 +329,10 @@ class Cap(rigid.Cap, Box):
 
     def dagger(self) -> Cup:
         """ The dagger of a pivotal cap. """
-        return self.cup_factory(self.left, self.right)
+        return self.Cup(self.left, self.right)
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
-class Sum(rigid.Sum, feedback.Sum, Box):
-    """
-    A pivotal sum is a sum of pivotal diagrams.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
-class Functor(rigid.Functor, feedback.Functor):
-    """
-    A pivotal functor is a rigid functor on a pivotal category.
-
-    Parameters:
-        ob_map (Mapping[Ty, Ty]) :
-            Map from atomic :class:`Ty` to :code:`cod.ob`.
-        ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
-        cod (Category) : The codomain of the functor.
-    """
-    dom = cod = Diagram
-
-
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.functor_factory = Functor
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.sum_factory = Sum
 CMap = cmap.CMap[Diagram]
 Id = Diagram.id
 
@@ -372,3 +345,5 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
 
 
 Bubble = Box.from_args
+
+export(__name__)

@@ -1,12 +1,13 @@
 """ DisCoPy's property-testing module in action. """
 
 import pickle
+import sys
 from typing import Self, TypeVar
 
 from hypothesis import Phase, find, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
-from pytest import mark, raises
+from pytest import mark, raises, warns
 
 from discopy import braided, cat, monoidal, rigid, testable
 from discopy.abc import Category, ColouredMonoid, Group, MonoidalCategory, Nat
@@ -27,7 +28,7 @@ class ParityEquation(Equation):
 class Parity(int, Equivalence):
     """ An integer up to parity, an equivalence relation besides equality. """
 
-    equivalence_factory = ParityEquation
+    Equation = ParityEquation
 
     @classmethod
     def strategy(cls, **params):
@@ -324,9 +325,11 @@ def test_canonical_instances():
     statement fails here before the property matrix ever searches for a
     counterexample. """
     for category in Testable.enrolled():
-        if not category.__module__.startswith("discopy."):
-            continue  # a category another test defines, e.g. the README's
-        box = getattr(category, "box_factory", None)
+        if not category.__module__.startswith("discopy.") or getattr(
+                sys.modules[category.__module__], category.__qualname__,
+                None) is not category:
+            continue  # a category a test or a doctest defines
+        box = getattr(category, "Box", None)
         if box is None or not (issubclass(box, category)
                                or issubclass(category, ColouredMonoid)):
             continue  # a map, a hypergraph, a type of one colour or a test
@@ -347,7 +350,7 @@ def test_extensional():
     from discopy.python import Function
     f, g = (Function(lambda x, k=k: x + k, int, int) for k in (1, 1))
     assert f != g and Extensional(f, g)
-    assert Function.equation_factory(f >> Function.id(int), f)
+    assert Function.Equation(f >> Function.id(int), f)
     assert not Extensional(f, Function.id(int))
     with raises(TypeError):
         values(list)
@@ -446,3 +449,23 @@ def test_environment_binds_numpy_scalar_types():
     environment = type(box).environment()
     assert eval(repr(box), environment) == box
     assert environment['matrix'] is matrix and 'bool' not in environment
+
+
+def test_legacy_factory():
+    """ A ``*_factory`` written before slots still reads and assigns one. """
+    from discopy import symmetric
+    from discopy.utils import factory
+    with warns(DeprecationWarning, match="symmetric.Diagram.Swap"):
+        assert symmetric.Diagram.swap_factory is symmetric.Swap
+
+    @factory
+    class Recipe(symmetric.Diagram):
+        pass
+
+    class Step(symmetric.Box, Recipe):
+        pass
+
+    Recipe.box_factory = Step
+    with warns(DeprecationWarning, match="assign .*Recipe.Box instead"):
+        assert Recipe.Box is Step
+    assert issubclass(Recipe.Swap, Step)

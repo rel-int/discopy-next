@@ -304,7 +304,7 @@ class Functor(cat.Functor):
     monad ``M``, when the homs of ``D`` are algebras of ``M``: an arrow
     ``m`` from ``A`` to ``B`` goes to the structure of
     ``D.algebra(M, F(A), F(B))`` applied to ``M(F)(m)``, where ``F`` is the
-    ``functor_factory`` of ``C``, e.g. :class:`~discopy.monoidal.Functor`
+    ``Functor`` of ``C``, e.g. :class:`~discopy.monoidal.Functor`
     for :class:`~discopy.monoidal.Diagram`.
 
     Parameters:
@@ -334,11 +334,11 @@ class Functor(cat.Functor):
     def base(self) -> cat.Functor:
         """
         The functor ``F: C -> D`` that is extended, i.e. the
-        ``functor_factory`` of ``C`` with the same maps, which evaluates the
+        ``Functor`` of ``C`` with the same maps, which evaluates the
         objects and the arrows inside.
         """
         C = self.dom.category
-        return C.functor_factory(self.ob_map, self.ar_map, dom=C, cod=self.cod)
+        return C.Functor(self.ob_map, self.ar_map, dom=C, cod=self.cod)
 
     def __call__(self, other):
         base = self.base

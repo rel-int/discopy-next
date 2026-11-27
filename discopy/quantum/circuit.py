@@ -78,7 +78,8 @@ from discopy import feedback, messages, tensor, frobenius
 from discopy.cat import factory
 from discopy.matrix import asarray, backend
 from discopy.tensor import Dim, Tensor
-from discopy.utils import assert_isinstance, deprecated_alias, factory_name
+from discopy.utils import (
+    export, assert_isinstance, deprecated_alias, factory_name)
 
 
 class Wire(frobenius.Wire):
@@ -202,8 +203,8 @@ class Ty(frobenius.Ty):
     >>> print(bit ** 2 @ qubit ** 3)
     bit @ bit @ qubit @ qubit @ qubit
     """
-    generator_factory = Wire
-    box_factory = None
+    Atom = Wire
+    Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
@@ -226,9 +227,9 @@ class Circuit(tensor.Diagram[complex]):
         dom (quantum.circuit.Ty) : The domain of the circuit diagram.
         cod (quantum.circuit.Ty) : The codomain of the circuit diagram.
     """
-    swap_factory: ClassVar[type["Swap"]]
-    sum_factory: ClassVar[type["Sum"]]
-    permutation_factory: ClassVar[type["Permutation"]]
+    Swap: ClassVar[type["Swap"]]
+    Sum: ClassVar[type["Sum"]]
+    Permutation: ClassVar[type["Permutation"]]
     ob = Ty
 
     @classmethod
@@ -890,7 +891,7 @@ class Circuit(tensor.Diagram[complex]):
         return super().permutation(perm, doms)
 
     @staticmethod
-    def cup_factory(left, right):
+    def Cup(left, right):
         from discopy.quantum.gates import CX, H, sqrt, Bra, Match, Discard
 
         if left == right == qubit:
@@ -900,12 +901,12 @@ class Circuit(tensor.Diagram[complex]):
         raise ValueError
 
     @staticmethod
-    def cap_factory(left, right):
+    def Cap(left, right):
         """ The cap of a circuit, the dagger of its cup. """
-        return Circuit.cup_factory(left, right).dagger()
+        return Circuit.Cup(left, right).dagger()
 
     @staticmethod
-    def spider_factory(n_legs_in, n_legs_out, typ, phase=None):
+    def Spider(n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None:
             raise NotImplementedError
 
@@ -945,6 +946,7 @@ class Circuit(tensor.Diagram[complex]):
             >> self.cod[:offset] @ gate @ self.cod[offset + len(gate.dom):]
 
 
+@Circuit.extend
 class Box(tensor.Box[complex], Circuit):
     """
     A circuit box is a tensor box in a circuit diagram.
@@ -1014,7 +1016,8 @@ class Box(tensor.Box[complex], Circuit):
         return self if self.z is None else super().rotate(left)
 
 
-class Sum(tensor.Sum[complex], Box):
+@Circuit.extend
+class Sum(tensor.Diagram.Sum[complex], Box):
     """ Sums of circuits. """
     @property
     def is_mixed(self):
@@ -1052,7 +1055,9 @@ class Sum(tensor.Sum[complex], Box):
         return [circuit.to_tk() for circuit in self.terms]
 
 
-class Elementwise(tensor.Elementwise[complex], Box):
+@Circuit.extend
+class Elementwise(  # ty: ignore[inconsistent-mro]
+        tensor.Elementwise[complex], Box):
     """
     A circuit elementwise box is a tensor one in a circuit, mixed when its
     boundary has both bits and qubits or its args are mixed. It
@@ -1072,6 +1077,7 @@ class Elementwise(tensor.Elementwise[complex], Box):
             or any(arg.is_mixed for arg in self.args)
 
 
+@Circuit.extend
 class Permutation(tensor.Permutation[complex], Box):
     "A permutation in a quantum circuit."
 
@@ -1081,7 +1087,8 @@ class Permutation(tensor.Permutation[complex], Box):
                    for left, right in zip(self.dom, self.cod))
 
 
-class Swap(Permutation, tensor.Swap, Box):
+@Circuit.extend
+class Swap(Permutation, tensor.Diagram.Swap, Box):
     """
     The logical swap of two circuit wires, i.e. plumbing.
 
@@ -1122,10 +1129,6 @@ def bitstring2index(bitstring):
     return sum(value * 2 ** i for i, value in enumerate(bitstring[::-1]))
 
 
-Circuit.box_factory = Box
-Circuit.swap_factory, Circuit.sum_factory = Swap, Sum
-Circuit.elementwise_factory = Elementwise
-Circuit.permutation_factory = Permutation
 bit, qubit = Ty(Digit(2)), Ty(Qudit(2))
 Id = Circuit.id
 
@@ -1134,3 +1137,6 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 
 Bubble = Elementwise.from_args
+
+
+export(__name__)

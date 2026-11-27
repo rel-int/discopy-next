@@ -81,14 +81,17 @@ Summary
 
 from __future__ import annotations
 
+import ast
 import builtins
 import inspect
+import textwrap
 import pickle
 import sys
+import types
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from copy import copy, deepcopy
-from dataclasses import KW_ONLY, dataclass, replace
+from dataclasses import KW_ONLY, dataclass, field, replace
 from functools import cached_property, reduce, wraps
 from operator import index, matmul
 from types import GenericAlias, NoneType, UnionType
@@ -96,7 +99,7 @@ from typing import (
     TYPE_CHECKING, Annotated, Any, ClassVar, Concatenate, ParamSpec, Self,
     TypeVar,
     TypeVarTuple,
-    get_args, get_origin)
+    get_args, get_origin, overload)
 
 from discopy import messages
 from discopy.utils import (
@@ -282,7 +285,7 @@ class Inequation[T](Equation[T]):
 def quotient(category, term):
     """
     A term up to the equation of its category, i.e. its image under the
-    ``up_to`` of :meth:`~discopy.abc.Category.equation_factory`, the term
+    ``up_to`` of :meth:`~discopy.abc.Category.Equation`, the term
     itself when the category compares on the nose, so that a construction
     over any category, e.g. a parametric map or a lens, compares its parts
     as that category does.
@@ -295,7 +298,7 @@ def quotient(category, term):
     >>> m = Matrix[int].id(2)
     >>> assert quotient(Matrix[int], m) is m
     """
-    up_to = category.equation_factory(term).up_to
+    up_to = category.Equation(term).up_to
     return term if up_to is None else up_to(term)
 
 
@@ -643,11 +646,11 @@ def inhabits(value, kind) -> bool:
 
 
 @dataclass
-class Declaration[**P, T](classmethod):
+class Declaration[**P, T]:
     """
     A declaration of a category, stated once on an abstract base class and
-    inherited by every category below it: an :class:`Axiom` or a
-    :class:`Rule`.
+    inherited by every category below it: an :class:`Axiom`, a :class:`Rule`
+    or a :class:`Slot`.
 
     The category is the class the declaration is bound to, e.g.
     :class:`~discopy.cat.Arrow` for those of :class:`~discopy.abc.Category`.
@@ -693,7 +696,8 @@ class Declaration[**P, T](classmethod):
     applicable: bool = True
 
     def __post_init__(self):
-        classmethod.__init__(self, self.function)
+        if isinstance(self, classmethod):
+            classmethod.__init__(self, self.function)
         self.name = self.name or self.function.__name__
         self.params = dict(self.params or {})
         self.__doc__ = self.function.__doc__
@@ -910,7 +914,7 @@ class Declaration[**P, T](classmethod):
 
 
 @dataclass(repr=False)
-class Axiom[**P, T](Declaration[P, T]):
+class Axiom[**P, T](Declaration[P, T], classmethod):
     """
     An axiom of a category: a :class:`Declaration` whose function states a
     law, from the category and its arguments to an :class:`Equation`, or to
@@ -965,7 +969,7 @@ class Axiom[**P, T](Declaration[P, T]):
     def canonical(self) -> Equation:
         """
         The law as a schema: its equation with an object named after each
-        type parameter, a ``box_factory`` named after each morphism, cast
+        type parameter, a ``Box`` named after each morphism, cast
         into the category when it is a generator rather than a term, e.g.
         the wire of a type, and two for each number, the equation a law
         declared broken raises included, and ``NotImplemented`` for a law
@@ -994,7 +998,7 @@ class Axiom[**P, T](Declaration[P, T]):
                              for i in range(get_args(kind)[1]))
             dom, cod = get_args(kind)[1:] if get_origin(kind) is Hom\
                 else (self.category.ob(name), ) * 2
-            box = self.category.box_factory(name, dom=dom, cod=cod)
+            box = self.category.Box(name, dom=dom, cod=cod)
             return box if isinstance(box, self.category)\
                 else self.category.cast(box)
 
@@ -1061,7 +1065,7 @@ class Axiom[**P, T](Declaration[P, T]):
 
 
 @dataclass(repr=False)
-class Rule[**P, T](Declaration[P, T]):
+class Rule[**P, T](Declaration[P, T], classmethod):
     """
     An inference rule of a category: a :class:`Declaration` whose function
     concludes a morphism from its premises, the objects and morphisms it
@@ -1098,6 +1102,30 @@ class Rule[**P, T](Declaration[P, T]):
         return tuple(
             side.__name__ if side in function.__type_params__ else None
             for side in sides)
+
+    @cached_property
+    def operation(self) -> str | None:
+        """
+        The method of the category the rule calls first, which a codomain
+        needs for a functor to send a generator to the rule there, see
+        :class:`Generator`, or :obj:`None` when the rule calls none.
+
+        >>> from discopy.abc import BraidedCategory, RigidCategory
+        >>> BraidedCategory.braiding.operation
+        'braid'
+        >>> RigidCategory.counit.operation
+        'cups'
+        """
+        function = inspect.unwrap(self.function)
+        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+        first = next(iter(tree.body[0].args.args), None)
+        calls = sorted((
+            node for node in ast.walk(tree) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and first is not None and node.func.value.id == first.arg),
+            key=lambda node: (node.lineno, node.col_offset))
+        return calls[0].func.attr if calls else None
 
     @cached_property
     def is_recursive(self) -> bool:
@@ -1139,6 +1167,231 @@ class Rule[**P, T](Declaration[P, T]):
         goal on a side that is not a variable.
         """
         return self.arguments(self.given(dom, cod), **params)
+
+
+def legacy_name(name: str) -> str:
+    """
+    The ``*_factory`` attribute that the :class:`Slot` named ``name``
+    replaces, read and written by code written before it.
+
+    >>> assert legacy_name("Swap") == "swap_factory"
+    >>> assert legacy_name("DualRail") == "dual_rail_factory"
+    """
+    return "".join(
+        f"_{c.lower()}" if c.isupper() and i else c.lower()
+        for i, c in enumerate(name)) + "_factory"
+
+
+class Legacy:
+    """
+    The ``*_factory`` attribute of a :class:`Slot` as it was named before,
+    read with a :class:`DeprecationWarning`, see :func:`legacy_name`.
+
+    Parameters:
+        name : The name of the slot it reads.
+    """
+    def __init__(self, name: str):
+        self.name = name
+
+    def __get__(self, instance, owner: type):
+        import warnings
+        warnings.warn(
+            f"{factory_name(owner)}.{legacy_name(self.name)} is deprecated, "
+            f"use {factory_name(owner)}.{self.name} instead.",
+            DeprecationWarning, stacklevel=2)
+        return getattr(owner, self.name)
+
+
+@dataclass(repr=False)
+class Slot[**P, T](Declaration[P, T]):
+    """
+    The class of a generator, declared once by the category introducing it
+    and built on first access by every level below, i.e. every subclass of
+    the category decorated with :func:`~discopy.utils.factory`, see
+    :meth:`Testable.slot`.
+
+    Its function is the class it builds the others from, its root, e.g.
+    :class:`~discopy.symmetric.Swap` for ``symmetric.Diagram.Swap``. At a
+    level below, the slot is the subclass of the slot of each base of the
+    level, of the slots of the level that the root subclasses, and of the
+    level itself when the root subclasses its category, so that
+    ``closed.Swap`` subclasses ``markov.Swap``, ``closed.Permutation``,
+    ``closed.Box`` and ``closed.Diagram``. A class attribute assigned by
+    hand wins, :meth:`Testable.extend` adds a class of its own to the
+    bases of a level and a subscript of a generic level, e.g.
+    ``tensor.Diagram[complex]``, subscripts the slot of its origin.
+
+    Code written before slots read and assigned their ``*_factory``, see
+    :func:`legacy_name`: reading one is deprecated, and a level assigning
+    one gets it as its slot, with a :class:`DeprecationWarning`.
+
+    Example
+    -------
+    >>> from discopy import symmetric, markov, closed
+    >>> assert symmetric.Diagram.Swap is symmetric.Swap
+    >>> assert closed.Swap.__bases__ == (
+    ...     markov.Swap, closed.Permutation, closed.Box, closed.Diagram)
+    """
+    cache: dict = field(default_factory=dict, init=False, compare=False)
+
+    __hash__ = Declaration.__hash__
+
+    def __set_name__(self, owner: type, name: str):
+        self.category, self.name = owner, name
+        if legacy_name(name) not in vars(owner):
+            setattr(owner, legacy_name(name), Legacy(name))
+
+    def bind(self, category: type) -> Self:
+        return self
+
+    def __get__(self, instance, owner: type) -> type[T]:
+        level = getattr(owner, "factory", owner)
+        if level not in self.cache:
+            self.cache[level] = self.resolve(level)
+        return self.cache[level]
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        return self.function(*args, **kwargs)
+
+    def resolve(self, level: type) -> type[T]:
+        """
+        The slot at a ``level``, built unless it is the category declaring
+        it, the subscript of a generic level or a level assigning its
+        ``*_factory`` by hand.
+        """
+        if level is self.category:
+            return self.function
+        legacy = legacy_name(self.name)
+        for klass in level.__mro__:
+            value = vars(klass).get(legacy)
+            if value is not None and not isinstance(value, Legacy):
+                import warnings
+                warnings.warn(
+                    f"{factory_name(klass)}.{legacy} is deprecated, "
+                    f"assign {factory_name(klass)}.{self.name} instead.",
+                    DeprecationWarning, stacklevel=4)
+                return value
+            if klass is self.category:
+                break
+        if vars(level).get("__is_named_generic__"):
+            origin = getattr(level.__origin__, self.name)
+            try:
+                return origin[level.__values__]
+            except TypeError:
+                return origin
+        return self.build(level)
+
+    @cached_property
+    def parents(self) -> tuple[str, ...]:
+        """
+        The names of the slots of the category that the root subclasses
+        directly or through bases that are not slots, e.g. the box of
+        :class:`~discopy.bang.Digging` through ``Structural``.
+        """
+        roots = {
+            getattr(self.category, name): name for name in slots(self.category)
+            if name != self.name}
+
+        def walk(klass: type) -> Iterator[str]:
+            for base in klass.__bases__:
+                if base in roots:
+                    yield roots[base]
+                elif issubclass(base, self.category):
+                    yield from walk(base)
+        return tuple(dict.fromkeys(walk(self.function)))
+
+    def build(self, level: type, extension: type | None = None) -> type[T]:
+        """
+        The subclass of the slots of the bases of ``level``, its parents at
+        ``level`` and ``level`` itself, with the ``extension`` first, or the
+        root when no base of ``level`` has the slot. A class that depends on
+        no level, i.e. that is no morphism, has no parent and refers to no
+        category, e.g. :class:`~discopy.monoidal.Layer`, is that of the base.
+        """
+        roots = list(dict.fromkeys(
+            value for base in level.__bases__
+            if isinstance(value := getattr(base, self.name, None), type)))
+        roots = [root for root in roots if not any(
+            other is not root and issubclass(other, root) for other in roots)]
+        rebound = {
+            key: level for key, value in vars(self.function).items()
+            if value is self.category}
+        if extension is None and not roots:
+            return self.function
+        if extension is None and len(roots) == 1 and not self.parents\
+                and not rebound and not issubclass(
+                    self.function, self.category):
+            return roots[0]
+        name = (extension or self.function).__name__
+        bases = tuple(dict.fromkeys((
+            *(() if extension is None else (extension, )), *roots,
+            *(getattr(level, parent) for parent in self.parents),
+            *((level, ) if issubclass(self.function, self.category) else ()))))
+        references = " and ".join(
+            f":class:`~{root.__module__}.{root.__name__}`" for root in roots)
+        namespace = rebound | {
+            "__module__": level.__module__, "__qualname__": name,
+            "__doc__": extension.__doc__ if extension is not None
+            and extension.__doc__ else
+            f"A {references} in a "
+            f":class:`~{level.__module__}.{level.__name__}`."}
+        return types.new_class(
+            name, bases, exec_body=lambda body: body.update(namespace))
+
+
+@dataclass(repr=False)
+class Generator[**P, T](Slot[P, T]):
+    """
+    A :class:`Slot` whose class is the conclusion of an inference rule with
+    no morphism among its premises, e.g. the braid of two atoms is
+    :meth:`~discopy.abc.BraidedCategory.braiding`. Every box it builds reads
+    the rule as its ``rule`` and the objects the rule takes as its
+    ``premises``, so that a functor sends it to the rule of its codomain on
+    the image of its premises, see :meth:`~discopy.cat.Functor.__call__`,
+    rather than each level matching the class of its boxes.
+
+    A class whose boxes conclude different rules, e.g. an evaluation on
+    the left or on the right, or one of them only when undecorated, e.g. a
+    spider with no phase, defines its own ``rule``, :obj:`None` for a box
+    that concludes none, which a functor then maps as any other box.
+
+    Parameters:
+        rule : The rule the generator concludes.
+
+    Example
+    -------
+    >>> from discopy.abc import BraidedCategory
+    >>> from discopy.braided import Braid, Ty
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Braid.rule.function is BraidedCategory.braiding.function
+    >>> assert Braid(x, y).premises == {"x": x, "y": y}
+    >>> assert Braid(x, y).rule(**Braid(x, y).premises) == Braid(x, y)
+    """
+    rule: Rule = None  # ty: ignore[invalid-assignment]
+
+    __hash__ = Declaration.__hash__
+
+    def __set_name__(self, owner: type, name: str):
+        super().__set_name__(owner, name)
+        if "rule" not in vars(self.function):
+            self.function.rule = classproperty(
+                lambda cls, rule=self.rule: rule.bind(cls.factory))
+
+
+def slots(category: type) -> dict[str, Slot]:
+    """
+    The slots of a ``category``, by name, those of its subclasses overriding
+    those of its bases. A slot that a level shadows with a behaviour, e.g.
+    the trace of a pivotal diagram made of cups and caps, is still a slot of
+    it: the class it builds there is the generator that level does not use.
+
+    >>> from discopy import symmetric, pivotal
+    >>> assert {"Box", "Swap", "Permutation"} <= set(slots(symmetric.Diagram))
+    >>> assert "Trace" in slots(pivotal.Diagram)
+    """
+    return {
+        name: value for base in reversed(category.__mro__)
+        for name, value in vars(base).items() if isinstance(value, Slot)}
 
 
 def axiom[**P, T](
@@ -1220,6 +1473,59 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
                 for name, value in visible.items()
                 if isinstance(value, kind)}
 
+    @overload
+    @classmethod
+    def slot[S: type](cls, root: S) -> S: ...
+
+    @overload
+    @classmethod
+    def slot[S: type](cls, root: Rule) -> Callable[[S], S]: ...
+
+    @classmethod
+    def slot[S: type](cls, root: S | Rule) -> S | Callable[[S], S]:
+        """
+        Declare a class as a :class:`Slot` of ``cls`` named after it, e.g.
+        ``@Diagram.slot`` above ``class Swap`` binds ``Diagram.Swap``, which
+        every level below builds a subclass of, or, given a rule, as the
+        :class:`Generator` concluding it, e.g.
+        ``@Diagram.slot(BraidedCategory.braiding)`` above ``class Braid``,
+        which defines the ``premises`` of its boxes.
+        """
+        if isinstance(root, Rule):
+            return lambda klass: cls.declare(Generator(klass, rule=root))
+        return cls.declare(Slot(root))
+
+    @classmethod
+    def declare[S: type](cls, slot: Slot[..., S]) -> S:
+        """ Bind a :class:`Slot` to ``cls`` under the name of its class. """
+        slot.__set_name__(cls, slot.function.__name__)
+        setattr(cls, slot.function.__name__, slot)
+        return slot.function
+
+    @classmethod
+    def extend[S: type](cls, extension: S) -> S:
+        """
+        Extend the :class:`Slot` of ``cls`` named after a class, e.g.
+        ``@Diagram.extend`` above ``class Swap`` in :mod:`~discopy.compact`.
+        A class that subclasses the root of the slot or the level is the
+        slot at that level as it is written, bases included. Any other class
+        is a mixin holding what the level adds: the slot is built with it
+        first among its bases.
+
+        Raises:
+            TypeError : When the slot was already built at that level.
+        """
+        slot = slots(cls)[extension.__name__]
+        level = getattr(cls, "factory", cls)
+        if level in slot.cache:
+            raise TypeError(
+                f"{factory_name(level)}.{slot.name} was built before "
+                f"{factory_name(extension)} extends it.")
+        slot.cache[level] = extension if issubclass(
+            extension, (slot.function, level))\
+            else slot.build(level, extension)
+        return slot.cache[level]
+
     axioms = classproperty(lambda cls: cls.declared(Axiom))
     """ The axioms inherited by ``cls``, see :meth:`declared`. """
 
@@ -1280,7 +1586,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
             ar = getattr(testable, "ar", None)
             return ar is testable or (ar is None or isinstance(ar, type))\
                 and "strategy" in vars(testable)\
-                and getattr(testable, "box_factory", None) is not testable\
+                and getattr(testable, "Box", None) is not testable\
                 and testable not in getattr(ar, "structural_boxes", ())
 
         checked = {
@@ -1526,7 +1832,7 @@ class Equivalence(Testable):
     laws of an equivalence relation stated once: reflexivity, symmetry and
     transitivity.
 
-    The relation is the :class:`Equation` subclass ``equivalence_factory``,
+    The relation is the :class:`Equation` subclass ``Equation``,
     which holds when its terms are related. A search over arbitrary
     instances would rarely meet related ones, so the two laws that need
     them quantify over :class:`Related` instances, which the type generates
@@ -1543,7 +1849,7 @@ class Equivalence(Testable):
     >>> assert not TermBase.equivalent(terms[0], g)
     >>> assert TermBase.transitivity(Related[TermBase](terms))
     """
-    equivalence_factory: ClassVar[type[Equation]]
+    Equation: ClassVar[type[Equation]]
 
     @classmethod
     @abstractmethod
@@ -1555,15 +1861,19 @@ class Equivalence(Testable):
 
     @classmethod
     def equivalent(cls, *terms) -> bool:
-        """ Whether the terms are related, by the ``equivalence_factory``. """
-        return bool(cls.equivalence_factory(*terms))
+        """ Whether the terms are related, by the ``Equation``. """
+        return bool(cls.Equation(*terms))
 
     @axiom
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
     def reflexivity(cls, term: Self) -> Equation:
         """ A term is related to itself. """
-        return cls.equivalence_factory(term, term)
+        return cls.Equation(term, term)
 
     @axiom
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
     def symmetry(cls, terms: Related[Self]) -> Equation:
         """ A term is related to another exactly when the other is to it. """
         first, _, third = terms
@@ -1571,6 +1881,8 @@ class Equivalence(Testable):
             cls.equivalent(first, third), cls.equivalent(third, first))
 
     @axiom
+    # the testable.Equation the axiom checks, not the class attribute
+    # pylint: disable-next=undefined-variable
     def transitivity(cls, terms: Related[Self]) -> Equation:
         """
         Terms related to each other are related to the same terms: a third

@@ -65,7 +65,7 @@ from discopy import bang, monoidal
 from discopy.abc import ClosedCategory
 from discopy.cat import factory
 from discopy.lambek import categorial
-from discopy.utils import get_origin
+from discopy.utils import export, get_origin
 
 
 @factory
@@ -97,50 +97,7 @@ class Diagram(bang.Diagram, categorial.Diagram):
     ob = Ty
 
 
-class Box(bang.Box, categorial.Box, Diagram):
-    """ A box of ``!L*``, e.g. a word whose type is its codomain. """
-
-
-class Eval(categorial.Eval, Box):
-    """ The evaluation of an exponential type, a box of ``!L*``. """
-
-
-class Coeval(categorial.Coeval, Box):
-    """ The coevaluation of an exponential type, a box of ``!L*``. """
-
-
-class Curry(categorial.Curry, Box):
-    """ The currying of a diagram of ``!L*``. """
-
-
-class Bang(bang.Bang, Box):
-    """ The bang of a diagram of ``!L*``. """
-
-
-class Dereliction(bang.Dereliction, Box):
-    """ The dereliction ``!x -> x`` of ``!L*``. """
-
-
-class Digging(bang.Digging, Box):
-    """ The digging ``!x -> !!x`` of ``!L*``. """
-
-
-class Contraction(bang.Contraction, Box):
-    """ The contraction ``!x -> !x @ !x`` of ``!L*``. """
-
-
-class Weakening(bang.Weakening, Box):
-    """ The weakening ``!x -> 1`` of ``!L*``. """
-
-
-class Exchange(bang.Exchange, Box):
-    """ The exchange ``!x @ y -> y @ !x`` of ``!L*``. """
-
-
-class Laxator(bang.Laxator, Box):
-    """ The laxator ``!x @ !y -> !(x @ y)`` of ``!L*``. """
-
-
+@Diagram.extend
 class Functor(bang.Functor, categorial.Functor):
     """
     A functor from ``!L*``: the bang and the structural boxes go through the
@@ -168,41 +125,20 @@ class Functor(bang.Functor, categorial.Functor):
 
     def __call__(self, other):
         if not self.has_exp and isinstance(other, (
-                categorial.Over, categorial.Under, categorial.Eval,
-                categorial.Coeval, categorial.Curry)):
+                categorial.Over, categorial.Under)):
             return monoidal.Functor.__call__(self, other)
+        if not self.has_exp and isinstance(other, (
+                categorial.Diagram.Eval, categorial.Diagram.Coeval,
+                categorial.Diagram.Curry)):
+            return self.image(other)
         return super().__call__(other)
 
 
 class TermBase(bang.TermBase):
     """ A kappa term of ``!L*``, see :class:`~discopy.bang.TermBase`. """
+    arrow = Diagram
 
 
-class Variable(TermBase, bang.Variable):
-    """ A variable of ``!L*``. """
+Diagram.TermBase = Ty.TermBase = TermBase
 
-
-class Constant(TermBase, bang.Constant):
-    """ A box of ``!L*`` as a term. """
-
-
-class Application(TermBase, bang.Application):
-    """ An application of ``!L*``, which shares banged variables. """
-
-
-class Kappa(TermBase, bang.Kappa):
-    """ A kappa abstraction of ``!L*``. """
-
-
-Diagram.box_factory, Diagram.functor_factory = Box, Functor
-Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
-Diagram.curry_factory, Diagram.bang_factory = Curry, Bang
-Diagram.dereliction_factory, Diagram.digging_factory = Dereliction, Digging
-Diagram.contraction_factory, Diagram.weakening_factory = (
-    Contraction, Weakening)
-Diagram.exchange_factory, Diagram.laxator_factory = Exchange, Laxator
-
-TermBase.functor = Functor.id(Diagram)
-TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
-TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory = Ty.term_factory = TermBase
+export(__name__)

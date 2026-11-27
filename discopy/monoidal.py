@@ -162,7 +162,7 @@ from contextvars import ContextVar
 from copy import copy
 from itertools import count
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, partial
 from operator import index
 from types import NoneType
 from typing import (
@@ -177,7 +177,7 @@ from discopy.abc import (
 from discopy.cat import let  # noqa: F401
 from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Hom, Obj, TestableGeneric,
-    Var, axiom)
+    Slot, Var, axiom)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -360,9 +360,9 @@ class Wire(cat.Ob):
                    is_dagger=tree.get('is_dagger', False))
 
 
-class List[generator_factory](Monoid["List"], TestableGeneric):
+class List[Atom](Monoid["List"], TestableGeneric):
     """
-    The free monoid on a ``generator_factory``, i.e. lists of its instances
+    The free monoid on a ``Atom``, i.e. lists of its instances
     with concatenation as :meth:`tensor` and the empty list as unit.
 
     ``List[X]`` is the free monoid on ``X`` the way ``Hypergraph[C]`` is the
@@ -499,7 +499,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         >>> assert generator in map(Ty, testable.VALUES)
         """
         from hypothesis import strategies as st
-        if cls.generator_factory is not type:
+        if cls.Atom is not type:
             raise NotImplementedError
         return st.sampled_from(tuple(testable.VALUES)).map(cls)
 
@@ -565,8 +565,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     >>> assert t.name == "Ty" and str(t) == "x @ y @ z"
     """
     ob = Colour
-    generator_factory = Wire
-    box_factory = classproperty(lambda cls: cls.generator_factory)
+    Atom = Wire
+    Box = classproperty(lambda cls: cls.Atom)
     """
     The generators of a type as a free category, i.e. its wires, a
     :class:`cat.Ob` that :meth:`cast` embeds as a type of length one.
@@ -606,24 +606,24 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         the boundary is not read.
         """
         # pylint: disable=unused-argument  # no type generated is coloured
-        return cls.generator_factory.strategy().map(cls)
+        return cls.Atom.strategy().map(cls)
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
-        Turn a constructor argument into a ``self.generator_factory``.
+        Turn a constructor argument into a ``self.Atom``.
 
         Old dumps and pickles used a plain ``cat.Ob``, with no colour, as
         the generators: upgrade it to ``Wire(x.name)`` for subclasses whose
         generators are plain ``Wire``.
         """
-        if isinstance(x, self.generator_factory):
+        if isinstance(x, self.Atom):
             return x
         if isinstance(x, str):
-            return self.generator_factory(x)
-        if self.generator_factory is Wire and type(x) is cat.Ob:
-            return self.generator_factory(x.name)
+            return self.Atom(x)
+        if self.Atom is Wire and type(x) is cat.Ob:
+            return self.Atom(x.name)
         raise TypeError(messages.TYPE_ERROR.format(
-            factory_name(self.generator_factory), factory_name(type(x))))
+            factory_name(self.Atom), factory_name(type(x))))
 
     def __init__(self, *inside: str | cat.Ob,
                  dom: Colour | None = None, cod: Colour | None = None,
@@ -632,8 +632,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
         for obj in inside:
-            assert_isinstance(obj, (str, self.generator_factory) + (
-                (cat.Ob, ) if self.generator_factory is Wire else ()))
+            assert_isinstance(obj, (str, self.Atom) + (
+                (cat.Ob, ) if self.Atom is Wire else ()))
         inside = tuple(map(self.cast_wire, inside))
         if dom is None and inside:
             dom = inside[0].dom
@@ -804,7 +804,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         inside = tuple(map(from_tree, tree['inside']))
         # Old dumps used cat.Ob as the generators of monoidal.Ty.
         inside = tuple(
-            cls.generator_factory(x.name) if type(x) is cat.Ob else x
+            cls.Atom(x.name) if type(x) is cat.Ob else x
             for x in inside)
         if inside:
             return cls(*inside)
@@ -893,8 +893,8 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     >>> assert CX @ 2 >> 2 @ CX == CX @ CX
     """
     ob = Colour
-    generator_factory = int
-    box_factory = None
+    Atom = int
+    Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
@@ -986,8 +986,8 @@ class Dim(Ty):
     >>> from discopy.utils import dumps, loads
     >>> assert loads(dumps(Dim(2, 3))) == Dim(2, 3)
     """
-    generator_factory = int
-    box_factory = None
+    Atom = int
+    Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
@@ -1455,12 +1455,12 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
 
-    box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
-    functor_factory: ClassVar[type["Functor"]]
+    Box: ClassVar[type["Box"]]
+    Sum: ClassVar[type["Sum"]]
+    Functor: ClassVar[type["Functor"]]
     draw_left_to_right: ClassVar[bool] = False
     ob = Ty
-    layer_factory = Layer
+    Layer = Slot(Layer)
 
     def __setstate__(self, state):
         if 'inside' not in state:  # Backward compatibility
@@ -1470,7 +1470,8 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         super().__setstate__(state)
 
     def __init__(
-            self, inside: tuple[Layer, ...], dom: Ty, cod: Ty, _scan=True):
+            self, inside: tuple[Layer, ...],  # ty: ignore[invalid-type-form]
+            dom: Ty, cod: Ty, _scan=True):
         inside = tuple(inside)
         if _scan:
             for layer in inside:
@@ -1481,13 +1482,13 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 
     @classproperty
     # pylint: disable-next=no-self-argument  # a property of the class
-    def structural_boxes(cls) -> tuple[type[Box], ...]:
+    def structural_boxes(cls) -> tuple[type["Box"], ...]:
         """
         The structural boxes of the free category, i.e. the box classes
         among its factories that draw themselves with a ``strategy`` of
-        their own rather than that of its :attr:`box_factory`, e.g.
+        their own rather than that of its :attr:`Box`, e.g.
         :class:`~discopy.braided.Braid` for
-        :attr:`~discopy.braided.Diagram.braid_factory`. A box class of
+        :attr:`Diagram.Braid <discopy.braided.Diagram.Braid>`. A box class of
         another category, e.g. the braid a symmetric diagram inherits from
         a balanced one, and a factory that is a method rather than a class
         are left out. :func:`~discopy.testable.assert_structural_boxes`
@@ -1500,15 +1501,15 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         >>> assert braided.Diagram.structural_boxes == (braided.Braid, )
         >>> assert braided.Braid not in symmetric.Diagram.structural_boxes
         """
-        factories = {
-            name: value
+        names = {
+            name: None
             # pylint: disable-next=no-member  # a class has a __mro__
             for base in reversed(cls.__mro__)
             for name, value in vars(base).items()
-            if name.endswith("_factory")}
-        free = cls.box_factory.strategy.__func__
+            if name[:1].isupper() and isinstance(value, (type, Slot))}
+        free = cls.Box.strategy.__func__
         return tuple(dict.fromkeys(
-            factory for factory in factories.values()
+            factory for factory in map(partial(getattr, cls), names)
             if isinstance(factory, type) and issubclass(factory, cls)
             and factory.strategy.__func__ is not free))
 
@@ -1591,7 +1592,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
             return self
         for other in others:
             if isinstance(other, Sum):
-                return self.sum_factory((self, )).tensor(*others)
+                return self.Sum((self, )).tensor(*others)
             assert_isinstance(other, self.ar)
             assert_isinstance(self, other.ar)
         suffixes = [others[-1].dom]
@@ -1755,15 +1756,15 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
             inside += [dom[position:position + offset - end], box]
             position += offset - end + len(box.dom)
             end = offset + len(box.cod)
-        layer = cls.layer_factory(*inside, dom[position:])
+        layer = cls.Layer(*inside, dom[position:])
         return cls((layer, ), layer.dom, layer.cod)
 
-    def to_drawing(self, functor_factory=None) -> Drawing:
+    def to_drawing(self, functor=None) -> Drawing:
         """ Called before :meth:`Diagram.draw`. """
         ob = ar = lambda x: x.to_drawing()
         dom = self.ar
         cod = Drawing
-        return (functor_factory or Functor)(ob, ar, dom, cod)(self)
+        return (functor or Functor)(ob, ar, dom, cod)(self)
 
     def to_typst(self, **params):
         """
@@ -1833,7 +1834,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 let(e(x2), lambda: h(x1), offset=1)))
         >>> assert (f >> g).to_term().eval() == f >> g
         """
-        return self.term_factory.from_diagram(self)
+        return self.TermBase.from_diagram(self)
 
     def to_staircases(self):
         """
@@ -1907,11 +1908,11 @@ let(e(x2), lambda: h(x1), offset=1)))
         return cat.Equation(foliated.foliation(), foliated)
 
     @classmethod
-    def equation_factory(cls, *terms: "Diagram") -> "Equation":
+    def Equation(cls, *terms: "Diagram") -> AbstractEquation:
         """
         The equation of a law, compared on the nose. A hypergraph is faithful
         only from :class:`~discopy.symmetric.Diagram` on, whose
-        ``equation_factory`` compares up to it: below, it is a quotient that
+        ``Equation`` compares up to it: below, it is a quotient that
         forgets the regions of a planar diagram and the side of its scalars,
         identifies a braid with its inverse, a twist with the identity and
         the adjoints of a type, so a planar law is compared syntactically
@@ -1919,8 +1920,8 @@ let(e(x2), lambda: h(x1), offset=1)))
 
         >>> x = Ty('x')
         >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
-        >>> assert not Diagram.equation_factory(f @ g, g >> f)
-        >>> assert Diagram.equation_factory(f @ g, f @ g)
+        >>> assert not Diagram.Equation(f @ g, g >> f)
+        >>> assert Diagram.Equation(f @ g, f @ g)
         """
         return Equation(*terms)
 
@@ -1961,7 +1962,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         >>> assert c @ x != x @ c
         >>> assert (c @ x).to_hypergraph() == (x @ c).to_hypergraph()
         """
-        graph = getattr(self, "hypergraph_factory", hypergraph.Hypergraph)[
+        graph = getattr(self, "Hypergraph", hypergraph.Hypergraph)[
             type(self).ar].from_diagram(self)
         if all(box.dom for box in self.boxes):
             return graph
@@ -2420,6 +2421,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         return super().from_tree(tree)
 
 
+@Diagram.extend
 class Box(cat.Box, Diagram):
     """
     A box is a diagram with a :code:`name` and the layer of just itself inside.
@@ -2531,12 +2533,13 @@ class Box(cat.Box, Diagram):
     >>> style = dict(color="green", frame_colour="red")
     >>> very = Box('λfx · ffx', Ty(), Ty('(n ← n) ← (n ← n)'),
     ...            color="green", height=2)
-    >>> big = (x >> B).bubble(
-    ...     dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
-    >>> car = C.bubble(dom=Ty(), cod=n, **style)
-    >>> very_big = (x >> B >> B).bubble(
-    ...     dom=very.cod @ n_n, cod=n_n, drawing_name="λx ·", **style)
-    >>> very_big_car = (C >> B >> B).bubble(dom=n_n @ n, cod=n, **style)
+    >>> big = Box.from_args(
+    ...     x >> B, dom=Ty(), cod=n_n, drawing_name="λx ·", **style)
+    >>> car = Box.from_args(C, dom=Ty(), cod=n, **style)
+    >>> very_big = Box.from_args(
+    ...     x >> B >> B, dom=very.cod @ n_n, cod=n_n, drawing_name="λx ·",
+    ...     **style)
+    >>> very_big_car = Box.from_args(C >> B >> B, dom=n_n @ n, cod=n, **style)
     >>> diagram = (very @ big @ car).foliation()\\
     ...     >> very_big @ n >> very_big_car
     >>> diagram.draw(doctest='docs/_static/monoidal/very-big-car.svg')
@@ -2551,14 +2554,17 @@ class Box(cat.Box, Diagram):
     >>> W = lambda *args: Primitive(
     ...     'W', Ty(), n, args=args, drawing_name="W",
     ...     draw_as_frame=True, draw_vertically=True)
-    >>> with_ = W(y, x).bubble(
-    ...     dom=Ty(), cod=Ty('(n → n) ← n'), drawing_name="λxy ·", **style)
-    >>> with_attitude = W(y, A).bubble(
-    ...     dom=with_.cod @ n, cod=Ty('n → n'), drawing_name="λy ·", **style)
-    >>> diagram = (C.bubble(dom=Ty(), cod=n, **style) @ with_
-    ...            @ A.bubble(dom=Ty(), cod=n, **style)).foliation()\\
+    >>> with_ = Box.from_args(
+    ...     W(y, x), dom=Ty(), cod=Ty('(n → n) ← n'), drawing_name="λxy ·",
+    ...     **style)
+    >>> with_attitude = Box.from_args(
+    ...     W(y, A), dom=with_.cod @ n, cod=Ty('n → n'), drawing_name="λy ·",
+    ...     **style)
+    >>> diagram = (Box.from_args(C, dom=Ty(), cod=n, **style) @ with_
+    ...            @ Box.from_args(A, dom=Ty(), cod=n, **style)).foliation()\\
     ...     >> n @ with_attitude\\
-    ...     >> W(C, A).bubble(dom=n @ with_attitude.cod, cod=n, **style)
+    ...     >> Box.from_args(
+    ...         W(C, A), dom=n @ with_attitude.cod, cod=n, **style)
     >>> diagram.draw(
     ...     doctest='docs/_static/monoidal/concepts-with-attitude.svg')
 
@@ -2586,7 +2592,7 @@ class Box(cat.Box, Diagram):
         if self.args:
             self.bubble_drawing(draw_as_frame, draw_as_square, draw_vertically)
         inside = () if self.is_identity\
-            else (self.layer_factory(self, normalise=False), )
+            else (self.Layer(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
 
     def bubble_drawing(
@@ -2740,6 +2746,7 @@ class Box(cat.Box, Diagram):
         return result
 
 
+@Diagram.extend
 class Sum(cat.Sum, Box):
     """
     A sum is a tuple of diagrams :code:`terms`
@@ -2767,7 +2774,7 @@ class Sum(cat.Sum, Box):
         if not others:
             return self
         sums = [
-            other if isinstance(other, Sum) else self.sum_factory((other, ))
+            other if isinstance(other, Sum) else self.Sum((other, ))
             for other in others]
         dom = self.dom.tensor(*(other.dom for other in sums))
         cod = self.cod.tensor(*(other.cod for other in sums))
@@ -2775,7 +2782,7 @@ class Sum(cat.Sum, Box):
             term.tensor(*rest) for term in self.terms
             for rest in itertools.product(
                 *(other.terms for other in sums)))
-        return self.sum_factory(terms, dom, cod)
+        return self.Sum(terms, dom, cod)
 
     to_drawing = Diagram.to_drawing
 
@@ -2790,6 +2797,7 @@ _WIRE_LEVEL: ContextVar[tuple[object, type] | None] = ContextVar(
     "WIRE_LEVEL", default=None)
 
 
+@Diagram.extend
 class Functor(cat.Functor):
     """
     A monoidal functor is a functor that preserves the tensor product.
@@ -2902,7 +2910,7 @@ class Functor(cat.Functor):
                 return other
             return self.colour_map[other]
         if isinstance(other, Dim) and isinstance(
-                other, self.dom.ob.generator_factory):
+                other, self.dom.ob.Atom):
             return self.cod.ob.cast(self.ob_map[self.dom.ob(other)])
         if isinstance(other, Dim):
             return self.cod.ob().tensor(*(  # ty: ignore[invalid-argument-type]
@@ -2923,7 +2931,7 @@ class Functor(cat.Functor):
             finally:
                 _WIRE_LEVEL.reset(token)
             return head.tensor(*tail)
-        if isinstance(other, self.dom.ob.generator_factory):
+        if isinstance(other, self.dom.ob.Atom):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
@@ -2955,7 +2963,7 @@ class Functor(cat.Functor):
             kept = {
                 attr: getattr(other, attr) for attr in other.serialised_attrs
                 if attr in getattr(
-                    self.cod, "elementwise_factory", self.cod.box_factory
+                    self.cod, "Elementwise", self.cod.Box
                 ).serialised_attrs
                 and attr not in (
                     "*", "*args", "args", "dom", "cod", "method")} | {
@@ -3096,9 +3104,6 @@ class Equation(cat.Equation, RichDisplay):
 Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
-Diagram.box_factory = Box
-Diagram.sum_factory = Sum
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
 Id = Diagram.id
@@ -3153,8 +3158,9 @@ class TermBase(cat.TermBase):
     """
     stack: Ty
     cod: Ty
-    sampler_factory: ClassVar[type[Sampler]]
+    Sampler: ClassVar[type[Sampler]]
 
+    arrow = Diagram
     strategy = classmethod(cat.TermBase.strategy.__func__)
 
     @staticmethod
@@ -3187,7 +3193,7 @@ class TermBase(cat.TermBase):
         fresh = count()
 
         def name(typ):
-            return [cls.variable_factory(f"x{next(fresh)}", wire)
+            return [cls.Variable(f"x{next(fresh)}", wire)
                     for wire in cls.wires(typ)]
 
         inputs = name(diagram.dom)
@@ -3198,7 +3204,7 @@ class TermBase(cat.TermBase):
                 outputs = cls.rewire(box, arguments)
                 if outputs is None:
                     outputs = name(box.cod)
-                    steps.append((cls.constant_factory(box)(
+                    steps.append((cls.Constant(box)(
                         *arguments), outputs, offset))
                 wires[offset:offset + len(box.dom)] = outputs
         result, = wires
@@ -3237,11 +3243,11 @@ class TermBase(cat.TermBase):
         >>> print(TermBase.generate(y, [1, 2, 1, 2, 2, 0, 2], [x], "ab"))
         let(c0, lambda a0, b1: c1(a0, b1, v0))
         """
-        sampler = cls.sampler_factory(cls, iter(choices), types, letters)
+        sampler = cls.Sampler(cls, iter(choices), types, letters)
         dom = [sampler.choose(types) for _ in range(sampler.choose(range(3)))]
         if sampler.choose((False, True)):
             return sampler.state(cod, tuple(
-                cls.variable_factory(f"v{i}", typ)
+                cls.Variable(f"v{i}", typ)
                 for i, typ in enumerate(dom)))
         variables = tuple(
             sampler.bound(i, typ) for i, typ in enumerate(dom))
@@ -3281,6 +3287,7 @@ class TermBase(cat.TermBase):
         .failing(messages.STATEMENTS_DO_NOT_COMMUTE)
 
 
+@TermBase.extend
 class Variable(TermBase, cat.Variable):
     """
     A variable with a name and a type of one wire, an identity diagram.
@@ -3306,6 +3313,7 @@ class Variable(TermBase, cat.Variable):
         self.stack = cod[:0]
 
 
+@TermBase.extend
 class Constant(TermBase, cat.Constant):
     """
     A box as a term, with its domain as stack. It prints as the name of the
@@ -3324,6 +3332,7 @@ class Constant(TermBase, cat.Constant):
     """
 
 
+@TermBase.extend
 class Application(TermBase, cat.Application):
     """
     The application of a term to an argument with no stack, which takes the
@@ -3382,6 +3391,7 @@ type y.
         return left @ self.arg.eval(functor) @ right >> func.eval(functor)
 
 
+@TermBase.extend
 class Kappa(TermBase, cat.Kappa):
     """
     The abstraction of a block of ``variables`` of the ``body``, contiguous
@@ -3589,6 +3599,7 @@ class InterchangeEquation(Equation):
         return result
 
 
+@TermBase.slot
 @dataclass
 class Sampler:
     """
@@ -3628,7 +3639,7 @@ class Sampler:
             self, dom: Sequence[Ty], cod: Sequence[Ty]) -> cat.Constant:
         """ A fresh constant between the tensors of two lists of types. """
         category = self.terms.functor.cod
-        return self.terms.constant_factory(category.box_factory(
+        return self.terms.Constant(category.Box(
             f"c{next(self.counter)}", category.ob().tensor(*dom),
             category.ob().tensor(*cod)))
 
@@ -3638,7 +3649,7 @@ class Sampler:
         The variable bound at a given level, named by its letter or after
         the variable it shadows, see :meth:`~discopy.cat.TermBase.bound_name`.
         """
-        return self.terms.variable_factory(
+        return self.terms.Variable(
             self.terms.bound_name(self.letters, level, shadowed), cod)
 
     def shuffle(self, bound: tuple) -> tuple:
@@ -3691,10 +3702,7 @@ class Sampler:
         return self.terms.bind(variables, body, len(left))(expression)
 
 
-TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
-Diagram.term_factory = TermBase
-TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
-TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+Diagram.TermBase = TermBase
 
 __getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
 

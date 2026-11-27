@@ -75,7 +75,7 @@ from operator import index
 from typing import ClassVar
 
 from discopy import (
-    symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
+    symmetric, monoidal, cmap, hypergraph, messages, op)
 from discopy.abc import (
     ComarkovCategory, DaggerCategory, DaggerMonoidalCategory, MarkovCategory,
     Nat)
@@ -84,6 +84,7 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
+    export,
     AxiomError, assert_isatomic, assert_iscomposable, factory_key,
     factory_name, from_tree)
 
@@ -117,10 +118,10 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    merge_factory: ClassVar[type["Merge"]]
-    noise_factory: ClassVar[type["Noise"]]
-    cofunction_factory: ClassVar[type["Cofunction"]]
-    layer_factory = Layer
+    Merge: ClassVar[type["Merge"]]
+    Noise: ClassVar[type["Noise"]]
+    Cofunction: ClassVar[type["Cofunction"]]
+    Layer = Layer
 
     map_agreement = monoidal.Diagram.map_agreement.failing(
         messages.MAP_HAS_NO_SPIDERS)
@@ -132,11 +133,11 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         messages.COMARKOV_HAS_NO_DAGGER)
 
     @classmethod
-    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+    def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or n_legs_out != 1:
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "merges"))
-        return cls.merge_factory(typ, n_legs_in)
+        return cls.Merge(typ, n_legs_in)
 
     @classmethod
     def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
@@ -155,7 +156,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Diagram.merge(x @ y) == Cofunction(x @ y, [0, 1, 0, 1])
         """
-        if cls.cofunction_factory.ar is cls:
+        if cls.Cofunction.ar is cls:
             return cls.from_cofunction(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
         return frobenius.Diagram.spiders.__func__(
@@ -187,23 +188,13 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
             dom = cod[:0].tensor(*(cod[i] for i in cofunc))
             return cls.from_permutation(  # ty: ignore[invalid-return-type]
                 finset.Permutation(cofunc).dagger(), dom)
-        if cls.cofunction_factory.ar is cls:
-            return cls.cofunction_factory(cod, cofunc)
+        if cls.Cofunction.ar is cls:
+            return cls.Cofunction(cod, cofunc)
         return super().from_cofunction(cofunc, cod)
 
 
-class Box(symmetric.Box, Diagram):
-    """
-    A comarkov box is a symmetric box in a comarkov diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Cofunction(Box):
+@Diagram.slot
+class Cofunction(Diagram.Box):
     """
     A function between finite sets as plumbing: input ``i`` goes to output
     ``cofunc[i]``, i.e. ``dom[i] == cod[cofunc[i]]``. An output that no input
@@ -242,20 +233,24 @@ class Cofunction(Box):
         :align: center
     """
     def __new__(cls, cod: monoidal.Ty | None = None, cofunc=None):
-        if cod is None or cls is not cls.ar.cofunction_factory:
+        if cod is None or cls is not cls.ar.Cofunction:
+            # the box a slot builds, which pylint misreads
+            # pylint: disable-next=no-value-for-parameter
             return super().__new__(cls)
         cofunc = list(cofunc)  # ty: ignore[invalid-argument-type]
         if sorted(cofunc) == list(range(len(cod))):
             return cls.ar.from_cofunction(cofunc, cod)
         if len(cod) == 1 and not any(cofunc):
-            return cls.ar.merge_factory(cod, len(cofunc))
+            return cls.ar.Merge(cod, len(cofunc))
+        # the box a slot builds, which pylint misreads
+        # pylint: disable-next=no-value-for-parameter
         return super().__new__(cls)
 
     def __init__(self, cod: monoidal.Ty, cofunc):
         func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
         self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
         dom = cod[:0].tensor(*(cod[i] for i in func))
-        Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
+        Diagram.Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
 
     def __getnewargs__(self):
         """
@@ -295,7 +290,7 @@ class Cofunction(Box):
         from discopy.drawing import Drawing
         counts, perm = self.cofunc.inside.factorise()
         merges = Drawing.id().tensor(*(
-            self.merge_factory(self.cod[j:j + 1], n).to_drawing() if n != 1
+            self.Merge(self.cod[j:j + 1], n).to_drawing() if n != 1
             else Drawing.id(self.cod[j:j + 1].to_drawing())
             for j, n in enumerate(counts)))
         return Drawing.permutation(perm.dagger(), [
@@ -331,7 +326,7 @@ is not a dagger category.
         if not issubclass(self.ar, MarkovCategory):
             raise AxiomError(messages.NOT_A_DAGGER.format(
                 self, factory_name(self.ar)))
-        return self.ar.function_factory(self.cod, list(self.cofunc.inside))
+        return self.ar.Function(self.cod, list(self.cofunc.inside))
 
     def fuse(self, other: Cofunction) -> Diagram:
         """
@@ -361,7 +356,7 @@ is not a dagger category.
         while plumbing < len(others) and (
                 isinstance(others[plumbing], monoidal.Ty)
                 or isinstance(others[plumbing], Cofunction)
-                and self.ar.layer_factory.is_plumbing_box(others[plumbing])
+                and self.ar.Layer.is_plumbing_box(others[plumbing])
                 or isinstance(others[plumbing], Diagram)
                 and not others[plumbing].inside):
             other, plumbing = others[plumbing], plumbing + 1
@@ -393,7 +388,8 @@ is not a dagger category.
 Layer.plumbing = (monoidal.Ty, Cofunction)
 
 
-class Permutation(symmetric.Permutation, Box):
+@Diagram.extend
+class Permutation(symmetric.Permutation, Diagram.Box):
     """
     A permutation in a comarkov category, i.e. a bijective
     :class:`Cofunction`, registered as a virtual subclass so that it keeps
@@ -419,16 +415,7 @@ class Permutation(symmetric.Permutation, Box):
 Cofunction.register(Permutation)
 
 
-class Swap(Permutation, symmetric.Swap, Box):
-    """
-    Symmetric swap in a comarkov diagram.
-
-    Parameters:
-        left (monoidal.Ty) : The type on the top left and bottom right.
-        right (monoidal.Ty) : The type on the top right and bottom left.
-    """
-
-
+@Diagram.slot(ComarkovCategory.multiplication)
 class Merge(Cofunction):
     """
     The merge of an atomic type :code:`x` some :code:`n` number of times,
@@ -445,13 +432,19 @@ class Merge(Cofunction):
         if n < 0:
             raise ValueError(f"A merge count is non-negative, got n={n}.")
         name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"
-        Box.__init__(self, name, dom=x ** n, cod=x,
-                     draw_as_spider=True, color="black", drawing_name="")
+        Diagram.Box.__init__(
+            self, name, dom=x ** n, cod=x,
+            draw_as_spider=True, color="black", drawing_name="")
+
+    @property
+    def premises(self) -> dict:
+        """ The atom merged and the number of its copies, see :attr:`rule`. """
+        return {"x": self.cod, "n": len(self.dom)}
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
         n = len(n) if isinstance(n, Sized) else index(n)
         return super().__new__(cls) if n else\
-            cls.noise_factory.__new__(cls.noise_factory, x)
+            cls.Noise.__new__(cls.Noise, x)
 
     def __getnewargs__(self):
         """
@@ -501,6 +494,7 @@ class Merge(Cofunction):
         return cls(from_tree(tree['cod']), len(from_tree(tree['dom'])))
 
 
+@Diagram.slot
 class Noise(Merge):
     """
     The noise on an atomic type :code:`x`, i.e. the merge of no copy: the
@@ -530,17 +524,7 @@ class Noise(Merge):
         return cls.atomic_strategy(types).map(cls)
 
 
-class Sum(symmetric.Sum, Box):
-    """
-    A comarkov sum is a symmetric sum and a comarkov box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Functor(symmetric.Functor):
     """
     A comarkov functor is a symmetric functor that preserves merges.
@@ -570,15 +554,14 @@ class Functor(symmetric.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Merge) and hasattr(self.cod, "merge"):
-            return self.cod.merge(self(other.cod), len(other.dom))
         if isinstance(other, Cofunction) and hasattr(
-                self.cod.ar, "cofunction_factory")\
+                self.cod.ar, "Cofunction") and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             sizes = [Nat(len(self(x))) for x in other.cod]
             return self.cod.ar.from_cofunction(finset.Function.function(
                 other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
+                and other.rule is None\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
                 or ComarkovCategory.cofunction.__func__.__get__(self.cod)
@@ -589,17 +572,7 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.merge_factory = Merge
-Diagram.cofunction_factory = Cofunction
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Diagram.noise_factory = Noise
-Diagram.sum_factory = Sum
 Id = Diagram.id
 
 
@@ -608,9 +581,9 @@ class Equation(symmetric.Equation):
     up_to = staticmethod(Diagram.to_hypergraph)
 
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
-    Diagram)
-Term = Variable | Constant | Application | Kappa
+TermBase = kappa_calculus(Diagram)
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

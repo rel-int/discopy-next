@@ -488,7 +488,7 @@ def test_functor_into_zx_rebuilds_spiders():
     assert F(frobenius.Diagram.spiders(2, 1, x @ x)).eval().is_close(
         Diagram.spiders(2, 1, Nat(2)).eval())
     with raises(ValueError):
-        Diagram.spider_factory(1, 1, Nat(2))
+        Diagram.Spider(1, 1, Nat(2))
 
 
 def test_Bubble_grad():

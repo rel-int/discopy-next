@@ -38,7 +38,7 @@ from typing import ClassVar
 from discopy import rigid, frobenius, messages
 from discopy.testable import no_strategy
 from discopy.cat import factory
-from discopy.utils import AxiomError, deprecated_alias, factory_name
+from discopy.utils import export, AxiomError, deprecated_alias, factory_name
 from discopy.lambek import thue
 from discopy.rigid import Wire  # noqa: F401  pylint: disable=unused-import
 
@@ -109,11 +109,11 @@ class Diagram(frobenius.Diagram):
     >>> F = tensor.Functor(ob, ar, dom=Diagram, dtype=bool)
     >>> assert F(sentence)
     """
-    swap_factory: ClassVar[type["Swap"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    spider_factory: ClassVar[type["Spider"]]
+    Swap: ClassVar[type["Swap"]]
+    Permutation: ClassVar[type["frobenius.Permutation"]]
+    Cup: ClassVar[type["frobenius.Cup"]]
+    Cap: ClassVar[type["frobenius.Cap"]]
+    Spider: ClassVar[type["Spider"]]
     ob = Ty
 
     def normal_form(self, **params):
@@ -148,7 +148,8 @@ class Diagram(frobenius.Diagram):
 
         wires = self[len(words):]
         is_pregroup = is_pregroup and all(
-            isinstance(box, (Cup, Cap, Swap)) for box in wires.boxes)
+            isinstance(box, (Diagram.Cup, Diagram.Cap, Swap))
+            for box in wires.boxes)
         if not is_pregroup or not words.cod:
             return rigid.Diagram.normal_form(self, **params)
         return rigid.Diagram.normal_form(words, **params)\
@@ -191,6 +192,7 @@ class Diagram(frobenius.Diagram):
     strategy = no_strategy
 
 
+@Diagram.extend
 class Box(frobenius.Box, Diagram):
     """
     A pregroup box is a frobenius box in a pregroup diagram.
@@ -199,23 +201,8 @@ class Box(frobenius.Box, Diagram):
         return self.flagged(rigid.Box.rotate(self, left))
 
 
-class Cup(frobenius.Cup, Box):
-    """
-    A pregroup cup is a frobenius cup in a pregroup diagram.
-    """
-
-
-class Cap(frobenius.Cap, Box):
-    """
-    A pregroup cap is a frobenius cap in a pregroup diagram.
-    """
-
-
-class Permutation(frobenius.Permutation, Box):
-    "A permutation in a pregroup diagram."
-
-
-class Swap(Permutation, frobenius.Swap, Box):
+@Diagram.extend
+class Swap(Diagram.Permutation, frobenius.Swap, Box):
     """
     A pregroup swap is a frobenius swap in a pregroup diagram.
     """
@@ -274,7 +261,7 @@ def eager_parse(*words, target=Ty('s')):
         for i in range(len(scan) - 1):
             if scan[i: i + 1].r != scan[i + 1: i + 2]:
                 continue
-            cup = Cup(scan[i: i + 1], scan[i + 1: i + 2])
+            cup = Diagram.Cup(scan[i: i + 1], scan[i + 1: i + 2])
             result = result >> Id(scan[: i]) @ cup @ Id(scan[i + 2:])
             scan, fail = result.cod, False
             break
@@ -298,10 +285,7 @@ def brute_force(*vocab, target=Ty('s')):
             test.append(words + (word, ))
 
 
-Diagram.box_factory = Box
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
-Diagram.permutation_factory = Permutation
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+Diagram.Spider = Spider
 
 
 Id = Diagram.id
@@ -311,3 +295,6 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 
 Bubble = Box.from_args
+
+
+export(__name__)

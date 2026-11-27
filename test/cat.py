@@ -646,6 +646,20 @@ def test_Bubble_no_common_boundary():
 
 
 ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
+INAPPLICABLE = {
+    "lambek.pregroup.{Feedback,Feedforward,Head,Tail,FollowedBy}":
+        "a pregroup type has no delay, no head and no tail",
+    "peirce.beta.{Head,FollowedBy}":
+        "a head is a frobenius.HeadOb, not a wire of a beta graph",
+    "peirce.alpha.Layer": "an alpha graph has no type of its own",
+    "quantum.{circuit,zx}.{Cup,Cap}":
+        "a circuit or a zx diagram makes its cups and caps of other boxes",
+}
+"""
+The classes of box a level builds for a structure its objects do not have,
+each with the reason: the level inherits the structure from a level above,
+whose generators cannot be built from its objects.
+"""
 
 
 @cache
@@ -678,8 +692,8 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
     "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
-    "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
-    'factory("x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '
+    "peirce.{alpha,beta}.Cut": 'c(c.ar.Box("f", t := c.ob(c.ob.Atom('
+    '"x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '
     'cod=k)), t, data=v), name="b")',  # not the unit, #636
     "monoidal.Layer":
     'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
@@ -765,7 +779,8 @@ def example(cls, value):
     from discopy.quantum import circuit, gates
     from discopy.rigid import Nat
     from discopy.utils import factory_name
-    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT:
+    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT or any(
+            factory_name(cls) in globs(key) for key in INAPPLICABLE):
         return None
     templates = {name: template for key, template in EXAMPLES.items()
                  for name in globs(key)}
@@ -774,18 +789,18 @@ def example(cls, value):
     assert issubclass(base, owner), f"{owner} needs an example"
     ob = sys.modules[cls.__module__].Ty\
         if issubclass(cls, monoidal.Layer) else cls.ob
-    x, y = (tensor.Dim(2), tensor.Dim(3)) if issubclass(cls, tensor.Box)\
+    x, y = (tensor.Dim(2), tensor.Dim(3)) if issubclass(cls, tensor.Diagram)\
         else (Dims(2), Dims(3)) if ob is Dims\
         else (Nat(1), Nat(1)) if ob is Nat else (ob('x'), ob('y'))
-    if issubclass(cls, circuit.Box):
+    if issubclass(cls, circuit.Circuit):
         x, y = circuit.qubit, circuit.qubit
-    terms = getattr(ob, "constant_factory", None) and (
-        ob.constant_factory("f", x << y), ob.constant_factory("a", y),
-        ob.variable_factory("u", y))
+    terms = getattr(ob, "Constant", None) and (
+        ob.Constant("f", x << y), ob.Constant("a", y),
+        ob.Variable("u", y))
     f, a, u = terms or (None, None, None)
     return eval(templates[factory_name(base)], dict(
         c=cls, x=x, y=y, v=value, f=f, a=a, u=u, sys=sys, closed=closed,
-        cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.box_factory(
+        cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.Box(
             "f", x, y, data=v)))
 
 
@@ -835,7 +850,7 @@ BROKEN = {
         "*.Cofunction": "it keeps its cofunc in an op",
         "*.Cospan": "it keeps left and right as legs",
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
-        "closed.{Pack,Unpack}": "it keeps its type delayed",
+        "{closed,lambek.abstract}.{Pack,Unpack}": "it keeps its type delayed",
     },
     "dagger": {
         "*.{Constant,Variable,Abstraction,Application} "
@@ -856,6 +871,9 @@ BROKEN = {
         "*.{Feedback,Feedforward,Trace}":
         "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
+        "{tensor,quantum.circuit,quantum.zx}.{Head,Tail,FollowedBy} "
+        "peirce.beta.Tail":
+        "it rotates as the box of its level, rebuilt from a name, dom and cod",
     },
     "subs": {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
@@ -863,7 +881,7 @@ BROKEN = {
     "tree": {
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "lambek.categorial.TypeRaising": "its tree drops its cod",
-        "neural.network.{Box,Feedback,Feedforward,Trace,Head,Tail}":
+        "neural.network.{Box,Sum,Feedback,Feedforward,Trace,Head,Tail}":
         "a module has none",
         "{tensor,quantum.circuit,quantum.zx}.Elementwise":
         "its tree drops its func, which == compares",
@@ -1069,7 +1087,7 @@ def test_terms_of_a_level(level, structure):
     diagram = wiring >> module.Box('f', x @ y, x)
     term = diagram.to_term()
     assert type(term) is module.Kappa and term.category is module.Diagram
-    assert module.Diagram.term_factory is module.TermBase
+    assert module.Diagram.TermBase is module.TermBase
     assert issubclass(module.Kappa, monoidal.Kappa)
     assert term.eval() == diagram
     assert len(term.constants) == len(diagram.boxes)

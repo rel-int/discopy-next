@@ -352,15 +352,16 @@ from typing import ClassVar
 from discopy import closed, feedback, cmap, hypergraph
 from discopy.cat import factory
 from discopy.lambek import categorial
+from discopy.utils import export
 
 
 @factory
 class Ty(closed.Ty):
     "An implicative type, the type of an abstract categorial grammar."
-    variable_factory: ClassVar[type["Variable"]]
-    constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[type["Application"]]
-    abstraction_factory: ClassVar[type["Abstraction"]]
+    Variable: ClassVar[type["closed.Variable"]]
+    Constant: ClassVar[type["closed.Constant"]]
+    Application: ClassVar[type["closed.Application"]]
+    Abstraction: ClassVar[type["closed.Abstraction"]]
 
     @classmethod
     def from_categorial(cls, old: categorial.Ty) -> Ty:
@@ -396,17 +397,17 @@ class Diagram(closed.Diagram):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    copy_factory: ClassVar[type["Copy"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    swap_factory: ClassVar[type["Swap"]]
-    curry_factory: ClassVar[type["Curry"]]
-    eval_factory: ClassVar[type["Eval"]]
-    coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
-    discard_factory: ClassVar[type["Discard"]]
-    sum_factory: ClassVar[type["Sum"]]
+    Box: ClassVar[type["closed.Box"]]
+    Functor: ClassVar[type["closed.Functor"]]
+    Copy: ClassVar[type["closed.Copy"]]
+    Permutation: ClassVar[type["closed.Permutation"]]
+    Swap: ClassVar[type["closed.Swap"]]
+    Curry: ClassVar[type["closed.Curry"]]
+    Eval: ClassVar[type["closed.Eval"]]
+    Coeval: ClassVar[type["closed.Coeval"]]
+    Trace: ClassVar[type["feedback.Trace"]]  # ty: ignore[invalid-type-form]
+    Discard: ClassVar[type["closed.Discard"]]
+    Sum: ClassVar[type["closed.Sum"]]
     ob = Ty
 
     @classmethod
@@ -469,78 +470,18 @@ class Diagram(closed.Diagram):
         """
         functor = categorial.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda box: cls.ob.constant_factory(
+            ar_map=lambda box: cls.ob.Constant(
                 box.name, functor(box.cod))
             if isinstance(box, categorial.Constant)
-            else Box(box.name, functor(box.dom), functor(box.cod)),
+            else Diagram.Box(box.name, functor(box.dom), functor(box.cod)),
             cod=cls)
         return functor(diagram)
 
 
-class Box(closed.Box, Diagram):
-    "An abstract box is a closed box in an abstract diagram."
+Diagram.Function.register(Diagram.Permutation)
 
 
-class Eval(closed.Eval, Box):
-    "The evaluation of an exponential type."
-
-
-class Coeval(closed.Coeval, Box):
-    "The coevaluation of an exponential type, i.e. the dagger of an Eval."
-
-
-class Curry(closed.Curry, Box):
-    "The currying of an abstract diagram."
-
-
-class Copy(closed.Copy, Box):
-    "The copy of an abstract type, or its discard when ``n=0``."
-
-
-class Discard(closed.Discard, Copy):
-    "The discard of an abstract type, i.e. a copy with zero legs."
-
-
-class Function(closed.Function, Box):
-    """
-    A markov function in an abstract diagram, which copies or discards, so
-    that plumbing tensors into a function of this level rather than of
-    :mod:`~discopy.closed`.
-
-    >>> x = Ty('x')
-    >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x
-    """
-
-
-class Permutation(closed.Permutation, Box):
-    "A permutation of abstract types."
-
-
-Function.register(Permutation)
-
-
-class Swap(Permutation, closed.Swap, Box):
-    "The symmetric swap of two abstract types."
-
-
-class Sum(closed.Sum, Box):
-    "A formal sum of abstract diagrams."
-
-
-class Functor(closed.Functor):
-    """
-    An abstract functor is a closed functor with abstract diagrams as domain.
-
-    Parameters:
-        ob_map (Mapping[Ty, Ty]) :
-            Map from atomic :class:`Ty` to :code:`cod.ob`.
-        ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
-        cod (Category) : The codomain of the functor.
-    """
-    dom = cod = Diagram
-
-
-class Lexicon(Functor):
+class Lexicon(Diagram.Functor):
     """
     A lexicon is a functor from one vocabulary to another, i.e. between two
     free closed categories: it sends atomic types to types and constants to
@@ -652,7 +593,7 @@ class Lexicon(Functor):
         ...     (None, 0, sleeps), (sleeps, 0, Alice)]
         """
         args = []
-        while isinstance(term, Application):
+        while isinstance(term, Ty.Application):
             term, args = term.function, [term.argument] + args
         yield parent, position, term
         for i, arg in enumerate(args):
@@ -698,12 +639,13 @@ class Lexicon(Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, closed.TermBase):
+class TermBase(Diagram.Box, closed.TermBase):
     "A term in the internal language of an abstract categorial grammar."
-    functor = Functor.id(Diagram)
+    functor = Diagram.Functor.id(Diagram)
     strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
+@Ty.extend
 class Constant(TermBase, closed.Constant):
     "A constant of the vocabulary of an abstract categorial grammar."
 
@@ -711,14 +653,17 @@ class Constant(TermBase, closed.Constant):
 Word = Constant
 
 
+@Ty.extend
 class Variable(TermBase, closed.Variable):
     "A variable term in an abstract categorial grammar."
 
 
+@Ty.extend
 class Application(TermBase, closed.Application):
     "The application of an abstract term to another."
 
 
+@Ty.extend
 class Abstraction(TermBase, closed.Abstraction):
     "The abstraction of a variable in an abstract term."
 
@@ -726,23 +671,7 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory, Diagram.functor_factory = Box, Functor
-Diagram.copy_factory = Copy
-Diagram.function_factory = Function
-Diagram.permutation_factory = Permutation
-Diagram.swap_factory = Swap
-Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
-Diagram.coeval_factory = Coeval
-Diagram.discard_factory = Discard
-Diagram.sum_factory = Sum
-Ty.under_factory = Ty.over_factory = staticmethod(Exp)
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory = Application
-Ty.abstraction_factory = Abstraction
+Ty.Under = Ty.Over = staticmethod(Exp)
 Hypergraph = hypergraph.Hypergraph[Diagram]
 for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
@@ -763,4 +692,7 @@ of type ``String``, ``Position(lambda x: x)`` is the empty string and
 from discopy.lambek.abstract import proofnet  # noqa: E402
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+
+export(__name__)

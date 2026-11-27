@@ -1050,7 +1050,7 @@ def test_List():
     from discopy import abc, monoidal
 
     # List[X] is a NamedGeneric on the generator type, cached like Hypergraph.
-    assert List[int].generator_factory is int and List[int] is List[int]
+    assert List[int].Atom is int and List[int] is List[int]
     a, b = List[int](2, 3), List[int](4)
     assert a @ b == List[int](2, 3, 4)
     with raises(TypeError):
@@ -1069,7 +1069,7 @@ def test_List():
         a[2]
 
     assert issubclass(List, abc.Monoid) and a.dom is a.cod is None
-    assert not issubclass(Ty, List) and Ty.generator_factory is Wire
+    assert not issubclass(Ty, List) and Ty.Atom is Wire
     assert all(issubclass(Ty, base)
                for base in (cat.Ob, cat.FreeCategory, abc.ColouredMonoid))
     assert Dim(2, 3)[::-1] == Dim(3, 2) and Dim(2, 3)[0] == Dim(2)
@@ -1222,14 +1222,14 @@ def test_box_factory():
     from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
-    assert cat.Arrow.box_factory is cat.Box
-    assert circuit.Circuit.box_factory is circuit.Box
-    assert network.Network.box_factory is network.Box
+    assert cat.Arrow.Box is cat.Box
+    assert circuit.Circuit.Box is circuit.Box
+    assert network.Network.Box is network.Box
     for module in (
             monoidal, braided, balanced, symmetric, traced, markov, rigid,
             pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
             tensor, categorial, abstract, pregroup, zx):
-        assert module.Diagram.box_factory is module.Box, module
+        assert module.Diagram.Box is module.Box, module
 
 
 def test_decode_without_boxes_and_offsets():

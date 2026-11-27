@@ -63,7 +63,7 @@ from __future__ import annotations
 from string import ascii_letters
 
 from discopy.monoidal import Dim
-from discopy.neural.network import Box, Dims, Network, Trace, namespace
+from discopy.neural.network import Box, Dims, Network, namespace
 from discopy.neural.wiring import memberships, table_of
 
 
@@ -215,7 +215,7 @@ def sum_product(factors, states: int) -> Network:
             for node, of in enumerate(nodes)]
         return (*beliefs, *(new[port] for port in ports))
 
-    return Trace(body, mem=state)
+    return Network.Trace(body, mem=state)
 
 
 def marginals(factors, *tensors) -> list:

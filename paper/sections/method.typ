@@ -16,7 +16,7 @@ category read as follows in the source.
 def unitality[A: Obj[C0], B: Obj[C0]](
         cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
     """ Left and right unitality of composition. """
-    return cls.equation_factory(
+    return cls.Equation(
         cls.id(f.dom).then(f), f, f.then(cls.id(f.cod)))
 
 @axiom
@@ -24,7 +24,7 @@ def associativity[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
         cls, f: Hom[C1, A, B], g: Hom[C1, B, C], h: Hom[C1, C, D]
 ) -> Equation[Hom[C1, A, D]]:
     """ Associativity of composition. """
-    return cls.equation_factory(
+    return cls.Equation(
         f.then(g).then(h), f.then(g.then(h)))
 ```
 
@@ -34,7 +34,7 @@ a morphism `f` from `A` to `B`, and its return annotation is the type of
 the conclusion, an equation between morphisms from `A` to `D`. The body
 builds the two sides with the operations of the class it is called on.
 An `Equation` is a list of terms that is true when they are all equal,
-and each category chooses its own `equation_factory`, that is what equal
+and each category chooses its own `Equation`, that is what equal
 means for its arrows.
 
 Every class below `Category` inherits the two laws, the free category

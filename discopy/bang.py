@@ -66,6 +66,7 @@ from discopy.abc import DaggerCategory, LinearCategory, MonoidalCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
+    export,
     AxiomError, assert_isinstance, factory_name, from_tree, get_origin)
 
 
@@ -75,13 +76,13 @@ class Ty(monoidal.Ty):
     A type with a bang, a monoidal type whose wires may be
     :class:`BangOb`.
     """
-    bang_factory: ClassVar[type[BangOb]]
-    term_factory: ClassVar[type["TermBase"]]
+    Bang: ClassVar[type[BangOb]]
+    TermBase: ClassVar[type["TermBase"]]
 
     def __call__(self, function: Callable, offset: int | None = None):
         """
         The kappa abstraction of a Python function, a :class:`Kappa` of the
-        terms of its :attr:`term_factory`: a type with a bang binds its
+        terms of its :attr:`TermBase`: a type with a bang binds its
         variables in a linear category even when the body has no box, e.g.
         weakens a banged variable it does not use.
 
@@ -97,7 +98,7 @@ class Ty(monoidal.Ty):
         >>> assert term.eval() == Weakening(x) @ x
         >>> assert eval(str(term)) == term
         """
-        return self.term_factory.kappa_factory.from_callable(
+        return self.TermBase.Kappa.from_callable(
             self, offset)(function)
 
     def bang(self) -> Self:
@@ -113,7 +114,7 @@ class Ty(monoidal.Ty):
         >>> assert str(x.bang()) == "x.bang()"
         >>> assert eval(str((x @ y).bang().bang())) == (x @ y).bang().bang()
         """
-        return type(self)(self.bang_factory(self))
+        return type(self)(self.Bang(self))
 
 
 class BangOb(monoidal.Wire):
@@ -181,7 +182,7 @@ class BangOb(monoidal.Wire):
         return self
 
 
-Ty.bang_factory = BangOb
+Ty.Bang = BangOb
 
 
 @factory
@@ -197,16 +198,16 @@ class Diagram(monoidal.Diagram, LinearCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
-    functor_factory: ClassVar[type["Functor"]]
-    bang_factory: ClassVar[type["Bang"]]
-    dereliction_factory: ClassVar[type["Dereliction"]]
-    digging_factory: ClassVar[type["Digging"]]
-    contraction_factory: ClassVar[type["Contraction"]]
-    weakening_factory: ClassVar[type["Weakening"]]
-    exchange_factory: ClassVar[type["Exchange"]]
-    laxator_factory: ClassVar[type["Laxator"]]
+    Box: ClassVar[type["monoidal.Box"]]
+    Sum: ClassVar[type["monoidal.Sum"]]
+    Functor: ClassVar[type["Functor"]]
+    Bang: ClassVar[type["Bang"]]
+    Dereliction: ClassVar[type["Dereliction"]]
+    Digging: ClassVar[type["Digging"]]
+    Contraction: ClassVar[type["Contraction"]]
+    Weakening: ClassVar[type["Weakening"]]
+    Exchange: ClassVar[type["Exchange"]]
+    Laxator: ClassVar[type["Laxator"]]
 
     ob = Ty
     dagger_involution = DaggerCategory.dagger_involution.failing(
@@ -227,37 +228,37 @@ class Diagram(monoidal.Diagram, LinearCategory):
         >>> assert f.bang() == Bang(f) and f.bang().dom == x.bang()
         >>> assert Diagram.id(x).bang() != Diagram.id(x.bang())
         """
-        return self.bang_factory(self)
+        return self.Bang(self)
 
     @classmethod
-    def dereliction(cls, x: Ty) -> Dereliction:
+    def dereliction(cls, x: Ty) -> "Dereliction":
         """ Wrapper around :class:`Dereliction`. """
-        return cls.dereliction_factory(x)
+        return cls.Dereliction(x)
 
     @classmethod
-    def digging(cls, x: Ty) -> Digging:
+    def digging(cls, x: Ty) -> "Digging":
         """ Wrapper around :class:`Digging`. """
-        return cls.digging_factory(x)
+        return cls.Digging(x)
 
     @classmethod
-    def contraction(cls, x: Ty) -> Contraction:
+    def contraction(cls, x: Ty) -> "Contraction":
         """ Wrapper around :class:`Contraction`. """
-        return cls.contraction_factory(x)
+        return cls.Contraction(x)
 
     @classmethod
-    def weakening(cls, x: Ty) -> Weakening:
+    def weakening(cls, x: Ty) -> "Weakening":
         """ Wrapper around :class:`Weakening`. """
-        return cls.weakening_factory(x)
+        return cls.Weakening(x)
 
     @classmethod
-    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> Exchange:
+    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> "Exchange":
         """ Wrapper around :class:`Exchange`. """
-        return cls.exchange_factory(x, y, is_dagger)
+        return cls.Exchange(x, y, is_dagger)
 
     @classmethod
-    def laxator(cls, x: Ty | None = None, y: Ty | None = None) -> Laxator:
+    def laxator(cls, x: Ty | None = None, y: Ty | None = None) -> "Laxator":
         """ Wrapper around :class:`Laxator`. """
-        return cls.laxator_factory(x, y)
+        return cls.Laxator(x, y)
 
     @classmethod
     def copy(cls, x: Ty, n: int = 2) -> Diagram:
@@ -380,22 +381,11 @@ class Diagram(monoidal.Diagram, LinearCategory):
         >>> print(x.bang()(lambda a: Dereliction(y)(f.bang()(a))))
         x.bang()(lambda a: Dereliction(y)((f).bang()(a)))
         """
-        return self.term_factory.constant_factory(self)(*arguments)
+        return self.TermBase.Constant(self)(*arguments)
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A box in the free linear category, i.e. a monoidal box of its diagrams.
-    """
-
-
-class Sum(monoidal.Sum, Box):
-    """
-    A sum in the free linear category, i.e. a monoidal sum and its box.
-    """
-
-
-class Bang(Box):
+@Diagram.slot
+class Bang(Diagram.Box):
     """
     The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
     a :class:`Curry` is.
@@ -424,8 +414,8 @@ class Bang(Box):
 
     def __init__(self, arg: Diagram):
         dom, cod = arg.dom.bang(), arg.cod.bang()
-        Box.__init__(self, f"({arg}).bang()", dom, cod, args=(arg, ),
-                     drawing_name="!")
+        Diagram.Box.__init__(self, f"({arg}).bang()", dom, cod, args=(arg, ),
+                             drawing_name="!")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r})"
@@ -446,7 +436,7 @@ class Bang(Box):
         return type(self)(self.arg.dagger())
 
 
-class Structural(Box):
+class Structural(Diagram.Box):
     """
     A structural box of a linear category, built from the types of its
     :attr:`serialised_attrs` rather than a name and a boundary: its name is
@@ -486,6 +476,7 @@ class Structural(Box):
         raise AxiomError(messages.BANG_HAS_NO_DAGGER.format(self))
 
 
+@Diagram.slot
 class Dereliction(Structural):
     """
     The dereliction ``!x -> x``, the counit of the bang and the rule of !L*
@@ -519,6 +510,7 @@ class Dereliction(Structural):
         return cls.atomic_strategy(types).map(cls)
 
 
+@Diagram.slot
 class Digging(Structural):
     """
     The digging ``!x -> !!x``, the comultiplication of the bang.
@@ -540,6 +532,7 @@ class Digging(Structural):
         super().__init__(f"Digging({x})", x.bang(), x.bang().bang())
 
 
+@Diagram.slot
 class Contraction(Structural):
     """
     The contraction ``!x -> !x @ !x``, the rule of !L* deriving
@@ -562,6 +555,7 @@ class Contraction(Structural):
         super().__init__(f"Contraction({x})", x.bang(), x.bang() @ x.bang())
 
 
+@Diagram.slot
 class Weakening(Structural):
     """
     The weakening ``!x -> Ty()``, the counit of the contraction. !L* is
@@ -584,6 +578,7 @@ class Weakening(Structural):
         super().__init__(f"Weakening({x})", x.bang(), x[:0])
 
 
+@Diagram.slot
 class Exchange(Structural):
     """
     The exchange ``!x @ y -> y @ !x`` of a banged type with any type, and its
@@ -631,6 +626,7 @@ class Exchange(Structural):
         return st.builds(cls, atoms, atoms, st.booleans())
 
 
+@Diagram.slot
 class Laxator(Structural):
     """
     The laxator ``!x @ !y -> !(x @ y)`` of the bang, and its unit
@@ -681,21 +677,13 @@ class Laxator(Structural):
 
 
 Id = Diagram.id
-Diagram.box_factory = Box
-Diagram.sum_factory = Sum
-Diagram.bang_factory = Bang
-Diagram.dereliction_factory = Dereliction
-Diagram.digging_factory = Digging
-Diagram.contraction_factory = Contraction
-Diagram.weakening_factory = Weakening
-Diagram.exchange_factory = Exchange
-Diagram.laxator_factory = Laxator
 for law in sorted(
         set(LinearCategory.axioms) - set(MonoidalCategory.axioms)):
     setattr(Diagram, law, getattr(LinearCategory, law).failing(
         messages.FREE_BANG))
 
 
+@Diagram.extend
 class Functor(monoidal.Functor):
     """
     A functor from the free linear category: into a linear category it
@@ -758,9 +746,6 @@ class Functor(monoidal.Functor):
         return super().__call__(other)
 
 
-Diagram.functor_factory = Functor
-
-
 class TermBase(monoidal.TermBase):
     """
     A term of a linear category, i.e. of the planar kappa calculus with a
@@ -783,6 +768,8 @@ class TermBase(monoidal.TermBase):
     ...
     ValueError: Expected banged variables to share, got a.
     """
+    arrow = Diagram
+
     @staticmethod
     def wire(functor, wiring: list[int], dom: Ty):
         """
@@ -793,25 +780,7 @@ class TermBase(monoidal.TermBase):
         return functor(functor.dom.wiring(wiring, dom))
 
 
-class Variable(TermBase, monoidal.Variable):
-    """
-    A variable with a name and a type of one wire, an identity diagram.
-
-    Parameters:
-        name : The name of the variable.
-        cod : The type of the variable.
-    """
-
-
-class Constant(TermBase, monoidal.Constant):
-    """
-    A box as a term, with its domain as stack.
-
-    Parameters:
-        box : The box.
-    """
-
-
+@TermBase.extend
 class Application(TermBase, monoidal.Application):
     """
     The application of a term to an argument with no stack, which shares
@@ -854,6 +823,7 @@ class Application(TermBase, monoidal.Application):
         return self.wire(functor, wiring, self.dom) >> super().eval(functor)
 
 
+@TermBase.extend
 class Kappa(TermBase, monoidal.Kappa):
     """
     The abstraction of a block of ``variables`` of the ``body``, as in a
@@ -883,7 +853,6 @@ class Kappa(TermBase, monoidal.Kappa):
     ValueError: Expected a block of variables next to the stack of f(b), \
 got a, b.
     """
-    above = None
 
     @staticmethod
     def used(variables, body) -> tuple:
@@ -950,10 +919,9 @@ got a, b.
         return self.wire(functor, wiring, self.dom) >> body.eval(functor)
 
 
-TermBase.functor = Functor.id(Diagram)
-TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
-TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory = Ty.term_factory = TermBase
+Diagram.TermBase = Ty.TermBase = TermBase
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

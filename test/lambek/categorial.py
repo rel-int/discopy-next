@@ -369,7 +369,7 @@ def test_Coeval():
     x, y = Ty('x'), Ty('y')
     coeval = Eval(x << y).dagger()
     assert isinstance(coeval, Coeval) and coeval.dagger() == Eval(x << y)
-    assert Diagram.box_factory is Box and Diagram.coeval_factory is Coeval
+    assert Diagram.Box is Box and Diagram.Coeval is Coeval
 
 
 def tokens(string):

@@ -280,7 +280,7 @@ class Hypergraph[category](
     >>> assert H.category.ob == Ty and H.category == Diagram
 
     The :class:`Functor` used by :meth:`from_diagram` is read off the category
-    itself, i.e. ``H.functor == H.category.functor_factory``.
+    itself, i.e. ``H.functor == H.category.Functor``.
 
     >>> from discopy.frobenius import Functor
     >>> assert H.functor == Functor
@@ -332,7 +332,7 @@ class Hypergraph[category](
     MAX_ARITY = 3
     """ The largest number of ports :meth:`strategy` samples for a box. """
 
-    functor = classproperty(lambda cls: cls.category.functor_factory)
+    functor = classproperty(lambda cls: cls.category.Functor)
     ob = classproperty(lambda cls: cls.category.ob)
 
     @axiom
@@ -687,7 +687,7 @@ class Hypergraph[category](
         if issubclass(cls.category, SymmetricCategory):
             return cls.swap(left, right)
         if len(left) == len(right) == 1:
-            return cls.from_box(cls.category.braid_factory(left, right))
+            return cls.from_box(cls.category.Braid(left, right))
         return cls.from_diagram(cls.category.braid(left, right))
 
     @classmethod
@@ -707,7 +707,7 @@ class Hypergraph[category](
             raise AxiomError(messages.NO_TWIST.format(
                 factory_name(cls.category)))
         if len(dom) == 1:
-            return cls.from_box(cls.category.twist_factory(dom))
+            return cls.from_box(cls.category.Twist(dom))
         return cls.from_diagram(cls.category.twist(dom))
 
     @classmethod
@@ -753,10 +753,10 @@ class Hypergraph[category](
     def merge(cls, typ, n=2) -> "Hypergraph":
         return cls.spiders(n, 1, typ)
 
-    cup_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cup_factory(left, right)))
-    cap_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cap_factory(left, right)))
+    Cup = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cup(left, right)))
+    Cap = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cap(left, right)))
 
     @staticmethod
     def assert_isadjoint(left, right):
@@ -801,7 +801,7 @@ class Hypergraph[category](
             raise AxiomError(messages.NO_CUPS.format(
                 factory_name(cls.category)))
         if not issubclass(cls.category, CompactCategory):
-            return cls.cup_factory(left, right) if len(left) == 1\
+            return cls.Cup(left, right) if len(left) == 1\
                 else cls.from_diagram(cls.category.cups(left, right))
         cls.assert_isadjoint(left, right)
         dom_wires = tuple(range(len(left))) + tuple(reversed(range(len(left))))
@@ -826,7 +826,7 @@ class Hypergraph[category](
             raise AxiomError(messages.NO_CUPS.format(
                 factory_name(cls.category)))
         if not issubclass(cls.category, CompactCategory):
-            return cls.cap_factory(left, right) if len(left) == 1\
+            return cls.Cap(left, right) if len(left) == 1\
                 else cls.from_diagram(cls.category.caps(left, right))
         cls.assert_isadjoint(right, left)
         cod_wires = tuple(range(len(left))) + tuple(reversed(range(len(left))))
@@ -872,7 +872,7 @@ class Hypergraph[category](
 
         Note
         ----
-        When ``category.trace_factory`` is a subclass of ``category``,
+        When ``category.Trace`` is a subclass of ``category``,
         e.g. for symmetric diagrams, then the result is just one big trace box
         wrapped up as a hypergraph, whatever ``n``, since the trace of ``n``
         wires of a diagram is its ``n`` one-wire traces nested, see
@@ -916,12 +916,12 @@ class Hypergraph[category](
             raise AxiomError(messages.NOT_TRACED.format(
                 factory_name(self.category)))
         assert_istraceable(self, n, left)
-        factory = self.category.trace_factory
+        factory = self.category.Trace
         if isclass(factory) and issubclass(factory, self.category):
             return self.from_box(self.to_diagram().trace(n, left))
         # pylint: disable-next=import-outside-toplevel  # pivotal imports us
         from discopy.pivotal import Diagram as Pivotal
-        if factory.__func__ is not Pivotal.trace_factory.__func__:
+        if factory.__func__ is not Pivotal.Trace.__func__:
             result = self
             for _ in range(n):
                 result = factory.__func__(type(self), result, left)
@@ -939,9 +939,9 @@ class Hypergraph[category](
         cup_wires = [(loop[i], out_of[i]) if left else (out_of[i], loop[i])
                      for i in range(n)]
         order = tuple(reversed(range(n))) if left else tuple(range(n))
-        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+        boxes = tuple(self.category.Cap(*legs[i]) for i in order)\
             + self.boxes + tuple(
-                self.category.cup_factory(*legs[i]) for i in order[::-1])
+                self.category.Cup(*legs[i]) for i in order[::-1])
         box_wires = tuple(((), cap_wires[i]) for i in order) + self.box_wires\
             + tuple((cup_wires[i], ()) for i in order[::-1])
         spider_types = dict(enumerate(self.spider_types)) | {
@@ -2560,7 +2560,7 @@ class Hypergraph[category](
             rewiring.update(zip(ports, legs))
             spider_types.update(dict.fromkeys(legs, typ))
             del spider_types[spider]
-            insertions.append((depth, self.category.spider_factory(
+            insertions.append((depth, self.category.Spider(
                 len(input_wires), len(output_wires), typ,
                 *([phase] if phase else [])), legs))
             depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
@@ -2655,8 +2655,8 @@ class Hypergraph[category](
                 consumer = None if cups else getattr(
                     self.ports[source], "depth", None)
                 depth = n_boxes if consumer is None else depths[consumer]
-                factory = self.category.cup_factory if cups\
-                    else self.category.cap_factory
+                factory = self.category.Cup if cups\
+                    else self.category.Cap
                 legs = self.leg_order(source, target)
                 spiders = (fresh, fresh + 1)
                 insertions.append((depth, factory(
@@ -2698,7 +2698,7 @@ class Hypergraph[category](
             fresh += len(input_wires)
             rewiring.update(zip(sorted(input_wires), legs))
             spider_types.update(dict.fromkeys(legs, typ))
-            insertions.append((depth, self.category.spider_factory(
+            insertions.append((depth, self.category.Spider(
                 len(input_wires), 1, typ), legs + (spider, )))
             depths = self.shift_depths(depths, depth)
         if not insertions:
@@ -2733,7 +2733,7 @@ class Hypergraph[category](
             fresh += len(output_wires)
             rewiring.update(zip(sorted(output_wires), legs))
             spider_types.update(dict.fromkeys(legs, typ))
-            insertions.append((depth, self.category.spider_factory(
+            insertions.append((depth, self.category.Spider(
                 1, len(output_wires), typ), (spider, ) + legs))
             depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
         if not insertions:
@@ -2949,7 +2949,7 @@ class Hypergraph[category](
                     draw, types)  # ty: ignore[invalid-argument-type]
                 for _ in range(n_scalars)]
             boxes = tuple(
-                draw(category.box_factory.strategy(dom=x, cod=y))
+                draw(category.Box.strategy(dom=x, cod=y))
                 for x, y in box_types)
             return cls(domain, codomain, boxes, wires, spider_types)
 
@@ -3306,10 +3306,10 @@ class Hypergraph[category](
         functor = factory.functor(
             ob_map=lambda typ: typ, ar_map=factory.from_box,
             dom=category, cod=factory)
-        trace = getattr(category, "trace_factory", ())
+        trace = getattr(category, "Trace", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()
-        permutation = getattr(category, "permutation_factory", ())
+        permutation = getattr(category, "Permutation", ())
 
         def image(box):
             if isinstance(box, trace):
@@ -3394,7 +3394,7 @@ class Hypergraph[category](
         decoder = Decoder(
             self.category, self.dom, self.dom_wires,
             foliate=self.is_boundary_connected, fuse=True)
-        caps = getattr(self.category, "cap_factory", None)
+        caps = getattr(self.category, "Cap", None)
         caps = caps if isclass(caps) else ()
 
         def beside(depth):
@@ -3742,7 +3742,7 @@ class Decoder:
         them is a diagram rather than a box, or in a category with no layers,
         e.g. a :class:`~discopy.tensor.Tensor` in a ``CMap[Tensor]``.
         """
-        if not hasattr(self.diagram, "layer_factory") or not all(
+        if not hasattr(self.diagram, "Layer") or not all(
                 isinstance(box, cat.Box) for box, _ in self.layer):
             for box, offset in self.layer:
                 dom = self.diagram.cod
@@ -3754,7 +3754,7 @@ class Decoder:
                 cursor = offset - shift + len(box.dom)
                 shift += len(box.cod) - len(box.dom)
             parts.append(dom[cursor:])
-            layer = self.diagram.layer_factory(*parts)
+            layer = self.diagram.Layer(*parts)
             self.then(self.diagram.ar((layer, ), layer.dom, layer.cod))
         self.layer = []
 

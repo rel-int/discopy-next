@@ -85,13 +85,13 @@ def test_dual_rail_then():
         D = module.DualRail()
         x, y = module.Ty('x'), D.cod.ob('y')
         before = module.Functor({x: x}, {})
-        after = D.cod.functor_factory({y: y}, {})
+        after = D.cod.Functor({y: y}, {})
         name = module.__name__.removeprefix("discopy.")
         for left, right in [(D, after), (before, D)]:
             with raises(AxiomError, match=rf"^{name}\.DualRail composes with "
                         r"no functor .* E\(D\(f\)\)"):
                 left >> right
-        assert D >> D.cod.functor_factory.id(D.cod) is D
+        assert D >> D.cod.Functor.id(D.cod) is D
         assert module.Functor.id(D.dom) >> D is D
     with raises(AxiomError, match="composes with no functor"):
         DualRail() >> DualRail(colour="red")

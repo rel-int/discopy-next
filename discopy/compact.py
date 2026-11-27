@@ -69,11 +69,11 @@ from typing import ClassVar
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
 from discopy import (
-    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction)
+    symmetric, ribbon, pivotal, cmap, hypergraph, interaction)
 from discopy.abc import (
     CompactCategory, DaggerMonoidalCategory, RigidCategory, SymmetricCategory)
 from discopy.cat import factory
-from discopy.utils import deprecated_alias
+from discopy.utils import export, deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 
@@ -103,50 +103,20 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     currying_naturality_left = CompactCategory.currying_naturality_left
     currying_naturality_right = CompactCategory.currying_naturality_right
 
-    sum_factory: ClassVar[type["Sum"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    box_factory: ClassVar[type["Box"]]
-    swap_factory: ClassVar[type["Swap"]]
-    functor_factory: ClassVar[type["Functor"]]
-    permutation_factory: ClassVar[type["Permutation"]]
+    Sum: ClassVar[type["symmetric.Sum"]]
+    Cup: ClassVar[type["ribbon.Cup"]]
+    Cap: ClassVar[type["ribbon.Cap"]]
+    Box: ClassVar[type["symmetric.Box"]]
+    Swap: ClassVar[type["symmetric.Swap"]]
+    Functor: ClassVar[type["Functor"]]
+    Permutation: ClassVar[type["Permutation"]]
     ob = Ty
-    layer_factory = Layer
-    trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
+    Layer = Layer
+    Trace = classmethod(pivotal.Diagram.Trace.__func__)
 
 
-class Box(symmetric.Box, ribbon.Box, Diagram):
-    """
-    A compact box is a symmetric and ribbon box in a compact diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (pivotal.Ty) : The domain of the box, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Cup(ribbon.Cup, Box):
-    """
-    A compact cup is a ribbon cup in a compact diagram.
-
-    Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
-    """
-
-
-class Cap(ribbon.Cap, Box):
-    """
-    A compact cap is a ribbon cap in a compact diagram.
-
-    Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
-    """
-
-
-class Permutation(symmetric.Permutation, Box):
+@Diagram.extend
+class Permutation(symmetric.Permutation, Diagram.Box):
     """
     A compact permutation is a symmetric permutation in a compact category.
 
@@ -162,27 +132,7 @@ class Permutation(symmetric.Permutation, Box):
     r = property(lambda self: self.rotate(left=False))
 
 
-class Swap(Permutation, symmetric.Swap, ribbon.Braid, Box):
-    """
-    A compact swap is a symmetric swap and a ribbon braid.
-
-    Parameters:
-        left (pivotal.Ty) : The type on the top left and bottom right.
-        right (pivotal.Ty) : The type on the top right and bottom left.
-    """
-
-
-class Sum(symmetric.Sum, ribbon.Sum, Box):
-    """
-    A compact sum is a sum of compact diagrams.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.extend
 class Functor(symmetric.Functor, ribbon.Functor):
     """
     A compact functor is both a symmetric functor and a ribbon functor.
@@ -201,34 +151,11 @@ class Functor(symmetric.Functor, ribbon.Functor):
         return ribbon.Functor.__call__(self, other)
 
 
-class DualRail(symmetric.DualRail, ribbon.DualRail):
-    """
-    The functor sending a compact diagram to its dual rail encoding, i.e.
-    :class:`symmetric.DualRail <discopy.symmetric.DualRail>` sending a
-    :class:`Permutation` to the dual rail braids of its swaps, and
-    :class:`ribbon.DualRail <discopy.ribbon.DualRail>` otherwise.
-
-    >>> x, y, z = map(Ty, "xyz")
-    >>> diagram = (Swap(x, y) @ z).to_braided()
-    >>> assert [type(box) for box in diagram.boxes] == [ribbon.DualRailBraid]
-    """
-    dom = Diagram
-
-
 CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
-    feedback.structural_boxes(Diagram, Box)
-Diagram.box_factory = Box
-Diagram.swap_factory = Swap
-Diagram.functor_factory = Functor
-Diagram.dual_rail_factory = DualRail
-Diagram.permutation_factory = Permutation
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.sum_factory = Sum
 interaction.Diagram[Diagram].dagger_involution_rigid\
     = DaggerMonoidalCategory.dagger_involution.weaken(within=RigidCategory)
 interaction.Diagram[Diagram].dagger_contravariance_rigid\
@@ -246,4 +173,6 @@ class Equation(symmetric.Equation):
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+export(__name__)

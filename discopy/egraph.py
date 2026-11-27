@@ -708,7 +708,7 @@ class History[factory](TestableGeneric, tuple):
             inputs = tuple(i % len(types) for i in draw(st.lists(
                 number, max_size=2 if types else 0)))
             name = draw(names)
-            return kind, category.box_factory(name, category.ob().tensor(*map(
+            return kind, category.Box(name, category.ob().tensor(*map(
                 types.__getitem__, inputs)), category.ob(name),
                 is_deterministic=not draw(sample)), inputs
 
@@ -1370,7 +1370,7 @@ class EGraph[category](
         @st.composite
         def egraphs(draw):
             graph = draw(graphs)
-            boxes = tuple(category.box_factory(
+            boxes = tuple(category.Box(
                 draw(st.sampled_from(GENERATORS[:2])), box.dom, box.cod,
                 is_deterministic=not draw(effect), is_affine=not draw(effect))
                 for box in graph.boxes)
@@ -1549,7 +1549,7 @@ class EGraph[category](
         """ Matching is sound, flags included: in ``(f >> c) @ g``, ``c`` the
         boxes of ``g`` made cartesian, rewriting a match into its pattern
         changes nothing, for the pattern of ``c`` and for it rewired. """
-        graph, factory = g.graph, cls.category.box_factory
+        graph, factory = g.graph, cls.category.Box
         graph = type(graph)(graph.dom, graph.cod, tuple(factory(
             box.name, box.dom, box.cod) for box in graph.boxes), graph.wires)
         composite = ((f >> type(g)(graph)) @ g).rebuild()
@@ -1566,7 +1566,7 @@ class EGraph[category](
         boxes, fresh = dict.fromkeys(graph.graph.boxes), GENERATORS[2]
         same = [(b, c) for b in boxes for c in boxes
                 if (b.dom, b.cod) == (c.dom, c.cod)]
-        renamed = [(b, cls.category.box_factory(fresh, b.dom, b.cod))
+        renamed = [(b, cls.category.Box(fresh, b.dom, b.cod))
                    for b in boxes]
 
         def saturated(rules):
@@ -1597,7 +1597,7 @@ class EGraph[category](
         for operation in history.operations:
             getattr(builder, operation[0])(*operation[1:])
         hypergraph = graph.graph
-        boxes = tuple(cls.category.box_factory(box.name, box.dom, box.cod)
+        boxes = tuple(cls.category.Box(box.name, box.dom, box.cod)
                       for box in hypergraph.boxes)
         lhs = pattern(type(hypergraph)(
             hypergraph.dom, hypergraph.cod, boxes, hypergraph.wires))
@@ -1621,7 +1621,7 @@ class EGraph[category](
         rules, fresh = [], GENERATORS[2]
         for b in dict.fromkeys(graph.graph.boxes[::-1]):
             rules += [(b.to_hypergraph(), c.to_hypergraph()) for c in (
-                *dict.fromkeys(graph.graph.boxes), cls.category.box_factory(
+                *dict.fromkeys(graph.graph.boxes), cls.category.Box(
                     fresh, b.dom, b.cod)) if (b.dom, b.cod) == (c.dom, c.cod)]
         builder = graph.builder()
         builder.step(rules)

@@ -356,14 +356,11 @@ class Valuation(Functor):
 ```
 
 Disjunction is given for free by the sum of arrows.
-Let's implement this with a subclass of `Sum` which we attach to `Formula` using the `sum_factory` attribute.
+`Formula.Sum` is built for us, a subclass of both `Sum` and `Formula`, so we only need to name it.
 We can then check that this indeed satisfies [De Morgan's laws](https://en.wikipedia.org/wiki/De_Morgan%27s_laws).
 
 ```python {.marimo}
-class Disjunction(Sum, Formula):
-    """ A Disjunction is a Sum in a Formula. """
-
-Formula.sum_factory = Disjunction
+assert issubclass(Formula.Sum, Sum) and issubclass(Formula.Sum, Formula)
 Formula.__or__ = Formula.__add__
 
 P, Q = Atom('P'), Atom('Q')

@@ -95,7 +95,7 @@ $$0 \otimes f = 0 \circ f = 0 = f \circ 0 = f \otimes 0$$
 ```python {.marimo}
 zero = a.zero(Ty(), Ty())
 
-assert zero + a == a.sum_factory((a, )) == a + zero
+assert zero + a == a.Sum((a, )) == a + zero
 assert (a + b) + c == a + b + c == a + (b + c)
 assert (a + b) @ (c + d) == (a @ c) + (a @ d) + (b @ c) + (b @ d)
 assert (a + b) >> (c + d) == (a >> c) + (a >> d) + (b >> c) + (b >> d)

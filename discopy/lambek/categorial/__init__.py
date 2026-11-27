@@ -74,6 +74,7 @@ from discopy.abc import ClosedCategory
 from discopy.cat import factory
 from discopy.lambek import thue
 from discopy.utils import (
+    export,
     BinaryBoxConstructor,
     AxiomError,
     factory_key,
@@ -86,19 +87,21 @@ from discopy.utils import (
 @factory
 class Ty(biclosed.Ty):
     "Base class for categorial grammar types."
-    variable_factory: ClassVar[type["Variable"]]
-    constant_factory: ClassVar[type["Constant"]]
-    abstraction_factory: ClassVar[type["Abstraction"]]
-    over_factory: ClassVar[type["Over"]]
-    under_factory: ClassVar[type["Under"]]
+    Variable: ClassVar[type["Variable"]]
+    Constant: ClassVar[type["Constant"]]
+    Abstraction: ClassVar[type["Abstraction"]]
+    Over: ClassVar[type["Over"]]
+    Under: ClassVar[type["Under"]]
 
 
+@Ty.extend
 class Over(biclosed.Over):
     "Categorial grammar type ``base << exponent``."
 
     ob = Ty
 
 
+@Ty.extend
 class Under(biclosed.Under):
     "Categorial grammar type ``exponent >> base``."
 
@@ -110,11 +113,11 @@ class Diagram(biclosed.Diagram):
     """
     A categorial diagram is a biclosed diagram with rules and words as boxes.
     """
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    curry_factory: ClassVar[type["Curry"]]
-    eval_factory: ClassVar[type["Eval"]]
-    coeval_factory: ClassVar[type["Coeval"]]
+    Box: ClassVar[type["biclosed.Box"]]
+    Functor: ClassVar[type["Functor"]]
+    Curry: ClassVar[type["biclosed.Curry"]]
+    Eval: ClassVar[type["biclosed.Eval"]]
+    Coeval: ClassVar[type["biclosed.Coeval"]]
     ob = Ty
 
     def to_pregroup(self):
@@ -130,25 +133,27 @@ class Diagram(biclosed.Diagram):
     @staticmethod
     def fa(left, right):
         """ Forward application. """
-        return Eval(left << right)
+        return Diagram.Eval(left << right)
 
     @staticmethod
     def ba(left, right):
         """ Backward application. """
-        return Eval(left >> right)
+        return Diagram.Eval(left >> right)
 
     @staticmethod
     def fc(left, middle, right):
         """ Forward composition. """
         return (
-            (left << middle) @ Eval(middle << right) >> Eval(left << middle)
+            (left << middle) @ Diagram.Eval(middle << right)
+            >> Diagram.Eval(left << middle)
         ).curry(n=len(right), left=True)
 
     @staticmethod
     def bc(left, middle, right):
         """ Backward composition. """
         return (
-            Eval(left >> middle) @ (middle >> right) >> Eval(middle >> right)
+            Diagram.Eval(left >> middle) @ (middle >> right)
+            >> Diagram.Eval(middle >> right)
         ).curry(n=len(left), left=False)
 
     @staticmethod
@@ -162,13 +167,7 @@ class Diagram(biclosed.Diagram):
         return BackwardCrossedComposition(middle << left, middle >> right)
 
 
-class Box(biclosed.Box, Diagram):
-    """
-    A categorial box is a grammar rule in a categorial diagram.
-    """
-
-
-class Word(thue.Word, Box):
+class Word(thue.Word, Diagram.Box):
     """
     A categorial word is a rule with a ``name``, a grammatical type as ``cod``
     and an optional domain ``dom``.
@@ -180,25 +179,7 @@ class Word(thue.Word, Box):
     """
 
 
-class Eval(biclosed.Eval, Box):
-    """
-    Evaluation box in a categorial grammar.
-    """
-
-
-class Coeval(biclosed.Coeval, Box):
-    """
-    Coevaluation box in a categorial grammar, the dagger of an evaluation.
-    """
-
-
-class Curry(biclosed.Curry, Box):
-    """
-    The currying of a categorial diagram.
-    """
-
-
-class ForwardCrossedComposition(BinaryBoxConstructor, Box):
+class ForwardCrossedComposition(BinaryBoxConstructor, Diagram.Box):
     """ Forward crossed composition rule. """
     serialised_attrs = ("left", "right")
 
@@ -210,11 +191,11 @@ class ForwardCrossedComposition(BinaryBoxConstructor, Box):
                 left, right, left.exponent, right.base))
         name = f"ForwardCrossedComposition({left}, {right})"
         dom, cod = left @ right, right.exponent >> left.base
-        Box.__init__(self, name, dom, cod)
+        Diagram.Box.__init__(self, name, dom, cod)
         BinaryBoxConstructor.__init__(self, left, right)
 
 
-class BackwardCrossedComposition(BinaryBoxConstructor, Box):
+class BackwardCrossedComposition(BinaryBoxConstructor, Diagram.Box):
     """ Backward crossed composition rule. """
     serialised_attrs = ("left", "right")
 
@@ -226,10 +207,11 @@ class BackwardCrossedComposition(BinaryBoxConstructor, Box):
                 left, right, left.base, right.exponent))
         name = f"BackwardCrossedComposition({left}, {right})"
         dom, cod = left @ right, right.base << left.exponent
-        Box.__init__(self, name, dom, cod)
+        Diagram.Box.__init__(self, name, dom, cod)
         BinaryBoxConstructor.__init__(self, left, right)
 
 
+@Diagram.extend
 class Functor(biclosed.Functor):
     """
     A categorial functor is a biclosed functor with a predefined mapping
@@ -260,7 +242,7 @@ class Functor(biclosed.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Diagram.Box, biclosed.TermBase):  # ty: ignore[inconsistent-mro]
     """
     A term in the internal language of a categorial grammar.
     """
@@ -279,6 +261,7 @@ class TermBase(Box, biclosed.TermBase):
         return Diagram.from_categorial(self)
 
 
+@Ty.extend
 class Constant(TermBase, biclosed.Constant):
     serialised_attrs = ("name", "cod")
 
@@ -290,6 +273,7 @@ class Constant(TermBase, biclosed.Constant):
         return self
 
 
+@Ty.extend
 class Variable(TermBase, biclosed.Variable):
     serialised_attrs = biclosed.Variable.serialised_attrs
 
@@ -297,6 +281,7 @@ class Variable(TermBase, biclosed.Variable):
         return self
 
 
+@Ty.extend
 class Abstraction(TermBase, biclosed.Abstraction):
     serialised_attrs = biclosed.Abstraction.serialised_attrs
     var: Variable
@@ -525,9 +510,9 @@ class FX(BinaryTerm):
         ob = functor.cod.ob
         f, g = (functor.map_term(term, context)
                 for term in (self.left, self.right))
-        var = ob.variable_factory.fresh(
+        var = ob.Variable.fresh(
             "x", functor(self.right.cod.exponent), f, g)
-        return ob.abstraction_factory(var, f(g(var)))
+        return ob.Abstraction(var, f(g(var)))
 
 
 class BX(BinaryTerm):
@@ -549,9 +534,9 @@ class BX(BinaryTerm):
         ob = functor.cod.ob
         f, g = (functor.map_term(term, context)
                 for term in (self.left, self.right))
-        var = ob.variable_factory.fresh(
+        var = ob.Variable.fresh(
             "x", functor(self.left.cod.exponent), f, g)
-        return ob.abstraction_factory(var, g(f(var)))
+        return ob.Abstraction(var, g(f(var)))
 
 
 type Term = (
@@ -624,7 +609,7 @@ def tree2diagram(tree: dict, dom=Ty()) -> Diagram:
             dom.inside[0].exponent,
             dom.inside[1].exponent)
     else:
-        rule = Box(tree['type'], dom, cod)
+        rule = Diagram.Box(tree['type'], dom, cod)
     return Id().tensor(*children) >> rule
 
 
@@ -717,17 +702,12 @@ def parse(sentence, k: int = 1, goal: Ty | None = None
 
 
 Id = Diagram.id
-Diagram.box_factory, Diagram.functor_factory = Box, Functor
-Diagram.curry_factory = Curry
-Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory =\
+Ty.Application =\
     lambda func, args, left=False: BA(args, func) if left else FA(func, args)
-Ty.abstraction_factory = Abstraction
-
-Ty.over_factory, Ty.under_factory = Over, Under
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+
+export(__name__)

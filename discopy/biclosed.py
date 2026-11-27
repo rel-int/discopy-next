@@ -95,13 +95,14 @@ from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
-    GENERATORS, Equation as AbstractEquation, Serialisable,
+    GENERATORS, Equation as AbstractEquation, Rule, Serialisable,
     Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import AlphaEquivalence, Renamed, factory
 # pylint: disable-next=unused-import  # still imported from this module
 from discopy.cat import Canonical  # noqa: F401
 from discopy.utils import (
+    export,
     AxiomError,
     assert_isinstance,
     deprecated_alias,
@@ -128,12 +129,12 @@ class Ty(monoidal.Ty):
     Applying a biclosed type to a callable yields a :class:`Abstraction`,
     applying it to a string yields a :class:`Constant`.
     """
-    variable_factory: ClassVar[type["Variable"]]
-    constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[Callable[..., "Application"]]
-    abstraction_factory: ClassVar[type["Abstraction"]]
-    over_factory: ClassVar[Callable[..., "Exp"]]
-    under_factory: ClassVar[Callable[..., "Exp"]]
+    Variable: ClassVar[type["Variable"]]
+    Constant: ClassVar[type["Constant"]]
+    Application: ClassVar[Callable[..., "Application"]]
+    Abstraction: ClassVar[type["Abstraction"]]
+    Over: ClassVar[Callable[..., "Exp"]]
+    Under: ClassVar[Callable[..., "Exp"]]
 
     def __pow__(self, other: "Ty | int") -> Self:
         return self.exp(other) if isinstance(other, Ty)\
@@ -152,10 +153,10 @@ class Ty(monoidal.Ty):
         return self.over(other)
 
     def over(self, other: Ty) -> Ty:
-        return self.ar(self.over_factory(self, other)) if other else self
+        return self.ar(self.Over(self, other)) if other else self
 
     def under(self, other: Ty) -> Ty:
-        return self.ar(self.under_factory(self, other)) if other else self
+        return self.ar(self.Under(self, other)) if other else self
 
     def __lshift__(self, other):
         return self.over(other)
@@ -166,7 +167,7 @@ class Ty(monoidal.Ty):
     def __call__(self, arg):
         # pylint: disable=signature-differs  # a lambda, with no offset
         if isinstance(arg, str):
-            return self.constant_factory(arg, self)
+            return self.Constant(arg, self)
         elif isinstance(arg, Callable):
             parameters = dict(signature(arg).parameters)
             left = False
@@ -178,8 +179,8 @@ class Ty(monoidal.Ty):
             varnames = list(parameters.keys())
             if len(varnames) != 1:
                 raise NotImplementedError
-            var = self.variable_factory(varnames[0], self)
-            return self.abstraction_factory(var, arg(var), left)
+            var = self.Variable(varnames[0], self)
+            return self.Abstraction(var, arg(var), left)
         raise ValueError
 
     @classmethod
@@ -222,7 +223,7 @@ class Ty(monoidal.Ty):
 
     def __setstate__(self, state):
         super().__setstate__(state)
-        if self.generator_factory is monoidal.Wire:
+        if self.Atom is monoidal.Wire:
             self.inside = tuple(map(self.cast_wire, self.inside))
 
     @property
@@ -304,7 +305,7 @@ class Exp(Wire):
     def __new__(cls, *args, **kwargs):
         base = args[0] if args else kwargs.get("base")
         return super().__new__(
-            getattr(base, "over_factory", cls) if cls is Exp else cls)
+            getattr(base, "Over", cls) if cls is Exp else cls)
 
     def __init__(self, base: Ty, exponent: Ty):
         assert_isinstance(base, self.ob)
@@ -367,6 +368,7 @@ class Exp(Wire):
         return self.base if isinstance(self, Under) else self.exponent
 
 
+@Ty.slot
 class Over(Exp):
     """
     An :code:`exponent` type over a :code:`base` type, called with :code:`<<`.
@@ -379,6 +381,7 @@ class Over(Exp):
         return f"({base} << {exponent})"
 
 
+@Ty.slot
 class Under(Exp):
     """
     A :code:`base` type under an :code:`exponent` type, called with :code:`>>`.
@@ -402,12 +405,12 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    curry_factory: ClassVar[type["Curry"]]
-    eval_factory: ClassVar[type["Eval"]]
-    coeval_factory: ClassVar[type["Coeval"]]
-    sum_factory: ClassVar[type["Sum"]]
-    functor_factory: ClassVar[type["Functor"]]
+    Box: ClassVar[type["monoidal.Box"]]
+    Curry: ClassVar[type["Curry"]]
+    Eval: ClassVar[type["Eval"]]
+    Coeval: ClassVar[type["Coeval"]]
+    Sum: ClassVar[type["monoidal.Sum"]]
+    Functor: ClassVar[type["Functor"]]
 
     ob = Ty
 
@@ -426,10 +429,10 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         >>> f = Box('f', Ty('x'), Ty('y'))
         >>> assert f.curry(0) == f
         """
-        return self.curry_factory(self, n, left) if n else self
+        return self.Curry(self, n, left) if n else self
 
     @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left=True) -> Eval:
+    def ev(cls, base: Ty, exponent: Ty, left=True) -> "Eval":
         """
         Wrapper around :class:`Eval` called by :class:`Functor`.
 
@@ -443,7 +446,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         """
         if not exponent:
             return cls.id(base)
-        return cls.eval_factory(
+        return cls.Eval(
             base << exponent if left else exponent >> base)
 
     def to_compact(self) -> CMap:
@@ -462,7 +465,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         return self.to_map().to_compact()
 
     def to_drawing(self):
-        return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+        return monoidal.Diagram.to_drawing(self, functor=Functor)
 
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.CURRY_HAS_NO_DAGGER)
@@ -490,18 +493,8 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         .failing(messages.FREE_CURRY)
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A biclosed box is a monoidal box in a biclosed diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (Ty) : The domain of the box, i.e. its input.
-        cod (Ty) : The codomain of the box, i.e. its output.
-    """
-
-
-class Eval(Box):
+@Diagram.slot(BiclosedCategory.ev_left)
+class Eval(Diagram.Box):
     """
     The evaluation of an exponential type.
 
@@ -563,14 +556,25 @@ class Eval(Box):
         return cls(from_tree(tree['x']), left=tree['left'])
 
     def dagger(self) -> Coeval:
-        return self.coeval_factory(self.x, self.left)
+        return self.Coeval(self.x, self.left)
+
+    @property
+    def rule(self) -> Rule:
+        """ The evaluation on the left or on the right, as :attr:`left`. """
+        return getattr(self.factory, "ev_left" if self.left else "ev_right")
+
+    @property
+    def premises(self) -> dict[str, Ty]:
+        """ The base and the exponent of the evaluated type. """
+        return {"base": self.x.base, "exponent": self.x.exponent}
 
     @property
     def drawing_name(self):
         return "<<" if self.left else ">>"
 
 
-class Coeval(Box):
+@Diagram.slot
+class Coeval(Diagram.Box):
     """
     The coevaluation of an exponential type, i.e. the dagger of :class:`Eval`.
 
@@ -612,10 +616,11 @@ class Coeval(Box):
         self.name = "Coeval" + str(self.x)
 
     def dagger(self) -> Eval:
-        return self.eval_factory(self.x, self.left)
+        return self.Eval(self.x, self.left)
 
 
-class Curry(Box):
+@Diagram.slot
+class Curry(Diagram.Box):
     """
     The currying of a biclosed diagram.
 
@@ -642,8 +647,8 @@ class Curry(Box):
             cod = arg.cod << arg.dom[len(arg.dom) - n:]
         else:
             dom, cod = arg.dom[n:], arg.dom[:n] >> arg.cod
-        Box.__init__(self, name, dom, cod, args=(arg, ),
-                     drawing_name="$\\Lambda$")
+        Diagram.Box.__init__(self, name, dom, cod, args=(arg, ),
+                             drawing_name="$\\Lambda$")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r}, " \
@@ -668,7 +673,7 @@ class Curry(Box):
         """
         if not self.n:
             return self.arg.to_drawing()
-        f, e = self.arg, self.coeval_factory(self.cod, left=self.left)
+        f, e = self.arg, self.Coeval(self.cod, left=self.left)
         return (f >> e).to_drawing().trace(self.n, left=not self.left)
 
     def dagger(self):
@@ -685,25 +690,10 @@ class Curry(Box):
         raise AxiomError(messages.CURRY_HAS_NO_DAGGER)
 
 
-class Sum(monoidal.Sum, Box):
-    """
-    A biclosed sum is a monoidal sum and a biclosed box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
 Id = Diagram.id
-Diagram.box_factory = Box
-Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
-Diagram.coeval_factory = Coeval
-Diagram.sum_factory = Sum
 
 
+@Diagram.extend
 class Functor(monoidal.Functor):
     """
     A biclosed functor is a monoidal functor
@@ -754,7 +744,7 @@ class Functor(monoidal.Functor):
                     and not isinstance(other, Constant):
                 return self(other.eval())
             if issubclass(get_origin(self.cod.ob), Ty) and issubclass(
-                    self.cod.ob.constant_factory, get_origin(self.cod)):
+                    self.cod.ob.Constant, get_origin(self.cod)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:
@@ -767,10 +757,8 @@ class Functor(monoidal.Functor):
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
             n = len(self(other.cod.exponent)) if other.n else 0
             return self.cod.curry(self(other.arg), n, other.left)
-        if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
-            base, exponent, left = other.x.base, other.x.exponent, other.left
-            result = self.cod.ev(self(base), self(exponent), left)
-            return result.dagger() if isinstance(other, Coeval) else result
+        if isinstance(other, Coeval) and hasattr(self.cod, "ev"):
+            return self(other.dagger()).dagger()
         if self.cod is Drawing:
             if isinstance(other, Ty) and other.inside == (other, ):
                 # Avoid infinite recursion when drawing.
@@ -787,10 +775,10 @@ class Functor(monoidal.Functor):
             context : The images of the variables bound so far.
         """
         name, cod = variable.name, self(variable.cod)
-        result = self.cod.ob.variable_factory(name, cod)
+        result = self.cod.ob.Variable(name, cod)
         while result in context.values():
             name += "_"
-            result = self.cod.ob.variable_factory(name, cod)
+            result = self.cod.ob.Variable(name, cod)
         return result
 
     def map_term(
@@ -816,7 +804,7 @@ class Functor(monoidal.Functor):
                 f"Expected a term of type {self(term.cod)} for "
                 f"{term}, got {result} of type {result.cod}.")
         expected = [context[v] for v in term.freevars]
-        ordered = self.cod.ob.over_factory is not self.cod.ob.under_factory
+        ordered = self.cod.ob.Over is not self.cod.ob.Under
         valid = result.freevars == expected if ordered else (
             set(result.freevars) == set(expected))
         if not valid:
@@ -826,9 +814,6 @@ class Functor(monoidal.Functor):
 
 
 CMap = cmap.CMap[Diagram]
-
-
-Diagram.functor_factory = Functor
 
 
 class Reducible[factory](TestableGeneric, tuple):
@@ -891,7 +876,7 @@ class Normalising(Testable):
             for strategy in cls.reduction_strategies))
 
 
-class TermBase(Box, AlphaEquivalence):
+class TermBase(Diagram.Box, AlphaEquivalence):
     """
     A term in the internal language of biclosed categories, an
     :class:`~discopy.testable.Equivalence` up to the names of its bound
@@ -968,7 +953,7 @@ class TermBase(Box, AlphaEquivalence):
 
     def __call__(self, other, left=False):
         args = (other, self, left) if left else (self, other, left)
-        return self.cod.application_factory(*args)
+        return self.cod.Application(*args)
 
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
@@ -1036,12 +1021,13 @@ class TermBase(Box, AlphaEquivalence):
         terms.
         """
         x = cls.ob(GENERATORS[0])
-        f, w = ((x << x) << terms[0].cod)("f"), cls.ob.variable_factory("w", x)
+        f, w = ((x << x) << terms[0].cod)("f"), cls.ob.Variable("w", x)
         return AlphaEquation(*(
-            cls.ob.abstraction_factory(w, f(term)(w), False)
+            cls.ob.Abstraction(w, f(term)(w), False)
             for term in terms))
 
 
+@Ty.slot
 class Constant(TermBase):
     """
     A constant term with a string as name and a :class:`Ty`, i.e. a term with
@@ -1089,6 +1075,7 @@ class Constant(TermBase):
         return f"{self.cod!s}({self.name!r})"
 
 
+@Ty.slot
 class Variable(TermBase):
     """
     A variable with a string as name and a :class:`Ty`.
@@ -1128,6 +1115,7 @@ class Variable(TermBase):
     __repr__ = Constant.__repr__
 
 
+@Ty.slot
 class Application(TermBase):
     """
     The application either ``function(argument)`` of a term ``function`` of
@@ -1176,7 +1164,7 @@ class Application(TermBase):
         return args @ func >> ev if self.left else func @ args >> ev
 
     def map(self, functor, context):
-        return functor.cod.ob.application_factory(
+        return functor.cod.ob.Application(
             functor.map_term(self.function, context),
             functor.map_term(self.argument, context), self.left)
 
@@ -1233,6 +1221,7 @@ class Application(TermBase):
                 scopes, [other.argument for other in others], depth)
 
 
+@Ty.slot
 class Abstraction(TermBase):
     serialised_attrs = ("var", "body", "left")
     var: Variable
@@ -1272,7 +1261,7 @@ class Abstraction(TermBase):
                    if key != self.var}
         variable = functor.map_variable(self.var, context)
         context[self.var] = variable
-        return functor.cod.ob.abstraction_factory(
+        return functor.cod.ob.Abstraction(
             variable, functor.map_term(self.body, context), self.left)
 
     def __repr__(self):
@@ -1324,8 +1313,9 @@ type Term = Constant | Variable | Application | Abstraction
 
 
 for law in sorted(
-        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
-    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        set(Diagram.Box.axioms) - set(Serialisable.axioms)
+        | set(Diagram.Box.rules)):
+    setattr(TermBase, law, getattr(Diagram.Box, law).inapplicable(
         messages.TERM_IS_A_BOX))
 
 
@@ -1385,18 +1375,18 @@ class Sampler:
         """ A fresh constant of a given type, if the sampler takes any. """
         if not self.constants:
             return self.variable(cod)
-        return self.category.ob.constant_factory(
+        return self.category.ob.Constant(
             f"c{next(self.counter)}", cod)
 
     def variable(self, cod: Ty) -> Variable:
         """ A fresh free variable of a given type. """
-        return self.category.ob.variable_factory(
+        return self.category.ob.Variable(
             f"v{next(self.counter)}", cod)
 
     def bound(self, level: int, cod: Ty) -> Variable:
         """ The variable bound at a given level, named by its letter. """
         letter = self.letters[level % len(self.letters)]
-        return self.category.ob.variable_factory(f"{letter}{level}", cod)
+        return self.category.ob.Variable(f"{letter}{level}", cod)
 
     def spine(self, cod: Ty, bound: tuple[Variable, ...]) -> Term:
         """ A fresh constant applied to the bound variables in order. """
@@ -1405,7 +1395,7 @@ class Sampler:
             function_type = function_type << variable.cod
         result = self.constant(function_type)
         for variable in bound:
-            result = self.category.ob.application_factory(
+            result = self.category.ob.Application(
                 result, variable, False)
         return result
 
@@ -1466,10 +1456,10 @@ class Sampler:
         if left:
             args = self.term(exponent, first)
             func = self.term(exponent >> cod, second)
-            return self.category.ob.application_factory(func, args, True)
+            return self.category.ob.Application(func, args, True)
         func = self.term(cod << exponent, first)
         args = self.term(exponent, second)
-        return self.category.ob.application_factory(func, args, False)
+        return self.category.ob.Application(func, args, False)
 
     def applications(self, cod: Ty, constraints: Constraints
                      ) -> list[Callable[[], Term]]:
@@ -1496,7 +1486,7 @@ class Sampler:
         body = self.term(cod.base, replace(
             constraints, prefix=opening, suffix=closing,
             level=constraints.level + 1))
-        return self.category.ob.abstraction_factory(var, body, left)
+        return self.category.ob.Abstraction(var, body, left)
 
     def term(self, cod: Ty, constraints: "Constraints | None" = None) -> Term:
         """
@@ -1542,13 +1532,6 @@ class Constraints:
         return self.prefix + self.suffix
 
 
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory = Application
-Ty.abstraction_factory = Abstraction
-Ty.over_factory, Ty.under_factory = Over, Under
-
-
 class Equation(monoidal.Equation):
     """ The :class:`monoidal.Equation` of biclosed diagrams. """
 
@@ -1567,9 +1550,12 @@ class AlphaEquation(cat.AlphaEquation, Equation):
     """
 
 
-TermBase.equivalence_factory = AlphaEquation
+TermBase.Equation = AlphaEquation
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 
-Bubble = Box.from_args
+Bubble = Diagram.Box.from_args
+
+
+export(__name__)

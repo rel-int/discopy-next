@@ -76,7 +76,8 @@ from discopy import (
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, Nat, Pregroup, RibbonCategory,
     SymmetricCategory, TracedCategory)
-from discopy.testable import Equation, TestableGeneric, quotient
+from discopy.testable import (
+    Equation, Equation as AbstractEquation, TestableGeneric, quotient)
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (
@@ -370,7 +371,7 @@ class Diagram[natural](
     cod: Ty
 
     @classmethod
-    def equation_factory(cls, *terms: Diagram) -> Equation:
+    def Equation(cls, *terms: Diagram) -> AbstractEquation:
         """
         The equation of a law, compared by the boundaries of its terms and
         by the equation of the :attr:`natural` category on their insides.

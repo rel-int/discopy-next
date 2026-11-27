@@ -72,8 +72,9 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
-    Tensor, Testable, Under, Unit, Var, axiom, rule)
+    Atom, Bang, Delay, Equation, Equation as AbstractEquation, Hom, L, Obj,
+    Objs, Over, Perm, R, Repeat, Tensor, Testable, Under, Unit, Var, axiom,
+    rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -120,7 +121,7 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return cls.ob, cls.ar
 
     @classmethod
-    def equation_factory(cls, *terms) -> Equation:
+    def Equation(cls, *terms) -> AbstractEquation:
         """
         Construct an equation, using strict equality by default.
 
@@ -133,10 +134,10 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return Equation(*terms)
 
     @classmethod
-    def ob_equation(cls, *objects) -> Equation:
+    def ob_equation(cls, *objects) -> AbstractEquation:
         """
         Construct an equation of objects, using strict equality by default,
-        as :meth:`equation_factory` does of morphisms: what
+        as :meth:`Equation` does of morphisms: what
         :func:`~discopy.testable.inhabits` checks the boundary of a term
         with, so that a category whose objects compare only up to a
         quotient, e.g. :class:`~discopy.stream.Stream`, says which.
@@ -188,17 +189,17 @@ class Category[C0, C1: Category](Testable[C1], ABC):
 
     @axiom
     def unitality[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+            cls, f: Hom[C1, A, B]) -> AbstractEquation[Hom[C1, A, B]]:
         """ Left and right unitality of composition. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.id(f.dom).then(f), f, f.then(cls.id(f.cod)))
 
     @axiom
     def associativity[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C], h: Hom[C1, C, D]
-    ) -> Equation[Hom[C1, A, D]]:
+    ) -> AbstractEquation[Hom[C1, A, D]]:
         """ Associativity of composition. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.then(g).then(h), f.then(g.then(h)))
 
     __rshift__ = __llshift__ = lambda self, other: self.then(other)
@@ -246,14 +247,14 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
     def dagger_involution[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ The dagger is involutive. """
-        return cls.equation_factory(f.dagger().dagger(), f)
+        return cls.Equation(f.dagger().dagger(), f)
 
     @axiom
     def dagger_contravariance[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, C, A]]:
         """ The dagger reverses composition. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.then(g).dagger(), g.dagger().then(f.dagger()))
 
 
@@ -382,7 +383,7 @@ class Groupoid[C0, C1: Groupoid](DaggerCategory[C0, C1]):
             cls, f: Hom[C1, A, B]
     ) -> Equation[tuple[Hom[C1, A, A], Hom[C1, B, B]]]:
         """ An arrow followed or preceded by its dagger is an identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             (f.then(f.dagger()), f.dagger().then(f)),
             (cls.id(f.dom), cls.id(f.cod)))
 
@@ -552,7 +553,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             k: Hom[C1, D, V]
     ) -> Equation[Hom[C1, Tensor[A, C], Tensor[U, V]]]:
         """ Bifunctoriality of the tensor, i.e. the interchange law. """
-        return cls.equation_factory(
+        return cls.Equation(
             f @ g >> h @ k, (f >> h) @ (g >> k))
 
     @axiom
@@ -560,7 +561,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
         """ Preservation of identities by tensor. """
-        return cls.equation_factory(cls.id(x) @ cls.id(y), cls.id(x @ y))
+        return cls.Equation(cls.id(x) @ cls.id(y), cls.id(x @ y))
 
     @axiom
     def tensor_associativity[
@@ -569,28 +570,28 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             cls, f: Hom[C1, A, B], g: Hom[C1, C, D], h: Hom[C1, U, V]
     ) -> Equation[Hom[C1, Tensor[A, C, U], Tensor[B, D, V]]]:
         """ Associativity of the tensor of morphisms. """
-        return cls.equation_factory((f @ g) @ h, f @ (g @ h))
+        return cls.Equation((f @ g) @ h, f @ (g @ h))
 
     @axiom
     def tensor_unit[A: Obj[C0], B: Obj[C0]](
             cls, unit: Var[C0, Unit[C0]], f: Hom[C1, A, B]
     ) -> Equation[Hom[C1, A, B]]:
         """ The unit object is a unit for the tensor of morphisms. """
-        return cls.equation_factory(unit @ f, f, f @ unit)
+        return cls.Equation(unit @ f, f, f @ unit)
 
     @axiom
     def left_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
             cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, C]]]:
         """ Whiskering on the left is a functor. """
-        return cls.equation_factory(x @ (f >> g), x @ f >> x @ g)
+        return cls.Equation(x @ (f >> g), x @ f >> x @ g)
 
     @axiom
     def right_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
             cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, Tensor[A, X], Tensor[C, X]]]:
         """ Whiskering on the right is a functor. """
-        return cls.equation_factory((f >> g) @ x, f @ x >> g @ x)
+        return cls.Equation((f >> g) @ x, f @ x >> g @ x)
 
     @axiom
     def tensor_whiskering[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
@@ -602,7 +603,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         with the laws above, those of a strict premonoidal category, which
         unlike :meth:`bifunctoriality` hold of :mod:`~discopy.monoidal`.
         """
-        return cls.equation_factory(f @ g, f @ g.dom >> f.cod @ g)
+        return cls.Equation(f @ g, f @ g.dom >> f.cod @ g)
 
     @rule
     def mix[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
@@ -624,7 +625,7 @@ class DaggerMonoidalCategory[C0: ColouredMonoid, C1: DaggerMonoidalCategory](
             cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
     ) -> Equation[Hom[C1, Tensor[B, D], Tensor[A, C]]]:
         """ The dagger distributes over the tensor. """
-        return cls.equation_factory(
+        return cls.Equation(
             (f @ g).dagger(), f.dagger() @ g.dagger())
 
 
@@ -649,7 +650,7 @@ class SpacialCategory[
             cls, scalar: Hom[C1, Unit[C0], Unit[C0]], f: Hom[C1, A, B])\
             -> Equation[Hom[C1, A, B]]:
         """ A scalar on the left of a morphism is a scalar on its right. """
-        return cls.equation_factory(scalar @ f, f @ scalar)
+        return cls.Equation(scalar @ f, f @ scalar)
 
 
 class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
@@ -707,7 +708,7 @@ class FeedbackCategory[
     def delay_unit[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Delaying by no time step is the identity. """
-        return cls.equation_factory(f.delay(0), f)
+        return cls.Equation(f.delay(0), f)
 
     @axiom
     def delay_composition[A: Obj[C0], B: Obj[C0]](
@@ -715,13 +716,13 @@ class FeedbackCategory[
     ) -> Equation[Hom[
             C1, Delay[C1, Delay[C1, A]], Delay[C1, Delay[C1, B]]]]:
         """ Delaying twice is delaying by two time steps. """
-        return cls.equation_factory(f.delay().delay(), f.delay(2))
+        return cls.Equation(f.delay().delay(), f.delay(2))
 
     @axiom
     def vanishing[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Feeding back the unit does nothing. """
-        return cls.equation_factory(f.feedback(0), f)
+        return cls.Equation(f.feedback(0), f)
 
     @axiom
     def joining[X: Obj[C0], Y: Obj[C0], M: Obj[C0], N: Obj[C0]](
@@ -730,7 +731,7 @@ class FeedbackCategory[
             x: Var[C0, X], y: Var[C0, Y], m: Var[C0, M], n: Var[C0, N]
     ) -> Equation[Hom[C1, X, Y]]:
         """ Feeding back a tensor is feeding back its factors in turn. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.feedback(dom=x, cod=y, mem=m @ n),
             f.feedback(dom=x @ cls.id(m).delay().dom, cod=y @ m, mem=n
                        ).feedback(dom=x, cod=y, mem=m))
@@ -743,7 +744,7 @@ class FeedbackCategory[
             x: Var[C0, X], y: Var[C0, Y], m: Var[C0, M]
     ) -> Equation[Hom[C1, Tensor[U, X], Tensor[V, Y]]]:
         """ Feedback commutes with tensoring a morphism on the left. """
-        return cls.equation_factory(
+        return cls.Equation(
             e @ f.feedback(dom=x, cod=y, mem=m),
             (e @ f).feedback(dom=e.dom @ x, cod=e.cod @ y, mem=m))
 
@@ -755,7 +756,7 @@ class FeedbackCategory[
             x: Var[C0, X], y: Var[C0, Y], m: Var[C0, M]
     ) -> Equation[Hom[C1, W, Z]]:
         """ Feedback is natural in its domain and its codomain. """
-        return cls.equation_factory(
+        return cls.Equation(
             (g @ cls.id(m).delay() >> f >> h @ m).feedback(
                 dom=g.dom, cod=h.cod, mem=m),
             g >> f.feedback(dom=x, cod=y, mem=m) >> h)
@@ -769,7 +770,7 @@ class FeedbackCategory[
         A morphism slides around the feedback, delayed on its way back in:
         the memory is its codomain on one side and its domain on the other.
         """
-        return cls.equation_factory(
+        return cls.Equation(
             (f >> y @ k).feedback(dom=x, cod=y, mem=k.cod),
             (x @ k.delay() >> f).feedback(dom=x, cod=y, mem=k.dom))
 
@@ -954,7 +955,7 @@ class TracedCategory[
         """
         # pylint: disable-next=no-member  # stated where there is a swap
         swap = cls.swap(x, x)
-        return cls.equation_factory(
+        return cls.Equation(
             swap.trace(mem=x, left=True),  # ty: ignore[unknown-argument]
             cls.id(x),
             swap.trace(mem=x))  # ty: ignore[unknown-argument]
@@ -963,7 +964,7 @@ class TracedCategory[
     def trace_vanishing[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Vanishing of a trace over the unit, on either side. """
-        return cls.equation_factory(f.trace(0, left=True), f, f.trace(0))
+        return cls.Equation(f.trace(0, left=True), f, f.trace(0))
 
     @axiom
     def trace_iteration_left[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
@@ -973,7 +974,7 @@ class TracedCategory[
         traced = f
         for _ in range(len(mem)):
             traced = traced.trace(left=True)
-        return cls.equation_factory(f.trace(len(mem), left=True), traced)
+        return cls.Equation(f.trace(len(mem), left=True), traced)
 
     @axiom
     def trace_iteration_right[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
@@ -983,7 +984,7 @@ class TracedCategory[
         traced = f
         for _ in range(len(mem)):
             traced = traced.trace()
-        return cls.equation_factory(f.trace(len(mem)), traced)
+        return cls.Equation(f.trace(len(mem)), traced)
 
     @axiom
     def trace_superposing_left[
@@ -991,7 +992,7 @@ class TracedCategory[
             cls, f: Hom[C1, Tensor[M, Γ], Tensor[M, Δ]], x: Var[C0, X]
     ) -> Equation[Hom[C1, Tensor[Γ, X], Tensor[Δ, X]]]:
         """ The left trace is natural with respect to the tensor. """
-        return cls.equation_factory(
+        return cls.Equation(
             (f @ x).trace(left=True), f.trace(left=True) @ x)
 
     @axiom
@@ -1000,7 +1001,7 @@ class TracedCategory[
             cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], x: Var[C0, X]
     ) -> Equation[Hom[C1, Tensor[X, Γ], Tensor[X, Δ]]]:
         """ The right trace is natural with respect to the tensor. """
-        return cls.equation_factory((x @ f).trace(), x @ f.trace())
+        return cls.Equation((x @ f).trace(), x @ f.trace())
 
     @axiom
     def trace_naturality_left[
@@ -1010,7 +1011,7 @@ class TracedCategory[
     ) -> Equation[Hom[C1, Γ, Δ]]:
         """ The left trace is natural in its domain and codomain. """
         n = len(mem)
-        return cls.equation_factory(
+        return cls.Equation(
             (mem @ g >> f >> mem @ g).trace(n, left=True),
             g >> f.trace(n, left=True) >> g)
 
@@ -1022,7 +1023,7 @@ class TracedCategory[
     ) -> Equation[Hom[C1, Γ, Δ]]:
         """ The right trace is natural in its domain and codomain. """
         n = len(mem)
-        return cls.equation_factory(
+        return cls.Equation(
             (g @ mem >> f >> g @ mem).trace(n), g >> f.trace(n) >> g)
 
     @axiom
@@ -1034,7 +1035,7 @@ class TracedCategory[
     ) -> Equation[Hom[C1, Γ, Δ]]:
         """ A morphism slides around a left trace. """
         base, cobase = f.dom[len(g.cod):], f.cod[len(g.dom):]
-        return cls.equation_factory(
+        return cls.Equation(
             (f >> g @ cobase).trace(len(g.cod), left=True),
             (g @ base >> f).trace(len(g.dom), left=True))
 
@@ -1048,7 +1049,7 @@ class TracedCategory[
         """ A morphism slides around a right trace. """
         base = f.dom[:len(f.dom) - len(g.cod)]
         cobase = f.cod[:len(f.cod) - len(g.dom)]
-        return cls.equation_factory(
+        return cls.Equation(
             (f >> cobase @ g).trace(len(g.cod)),
             (base @ g >> f).trace(len(g.dom)))
 
@@ -1160,14 +1161,14 @@ class BiclosedCategory[
             cls, f: Hom[C1, Tensor[Γ, E], X]
     ) -> Equation[Hom[C1, Tensor[Γ, E], X]]:
         """ Left currying followed by evaluation. """
-        return cls.equation_factory(f.curry().uncurry(), f)
+        return cls.Equation(f.curry().uncurry(), f)
 
     @axiom
     def currying_right[Γ: Obj[C0], X: Atom[C0], E: Atom[C0]](
             cls, f: Hom[C1, Tensor[E, Γ], X]
     ) -> Equation[Hom[C1, Tensor[E, Γ], X]]:
         """ Right currying followed by evaluation. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.curry(left=False).uncurry(left=False), f)
 
     @axiom
@@ -1175,7 +1176,7 @@ class BiclosedCategory[
             cls, base: Var[C0, Y], exponent: Var[C0, E]
     ) -> Equation[Hom[C1, Over[Y, E], Over[Y, E]]]:
         """ The left currying of the left evaluation is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.ev(base, exponent).curry(len(exponent)),
             cls.id(base << exponent))
 
@@ -1184,7 +1185,7 @@ class BiclosedCategory[
             cls, base: Var[C0, Y], exponent: Var[C0, E]
     ) -> Equation[Hom[C1, Under[E, Y], Under[E, Y]]]:
         """ The right currying of the right evaluation is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.ev(base, exponent, left=False).curry(
                 len(exponent), left=False),
             cls.id(exponent >> base))
@@ -1196,7 +1197,7 @@ class BiclosedCategory[
             exponent: Var[C0, E]) -> Equation[Hom[C1, Δ, Over[Z, E]]]:
         """ Left currying is natural in the context. """
         n = len(exponent)
-        return cls.equation_factory(
+        return cls.Equation(
             (g @ exponent >> f).curry(n), g >> f.curry(n))
 
     @axiom
@@ -1206,7 +1207,7 @@ class BiclosedCategory[
             exponent: Var[C0, E]) -> Equation[Hom[C1, Δ, Under[E, Z]]]:
         """ Right currying is natural in the context. """
         n = len(exponent)
-        return cls.equation_factory(
+        return cls.Equation(
             (exponent @ g >> f).curry(n, left=False),
             g >> f.curry(n, left=False))
 
@@ -1341,21 +1342,21 @@ class LinearCategory[
     def bang_identity[X: Obj[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
         """ The bang of an identity is the identity. """
-        return cls.equation_factory(cls.id(x).bang(), cls.id(cls.banged(x)))
+        return cls.Equation(cls.id(x).bang(), cls.id(cls.banged(x)))
 
     @axiom
     def bang_composition[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, Bang[C1, A], Bang[C1, C]]]:
         """ The bang of a composition is the composition of the bangs. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.then(g).bang(), f.bang().then(g.bang()))
 
     @axiom
     def dereliction_naturality[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Bang[C1, A], B]]:
         """ The dereliction is natural. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() >> cls.dereliction(f.cod), cls.dereliction(f.dom) >> f)
 
     @axiom
@@ -1363,7 +1364,7 @@ class LinearCategory[
             cls, f: Hom[C1, A, B]
     ) -> Equation[Hom[C1, Bang[C1, A], Bang[C1, Bang[C1, B]]]]:
         """ The digging is natural. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() >> cls.digging(f.cod),
             cls.digging(f.dom) >> f.bang().bang())
 
@@ -1372,7 +1373,7 @@ class LinearCategory[
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
         """ Digging then derelicting either bang is the identity. """
         digging, banged = cls.digging(x), cls.banged(x)
-        return cls.equation_factory(
+        return cls.Equation(
             digging >> cls.dereliction(banged), cls.id(banged),
             digging >> cls.dereliction(x).bang())
 
@@ -1382,7 +1383,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, Bang[C1, Bang[C1, X]]]]]:
         """ Digging twice is digging either bang. """
         digging = cls.digging(x)
-        return cls.equation_factory(
+        return cls.Equation(
             digging >> cls.digging(cls.banged(x)), digging >> digging.bang())
 
     @axiom
@@ -1392,7 +1393,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Bang[C1, A], Bang[C1, C]],
                       Bang[C1, Tensor[B, D]]]]:
         """ The laxator is natural. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() @ g.bang() >> cls.laxator(f.cod, g.cod),
             cls.laxator(f.dom, g.dom) >> (f @ g).bang())
 
@@ -1402,7 +1403,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y], Bang[C1, Z]],
                       Bang[C1, Tensor[X, Y, Z]]]]:
         """ The laxator is associative. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.laxator(x, y) @ cls.banged(z) >> cls.laxator(x @ y, z),
             cls.banged(x) @ cls.laxator(y, z) >> cls.laxator(x, y @ z))
 
@@ -1411,7 +1412,7 @@ class LinearCategory[
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
         """ The laxator is unital on either side. """
         unit, banged = cls.laxator(), cls.banged(x)
-        return cls.equation_factory(
+        return cls.Equation(
             unit @ banged >> cls.laxator(x[:0], x), cls.id(banged),
             banged @ unit >> cls.laxator(x, x[:0]))
 
@@ -1420,7 +1421,7 @@ class LinearCategory[
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]], Tensor[X, Y]]]:
         """ The dereliction is monoidal. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.laxator(x, y) >> cls.dereliction(x @ y),
             cls.dereliction(x) @ cls.dereliction(y))
 
@@ -1428,7 +1429,7 @@ class LinearCategory[
     def dereliction_unit[X: Obj[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
         """ The dereliction is monoidal on the unit. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.laxator() >> cls.dereliction(x[:0]), cls.id(x[:0]))
 
     @axiom
@@ -1438,7 +1439,7 @@ class LinearCategory[
                       Bang[C1, Bang[C1, Tensor[X, Y]]]]]:
         """ The digging is monoidal. """
         laxator = cls.laxator(x, y)
-        return cls.equation_factory(
+        return cls.Equation(
             laxator >> cls.digging(x @ y),
             cls.digging(x) @ cls.digging(y)
             >> cls.laxator(cls.banged(x), cls.banged(y)) >> laxator.bang())
@@ -1449,7 +1450,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Unit[C0], Bang[C1, Bang[C1, Unit[C0]]]]]:
         """ The digging is monoidal on the unit. """
         unit = cls.laxator()
-        return cls.equation_factory(
+        return cls.Equation(
             unit >> cls.digging(x[:0]), unit >> unit.bang())
 
     @axiom
@@ -1459,7 +1460,7 @@ class LinearCategory[
                 Tensor[Bang[C1, X], Bang[C1, X], Bang[C1, X]]]]:
         """ Copying either of two copies gives the same three copies. """
         contraction, banged = cls.contraction(x), cls.banged(x)
-        return cls.equation_factory(
+        return cls.Equation(
             contraction >> contraction @ banged,
             contraction >> banged @ contraction)
 
@@ -1469,7 +1470,7 @@ class LinearCategory[
         """ Weakening either of two copies leaves the banged object. """
         contraction, banged = cls.contraction(x), cls.banged(x)
         weakening = cls.weakening(x)
-        return cls.equation_factory(
+        return cls.Equation(
             contraction >> weakening @ banged, cls.id(banged),
             contraction >> banged @ weakening)
 
@@ -1479,7 +1480,7 @@ class LinearCategory[
                 C1, Bang[C1, X], Tensor[Bang[C1, X], Bang[C1, X]]]]:
         """ The two copies are interchangeable, through the exchange. """
         contraction = cls.contraction(x)
-        return cls.equation_factory(
+        return cls.Equation(
             contraction >> cls.exchange(x, cls.banged(x)), contraction)
 
     @axiom
@@ -1487,7 +1488,7 @@ class LinearCategory[
             cls, f: Hom[C1, A, B]
     ) -> Equation[Hom[C1, Bang[C1, A], Tensor[Bang[C1, B], Bang[C1, B]]]]:
         """ The contraction is natural. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() >> cls.contraction(f.cod),
             cls.contraction(f.dom) >> f.bang() @ f.bang())
 
@@ -1495,7 +1496,7 @@ class LinearCategory[
     def weakening_naturality[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Bang[C1, A], Unit[C0]]]:
         """ The weakening is natural. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() >> cls.weakening(f.cod), cls.weakening(f.dom))
 
     @axiom
@@ -1504,7 +1505,7 @@ class LinearCategory[
                 C1, Bang[C1, X], Bang[C1, Tensor[Bang[C1, X], Bang[C1, X]]]]]:
         """ The contraction is a morphism of coalgebras. """
         digging, banged = cls.digging(x), cls.banged(x)
-        return cls.equation_factory(
+        return cls.Equation(
             cls.contraction(x) >> digging @ digging
             >> cls.laxator(banged, banged),
             digging >> cls.contraction(x).bang())
@@ -1514,7 +1515,7 @@ class LinearCategory[
             cls, x: Var[C0, X]
     ) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, Unit[C0]]]]:
         """ The weakening is a morphism of coalgebras. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.weakening(x) >> cls.laxator(),
             cls.digging(x) >> cls.weakening(x).bang())
 
@@ -1525,7 +1526,7 @@ class LinearCategory[
                 Tensor[Bang[C1, Bang[C1, X]], Bang[C1, Bang[C1, X]]]]]:
         """ The digging is a morphism of comonoids, for the contraction. """
         digging = cls.digging(x)
-        return cls.equation_factory(
+        return cls.Equation(
             digging >> cls.contraction(cls.banged(x)),
             cls.contraction(x) >> digging @ digging)
 
@@ -1533,7 +1534,7 @@ class LinearCategory[
     def digging_weakening[X: Obj[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Unit[C0]]]:
         """ The digging is a morphism of comonoids, for the weakening. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.digging(x) >> cls.weakening(cls.banged(x)),
             cls.weakening(x))
 
@@ -1543,7 +1544,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Y], Tensor[Bang[C1, X], Y]]]:
         """ Exchanging back and forth is the identity. """
         exchange = cls.exchange(x, y)
-        return cls.equation_factory(
+        return cls.Equation(
             exchange >> cls.exchange(x, y, is_dagger=True),
             cls.id(exchange.dom))
 
@@ -1553,7 +1554,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Y, Bang[C1, X]], Tensor[Y, Bang[C1, X]]]]:
         """ Exchanging forth and back is the identity. """
         inverse = cls.exchange(x, y, is_dagger=True)
-        return cls.equation_factory(
+        return cls.Equation(
             inverse >> cls.exchange(x, y), cls.id(inverse.dom))
 
     @axiom
@@ -1562,7 +1563,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], A], Tensor[B, Bang[C1, X]]]]:
         """ The exchange is natural in the object it is exchanged with. """
         banged = cls.banged(x)
-        return cls.equation_factory(
+        return cls.Equation(
             cls.exchange(x, f.dom) >> f @ banged,
             banged @ f >> cls.exchange(x, f.cod))
 
@@ -1571,7 +1572,7 @@ class LinearCategory[
             cls, f: Hom[C1, A, B], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[Bang[C1, A], Y], Tensor[Y, Bang[C1, B]]]]:
         """ The exchange is natural in the banged object. """
-        return cls.equation_factory(
+        return cls.Equation(
             f.bang() @ y >> cls.exchange(f.cod, y),
             cls.exchange(f.dom, y) >> y @ f.bang())
 
@@ -1581,7 +1582,7 @@ class LinearCategory[
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Y, Z],
                       Tensor[Y, Z, Bang[C1, X]]]]:
         """ Exchanging past a tensor is exchanging past each factor. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.exchange(x, y @ z),
             cls.exchange(x, y) @ z >> y @ cls.exchange(x, z))
 
@@ -1589,7 +1590,7 @@ class LinearCategory[
     def exchange_unit[X: Obj[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
         """ Exchanging past the unit is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.exchange(x, x[:0]), cls.id(cls.banged(x)))
 
 
@@ -1741,7 +1742,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """ The two snake equations. """
         snake_r = x @ cls.caps(x.r, x) >> cls.cups(x, x.r) @ x
         snake_l = cls.caps(x, x.l) @ x >> x @ cls.cups(x.l, x)
-        return cls.equation_factory(snake_r, cls.id(x), snake_l)
+        return cls.Equation(snake_r, cls.id(x), snake_l)
 
     @axiom
     def caps_coherence[M: Atom[C0], N: Atom[C0], X: Obj[C0], Y: Obj[C0]](
@@ -1749,7 +1750,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
     ) -> Equation[Hom[
             C1, Unit[C0], Tensor[M, X, N, Y, L[Tensor[M, X, N, Y]]]]]:
         """ Monoidal coherence of caps. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.caps(x @ y, (x @ y).l),
             cls.caps(x, x.l) >> x @ cls.caps(y, y.l) @ x.l)
 
@@ -1759,7 +1760,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
     ) -> Equation[Hom[
             C1, Tensor[M, X, N, Y, R[Tensor[M, X, N, Y]]], Unit[C0]]]:
         """ Monoidal coherence of cups. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.cups(x @ y, (x @ y).r),
             x @ cls.cups(y, y.r) @ x.r >> cls.cups(x, x.r))
 
@@ -1768,7 +1769,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, R[C], R[A]]]:
         """ Transposition reverses composition. """
-        return cls.equation_factory(
+        return cls.Equation(
             (f >> g).transpose(), g.transpose() >> f.transpose())
 
     @axiom
@@ -1776,13 +1777,13 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             cls, f: Hom[C1, A, B], g: Hom[C1, B, C]
     ) -> Equation[Hom[C1, R[C], R[A]]]:
         """ Rotation, i.e. the right adjoint, reverses composition. """
-        return cls.equation_factory((f >> g).r, g.r >> f.r)
+        return cls.Equation((f >> g).r, g.r >> f.r)
 
     @axiom
     def adjunction[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ The left and right adjoints are mutually inverse. """
-        return cls.equation_factory(f.l.r, f, f.r.l)
+        return cls.Equation(f.l.r, f, f.r.l)
 
     @rule
     def counit[X: Obj[C0]](
@@ -1818,7 +1819,7 @@ class PivotalCategory[
     def pivotality[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, L[B], L[A]]]:
         """ The left and right transposes are equal. """
-        return cls.equation_factory(f.transpose(left=True), f.transpose())
+        return cls.Equation(f.transpose(left=True), f.transpose())
 
 
 class BraidedCategory[
@@ -1868,7 +1869,7 @@ class BraidedCategory[
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
         """ The braid followed by its inverse is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.braid(x, y) >> cls.braid_inverse(x, y), cls.id(x @ y))
 
     @axiom
@@ -1876,7 +1877,7 @@ class BraidedCategory[
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[Y, X], Tensor[Y, X]]]:
         """ The inverse of the braid followed by it is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.braid_inverse(x, y) >> cls.braid(x, y), cls.id(y @ x))
 
     @axiom
@@ -1884,7 +1885,7 @@ class BraidedCategory[
             cls, x: Var[C0, X], y: Var[C0, Y], z: Var[C0, Z]
     ) -> Equation[Hom[C1, Tensor[X, Y, Z], Tensor[Y, Z, X]]]:
         """ The left hexagon equation. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.braid(x, y @ z), cls.braid(x, y) @ z >> y @ cls.braid(x, z))
 
     @axiom
@@ -1892,7 +1893,7 @@ class BraidedCategory[
             cls, x: Var[C0, X], y: Var[C0, Y], z: Var[C0, Z]
     ) -> Equation[Hom[C1, Tensor[X, Y, Z], Tensor[Z, X, Y]]]:
         """ The right hexagon equation. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.braid(x @ y, z), x @ cls.braid(y, z) >> cls.braid(x, z) @ y)
 
     @axiom
@@ -1900,7 +1901,7 @@ class BraidedCategory[
             cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
     ) -> Equation[Hom[C1, Tensor[A, C], Tensor[D, B]]]:
         """ Naturality of the braid. """
-        return cls.equation_factory(
+        return cls.Equation(
             f @ g >> cls.braid(f.cod, g.cod),
             cls.braid(f.dom, g.dom) >> g @ f)
 
@@ -1989,7 +1990,7 @@ class SymmetricCategory[
     def permutation_identity[N: Nat](
             cls, doms: Objs[C0, N]) -> Equation[C1]:
         """ The permutation that leaves every object in place. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.permutation(range(len(doms)), doms),
             cls.id(cls.ob().tensor(*doms)))
 
@@ -1999,7 +2000,7 @@ class SymmetricCategory[
     ) -> Equation[C1]:
         """ Permuting by ``xs`` then ``ys`` permutes by their composite. """
         moved = [doms[x] for x in xs]
-        return cls.equation_factory(
+        return cls.Equation(
             cls.permutation(xs, doms) >> cls.permutation(ys, moved),
             cls.permutation([xs[y] for y in ys], doms))
 
@@ -2009,7 +2010,7 @@ class SymmetricCategory[
         """ A permutation followed by its inverse is the identity. """
         moved = [doms[x] for x in xs]
         inverse = [xs.index(i) for i in range(len(xs))]
-        return cls.equation_factory(
+        return cls.Equation(
             cls.permutation(xs, doms) >> cls.permutation(inverse, moved),
             cls.id(cls.ob().tensor(*doms)))
 
@@ -2018,7 +2019,7 @@ class SymmetricCategory[
             cls: type[C1], xs: Perm[N], doms: Objs[C0, N]
     ) -> Equation[C1]:
         """ A permutation is the composite of swaps, whatever overrides it. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.permutation(xs, doms),
             SymmetricCategory.permutation.__func__(cls, xs, doms))
 
@@ -2027,7 +2028,7 @@ class SymmetricCategory[
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
         """ Involutivity of the swap. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.swap(x, y) >> cls.swap(y, x), cls.id(x @ y))
 
     @rule
@@ -2128,7 +2129,7 @@ class MarkovCategory[
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
         """ Discarding either of two copies leaves the object itself. """
         copy, discard, identity = cls.copy(x), cls.discard(x), cls.id(x)
-        return cls.equation_factory(
+        return cls.Equation(
             copy >> discard @ identity, identity, copy >> identity @ discard)
 
     @axiom
@@ -2137,7 +2138,7 @@ class MarkovCategory[
             -> Equation[Hom[C1, X, Tensor[X, X, X]]]:
         """ Copying either of two copies gives the three copies. """
         copy, identity = cls.copy(x), cls.id(x)
-        return cls.equation_factory(
+        return cls.Equation(
             copy >> copy @ identity, cls.copy(x, 3), copy >> identity @ copy)
 
     @axiom
@@ -2146,14 +2147,14 @@ class MarkovCategory[
             -> Equation[Hom[C1, X, Tensor[X, X]]]:
         """ The two copies of an object are interchangeable. """
         copy = cls.copy(x)
-        return cls.equation_factory(copy >> cls.swap(x, x), copy)
+        return cls.Equation(copy >> cls.swap(x, x), copy)
 
     @axiom
     def discard_coherence[X: Obj[C0], Y: Obj[C0]](
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Unit[C0]]]:
         """ Monoidal coherence of discarding. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.copy(x @ y, 0), cls.copy(x, 0) @ cls.copy(y, 0))
 
     @axiom
@@ -2164,7 +2165,7 @@ class MarkovCategory[
         Copying a tensor is copying its factors, with the inner copies
         swapped so that each copy of the tensor comes together.
         """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.copy(x @ y),
             cls.copy(x) @ cls.copy(y)
             >> cls.id(x) @ cls.swap(x, y) @ cls.id(y))
@@ -2246,7 +2247,7 @@ class ComarkovCategory[
             -> Equation[Hom[C1, Tensor[X, X, X], X]]:
         """ Merging either of two merges gives the merge of three. """
         merge, identity = cls.merge(x), cls.id(x)
-        return cls.equation_factory(
+        return cls.Equation(
             merge @ identity >> merge, cls.merge(x, 3),
             identity @ merge >> merge)
 
@@ -2256,14 +2257,14 @@ class ComarkovCategory[
             -> Equation[Hom[C1, Tensor[X, X], X]]:
         """ The two copies merged into an object are interchangeable. """
         merge = cls.merge(x)
-        return cls.equation_factory(cls.swap(x, x) >> merge, merge)
+        return cls.Equation(cls.swap(x, x) >> merge, merge)
 
     @axiom
     def merge_unitality[X: Obj[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
         """ Merging the object with noise on either side leaves it itself. """
         merge, noise, identity = cls.merge(x), cls.noise(x), cls.id(x)
-        return cls.equation_factory(
+        return cls.Equation(
             noise @ identity >> merge, identity, identity @ noise >> merge)
 
     @axiom
@@ -2274,7 +2275,7 @@ class ComarkovCategory[
         Merging a tensor is swapping the inner factors so that the copies
         of each factor come together, then merging its factors.
         """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.merge(x @ y),
             cls.id(x) @ cls.swap(y, x) @ cls.id(y)
             >> cls.merge(x) @ cls.merge(y))
@@ -2302,7 +2303,7 @@ class ClosedCategory[
         """ Currying on the left is currying on the right after a swap. """
         n = len(exponent)
         base = f.dom[:len(f.dom) - n]
-        return cls.equation_factory(
+        return cls.Equation(
             f.curry(n), (cls.swap(exponent, base) >> f).curry(n, left=False))
 
 
@@ -2328,7 +2329,7 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
         """ Compatibility of the twist and braid. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.twist(x @ y),
             cls.braid(x, y) >> cls.twist(y) @ cls.twist(x)
             >> cls.braid(y, x))
@@ -2337,14 +2338,14 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
     def twist_naturality[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Naturality of the twist. """
-        return cls.equation_factory(
+        return cls.Equation(
             f >> cls.twist(f.cod), cls.twist(f.dom) >> f)
 
     @axiom
     def twist_unit(cls) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
         """ The twist of the unit is the identity. """
         unit = cls.ob()
-        return cls.equation_factory(cls.twist(unit), cls.id(unit))
+        return cls.Equation(cls.twist(unit), cls.id(unit))
 
     @axiom
     def yanking[X: Atom[C0]](
@@ -2356,7 +2357,7 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         swap.
         """
         braid = cls.braid(x, x)
-        return cls.equation_factory(
+        return cls.Equation(
             braid.trace(mem=x, left=True),  # ty: ignore[unknown-argument]
             cls.twist(x),
             braid.trace(mem=x))  # ty: ignore[unknown-argument]
@@ -2400,7 +2401,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
             cls, x: Var[C0, X]
     ) -> Equation[Hom[C1, Unit[C0], Tensor[R[X], X]]]:
         """ Reidemeister move 1 for caps. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.caps(x, x.r) >> cls.swap(x, x.r), cls.caps(x.r, x))
 
     @axiom
@@ -2408,7 +2409,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
             cls, x: Var[C0, X]
     ) -> Equation[Hom[C1, Tensor[X, R[X]], Unit[C0]]]:
         """ Reidemeister move 1 for cups. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.swap(x, x.r) >> cls.cups(x.r, x), cls.cups(x, x.r))
 
 
@@ -2440,7 +2441,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
             cls, x: Var[C0, X], m: Var[int, M], n: Var[int, N]
     ) -> Equation[Hom[C1, Repeat[X, M], Repeat[X, N]]]:
         """ Two spiders connected by a leg fuse into one. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.spiders(m, 1, x) >> cls.spiders(1, n, x),
             cls.spiders(m, n, x))
 
@@ -2448,7 +2449,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
     def spider_specialness[X: Atom[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
         """ Splitting a wire then merging it back is the identity. """
-        return cls.equation_factory(
+        return cls.Equation(
             cls.spiders(1, 2, x) >> cls.spiders(2, 1, x), cls.id(x))
 
     @axiom
@@ -2456,7 +2457,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, Tensor[X, X], X]]:
         """ Spiders do not see the order of their legs. """
         merge = cls.spiders(2, 1, x)
-        return cls.equation_factory(cls.swap(x, x) >> merge, merge)
+        return cls.Equation(cls.swap(x, x) >> merge, merge)
 
     @rule
     def spider[X: Atom[C0], M: Nat, N: Nat](

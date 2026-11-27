@@ -51,7 +51,7 @@ def test_Dim_unwind():
     f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
     assert Dim(2).unwind() == Dim(2)
     assert f.to_hypergraph().to_diagram() == f
-    assert (f @ f).foliation().inside == (Diagram.layer_factory(f, f), )
+    assert (f @ f).foliation().inside == (Diagram.Layer(f, f), )
     assert (f >> f).simplify() == f >> f
 
 
@@ -124,8 +124,8 @@ def test_Tensor_cups():
 def test_Tensor_cup_factory_nests_compound_dims():
     x = Dim(2, 3)
     nested = np.einsum("ad,bc->abcd", np.identity(2), np.identity(3))
-    assert np.all(Tensor.cup_factory(x, x.r).array == nested)
-    assert Tensor.cup_factory(x, x.r) == Tensor.cups(x, x.r)
+    assert np.all(Tensor.Cup(x, x.r).array == nested)
+    assert Tensor.Cup(x, x.r) == Tensor.cups(x, x.r)
     assert np.all(Tensor.caps(x, x.l).array == nested)
 
 
