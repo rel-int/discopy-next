@@ -16,7 +16,10 @@ Both artefacts are generated (they are *not* committed): ``conf.py`` calls
 :func:`generate` from a ``builder-inited`` hook, so ``sphinx-build`` renders the
 notebooks as part of a normal docs build. If a notebook cannot be executed
 (e.g. an optional dependency is missing on Read the Docs) the build still
-succeeds -- the page falls back to a link to the notebook source.
+succeeds -- the page falls back to a link to the notebook source. A build
+that runs no notebook, as Read the Docs', embeds instead the HTML the ``build``
+workflow rendered on ``main`` and pushed to the :data:`BRANCH` branch, when it
+can download its tarball from :data:`RENDERED`.
 
 It can also be run as a script::
 
@@ -36,25 +39,34 @@ import os
 import re
 import subprocess
 import sys
+import tarfile
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from html import escape
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
+from urllib.request import urlopen
 
 DOCS = Path(__file__).resolve().parent
 NOTEBOOKS = DOCS / "notebooks"
 HTML_DIR = DOCS / "_static" / "notebooks"
 SUBDIRECTORIES = ("optyx", )
 REPOSITORY = os.environ.get(
-    "READTHEDOCS_GIT_CLONE_URL", "https://github.com/discopy/discopy")
+    "READTHEDOCS_GIT_CLONE_URL",
+    "https://github.com/discopy/discopy").removesuffix(".git")
 SOURCE = "{}/blob/{}".format(
-    REPOSITORY.removesuffix(".git"),
-    os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
+    REPOSITORY, os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
 ISSUES = "https://github.com/rel-int/discopy-next/issues/"
 # The environment variable that makes :func:`generate` link to each notebook
 # rather than run it.
 SKIP = "DISCOPY_SKIP_NOTEBOOKS"
+# The branch the ``build`` workflow pushes the notebooks it rendered on
+# ``main`` to: their HTML, as in :data:`HTML_DIR`, and a ``COMMIT`` file.
+BRANCH = "rendered-notebooks"
+# The environment variable holding the URL of a tarball of :data:`BRANCH`,
+# whose notebooks :func:`generate` embeds when it runs none, as ``conf.py``
+# sets on Read the Docs.
+RENDERED = "DISCOPY_RENDERED_NOTEBOOKS"
 
 # Notebooks that fail to execute on a bug an open issue tracks, so that
 # ``--check`` does not block on them; ``generate`` already falls back to a link
@@ -96,6 +108,14 @@ FALLBACK = """\
     execute it may be missing). You can read its source on GitHub:
     `{name}.md <{source}/docs/notebooks/{name}.md>`_.
 """
+
+DOWNLOADED = """\
+.. note::
+
+    This build does not run this notebook: it shows the rendering of the
+    ``build`` workflow at `{commit:.8} <{repository}/commit/{commit}>`_.
+
+""" + IFRAME
 
 SKIPPED = """\
 .. note::
@@ -172,15 +192,42 @@ def add_theme_style(output: Path, title: str) -> None:
     output.write_text(text.replace("</head>", THEME_STYLE + "</head>", 1))
 
 
-def write_page(
-        notebook: Path, *, rendered: bool, skipped: bool = False) -> None:
+def download(url: str) -> tuple[str, set[str]]:
+    """Extract the notebooks of the tarball of :data:`BRANCH` at ``url`` in
+    :data:`HTML_DIR`, returning the commit that rendered them and their names.
+
+    Its files sit in one top-level directory, as in a GitHub archive.
+    """
+    commit, names = "", set()
+    with urlopen(url, timeout=60) as response, tarfile.open(
+            fileobj=response, mode="r|gz") as archive:
+        for member in archive:
+            path = PurePosixPath(*PurePosixPath(member.name).parts[1:])
+            if not member.isfile() or ".." in path.parts:
+                continue
+            data = archive.extractfile(member).read()
+            if path == PurePosixPath("COMMIT"):
+                commit = data.decode().strip()
+            elif path.suffix == ".html":
+                (HTML_DIR / path).parent.mkdir(parents=True, exist_ok=True)
+                (HTML_DIR / path).write_bytes(data)
+                names.add(path.with_suffix("").as_posix())
+    return commit, names
+
+
+def write_page(notebook: Path, *, rendered: bool, skipped: bool = False,
+               commit: str = "") -> None:
     """Write the reStructuredText page for ``notebook``: its rendering, or a
-    link to its source, saying whether the build skipped it or it failed."""
+    link to its source, saying whether the build skipped it or it failed.
+
+    A ``commit`` says the rendering is the one of :func:`download`.
+    """
     title, name = title_of(notebook), name_of(notebook)
-    template = IFRAME if rendered else SKIPPED if skipped else FALLBACK
+    template = (DOWNLOADED if commit else IFRAME) if rendered\
+        else SKIPPED if skipped else FALLBACK
     body = template.format(
         name=name, up="../" * (name.count("/") + 1), title=escape(title),
-        source=SOURCE)
+        source=SOURCE, commit=commit, repository=REPOSITORY)
     (NOTEBOOKS / f"{name}.rst").write_text(
         f"{title}\n{'=' * len(title)}\n\n" + body)
 
@@ -190,13 +237,25 @@ def generate(*, strict: bool = False) -> None:
 
     When ``strict`` is false a notebook that fails to execute falls back to a
     link page instead of aborting the build. When the environment sets
-    :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs and
-    every page is a link page, as is that of every notebook of
-    :data:`UNEXECUTED`.
+    :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs:
+    every page embeds the rendering downloaded from :data:`RENDERED`, if
+    it is set and has one, or else links to its source, as does that of
+    every notebook of :data:`UNEXECUTED`. A notebook that fails to execute
+    leaves no HTML, so that the workflow does not push it to :data:`BRANCH`.
     """
+    skip, commit, downloaded = os.environ.get(SKIP) == "1", "", set()
+    if skip and os.environ.get(RENDERED):
+        try:
+            commit, downloaded = download(os.environ[RENDERED])
+        except (OSError, tarfile.TarError) as error:
+            print(f"no rendered notebooks: {error}", file=sys.stderr)
     for notebook in notebooks():
-        if os.environ.get(SKIP) == "1" or name_of(notebook) in UNEXECUTED:
+        name = name_of(notebook)
+        if name in UNEXECUTED or skip and name not in downloaded:
             write_page(notebook, rendered=False, skipped=True)
+            continue
+        if skip:
+            write_page(notebook, rendered=True, commit=commit)
             continue
         try:
             export(notebook, check=False)
@@ -204,6 +263,7 @@ def generate(*, strict: bool = False) -> None:
         except (subprocess.CalledProcessError, OSError):
             if strict:
                 raise
+            (HTML_DIR / f"{name}.html").unlink(missing_ok=True)
             write_page(notebook, rendered=False)
 
 
