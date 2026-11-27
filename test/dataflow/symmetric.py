@@ -123,3 +123,13 @@ def test_callable_maps_take_heads_as_generators():
     F = Functor(lambda _: y, lambda box: g if box != f else None,
                 cod=symmetric.Diagram)
     assert F(f.head) == F(f.tail) == g
+
+
+def test_mapped_followed_by_is_daggered_functorially():
+    from discopy import symmetric
+    x, y = Ty('x'), symmetric.Ty('y')
+    fby, g = FollowedBy(x), symmetric.Box('g', y @ y, y)
+    F = Functor({x: y, x.head: y, x.delay(): y}, {fby: g},
+                cod=symmetric.Diagram)
+    assert F(fby.dagger()) == g.dagger()
+    assert F(fby >> fby.dagger()) == g >> g.dagger()

@@ -397,6 +397,10 @@ class Functor(feedback.Functor):
             return result.dagger() if other.is_dagger\
                 and issubclass(self.cod, DaggerCategory)\
                 and self.cod.has_dagger() else result
+        if isinstance(other, FollowedBy) and other.is_dagger\
+                and issubclass(self.cod, DaggerCategory)\
+                and self.cod.has_dagger():
+            return self(other.dagger()).dagger()
         mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
             if isinstance(other, (HeadOb, TailOb))\
             else (self.ar_map.mapping, other)
