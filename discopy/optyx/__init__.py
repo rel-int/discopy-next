@@ -4,16 +4,16 @@ diagrams mixing qubits, photonic modes and classical bits, with lossy
 channels, heralded measurements and classical feed-forward, evaluated as
 tensor networks or with permanents.
 
-:mod:`discopy.optyx.channel` is the category of channels these diagrams live
-in, with qubits in :mod:`discopy.optyx.qubits`, photons in
-:mod:`discopy.optyx.photonic` and bits in :mod:`discopy.optyx.classical`, on
-top of the calculi of :mod:`discopy.optyx.core`.
-:mod:`discopy.optyx.contextuality` gives the empirical models of their
-Bell tests, :mod:`discopy.optyx.interaction` closes their feedback loops as
+:mod:`~discopy.optyx.channel` is the category of channels these diagrams live
+in, with qubits in :mod:`~discopy.optyx.qubits`, photons in
+:mod:`~discopy.optyx.photonic` and bits in :mod:`~discopy.optyx.classical`, on
+top of the calculi of :mod:`~discopy.optyx.core`.
+:mod:`~discopy.optyx.contextuality` gives the empirical models of their
+Bell tests, :mod:`~discopy.optyx.interaction` closes their feedback loops as
 combinatorial maps of recurrent channels with stream and stationary
-semantics, :mod:`discopy.optyx.term` compiles linear terms with bangs to them,
-:mod:`discopy.optyx.sampling` samples their outputs tick after
-tick, and :mod:`discopy.optyx.compiler` compiles measurement-based patterns
+semantics, :mod:`~discopy.optyx.term` compiles linear terms with bangs to them,
+:mod:`~discopy.optyx.sampling` samples their outputs tick after
+tick, and :mod:`~discopy.optyx.compiler` compiles measurement-based patterns
 to single-emitter photonic hardware.
 
 .. autosummary::

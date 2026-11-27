@@ -447,3 +447,19 @@ def test_a_channel_traces_through_its_own_cup():
              >> qubit @ Diagram.cups(qubit, qubit))
     assert np.allclose(np.asarray(
         snake.eval().tensor.array).reshape(2, 2), np.eye(2))
+
+
+@pytest.mark.parametrize("box", [
+    Measure(qubit @ qmode), Encode(bit @ mode, internal_states=([1, 0], )),
+    optyx.channel.Discard(qmode), photonic.Discard(2), photonic.Encode(1),
+    photonic.NumberResolvingMeasurement(2), qubits.Measure(2),
+    qubits.Discard(1), qubits.Encode(2), photonic.Phase(.2),
+    photonic.BBS(.1, is_conj=True), photonic.TBS(.3, is_gate_dagger=True),
+    photonic.MZI(.1, .2, is_conj=True)])
+def test_a_box_loads_its_own_tree(box):
+    """A box whose constructor takes none of the fields of `cat.Box.to_tree`
+    reads its own arguments back from its tree (next#731), in a diagram too."""
+    from discopy.utils import dumps, loads
+    loaded = loads(dumps(box))
+    assert loaded == box and loaded.to_tree() == box.to_tree()
+    assert loads(dumps(box @ box)) == box @ box

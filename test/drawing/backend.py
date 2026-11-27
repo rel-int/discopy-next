@@ -1009,3 +1009,184 @@ def test_label_contrast_through_two_turns_reflected():
     assert inside.turns == 2 and not inside.cod_is_after()
     typ = SimpleNamespace(dom="white", cod="black")
     assert inside.label_background(typ) == "black"
+
+
+def test_left_to_right_frame_keeps_its_name_inside():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.alignments = {}
+
+        def draw_text(self, text, i, j, **params):
+            self.alignments[text] = params.get("verticalalignment")
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    y, x = Primitive('y', Ty(), n), Primitive('x', Ty(), n)
+    with_ = Primitive('W', Ty(), n, args=(y, x), drawing_name="W",
+                      draw_as_frame=True, draw_vertically=True)
+    recorder = Recorder()
+    with_.bubble(dom=Ty(), cod=n).draw(backend=recorder)
+    assert recorder.alignments["W"] == "top"
+    assert recorder.alignments["n"] == "bottom"
+
+
+def test_frame_name_drawn_without_wire_labels():
+    from discopy.drawing.backend import Backend
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts = []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.append(text)
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    recorder = Recorder()
+    Box('f', x, x).bubble(
+        dom=x, cod=x, drawing_name="g", draw_as_frame=True
+    ).draw(backend=recorder, wire_labels=False)
+    assert "g" in recorder.texts and "x" not in recorder.texts
+
+
+def test_left_to_right_frame_keeps_its_name_inside_when_reflected():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Diagram
+    from discopy.utils import factory
+
+    @factory
+    class Body(Diagram):
+        draw_left_to_right = True
+
+    class Primitive(Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.texts, self.frames = {}, []
+
+        def draw_text(self, text, i, j, **params):
+            self.texts[text] = (j, params.get("verticalalignment"))
+
+        def draw_polygon(self, *points, **params):
+            self.frames.append([y for _, y in points])
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    n = Ty('n')
+    frame = Primitive('W', Ty(), n, args=(
+        Primitive('y', Ty(), n), Primitive('x', Ty(), n)), drawing_name="W",
+        draw_as_frame=True, draw_vertically=True)
+    for dagger in (False, True):
+        recorder = Recorder()
+        drawing = frame.bubble(dom=Ty(), cod=n).to_drawing()
+        (drawing.dagger() if dagger else drawing).draw(backend=recorder)
+        j, alignment = recorder.texts["W"]
+        bottom, top = min(recorder.frames[0]), max(recorder.frames[0])
+        assert alignment == ("bottom" if dagger else "top")
+        assert bottom < j < top
+
+
+def test_frame_sides_have_an_edge_between_two_colours():
+    from discopy.drawing.backend import Backend
+    from discopy.monoidal import Colour, Wire
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.widths = []
+
+        def draw_wire(self, source, target, *args, **params):
+            self.widths.append(params.get("linewidth"))
+
+        def draw_text(self, text, i, j, **params):
+            pass
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x = Ty('x')
+    framed, recorder = Recorder(), Recorder()
+    Box('f', x, x).bubble(dom=x, cod=x, draw_as_frame=True).draw(
+        backend=framed)
+    assert framed.widths and 0 not in framed.widths
+    Box('f', x, x).to_drawing().slot(None).draw(backend=recorder)
+    assert 0 in recorder.widths
+    coloured = Ty(Wire('x', Colour('red'), Colour('blue')))
+    coloured_slot = Recorder()
+    Box('f', coloured, coloured).to_drawing().slot(None).draw(
+        backend=coloured_slot)
+    assert 0 not in coloured_slot.widths
+
+
+def test_left_to_right_args_in_the_variants_of_a_box():
+    from discopy import pivotal
+    from discopy.drawing.backend import Backend
+    from discopy.utils import Point, factory
+
+    @factory
+    class Body(pivotal.Diagram):
+        draw_left_to_right = True
+
+    class Primitive(pivotal.Box, Body):
+        pass
+
+    class Recorder(Backend):
+        def __init__(self):
+            super().__init__()
+            self.polygons, self.texts = [], {}
+
+        def draw_polygon(self, *points, **params):
+            self.polygons.append(points)
+
+        def draw_text(self, text, i, j, **params):
+            self.texts.setdefault(text, []).append(Point(i, j))
+
+        def output(self, path=None, show=True, **params):
+            pass
+
+    x, y = pivotal.Ty('x'), pivotal.Ty('y')
+    f, g = Primitive('f', x, y), Primitive('g', y, x)
+    W = pivotal.Box('W', x, y, args=(f, g), drawing_name="W")
+    chopped = {}
+    for name, diagram in [("W", W), ("dagger", W[::-1]),
+                          ("transpose", W.r), ("conjugate", W[::-1].r),
+                          ("reflected", W.r.to_drawing().dagger())]:
+        recorder = Recorder()
+        diagram.draw(backend=recorder, asymmetry=.25)
+        outline, = (p for p in recorder.polygons if len(p) == 5)
+        xs, ys = [p[0] for p in outline], [p[1] for p in outline]
+        chopped[name] = next(
+            (cx == max(xs), cy == max(ys))
+            for cx in (min(xs), max(xs)) for cy in (min(ys), max(ys))
+            if (cx, cy) not in outline)
+        (f_at, ), (g_at, ) = recorder.texts["f"], recorder.texts["g"]
+        turned = name in ("transpose", "conjugate", "reflected")
+        assert (f_at.y < g_at.y) == (name in ("transpose", "conjugate"))
+        f_input = min(  # The label of the wire into f, its x or its y.
+            recorder.texts["y" if name in ("dagger", "conjugate") else "x"],
+            key=lambda p: abs(p.y - f_at.y))
+        assert (f_input.x > f_at.x) == turned
+    assert chopped == {  # Whether the corner cut off is right, top.
+        "W": (True, False), "dagger": (True, True),
+        "transpose": (False, True), "conjugate": (False, False),
+        "reflected": (False, False)}

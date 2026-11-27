@@ -19,16 +19,16 @@ where :math:`\\varphi` takes the arrows of ``m`` first, see
 :meth:`Arrow.pairs`. This is a category for every monad, and a monoidal one
 when ``C`` is monoidal and ``M`` is commutative, see :meth:`Arrow.tensor`.
 For the list monad the composite of two lists is the list of composites,
-which is how :class:`~discopy.sum.Sum` composes: a sum is a list of arrows.
+which is how :class:`~discopy.cat.Sum` composes: a sum is a list of arrows.
 
 A functor ``F: C -> D`` extends to :math:`M_* C \\to D` when each hom of
 ``D`` is an algebra of ``M`` and composition in ``D`` is a homomorphism in
 each variable: an arrow ``m`` goes to the structure of
 :math:`D(F(A), F(B))` applied to :math:`M(F)(m)`, see :class:`Functor`.
 ``D`` gives this algebra as a classmethod, ``D.algebra(M, dom, cod)``, e.g.
-:meth:`discopy.cat.Arrow.algebra`, the formal sum, and
-:meth:`discopy.matrix.Matrix.algebra`, the sum of matrices, both for the list
-monad.
+:meth:`Arrow.algebra <discopy.cat.Arrow.algebra>`, the formal sum, and
+:meth:`Matrix.algebra <discopy.matrix.Matrix.algebra>`, the sum of matrices,
+both for the list monad.
 
 Summary
 -------
@@ -55,7 +55,7 @@ A list of arrows composes as a sum does:
 >>> assert (Arrow[cat.Arrow, List].id(x) >> m) == m == (m >> n.id(y))
 
 A functor into arrows extends along their sum, and the extension is a
-functor: it sends a list to a :class:`~discopy.sum.Sum` and preserves
+functor: it sends a list to a :class:`~discopy.cat.Sum` and preserves
 composition.
 
 >>> F = Functor(ob_map=lambda x: x, ar_map=lambda f: f,
@@ -304,15 +304,15 @@ class Functor(cat.Functor):
     monad ``M``, when the homs of ``D`` are algebras of ``M``: an arrow
     ``m`` from ``A`` to ``B`` goes to the structure of
     ``D.algebra(M, F(A), F(B))`` applied to ``M(F)(m)``, where ``F`` is the
-    ``functor_factory`` of ``C``, e.g. :class:`discopy.monoidal.Functor`
-    for :class:`discopy.monoidal.Diagram`.
+    ``functor_factory`` of ``C``, e.g. :class:`~discopy.monoidal.Functor`
+    for :class:`~discopy.monoidal.Diagram`.
 
     Parameters:
         ob_map : Mapping from the objects of ``C`` to those of ``D``.
         ar_map : Mapping from the boxes of ``C`` to the arrows of ``D``.
         dom : The change of base, e.g. ``Arrow[cat.Arrow, List]``.
         cod : The category ``D``, with a classmethod ``algebra``, see
-            :meth:`discopy.cat.Arrow.algebra`.
+            :meth:`~discopy.cat.Arrow.algebra`.
 
     Example
     -------

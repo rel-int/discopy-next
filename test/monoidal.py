@@ -992,13 +992,13 @@ def test_Sum():
     x = Ty('x')
     f = Box('f', x, x)
     with raises(ValueError):
-        Diagram.sum_factory(())
+        Sum(())
     with raises(AxiomError):
-        Diagram.sum_factory((f, ), dom=Ty())
+        Sum((f, ), dom=Ty())
     with raises(AxiomError):
         f + Box('g', Ty(), x)
-    assert Diagram.sum_factory([f]) == f
-    assert {Diagram.sum_factory([f]): 42}[Diagram.sum_factory([f])] == 42
+    assert Sum([f]) == f
+    assert {Sum([f]): 42}[Sum([f])] == 42
     assert Id(x).then(*(3 * (f + f, ))) == sum(8 * [f >> f >> f])
     assert Id(Ty()).tensor(*(3 * (f + f, ))) == sum(8 * [f @ f @ f])
 
@@ -1545,3 +1545,32 @@ def test_laws():
     term = find(TermBase.strategy(), lambda term: term.stack and "let" in str(
         term))
     assert all(law(term) for law in laws)
+
+
+def test_Functor_reads_a_higher_level_type_as_itself():
+    """ A functor of a lower level than the types of a box reads each of them
+    as itself, so that its images compose and a dict keyed on the type finds
+    it (next#703). """
+    from discopy import rigid, symmetric
+    for x in (rigid.Ty('x'), symmetric.Ty('x')):
+        f, F = Box('f', x, x), Functor.id(Diagram)
+        assert F(x) == x and F(f).dom == F(f.dom) and F(f >> f) == f >> f
+        assert Functor({x: Ty('y')}, {})(x @ x) == Ty('y', 'y')
+    G = rigid.Functor({rigid.Ty('y'): rigid.Ty('z')}, {})
+    F = Functor(lambda _: G(rigid.Wire('y')), {})  # G reads its own level
+    assert F(Ty('x')) == rigid.Ty('z')
+
+
+def test_box_with_args_keeps_its_drawing_name():
+    f = Box('f', Ty('x'), Ty('x'))
+    bubble = f.bubble(drawing_name="g")
+    assert bubble[::-1].drawing_name == "g"
+    assert bubble[::-1][::-1].drawing_name == "g"
+    assert bubble.rebuild(drawing_name="").drawing_name == ""
+
+
+def test_rebuild_keeps_a_name_derived_from_new_data():
+    from pytest import importorskip
+    phi = importorskip("sympy.abc").phi
+    from discopy.quantum.zx import Scalar
+    assert Scalar(phi).lambdify(phi)(2).drawing_name == Scalar(2).drawing_name

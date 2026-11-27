@@ -16,6 +16,7 @@ Summary
     FreeCategory
     Arrow
     Box
+    Sum
     Id
     Functor
     Transformation
@@ -64,8 +65,8 @@ We can create dagger functors from the free category to itself:
 >>> assert F(arrow) == (h >> f >> g)[::-1]
 
 The dagger is a contravariant involutive identity-on-objects endofunctor,
-see :meth:`discopy.abc.DaggerCategory.dagger_involution` and
-:meth:`discopy.abc.DaggerCategory.dagger_contravariance`:
+see :meth:`~discopy.abc.DaggerCategory.dagger_involution` and
+:meth:`~discopy.abc.DaggerCategory.dagger_contravariance`:
 
 >>> assert f[::-1][::-1] == f
 >>> assert Id(x)[::-1] == Id(x)
@@ -102,18 +103,18 @@ let(f(a), lambda y: let(g(y), lambda z: h(z)))
 >>> assert statement.normal_form() == e(d(c(a)))
 >>> assert statement.eval() == arrow
 
-Every module of the hierarchy below :mod:`discopy.biclosed` has terms of its
+Every module of the hierarchy below :mod:`~discopy.biclosed` has terms of its
 own, each a variant of the kappa calculus: planar and linear in
-:mod:`discopy.monoidal`, linear in :mod:`discopy.symmetric`, with copy and
-discard in :mod:`discopy.markov`. A module that adds no way to bind a
-variable, e.g. :mod:`discopy.braided`, gets its terms from
+:mod:`~discopy.monoidal`, linear in :mod:`~discopy.symmetric`, with copy and
+discard in :mod:`~discopy.markov`. A module that adds no way to bind a
+variable, e.g. :mod:`~discopy.braided`, gets its terms from
 :func:`kappa_calculus`, with its structural boxes as constants. From
-:mod:`discopy.biclosed` up, terms are those of the lambda calculus.
+:mod:`~discopy.biclosed` up, terms are those of the lambda calculus.
 
 Every module up the hierarchy has terms of its own, subclasses of these
 which say what a context is: one variable in a category, a list of variables
 each used once and in order in a monoidal one, see
-:class:`discopy.monoidal.TermBase`. Below :mod:`discopy.biclosed`, which
+:class:`~discopy.monoidal.TermBase`. Below :mod:`~discopy.biclosed`, which
 adds the abstraction of the lambda calculus, they are variants of the kappa
 calculus.
 """
@@ -122,7 +123,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import suppress
-from functools import total_ordering, reduce
+from functools import cached_property, total_ordering, reduce
 from inspect import signature
 from itertools import count
 from typing import (
@@ -147,6 +148,7 @@ from discopy.utils import (  # noqa: F401
     MappingOrCallable,
     assert_isinstance,
     assert_iscomposable,
+    assert_isparallel,
     get_origin,
     identity,
 )
@@ -200,7 +202,7 @@ class Ob(Serialisable["Ob"]):
         The kappa abstraction of a Python function from a variable of this
         type to a term, see :class:`Kappa`, as a type of a closed category
         applied to a function is a lambda abstraction, see
-        :class:`discopy.biclosed.Ty`.
+        :class:`~discopy.biclosed.Ty`.
 
         Parameters:
             function : The body, as a function of the variable.
@@ -319,8 +321,9 @@ class FreeCategory(Category):
         Derive the terms of a free category from its rules: a generator, or the
         conclusion of one of its :attr:`rules` chosen at random, its morphism
         premises sampled by the :meth:`strategy` of the category with one less
-        unit of ``fuel``, see :meth:`discopy.testable.Rule.strategy`. Once the
-        fuel runs out, only the rules with no morphism premise are applied. A
+        unit of ``fuel``, see
+        :meth:`Rule.strategy <discopy.testable.Rule.strategy>`. Once the fuel
+        runs out, only the rules with no morphism premise are applied. A
         conclusion that misses ``dom`` or ``cod`` is composed with a generator
         from or to it, so that both are honoured, with no filtering, whenever
         the :meth:`generator_strategy` reads them: that of a type does not,
@@ -332,7 +335,7 @@ class FreeCategory(Category):
             cod : The codomain, sampled if ``None``.
             fuel : How deep the rules nest.
             within : The class whose rules a term is derived from, e.g.
-                :class:`discopy.abc.MonoidalCategory` for the terms of the
+                :class:`~discopy.abc.MonoidalCategory` for the terms of the
                 underlying monoidal category, the category itself if
                 ``None``.
 
@@ -456,7 +459,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     see :class:`monoidal.Nat`.
     """
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type[formal_sum.Sum]]
+    sum_factory: ClassVar[type["Sum"]]
     ob = Ob
 
     @classmethod
@@ -465,7 +468,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         The strategy the property matrix samples the terms of a free category
         from: its :meth:`search`, which a category with a combinatorial
         representation mixes with the :meth:`quotient_strategy` of it, e.g.
-        :meth:`discopy.symmetric.Diagram.strategy`.
+        :meth:`~discopy.symmetric.Diagram.strategy`.
 
         Parameters are those of :meth:`search`.
         """
@@ -585,7 +588,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> assert Arrow.id() == Id() == Id(Ob())
         >>> assert Arrow.id('x') == Id('x') == Id(Ob('x'))
         """
-        if any(isinstance(other, formal_sum.Sum) for other in others):
+        if any(isinstance(other, Sum) for other in others):
             return self.sum_factory((self, )).then(*others)
         return super().then(*others)
 
@@ -605,8 +608,8 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         """
         The algebra of a monad on the arrows from ``dom`` to ``cod``, by which
         a functor into arrows extends to the change of base of its domain,
-        see :class:`discopy.enriched.Functor`: the formal
-        :class:`~discopy.sum.Sum` of a list of arrows, for the
+        see :class:`~discopy.enriched.Functor`: the formal
+        :class:`Sum` of a list of arrows, for the
         :attr:`~discopy.kleisli.monad.List` monad.
 
         Parameters:
@@ -720,7 +723,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
 
     def to_tree(self) -> dict:
         """
-        Serialise a DisCoPy arrow, see :func:`discopy.utils.dumps`.
+        Serialise a DisCoPy arrow, see :func:`~discopy.utils.dumps`.
 
         Example
         -------
@@ -751,7 +754,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     @classmethod
     def from_tree(cls, tree: dict) -> Arrow:
         """
-        Decode a serialised DisCoPy arrow, see :func:`discopy.utils.loads`.
+        Decode a serialised DisCoPy arrow, see :func:`~discopy.utils.loads`.
 
         Parameters:
             tree : DisCoPy serialisation.
@@ -980,7 +983,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         The dagger of a box, that of its args too. Bubbling and daggering do
         not commute, as :meth:`__str__` prints them: the dagger of a bubble is
         not the bubble of a dagger, so that a functor cannot separate equal
-        bubbles, e.g. into :class:`discopy.tensor.Elementwise` where the two
+        bubbles, e.g. into :class:`~discopy.tensor.Elementwise` where the two
         have different arrays.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
@@ -1014,7 +1017,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         A box prints as its name, a box with args as a call on them, a
         daggered one as the dagger of the box: bubbling and daggering need
         not commute, so printing the dagger on the args would read back as
-        the other value, e.g. in :class:`discopy.tensor.Elementwise`.
+        the other value, e.g. in :class:`~discopy.tensor.Elementwise`.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
         >>> print(f.bubble().dagger())
@@ -1100,6 +1103,146 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
                    is_dagger=is_dagger, **kwargs)
 
 
+class Sum(Box):
+    """
+    A sum is a tuple of arrows :code:`terms` with the same domain and
+    codomain, a box of the free category enriched in monoids.
+
+    Composition distributes over the sum: the terms of ``f >> g`` are the
+    composites of a term of ``f`` with a term of ``g``, and the unit is the
+    empty sum of a given type, the zero arrow. A sum of one term is equal to
+    that term, and a functor sends a sum to the sum of the images of its
+    terms.
+
+    Parameters:
+        terms : The terms of the formal sum.
+        dom : The domain of the formal sum.
+        cod : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
+    >>> f, g = Box('f', x, y), Box('g', y, z)
+    >>> zero = Sum((), x, y)
+    >>> assert f + zero == f == zero + f
+    >>> assert f >> (g + g) == (f >> g) + (f >> g) == (f + f) >> g
+    >>> print(f + f)
+    (f) + (f)
+    >>> f + f
+    cat.Sum(terms=(cat.Box('f', cat.Ob('x'), cat.Ob('y')), \
+cat.Box('f', cat.Ob('x'), cat.Ob('y'))))
+
+    Important
+    ---------
+    Domain and codomain are optional only if the terms are non-empty.
+
+    Note
+    ----
+    The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
+    """
+    serialised_attrs = ("terms", "dom", "cod")
+
+    def __init__(
+            self, terms: tuple[Arrow, ...],
+            dom: Ob | None = None, cod: Ob | None = None):
+        terms = tuple(terms)
+        if not terms and (dom is None or cod is None):
+            raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
+        dom = terms[0].dom if dom is None else dom
+        cod = terms[0].cod if cod is None else cod
+        unit = self.sum_factory((), dom, cod) if terms else None
+        for arrow in terms:
+            assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
+        self.terms = terms
+        super().__init__("", dom, cod)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        """ The name of a sum is its :code:`repr`, computed when needed. """
+        str_args = "" if self.terms\
+            else f", dom={repr(self.dom)}, cod={repr(self.cod)}"
+        return factory_name(type(self))\
+            + f"(terms={repr(self.terms)}{str_args})"
+
+    @property
+    def is_generator(self):
+        return len(self.terms) == 1 and self.terms[0].is_generator
+
+    @property
+    def generator(self):
+        return self.terms[0].generator if self.is_generator else None
+
+    def setoid(self):
+        """ Ensure that a singleton sum is in fact equal to its only term. """
+        return self.terms[0].setoid() if len(self.terms) == 1 else (
+            factory_key(type(self)), self.terms, self.dom, self.cod)
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return " + ".join(f"({arrow})" for arrow in self.terms)\
+            if self.terms else\
+            f"{factory_name(type(self))}((), {self.dom}, {self.cod})"
+
+    def atoms(self) -> list:
+        """ The atoms of a sum: those of its boundary and of its terms. """
+        return self.dom.atoms() + self.cod.atoms() + [
+            atom for term in self.terms for atom in term.atoms()]
+
+    def __add__(self, other):
+        assert_isparallel(self, other)
+        other = other if isinstance(other, Sum)\
+            else self.sum_factory((other, ))
+        return self.sum_factory(
+            (*self.terms, *other.terms), self.dom, self.cod)
+
+    def __iter__(self):
+        yield from self.terms
+
+    def __len__(self):
+        return len(self.terms)
+
+    @unbiased
+    def then(self, other):
+        assert_iscomposable(self, other)
+        other = other if isinstance(other, Sum)\
+            else self.sum_factory((other, ))
+        terms = tuple(f.then(g) for f in self.terms for g in other.terms)
+        return self.sum_factory(terms, self.dom, other.cod)
+
+    def dagger(self):
+        terms = tuple(f.dagger() for f in self.terms)
+        return self.sum_factory(terms, self.cod, self.dom)
+
+    @property
+    def free_symbols(self):
+        return {x for box in self.terms for x in box.free_symbols}
+
+    def subs(self, *args):
+        terms = tuple(f.subs(*args) for f in self.terms)
+        return self.sum_factory(terms, self.dom, self.cod)
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: self.sum_factory(
+            tuple(box.lambdify(*symbols, **kwargs)(*xs) for box in self.terms),
+            dom=self.dom, cod=self.cod)
+
+    def to_tree(self):
+        return {
+            'factory': factory_name(type(self)),
+            'terms': [t.to_tree() for t in self.terms],
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree):
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        terms = tuple(map(from_tree, tree['terms']))
+        return cls(terms=terms, dom=dom, cod=cod)
+
+
 Bubble = Box.from_args
 
 
@@ -1150,11 +1293,12 @@ class Functor(Category[type, "Functor"]):
     A daggered box is mapped as the dagger of the image of the box, when the
     codomain is a :class:`~discopy.abc.DaggerCategory` that
     :meth:`~discopy.abc.DaggerCategory.has_dagger`. When it is not, e.g.
-    a functor into :class:`discopy.stream.Stream`,
-    :class:`discopy.python.Function`,
-    :class:`discopy.python.additive.Function` or integer diagrams over
-    :class:`discopy.python.Function`, the image of a daggered box
-    is read off :code:`ar_map` like that of any other box.
+    a functor into :class:`~discopy.stream.Stream`,
+    :class:`python.Function <discopy.python.Function>`,
+    :class:`additive.Function <discopy.python.additive.Function>` or integer
+    diagrams over :class:`python.Function <discopy.python.Function>`, the
+    image of a daggered box is read off :code:`ar_map` like that of any other
+    box.
 
     >>> from discopy import python
     >>> F = Functor(
@@ -1173,7 +1317,7 @@ class Functor(Category[type, "Functor"]):
     def id(cls, dom: type | None = None) -> Self:
         """
         The identity functor on a given category ``dom``, with the shared
-        :func:`discopy.utils.identity` as both of its maps.
+        :func:`~discopy.utils.identity` as both of its maps.
 
         Parameters:
             dom : The domain of the functor.
@@ -1205,7 +1349,7 @@ class Functor(Category[type, "Functor"]):
         The composite sends each object and box to its image under ``other``
         of its image under ``self``: it is the composite of two functors that
         their maps determine. A functor that its maps do not determine, e.g.
-        :class:`discopy.balanced.DualRail`, has ``composes`` false: apply the
+        :class:`~discopy.balanced.DualRail`, has ``composes`` false: apply the
         two in turn instead.
 
         Example
@@ -1325,7 +1469,7 @@ which JSON cannot hold.
             if isinstance(result, tuple) and not issubclass(origin, Nat):
                 return self.cod.ob(*result)
             return self.cod.ob(result)
-        if isinstance(other, formal_sum.Sum):
+        if isinstance(other, Sum):
             return sum(map(self, other.terms),
                        self.cod.zero(self(other.dom), self(other.cod)))
         if isinstance(other, Box) and other.args\
@@ -1365,7 +1509,7 @@ class Transformation(Category[Functor, "Transformation"]):
         components :
             A mapping from objects ``x`` in the domain category to arrows
             ``components[x] : dom(x) -> cod(x)`` in the codomain category,
-            or :func:`discopy.utils.identity` for the identity, see
+            or :func:`~discopy.utils.identity` for the identity, see
             :meth:`id`.
         dom : The domain functor.
         cod : The codomain functor.
@@ -1428,7 +1572,7 @@ class Transformation(Category[Functor, "Transformation"]):
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
         identity arrow on ``dom(x)``, with the shared
-        :func:`discopy.utils.identity` as its components. A component is read
+        :func:`~discopy.utils.identity` as its components. A component is read
         by calling the transformation, as ``alpha(x)``: ``components[x]`` is
         what was given, i.e. ``x`` itself for the identity.
 
@@ -1555,6 +1699,7 @@ which JSON cannot hold.
 
 Ob.equation_factory = Equation
 Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
+Arrow.sum_factory = Sum
 Arrow.functor_factory = Functor
 Id = Arrow.id
 
@@ -1650,10 +1795,10 @@ class Canonical[factory](TestableGeneric, tuple):
 
 class AlphaEquivalence(Equivalence):
     """
-    Terms with bound variables, an :class:`discopy.testable.Equivalence` up
+    Terms with bound variables, an :class:`~discopy.testable.Equivalence` up
     to their names, see :meth:`alpha_eq`: the terms of the kappa calculus,
     see :class:`TermBase`, and those of the lambda calculus, see
-    :class:`discopy.biclosed.TermBase`.
+    :class:`biclosed.TermBase <discopy.biclosed.TermBase>`.
 
     """
     def alpha_eq(self, *others: Term) -> bool:
@@ -1871,7 +2016,7 @@ class TermBase(Serialisable, AlphaEquivalence):
     are its arrows, see :meth:`normal_form_completeness`.
 
     The modules up the hierarchy subclass these terms and relax what a
-    context is, e.g. a :class:`discopy.monoidal.TermBase` has a list of
+    context is, e.g. a :class:`~discopy.monoidal.TermBase` has a list of
     variables, each used once and in order, around a stack of many inputs.
 
     Attributes:
@@ -2063,7 +2208,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         """
         The number of free occurrences of a variable: at most one in a
         linear term, any number where variables are copied and discarded,
-        see :class:`discopy.markov.TermBase`.
+        see :class:`~discopy.markov.TermBase`.
 
         Example
         -------
@@ -2520,7 +2665,7 @@ class Kappa(TermBase):
         variables : The variables to bind, the one of the body.
         body : The term in which they are bound.
         offset : The number of free variables left of the stack, none in a
-            category, see :class:`discopy.monoidal.Kappa`.
+            category, see :class:`~discopy.monoidal.Kappa`.
 
     Note
     ----
@@ -2724,11 +2869,11 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
 
 
 TERMS = {
-    "TermBase": "A term of the kappa calculus of :mod:`discopy.{}`.",
-    "Variable": "A variable of the terms of :mod:`discopy.{}`.",
-    "Constant": "A box of :mod:`discopy.{}` as a term.",
-    "Application": "An application of terms of :mod:`discopy.{}`.",
-    "Kappa": "A kappa abstraction of terms of :mod:`discopy.{}`."}
+    "TermBase": "A term of the kappa calculus of :mod:`~discopy.{}`.",
+    "Variable": "A variable of the terms of :mod:`~discopy.{}`.",
+    "Constant": "A box of :mod:`~discopy.{}` as a term.",
+    "Application": "An application of terms of :mod:`~discopy.{}`.",
+    "Kappa": "A kappa abstraction of terms of :mod:`~discopy.{}`."}
 
 
 def kappa_calculus(
@@ -2742,11 +2887,11 @@ def kappa_calculus(
     generated with its boxes and read its structural boxes, e.g. a braid,
     as constants like any other.
 
-    This is for the levels below :mod:`discopy.biclosed`: from there up a
+    This is for the levels below :mod:`~discopy.biclosed`: from there up a
     type applied to a Python function is a lambda abstraction, see
-    :class:`discopy.biclosed.Ty`, and a diagram reads with the kappa terms
+    :class:`~discopy.biclosed.Ty`, and a diagram reads with the kappa terms
     of the level it subclasses, e.g. a compact one with those of
-    :mod:`discopy.symmetric`.
+    :mod:`~discopy.symmetric`.
 
     Parameters:
         diagram : The diagram class of the level.
@@ -2803,8 +2948,3 @@ Arrow.term_factory = TermBase
 TermBase.equivalence_factory = AlphaEquation
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-
-# pylint: disable-next=wrong-import-position,ungrouped-imports  # a cat.Box
-from discopy import sum as formal_sum  # noqa: E402
-
-__getattr__ = utils.deprecated_alias(__name__, {"Sum": "discopy.sum.Sum"})

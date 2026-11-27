@@ -4,7 +4,7 @@
 What a generator promises: its legs, grouped into orbits, and the symmetry
 each orbit carries.
 
-A functor into :mod:`discopy.neural` preserves swaps, copies, discards and
+A functor into :mod:`~discopy.neural` preserves swaps, copies, discards and
 traces strictly and for free, because they are wiring: a permutation of
 tensors. What it cannot preserve for free is a box whose legs carry a
 symmetry -- a spider, the members of a constraint unit over nine cells.
@@ -25,7 +25,7 @@ generator*, which would otherwise be agreed on by hand:
 * :meth:`Signature.generators` gives the group an equivariance check runs a
   module against -- the check itself is the notebooks' business.
 
-The boxes and the maps live in :mod:`discopy.frobenius`: every box a builder
+The boxes and the maps live in :mod:`~discopy.frobenius`: every box a builder
 wires has an empty domain, so every wire joins two codomain ports, which a
 map accepts only between self-dual roles. Interpreting such a map as a
 :class:`~discopy.neural.network.Network` is the business of a later level,
@@ -202,7 +202,7 @@ class Signature:
         """
         The abstract box of this signature: no domain, one port per leg.
 
-        The box lives in :mod:`discopy.frobenius`, since every box a
+        The box lives in :mod:`~discopy.frobenius`, since every box a
         builder wires has an empty domain, so every wire joins two codomain
         ports, and a map accepts such a wire only between adjoint types:
         the roles have to be self-dual.
@@ -368,7 +368,7 @@ def from_incidence(incidence: tuple, node: Signature,
                    ) -> frobenius.CMap:
     """
     The bipartite incidence graph of a family of nodes and the factors
-    they belong to, as a closed map in :mod:`discopy.frobenius`: one node
+    they belong to, as a closed map in :mod:`~discopy.frobenius`: one node
     box per node with one incidence port per factor it belongs to plus
     its traced loops, one factor box per factor with one port per
     member, and a wire from each node to each of its factors.
@@ -462,7 +462,7 @@ def from_relation(relation: tuple, node: Signature, node_name: str = NODE
                   ) -> frobenius.CMap:
     """
     The graph of a binary relation between nodes, as a closed map in
-    :mod:`discopy.frobenius`: one node box per node with one port per
+    :mod:`~discopy.frobenius`: one node box per node with one port per
     related node plus its traced loops, and a wire between each related
     pair. No relation boxes.
 

@@ -195,7 +195,7 @@ Coloured regions are also checked as part of the gallery:
     :align: center
 
 The regions of a crossing follow its strands, see
-:meth:`discopy.drawing.backend.Backend.region_separators`:
+:meth:`~discopy.drawing.backend.Backend.region_separators`:
 
 >>> from discopy import symmetric
 >>> red, blue = Colour("red"), Colour("blue")
@@ -317,7 +317,7 @@ class PlaneGraph(NamedTuple):
     def __repr__(self):
         """
         The graph as the adjacency of each of its nodes sorted by
-        :attr:`discopy.utils.Node.index`, rather than its address: the order
+        :attr:`~discopy.utils.Node.index`, rather than its address: the order
         the graph happens to store its nodes in is no part of the plane
         graph, and an adjacency also names a node with no edge, which an
         edge list would lose.
@@ -401,7 +401,7 @@ class Drawing(
 
     def to_tree(self) -> dict:
         """
-        A drawing has no tree, see :func:`discopy.utils.dumps`: serialise the
+        A drawing has no tree, see :func:`~discopy.utils.dumps`: serialise the
         diagram it is the drawing of instead.
 
         >>> from discopy.monoidal import Box
@@ -544,7 +544,7 @@ which to_drawing recomputes.
 
     def to_typst(self, **params):
         """
-        The :class:`discopy.drawing.typst_ast.Document` of the drawing,
+        The :class:`~discopy.drawing.typst_ast.Document` of the drawing,
         whose ``render`` is its Typst source.
 
         >>> from discopy.monoidal import Ty, Box
@@ -965,8 +965,8 @@ which to_drawing recomputes.
             if target.kind != "cod":
                 return  # Otherwise we would have to reposition everything.
             x, _ = self.positions[dom_node]
-            _, y = self.positions[cod_node]
-            self.positions[cod_node] = Point(x, y)
+            for n in (cod_node, target):
+                self.positions[n] = Point(x, self.positions[n].y)
 
     @property
     def is_identity(self):
@@ -1023,7 +1023,7 @@ which to_drawing recomputes.
         """
         Draw a permutation of blocks of wires, the ``i``-th block of its
         codomain being the ``xs[i]``-th of ``doms``, as in
-        :meth:`discopy.abc.SymmetricCategory.permutation`.
+        :meth:`~discopy.abc.SymmetricCategory.permutation`.
 
         >>> from discopy.monoidal import Ty
         >>> x, y, z = map(Ty, "xyz")
@@ -1227,7 +1227,7 @@ which to_drawing recomputes.
             other : The drawing to compose with.
             draw_step_by_step : Whether to return the list of drawings that
                 connect one wire at a time, e.g. for
-                :func:`discopy.drawing.to_gif`, rather than the composite,
+                :func:`~discopy.drawing.to_gif`, rather than the composite,
                 for one ``other`` only.
 
         Example
@@ -1394,6 +1394,12 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "nested", None):
+                # The reflection of a transpose is a conjugate, and back.
+                vars(result).update(
+                    mirror_nested=not box.mirror_nested,
+                    is_transpose=box.is_conjugate,
+                    is_conjugate=box.is_transpose)
             return result
 
         if self.is_box:
@@ -1549,7 +1555,7 @@ which to_drawing recomputes.
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))
         right = Ty(Wire("", arg_dom.cod, dom.cod))
-        left[0].always_draw_label = True
+        left.inside[0].always_draw_label = True
         wires_can_go_straight = (
             len(dom), len(cod)) == (len(arg_dom), len(arg_cod))
         if frame_sides:
