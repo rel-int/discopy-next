@@ -7,18 +7,18 @@ from pathlib import Path
 import pytest
 
 ADR_DIR = Path(__file__).parent.parent / "docs" / "adr"
-RECORD = re.compile(r"^([0-9]{4})-[a-z0-9-]+\.md$")
+RECORD = re.compile(r"([0-9]{4})-[a-z0-9-]+\.md")
 
 
 def adr_numbers(paths):
     names = [Path(path).name for path in paths
              if Path(path).name != "index.md"]
-    bad = [name for name in names if not RECORD.match(name)]
+    bad = [name for name in names if not RECORD.fullmatch(name)]
     if bad:
         raise ValueError(f"Malformed ADR filename(s): {bad}")
     by_number = collections.defaultdict(list)
     for name in names:
-        by_number[RECORD.match(name).group(1)].append(name)
+        by_number[RECORD.fullmatch(name).group(1)].append(name)
     duplicates = {num: files for num, files in by_number.items()
                   if len(files) > 1}
     if duplicates:
@@ -27,7 +27,7 @@ def adr_numbers(paths):
 
 
 def test_adr_numbers():
-    paths = sorted(ADR_DIR.glob("*.md"))
+    paths = sorted(ADR_DIR.iterdir())
     assert ADR_DIR / "index.md" in paths
     numbers = adr_numbers(paths)
     assert numbers == sorted(numbers)
@@ -53,6 +53,8 @@ def test_adr_malformed_filename(tmp_path):
         "0008-Upper.md",
         "adr.md",
         "\u0660\u0660\u0660\u0661-record.md",
+        "0008-record.md\n",
+        "0008-record.txt",
     ):
         with pytest.raises(ValueError, match="Malformed ADR filename"):
             adr_numbers([tmp_path / "index.md", tmp_path / bad])
