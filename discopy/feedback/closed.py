@@ -2,7 +2,7 @@
 
 """
 The free closed Markov feedback category, i.e. closed diagrams with feedback,
-whose wires carry a time step, see :mod:`discopy.feedback`.
+whose wires carry a time step, see :mod:`~discopy.feedback`.
 
 An exponential and a product are wires of their own, delayed as a whole,
 leaving their factors alone: the delay is not a closed functor.

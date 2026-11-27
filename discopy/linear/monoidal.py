@@ -3,10 +3,10 @@
 """
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
-:class:`discopy.abc.LinearCategory`. The comonad, its :class:`Bang`,
+:class:`~discopy.abc.LinearCategory`. The comonad, its :class:`Bang`,
 :class:`Dereliction` and :class:`Digging`, are those of
-:mod:`discopy.linear.cat`; this module adds what uses the tensor, the
-:class:`Contraction` and :class:`Weakening` of the comonoid on a banged
+:mod:`linear.cat <discopy.linear.cat>`; this module adds what uses the tensor,
+the :class:`Contraction` and :class:`Weakening` of the comonoid on a banged
 object, the :class:`Laxator` and the :class:`Exchange`, which makes a banged
 object central and needs no symmetry.
 
@@ -54,7 +54,7 @@ dereliction, after the bang of ``f``.
     :align: center
 
 A :class:`Functor` into a category without a bang, e.g.
-:class:`discopy.tensor.Diagram`, sends banged wires and boxes through its
+:class:`~discopy.tensor.Diagram`, sends banged wires and boxes through its
 ``ob_map`` and ``ar_map``, e.g. ``!x`` to a Fock space and ``f.bang()`` to
 the second quantisation of ``f``, see the notebook
 :doc:`/notebooks/optyx/linear_logic`.
@@ -166,7 +166,7 @@ class Diagram(monoidal.Diagram, cat.Arrow, LinearCategory):
     A diagram in the free linear category: a monoidal diagram with
     :class:`Bang` bubbles and the :class:`Dereliction`, :class:`Digging`,
     :class:`Contraction`, :class:`Weakening`, :class:`Exchange` and
-    :class:`Laxator` boxes, see :class:`discopy.abc.LinearCategory`.
+    :class:`Laxator` boxes, see :class:`~discopy.abc.LinearCategory`.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -215,7 +215,7 @@ class Diagram(monoidal.Diagram, cat.Arrow, LinearCategory):
         """
         The ``n`` copies of a banged wire ``!y``, by :class:`Contraction`, so
         that a term language sharing its variables with ``cod.copy`` and
-        ``cod.discard``, e.g. :class:`discopy.closed.TermBase`, copies only
+        ``cod.discard``, e.g. :class:`~discopy.closed.TermBase`, copies only
         what linear logic lets it copy.
 
         Parameters:
@@ -386,7 +386,7 @@ class Structural(cat.Structural, Box):
 class Dereliction(cat.Dereliction, Structural):
     """
     The dereliction ``!x -> x`` of a type, see
-    :class:`discopy.linear.cat.Dereliction`.
+    :class:`~discopy.linear.cat.Dereliction`.
 
     Parameters:
         x : The type to derelict.
@@ -412,7 +412,7 @@ class Dereliction(cat.Dereliction, Structural):
 class Digging(cat.Digging, Structural):
     """
     The digging ``!x -> !!x`` of a type, see
-    :class:`discopy.linear.cat.Digging`.
+    :class:`~discopy.linear.cat.Digging`.
 
     Parameters:
         x : The type to dig.
@@ -586,7 +586,7 @@ class Functor(monoidal.Functor):
     A functor from the free linear category: into a linear category it
     sends a :class:`BangOb`, a :class:`Bang` and the structural boxes
     through the bang and the structure of its codomain, and into any other
-    category, e.g. :class:`discopy.tensor.Diagram`, through its ``ob_map``
+    category, e.g. :class:`~discopy.tensor.Diagram`, through its ``ob_map``
     and ``ar_map``.
 
     Example
@@ -649,7 +649,7 @@ Diagram.functor_factory = Functor
 class TermBase(monoidal.TermBase):
     """
     A term of a linear category, i.e. of the planar kappa calculus with a
-    bang: a :class:`discopy.monoidal.TermBase` where a variable of a banged
+    bang: a :class:`~discopy.monoidal.TermBase` where a variable of a banged
     type ``!x`` occurs any number of times, every other variable once and in
     order. An :class:`Application` copies the banged variables its function
     and its argument share by :class:`Contraction` and brings each copy

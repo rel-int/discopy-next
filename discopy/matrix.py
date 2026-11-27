@@ -32,7 +32,7 @@ Summary
 See also
 --------
 
-* :class:`discopy.tensor.Tensor` is a subclass of :class:`Matrix` with the
+* :class:`~discopy.tensor.Tensor` is a subclass of :class:`Matrix` with the
   Kronecker product as tensor.
 
 """
@@ -402,7 +402,7 @@ and 'Matrix[int]'
 
     def to_tree(self) -> dict:
         """
-        Serialise a matrix, see :func:`discopy.utils.dumps`.
+        Serialise a matrix, see :func:`~discopy.utils.dumps`.
 
         The ``dtype`` travels in the factory name, as it does in the
         ``repr``, so that a matrix comes back with the entries it was
@@ -427,13 +427,13 @@ and 'Matrix[int]'
     @classmethod
     def from_tree(cls, tree: dict) -> Matrix:
         """
-        Decode a serialised matrix, see :func:`discopy.utils.loads`.
+        Decode a serialised matrix, see :func:`~discopy.utils.loads`.
 
         Parameters:
             tree : DisCoPy serialisation.
 
         The class the tree names is the subscripted one, so the pair is
-        read through :func:`discopy.utils.from_tree` rather than off the
+        read through :func:`~discopy.utils.from_tree` rather than off the
         bare class, which would infer a ``dtype`` from the array instead.
 
         Example
@@ -537,7 +537,7 @@ and 'Matrix[int]'
         """
         The algebra of a monad on the matrices from ``dom`` to ``cod``, by
         which a functor into matrices extends to the change of base of its
-        domain, see :class:`discopy.enriched.Functor`: the sum of a list of
+        domain, see :class:`~discopy.enriched.Functor`: the sum of a list of
         matrices, for the :attr:`~discopy.kleisli.monad.List` monad.
 
         Parameters:
@@ -601,7 +601,7 @@ and 'Matrix[int]'
         """
         The matrix that permutes blocks of dimensions.
 
-        Overrides the default of :class:`discopy.abc.SymmetricCategory`, which
+        Overrides the default of :class:`~discopy.abc.SymmetricCategory`, which
         composes ``len(xs)`` swaps, by writing each block in one pass.
 
         Parameters:

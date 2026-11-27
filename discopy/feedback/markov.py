@@ -2,7 +2,7 @@
 
 """
 The free Markov feedback category, i.e. Markov diagrams with feedback, whose
-wires carry a time step: the syntax of streams, see :mod:`discopy.stream`.
+wires carry a time step: the syntax of streams, see :mod:`~discopy.stream`.
 
 Summary
 -------

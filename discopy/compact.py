@@ -211,9 +211,9 @@ class Functor(symmetric.Functor, ribbon.Functor):
 class DualRail(symmetric.DualRail, ribbon.DualRail):
     """
     The functor sending a compact diagram to its dual rail encoding, i.e.
-    :class:`discopy.symmetric.DualRail` sending a :class:`Permutation` to the
-    dual rail braids of its swaps, and :class:`discopy.ribbon.DualRail`
-    otherwise.
+    :class:`symmetric.DualRail <discopy.symmetric.DualRail>` sending a
+    :class:`Permutation` to the dual rail braids of its swaps, and
+    :class:`ribbon.DualRail <discopy.ribbon.DualRail>` otherwise.
 
     >>> x, y, z = map(Ty, "xyz")
     >>> diagram = (Swap(x, y) @ z).to_braided()

@@ -193,7 +193,8 @@ Q 468 432 468 432
    <g id="patch_3">
     <path d="M 18 270 
 L 18 234 
-L 135 234 
+L 112.5 234 
+L 126 247.5 
 L 126 270 
 z
 " clip-path="url(#pb5bdab1115)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
@@ -201,7 +202,8 @@ z
    <g id="patch_4">
     <path d="M 162 342 
 L 162 306 
-L 279 306 
+L 256.5 306 
+L 270 319.5 
 L 270 342 
 z
 " clip-path="url(#pb5bdab1115)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
@@ -209,7 +211,8 @@ z
    <g id="patch_5">
     <path d="M 378 198 
 L 378 162 
-L 495 162 
+L 472.5 162 
+L 486 175.5 
 L 486 198 
 z
 " clip-path="url(#pb5bdab1115)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>

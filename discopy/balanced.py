@@ -71,7 +71,7 @@ class Ribbon(Colour):
     """
     The coloured region between the two rails of a ribbon in the dual rail
     drawing of a balanced or ribbon diagram, see :func:`double_rail`. Like
-    any :class:`discopy.monoidal.Colour` it fills the region between the two
+    any :class:`~discopy.monoidal.Colour` it fills the region between the two
     wires on either side of it; it also carries the ``width`` of the ribbon,
     i.e. how far apart its two rails are drawn. Taking the adjoint of a
     doubled type swaps the sides of each object, so the two rails stay one
@@ -82,7 +82,7 @@ class Ribbon(Colour):
             default with the back of a twisting ribbon filled dark gray.
         label : An optional label for the drawing legend.
         width : The gap between the two rails, defaults to the
-            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+            ``ribbon_width`` in :data:`~discopy.config.DRAWING_DEFAULT`.
 
     Example
     -------
@@ -122,7 +122,7 @@ def double_rail(
     Parameters:
         typ : The type to double.
         width : The gap between the two rails, defaults to the ``ribbon_width``
-            in :data:`discopy.config.DRAWING_DEFAULT`.
+            in :data:`~discopy.config.DRAWING_DEFAULT`.
         colour : The name of the colour filling the inside of each ribbon,
             or a function from object to colour name.
     """
@@ -139,7 +139,7 @@ def double_rail(
 class Diagram(braided.Diagram, BalancedCategory):
     """
     A balanced diagram is a braided diagram with :class:`Twist`, see
-    :mod:`discopy.feedback.balanced` for the traced ones.
+    :mod:`~discopy.feedback.balanced` for the traced ones.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -177,7 +177,7 @@ class Diagram(braided.Diagram, BalancedCategory):
         Parameters:
             width : The width of a ribbon, i.e. the gap between the two wires
                 encoding each object, defaults to the ``ribbon_width`` in
-                :data:`discopy.config.DRAWING_DEFAULT`. Set to ``0`` to return
+                :data:`~discopy.config.DRAWING_DEFAULT`. Set to ``0`` to return
                 the diagram as is, i.e. without doubling it into dual rails.
             colour : The name of the colour filling the inside of each ribbon
                 (or a function from object to colour name), passed on to
@@ -424,11 +424,11 @@ class DualRail(Functor):
     a box on the rails of its ribbons and every :class:`Twist` and
     :class:`Braid` into a single box crossing the two ribbons of a wire as a
     whole. It lands in balanced :class:`Diagram`, as
-    :class:`discopy.ribbon.DualRail` lands in ribbon diagrams.
+    :class:`~discopy.ribbon.DualRail` lands in ribbon diagrams.
 
     Parameters:
         width : The gap between the two rails of each ribbon, defaults to the
-            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+            ``ribbon_width`` in :data:`~discopy.config.DRAWING_DEFAULT`.
         colour : The name of the colour filling the inside of each ribbon (or
             a function from object to colour name), see :func:`double_rail`.
 
@@ -437,7 +437,7 @@ class DualRail(Functor):
     A dual rail encoding is not determined by its maps: it sends a twist or a
     braid, and at the levels above a swap, a cup or a cap, to a box rather
     than to the same structure on the encoded wires. So it composes with no
-    functor but the identity, see :meth:`discopy.cat.Functor.then`: apply the
+    functor but the identity, see :meth:`~discopy.cat.Functor.then`: apply the
     two in turn instead.
 
     >>> x = Ty('x')
