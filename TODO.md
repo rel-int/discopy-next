@@ -39,4 +39,4 @@
 - [x] messages.py NO_DATAFLOW wording
 - [x] syntax.rst: architecture diagram omits dataflow; grammar of the clause
 - [x] dataflow HeadOb/TailOb dagger raises
-- [ ] StreamWire validates is_constant
+- [x] StreamWire validates is_constant
