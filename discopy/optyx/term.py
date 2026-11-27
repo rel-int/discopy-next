@@ -1,6 +1,6 @@
 """
 Linear terms with bangs compiled to optical protocols: a :class:`Term` is a
-diagram of :mod:`discopy.bang`, the free linear category, on the dual-rail
+diagram of :mod:`~discopy.bang`, the free linear category, on the dual-rail
 :data:`qubit` and its bang, the bosonic Fock space of its two modes.
 :meth:`Term.to_channel` compiles it to a :class:`channel.Diagram`:
 
@@ -60,7 +60,7 @@ a Hong-Ou-Mandel beam splitter and the two heralded copies are entangled.
 >>> bell = protocol.get_kraus().to_tensor().eval().array
 >>> assert np.allclose(bell, [[1, 0], [0, -1]])
 
-The kappa terms of :mod:`discopy.bang`, those of :mod:`discopy.monoidal`
+The kappa terms of :mod:`~discopy.bang`, those of :mod:`~discopy.monoidal`
 where a banged variable may be used any number of times, write the copy of
 ``!H(x)`` with the boxes it calls, and evaluate to a :class:`Term`:
 
@@ -112,7 +112,7 @@ qubit = Ty("qubit")
 @factory
 class Term(bang.Diagram):
     """
-    A term on qubits with bangs, i.e. a diagram of :mod:`discopy.bang` whose
+    A term on qubits with bangs, i.e. a diagram of :mod:`~discopy.bang` whose
     boxes hold the unitary of one photon in the two modes of a qubit.
 
     Parameters:
@@ -207,7 +207,7 @@ class Bang(bang.Bang, Box):
 
 class Dereliction(bang.Dereliction, Box):
     """
-    The dereliction of :mod:`discopy.bang`, which heralds one photon in the
+    The dereliction of :mod:`~discopy.bang`, which heralds one photon in the
     two modes of a qubit.
 
     Example
@@ -223,13 +223,13 @@ class Dereliction(bang.Dereliction, Box):
 
 class Digging(bang.Digging, Box):
     """
-    The digging of :mod:`discopy.bang`, which has no image in optyx.
+    The digging of :mod:`~discopy.bang`, which has no image in optyx.
     """
 
 
 class Contraction(bang.Contraction, Box):
     """
-    The contraction of :mod:`discopy.bang`, the W node on each mode.
+    The contraction of :mod:`~discopy.bang`, the W node on each mode.
 
     Example
     -------
@@ -243,7 +243,7 @@ class Contraction(bang.Contraction, Box):
 
 class Weakening(bang.Weakening, Box):
     """
-    The weakening of :mod:`discopy.bang`, which selects the vacuum.
+    The weakening of :mod:`~discopy.bang`, which selects the vacuum.
 
     Example
     -------
@@ -257,7 +257,7 @@ class Weakening(bang.Weakening, Box):
 
 class Exchange(bang.Exchange, Box):
     """
-    The exchange of :mod:`discopy.bang`, the swap.
+    The exchange of :mod:`~discopy.bang`, the swap.
 
     Example
     -------
@@ -272,7 +272,7 @@ class Exchange(bang.Exchange, Box):
 
 class Laxator(bang.Laxator, Box):
     """
-    The laxator of :mod:`discopy.bang`, which has no image in optyx.
+    The laxator of :mod:`~discopy.bang`, which has no image in optyx.
     """
 
 

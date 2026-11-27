@@ -135,7 +135,7 @@ class Tree:
     def to_tree(self) -> dict:
         """
         Serialise a tree as its ``root`` and its ``branches``, see
-        :func:`discopy.utils.dumps`, while a rule is serialised as a box.
+        :func:`~discopy.utils.dumps`, while a rule is serialised as a box.
 
         Example
         -------

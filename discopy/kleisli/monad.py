@@ -22,7 +22,7 @@ satisfying the unit and associativity laws of a monoid, i.e. for every type
 A monad may also come with an :attr:`Monad.iterate` operator, i.e. the
 extra structure of an `Elgot monad
 <https://ncatlab.org/nlab/show/Elgot+monad>`_ needed to trace the Kleisli
-category, see :mod:`discopy.kleisli.additive`.
+category, see :mod:`~discopy.kleisli.additive`.
 
 Summary
 -------
@@ -37,6 +37,7 @@ Summary
 .. admonition:: Data
 
     .. autosummary::
+        :template: data.rst
         :nosignatures:
         :toctree:
 
@@ -136,7 +137,7 @@ class Monad(EndoFunctor):
     which does not follow from ``(functor, unit, mult)``: a monadic value
     holds both exiting and looping outcomes at once and the monoid
     structure alone cannot tell them apart. This is what makes
-    :meth:`discopy.kleisli.additive.Channel.trace` defined exactly for the
+    :meth:`~discopy.kleisli.additive.Channel.trace` defined exactly for the
     monads that supply one, see :func:`iterate_maybe`,
     :func:`iterate_powerset` and :func:`iterate_subdistribution`.
 
@@ -336,7 +337,7 @@ The list monad, sending a type ``X`` to ``list[X]``, i.e. the free monoid
 monad: its unit takes a singleton and its multiplication concatenates.
 
 Its algebras are the monoids, the structure sending a list to its product,
-e.g. the sum of a list of arrows, see :meth:`discopy.cat.Arrow.algebra`. It
+e.g. the sum of a list of arrows, see :meth:`~discopy.cat.Arrow.algebra`. It
 is not commutative and comes with no :attr:`Monad.iterate`.
 
 >>> assert List.mult(int)([[1, 2], [], [3]]) == [1, 2, 3]
@@ -544,10 +545,10 @@ def make_state(S: type) -> Monad:
     ----
     The state monad is not commutative: two channels tensored in its Kleisli
     category run their effects in a given order, so the two biased tensors
-    differ, see :mod:`discopy.kleisli.multiplicative`. It comes with no
+    differ, see :mod:`~discopy.kleisli.multiplicative`. It comes with no
     :attr:`Monad.iterate`, so tracing one of its channels raises rather
     than guessing at the semantics, see
-    :meth:`discopy.kleisli.additive.Channel.trace`.
+    :meth:`~discopy.kleisli.additive.Channel.trace`.
 
     Example
     -------

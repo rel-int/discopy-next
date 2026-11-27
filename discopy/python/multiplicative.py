@@ -312,7 +312,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         Parameters:
             n : The number of types to trace over.
             left : Whether to trace the first ``n`` types instead, see
-                :meth:`discopy.abc.SymmetricCategory.left_trace`.
+                :meth:`~discopy.abc.SymmetricCategory.left_trace`.
 
         Example
         -------

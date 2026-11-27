@@ -7,13 +7,13 @@ Combinatorial maps of recurrent channels.
 A :class:`CMap` is a combinatorial map: a list of :class:`Box` carrying
 channels, together with edges pairing their ports. Its semantics is the
 recurrent protocol :meth:`CMap.protocol`, a
-:class:`discopy.optyx.channel.Diagram` with a feedback loop on the paired
+:class:`~discopy.optyx.channel.Diagram` with a feedback loop on the paired
 ports. It has finite stream semantics through :meth:`CMap.unroll` and
 stationary semantics through :meth:`CMap.fix`.
 
 This is the Int (geometry of interaction) construction of Joyal, Street
 and Verity applied to the feedback category of channels:
-:meth:`discopy.optyx.channel.Diagram.feedback` plays the role of a delayed
+:meth:`~discopy.optyx.channel.Diagram.feedback` plays the role of a delayed
 trace, so the structure is compact closed up to time shifts.
 
 Every port of a box is both read and written at each time step, so a box
@@ -87,7 +87,7 @@ computation sits in the boxes, as in a premonoidal normal form.
     :align: center
 
 **Feedback closes the time loop.** :attr:`CMap.protocol` applies
-:meth:`discopy.optyx.channel.Diagram.feedback` to the step, closing
+:meth:`~discopy.optyx.channel.Diagram.feedback` to the step, closing
 :attr:`CMap.memory` — the paired ports followed by the internal memories —
 onto itself with a one-tick delay. The memory is a *delay*, which makes
 the protocol the feedback of a monoidal stream (Di Lavore, de Felice and
@@ -105,7 +105,7 @@ is syntax.
 tick to the next — below, two ticks of the triangle with the memory left
 open; :meth:`CMap.unroll` itself also prepares the initial memory and
 discards the final one. The result is an ordinary
-:class:`discopy.optyx.channel.Diagram` whose width is the memory cut and whose
+:class:`~discopy.optyx.channel.Diagram` whose width is the memory cut and whose
 depth is the number of ticks.
 
 >>> two_ticks = triangle.step \\
@@ -118,9 +118,10 @@ depth is the number of ticks.
     :align: center
 
 **Doubling gives the tensors.** From here the standard optyx pipeline
-applies. :meth:`discopy.optyx.channel.Diagram.double` maps the unrolled channel
+applies. :meth:`~discopy.optyx.channel.Diagram.double` maps the unrolled
+channel
 diagram to its Kraus map beside the conjugate, and :code:`to_tensor()`
-translates it to a :class:`discopy.tensor.Diagram` whose wires carry
+translates it to a :class:`~discopy.tensor.Diagram` whose wires carry
 dimensions and whose boxes carry arrays — the recurrent tensor network.
 DisCoPy contracts it: exactly with :code:`eval`, or through Quimb with
 :code:`to_quimb`. The cost is controlled by the number of ticks, the
@@ -136,7 +137,7 @@ local dimension of the wires and the width of the memory cut.
 
 **The fixpoint is computed through contraction.** :meth:`CMap.fix`
 closes the time direction the other way: following
-:meth:`discopy.optyx.channel.Diagram.fix`, it contracts ever longer unrollings
+:meth:`~discopy.optyx.channel.Diagram.fix`, it contracts ever longer unrollings
 of the doubled network until the output stops changing — see
 :doc:`/notebooks/optyx/fixpoints` for the certificates behind it. For the
 triangle, spider fusion makes every memory agree with its neighbours:
@@ -181,7 +182,7 @@ class Box:
         name : The name of the box.
         dom : The input ports.
         cod : The output ports.
-        channel : A :class:`discopy.optyx.channel.Diagram` from
+        channel : A :class:`~discopy.optyx.channel.Diagram` from
             :code:`dom @ cod @ memory` to
             :code:`dom @ cod @ memory @ prediction`, reading and writing
             every port, updating the memory and writing the prediction.
@@ -436,7 +437,7 @@ class CMap:
     def unroll(self, n_steps: int = 1) -> Diagram:
         """
         The protocol unrolled over :code:`n_steps + 1` time steps — as in
-        :meth:`discopy.optyx.channel.Diagram.unroll`, :code:`n_steps` counts
+        :meth:`~discopy.optyx.channel.Diagram.unroll`, :code:`n_steps` counts
         unrollings — a channel diagram evaluated as a tensor network by
         the existing backends.
 
@@ -446,7 +447,7 @@ class CMap:
 
         The memory starts open at the end of the domain and is discarded
         after the last step, the default boundaries of
-        :meth:`discopy.optyx.channel.Diagram.feedback`; :meth:`fix` is where
+        :meth:`~discopy.optyx.channel.Diagram.feedback`; :meth:`fix` is where
         other boundaries are chosen.
 
         >>> cmap = CMap([Box("f", qubit, qubit, cnot)], [((0, 0), (0, 1))])
@@ -462,11 +463,11 @@ class CMap:
 
         ``input_state`` prepares the boundary input afresh at every time
         step, inside the loop so that the stationary certificates of
-        :meth:`discopy.optyx.channel.Diagram.fix` can apply. It is required
+        :meth:`~discopy.optyx.channel.Diagram.fix` can apply. It is required
         when the map has unpaired ports. ``initial_state`` prepares the
         feedback memory, the paired ports followed by the internal memories,
         before the first time step. Remaining parameters are those of
-        :meth:`discopy.optyx.channel.Diagram.fix`.
+        :meth:`~discopy.optyx.channel.Diagram.fix`.
 
         A box that swaps its output port with its internal memory is a
         delay line: fed a photon at every step, its stationary output is
