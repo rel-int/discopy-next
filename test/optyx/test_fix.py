@@ -399,7 +399,7 @@ def test_compressed_solvers_refuse_chi_one():
 
 def test_fix_truncates_a_growing_photon_budget():
     """A loop which accumulates photons outgrows a small `chi`: at the
-    certified depth of a ninety-percent loss this one needs four
+    certified depth of a ninety-percent loss this one needs three
     dimensions, so `max_chi=2` warns that the result is truncated while
     `max_chi=4` holds the budget and stays silent."""
     assert [sampler().at_time(n).truncation_dimensions()[0]

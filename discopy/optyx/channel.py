@@ -1037,7 +1037,8 @@ class Diagram(frobenius.Diagram):
                 within, and the stopping distance of the fallback iteration.
             max_chi : The largest bond dimension a compressed contraction
                 keeps: a bond past it is truncated down to `max_chi >= 2`,
-                with a warning (`max_chi=1` raises when a bond exceeds one).
+                with a warning (`max_chi=1` raises when a wire of the codomain
+                needs more than one dimension).
                 The public `MAX_BOND_DIMENSION` of eight by default — what a
                 laptop contracts in seconds. `None` contracts exactly,
                 whatever that costs.
@@ -1098,8 +1099,8 @@ class Diagram(frobenius.Diagram):
         if compressible and needed > max_chi:
             if max_chi == 1:
                 raise ValueError(
-                    f"Compressed contraction needs max_chi >= 2 when the "
-                    f"network has bond dimension {needed} > 1 "
+                    f"Compressed contraction needs max_chi >= 2 when "
+                    f"a wire of the network needs dimension {needed} > 1 "
                     "(pass max_chi=None for exact contraction).")
             warnings.warn(
                 f"the contraction needs dimension {needed} but "
@@ -1149,7 +1150,8 @@ class Diagram(frobenius.Diagram):
             max_chi : The largest bond dimension each contraction keeps,
                 as in :meth:`fix`; a bond past it is truncated down to
                 `max_chi >= 2` with a warning, once, at the first depth that
-                truncates (`max_chi=1` raises when a bond exceeds one). Each
+                truncates (`max_chi=1` raises when a wire of the codomain needs
+                more than one dimension). Each
                 depth is contracted with a fresh optimiser. `None` contracts
                 exactly.
                 Note a truncated contraction biases the very distances
@@ -1187,7 +1189,7 @@ class Diagram(frobenius.Diagram):
                 if max_chi == 1:
                     raise ValueError(
                         f"Compressed contraction needs max_chi >= 2 when "
-                        f"the network has bond dimension {needed} > 1 "
+                        f"a wire of the network needs dimension {needed} > 1 "
                         "(pass max_chi=None for exact contraction).")
                 if not warned:
                     warned = True
