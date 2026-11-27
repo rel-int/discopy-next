@@ -6,7 +6,7 @@
 >
 > This reverses #695's ruling, which kept numbers (#695 is closed): say so in the PR. #750 checks distinct ADR numbers. Repurpose it, or replace it in this PR, into a test that ADR filenames match the dated-slug pattern and every cross-reference to an ADR resolves. Open PRs that add 0008/0012 records (#679, #690, #706, #734, #737) will need renaming after this lands: list them in the PR description and leave a short comment on each.
 
-- [ ] changelog.d/ fragments compiled by towncrier: config, template, CHANGELOG.md keeps released versions
+- [WIP] @T-e5f32d46-2026-11-27 19:10 changelog.d/ fragments compiled by towncrier: config, template, CHANGELOG.md keeps released versions
 - [ ] Migrate every [Unreleased] bullet of CHANGELOG.md into a fragment
 - [ ] CI check: a PR touching discopy/ adds a fragment, label no-changelog opts out
 - [ ] Repoint the tooling that reads [Unreleased]: checkboxes finish, next-checks changelog gate, merge-main driver, CONTRIBUTING, AGENTS
