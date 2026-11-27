@@ -65,7 +65,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 
 from discopy import feedback, messages
-from discopy.abc import DaggerCategory
+from discopy.abc import DaggerCategory, FeedbackCategory
 from discopy.utils import (
     AxiomError, assert_isinstance, factory_name, from_tree)
 
@@ -387,10 +387,18 @@ class Functor(feedback.Functor):
     have rather than make them up.
     """
     def __call__(self, other):
-        if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy))\
-                or other.time_step:
+        if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy)):
             return super().__call__(other)
-        if hasattr(self.cod, "followed_by"):
+        mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
+            if isinstance(other, (HeadOb, TailOb))\
+            else (self.ar_map.mapping, other)
+        mapped = isinstance(mapping, Mapping) and key in mapping
+        cod = self.cod.ob if isinstance(other, (HeadOb, TailOb)) else self.cod
+        if other.time_step and not mapped and getattr(
+                cod, "delay", FeedbackCategory.delay)\
+                is not FeedbackCategory.delay:
+            return super().__call__(other)
+        if hasattr(self.cod, "followed_by") and not other.time_step:
             if not isinstance(other, FollowedBy):
                 return getattr(self(other.arg), other.part)
             arg = other.dom if other.is_dagger else other.cod
@@ -403,10 +411,7 @@ class Functor(feedback.Functor):
                 and issubclass(self.cod, DaggerCategory)\
                 and self.cod.has_dagger():
             return self(other.dagger()).dagger()
-        mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
-            if isinstance(other, (HeadOb, TailOb))\
-            else (self.ar_map.mapping, other)
-        if isinstance(mapping, Mapping) and key not in mapping:
+        if isinstance(mapping, Mapping) and not mapped:
             raise AxiomError(messages.NO_DATAFLOW.format(
                 factory_name(self.cod)))
         if isinstance(other, (HeadOb, TailOb)):

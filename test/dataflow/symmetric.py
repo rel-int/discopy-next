@@ -133,3 +133,12 @@ def test_mapped_followed_by_is_daggered_functorially():
                 cod=symmetric.Diagram)
     assert F(fby.dagger()) == g.dagger()
     assert F(fby >> fby.dagger()) == g >> g.dagger()
+
+
+def test_mapped_delayed_heads_are_generators():
+    from discopy import symmetric
+    x, y = Ty('x'), symmetric.Ty('y')
+    f, g = Box('f', x, x), symmetric.Box('g', y, y)
+    F = Functor({x: y, x.delay(): y, x.head: y, x.head.delay(): y},
+                {f.head.delay(): g, f.tail.delay(): g}, cod=symmetric.Diagram)
+    assert F(f.head.delay()) == F(f.tail.delay()) == g
