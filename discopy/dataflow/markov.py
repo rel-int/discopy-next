@@ -109,7 +109,7 @@ functions gives the random walk:
 
 from __future__ import annotations
 
-from discopy import feedback, hypergraph
+from discopy import feedback
 from discopy.cat import factory, kappa_calculus
 from discopy.dataflow import symmetric
 # pylint: disable-next=unused-import
@@ -213,7 +213,7 @@ Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
-Hypergraph = hypergraph.Hypergraph[Diagram]
+Hypergraph = symmetric.Hypergraph[Diagram]
 Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)

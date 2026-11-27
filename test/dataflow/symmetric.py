@@ -85,8 +85,6 @@ def test_stream_boxes_raise_into_a_codomain_without_streams():
     for term in (x.head, f.head, f.tail, FollowedBy(x), f.head.delay()):
         with raises(AxiomError):
             F(term)
-    G = Functor({x: int, x.head: int}, {}, cod=python.Function)
-    assert G(x.head) == G(x)
 
 
 def test_HeadOb_TailOb_dagger():
@@ -98,16 +96,6 @@ def test_HeadOb_TailOb_dagger():
         Wire('x', is_constant=1)
 
 
-def test_mapped_heads_are_generators_into_a_codomain_without_streams():
-    from discopy import symmetric
-    x, y = Ty('x'), symmetric.Ty('y')
-    f, g = Box('f', x, x), symmetric.Box('g', y, y)
-    F = Functor({x: y, x.head: y}, {f.head: g, f.tail: g},
-                cod=symmetric.Diagram)
-    assert F(f.head) == F(f.tail) == g
-    assert F(f.head >> f.head) == g >> g
-
-
 def test_terms_evaluate_back_to_dataflow():
     from discopy.dataflow import markov
     for diagram in (Diagram, markov.Diagram):
@@ -116,29 +104,25 @@ def test_terms_evaluate_back_to_dataflow():
         assert type(d.to_term().eval()) is diagram
 
 
-def test_callable_maps_take_heads_as_generators():
+def test_mapping_or_callable_raises_into_a_codomain_without_streams():
     from discopy import symmetric
     x, y = Ty('x'), symmetric.Ty('y')
-    f, g = Box('f', x, x), symmetric.Box('g', y, y)
-    F = Functor(lambda _: y, lambda box: g if box != f else None,
-                cod=symmetric.Diagram)
-    assert F(f.head) == F(f.tail) == g
+    f, g, fby = Box('f', x, x), symmetric.Box('g', y, y), FollowedBy(x)
+    terms = (x.head, x.head.delay(), f.head, f.tail.delay(), fby, fby[::-1])
+    for F in (Functor({x: y, x.head: y, x.head.delay(): y},
+                      {f: g, f.head: g, f.tail.delay(): g, fby: g},
+                      cod=symmetric.Diagram),
+              Functor(lambda _: y, lambda _: g, cod=symmetric.Diagram)):
+        for term in terms:
+            with raises(AxiomError, match="symmetric.Diagram has no head"):
+                F(term)
 
 
-def test_mapped_followed_by_is_daggered_functorially():
-    from discopy import symmetric
-    x, y = Ty('x'), symmetric.Ty('y')
-    fby, g = FollowedBy(x), symmetric.Box('g', y @ y, y)
-    F = Functor({x: y, x.head: y, x.delay(): y}, {fby: g},
-                cod=symmetric.Diagram)
-    assert F(fby.dagger()) == g.dagger()
-    assert F(fby >> fby.dagger()) == g >> g.dagger()
-
-
-def test_mapped_delayed_heads_are_generators():
-    from discopy import symmetric
-    x, y = Ty('x'), symmetric.Ty('y')
-    f, g = Box('f', x, x), symmetric.Box('g', y, y)
-    F = Functor({x: y, x.delay(): y, x.head: y, x.head.delay(): y},
-                {f.head.delay(): g, f.tail.delay(): g}, cod=symmetric.Diagram)
-    assert F(f.head.delay()) == F(f.tail.delay()) == g
+def test_hypergraph_has_the_primitives():
+    x = Ty(Wire('x', is_constant=False))
+    f = Box('f', x, x)
+    for term in (f.head.delay(2), f.tail.delay(), FollowedBy(x)[::-1].delay()):
+        graph = term.to_hypergraph()
+        assert graph.boxes == (term, ) and graph.to_diagram() == term
+    assert f.delay(2).to_hypergraph() == f.to_hypergraph().delay(2)
+    assert Equation((f >> f).head, Head(f >> f >> Id(x)))

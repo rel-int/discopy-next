@@ -23,9 +23,12 @@ Dataflow Programming" (Di Lavore et al. 2022), with `discopy.stream` as their se
   package's `__init__` only its docstring. A level above it, e.g. `dataflow.markov` over
   `feedback.markov`, is one class per class of the base level mixed into its feedback level,
   written out, nothing generated.
-- A dataflow functor sends the primitives to those of its codomain, e.g. `stream.Stream`. Into a
-  codomain without them, a callable map, e.g. that of `to_hypergraph`, takes them as generators,
-  and a mapping that does not have them raises.
+- A dataflow functor sends the primitives to those of its codomain, e.g. `stream.Stream`, and
+  raises on a codomain without them, whether its map is a mapping or a callable: they are the
+  structure of the category, not generators. The hypergraph of a dataflow diagram has them, so
+  `to_hypergraph` and `Equation` go through: `dataflow.symmetric.Hypergraph`, the
+  `hypergraph_factory` of both levels, has the head and the tail of the diagram it decodes to as
+  boxes, the followed-by as a box and a delay of each box and spider.
 - No other level has them, and `feedback` and `dataflow` keep the same direction of import as
   `feedback` and the plain levels: `dataflow` imports `feedback`, never the converse.
 

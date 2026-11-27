@@ -69,11 +69,10 @@ Example
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import ClassVar
 
 from discopy import feedback, hypergraph, messages
-from discopy.abc import DaggerCategory, FeedbackCategory
+from discopy.abc import DaggerCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.feedback import symmetric
 from discopy.symmetric import (  # noqa: F401  pylint: disable=unused-import
@@ -438,11 +437,9 @@ class Functor(symmetric.Functor):
     """
     A symmetric dataflow functor is a symmetric feedback functor that sends
     heads, tails and followed-bys to those of its codomain, e.g.
-    :class:`~discopy.stream.Stream`. Into a codomain that has none, they are
-    generators, not the bubbles of their args: a callable map, e.g. that of
-    :meth:`~discopy.symmetric.Diagram.to_hypergraph`, is called on them, and
-    a mapping sends them to their images and raises on those it does not
-    have rather than make them up.
+    :class:`~discopy.stream.Stream` or :class:`Hypergraph`, and raises on
+    a codomain that has none, whatever its map: they are the structure of
+    the category, not generators.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) : Map from atomic :class:`Ty` to
@@ -461,7 +458,7 @@ class Functor(symmetric.Functor):
     >>> assert F(f.head) == F(f).head and F(f.tail) == F(f).tail
 
     >>> from discopy import python
-    >>> G = Functor({x: int}, {}, cod=python.Function)
+    >>> G = Functor(lambda _: int, lambda _: None, cod=python.Function)
     >>> G(FollowedBy(x))
     Traceback (most recent call last):
     ...
@@ -472,38 +469,62 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy)):
             return super().__call__(other)
-        mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
-            if isinstance(other, (HeadOb, TailOb))\
-            else (self.ar_map.mapping, other)
-        mapped = isinstance(mapping, Mapping) and key in mapping
-        cod = self.cod.ob if isinstance(other, (HeadOb, TailOb)) else self.cod
-        if other.time_step and not mapped and getattr(
-                cod, "delay", FeedbackCategory.delay)\
-                is not FeedbackCategory.delay:
-            return super().__call__(other)
-        if hasattr(self.cod, "followed_by") and not other.time_step:
-            if not isinstance(other, FollowedBy):
-                return getattr(self(other.arg), other.part)
-            arg = other.dom if other.is_dagger else other.cod
-            result = self.cod.followed_by(  # ty: ignore[call-non-callable]
-                self(arg))
-            return result.dagger() if other.is_dagger\
-                and issubclass(self.cod, DaggerCategory)\
-                and self.cod.has_dagger() else result
-        if isinstance(other, FollowedBy) and other.is_dagger\
-                and issubclass(self.cod, DaggerCategory)\
-                and self.cod.has_dagger():
-            return self(other.dagger()).dagger()
-        if isinstance(mapping, Mapping) and not mapped:
+        if not hasattr(self.cod, "followed_by"):
             raise AxiomError(messages.NO_DATAFLOW.format(
                 factory_name(self.cod)))
-        if isinstance(other, (HeadOb, TailOb)):
-            return super().__call__(other)
-        result = self.ar_map[other]
-        return result if isinstance(result, self.cod)\
-            else self.cod(
-                result,  # ty: ignore[invalid-argument-type]  # e.g. an array
-                self(other.dom), self(other.cod))
+        if other.time_step:
+            result = self(other.reset())
+            for _ in range(other.time_step):
+                result = result.delay()
+            return result
+        if not isinstance(other, FollowedBy):
+            return getattr(self(other.arg), other.part)
+        result = self.cod.followed_by(self(other.arg))
+        return result.dagger() if other.is_dagger\
+            and issubclass(self.cod, DaggerCategory)\
+            and self.cod.has_dagger() else result
+
+
+class Hypergraph(hypergraph.Hypergraph):
+    """
+    A dataflow hypergraph is a hypergraph of dataflow diagrams with their
+    structure, so that :meth:`~discopy.monoidal.Diagram.to_hypergraph` and
+    :class:`Equation` map into a codomain that has it: the head and the tail
+    of a hypergraph are those of the diagram it decodes to, as boxes, its
+    :meth:`followed_by` is that box and its :meth:`delay` delays each box
+    and each spider.
+
+    Example
+    -------
+    >>> x = Ty(Wire('x', is_constant=False))
+    >>> f, g = Box('f', x, x), Box('g', x, x)
+    >>> assert (f >> g).head.to_hypergraph()\\
+    ...     == (f >> g).to_hypergraph().head == Head(f >> g).to_hypergraph()
+    >>> assert FollowedBy(x).delay().to_hypergraph()\\
+    ...     == Hypergraph[Diagram].followed_by(x).delay()
+    """
+    @property
+    def head(self):
+        """ The hypergraph of the head of the diagram it decodes to. """
+        return self.from_box(self.category.head_factory(self.to_diagram()))
+
+    @property
+    def tail(self):
+        """ The hypergraph of the tail of the diagram it decodes to. """
+        return self.from_box(self.category.tail_factory(self.to_diagram()))
+
+    @classmethod
+    def followed_by(cls, dom):
+        """ The hypergraph of the followed-by of a type. """
+        return cls.from_box(cls.category.followed_by_factory(dom))
+
+    def delay(self, n_steps=1):
+        """ The delay of each box and each spider of the hypergraph. """
+        return type(self)(
+            self.dom.delay(n_steps), self.cod.delay(n_steps),
+            tuple(box.delay(n_steps) for box in self.boxes), self.wires,
+            tuple(typ.delay(n_steps) for typ in self.spider_types),
+            self.offsets, self.phases)
 
 
 Feedback, Feedforward, Trace = feedback.structural_boxes(Diagram, Box)
@@ -514,7 +535,8 @@ Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
-Hypergraph = hypergraph.Hypergraph[Diagram]
+Diagram.hypergraph_factory = Hypergraph
+Hypergraph = Hypergraph[Diagram]
 Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
