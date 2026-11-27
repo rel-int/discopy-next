@@ -1,6 +1,6 @@
 from pytest import raises
 
-from discopy.abc import ClosedCategory, MarkovCategory
+from discopy.abc import ClosedSymmetricCategory, MarkovCategory
 from discopy.closed.symmetric import *
 from discopy.utils import AxiomError
 
@@ -16,7 +16,7 @@ def test_one_exponential_on_either_side():
 
 
 def test_closed_and_not_markov():
-    assert issubclass(Diagram, ClosedCategory)
+    assert issubclass(Diagram, ClosedSymmetricCategory)
     assert not issubclass(Diagram, MarkovCategory)
     with raises(AttributeError):
         Diagram.copy

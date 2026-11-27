@@ -10,8 +10,9 @@ A traced category is a feedback category whose delay is the identity: the
 wires of a feedback diagram carry a time step, and a :class:`Trace` is a
 :class:`Feedback` whose memory is not delayed.
 
-This package is the monoidal level, its submodules the levels of the
-hierarchy with feedback, each subclassing the ordinary module of the same
+This package is the monoidal level, :mod:`~discopy.feedback.cat` the free
+category with a delay and no tensor, and its other submodules the levels of
+the hierarchy with feedback, each subclassing the ordinary module of the same
 name: :mod:`~discopy.feedback.balanced`, :mod:`~discopy.feedback.symmetric`
 for the usual notion of trace, :mod:`~discopy.feedback.markov` for the syntax
 of streams, :mod:`~discopy.feedback.comarkov` and the package
@@ -25,6 +26,7 @@ the interpretation of streams, the main example of a feedback category.
     :template: module.rst
     :toctree: ../_api
 
+    cat
     balanced
     symmetric
     markov
@@ -275,6 +277,7 @@ In the category of streams, this is just the identity.
 from __future__ import annotations
 
 from copy import copy
+from collections.abc import Mapping
 from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
@@ -1310,7 +1313,11 @@ class Sum(monoidal.Sum, Box):
 class Functor(monoidal.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
-    and traces.
+    and traces: a delayed box that is not a key of a mapping
+    :code:`ar_map` goes to the delay of the image of the box, which is the
+    image itself in a codomain that overrides :code:`delay` with the
+    identity, e.g. :class:`~discopy.tensor.Tensor`; a callable
+    :code:`ar_map` gets the delayed box.
 
     Parameters:
         ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
@@ -1358,12 +1365,22 @@ class Functor(monoidal.Functor):
 
     def __call__(self, other):
         if isinstance(other, Trace):
-            n = len(self(other.arg.dom)) - len(self(other.dom))
-            return self.cod.trace(self(other.arg), n, left=other.left)
+            arg = other.arg
+            while len(arg.boxes) == 1 and isinstance(arg.boxes[0], Trace)\
+                    and (arg.dom, arg.cod) == (
+                        arg.boxes[0].dom, arg.boxes[0].cod)\
+                    and arg.boxes[0].left == other.left:
+                arg = arg.boxes[0].arg
+            n = len(self(arg.dom)) - len(self(other.dom))
+            return self.cod.trace(self(arg), n, left=other.left)
         if isinstance(other, (Wire, Box)) and other.time_step:
-            cod = self.cod.ob if isinstance(other, Wire) else self.cod.ar
+            cod, mapping = (self.cod.ob, self.ob_map.mapping)\
+                if isinstance(other, Wire) else (
+                    self.cod.ar, self.ar_map.mapping)
             if getattr(cod, "delay", FeedbackCategory.delay)\
-                    is not FeedbackCategory.delay:
+                    is not FeedbackCategory.delay\
+                    and not (isinstance(mapping, Mapping)
+                             and other in mapping):
                 result = self(other.reset())
                 for _ in range(other.time_step):
                     result = result.delay()
@@ -1392,6 +1409,11 @@ class Functor(monoidal.Functor):
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),
                 mem=self(other.mem), **left)
+        if isinstance(other, Box) and other.time_step\
+                and hasattr(self.cod.ar, "delay")\
+                and isinstance(self.ar_map.mapping, Mapping)\
+                and other not in self.ar_map.mapping:
+            return self(other.reset()).delay(other.time_step)
         return super().__call__(other)
 
 
@@ -1512,4 +1534,4 @@ Bubble = Box.from_args
 # The levels with feedback subclass this one, so they are imported last.
 # pylint: disable-next=wrong-import-position
 from discopy.feedback import (  # noqa: E402,F401
-    balanced, symmetric, markov, comarkov, closed)
+    cat, balanced, symmetric, markov, comarkov, closed)

@@ -64,6 +64,7 @@ from discopy.abc import (
     CompactCategory,
     DaggerMonoidalCategory,
     MarkovCategory,
+    PivotalCategory,
     Pregroup,
     RigidCategory,
     SpacialCategory,
@@ -1658,20 +1659,21 @@ class CMap[category](
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for a planar traced
-        category, then the result is just one big trace box wrapped up as a
-        map, whatever ``n``, since the trace of ``n`` wires of a diagram is
-        its ``n`` one-wire traces nested: nesting them on the diagram
-        converts the map once instead of once per wire.
+        When ``category.trace_factory`` is a class and the category has no
+        duals, e.g. for a planar traced category, then the result is just one
+        big trace box wrapped up as a map, whatever ``n``, since the trace of
+        ``n`` wires of a diagram is its ``n`` one-wire traces nested: nesting
+        them on the diagram converts the map once instead of once per wire.
 
-        Otherwise it is a class method, e.g. for compact diagrams, in which
-        case we use it to introduce cup and cap boxes, one pair per wire: the
-        cups and caps of a pivotal category are atomic, so the ``n``-wire
-        trace is the nest of ``n`` one-wire traces there as well. When that
-        class method is the pivotal one itself, the whole onion of ``n`` cup
-        and cap pairs goes to one constructor call rather than being composed
-        pair by pair; a category overriding it gets the nest its own factory
-        builds, like :meth:`Hypergraph.explicit_trace`.
+        Over a pivotal category, e.g. for compact diagrams, the trace box is
+        equal to a cap, the diagram and a cup, see
+        :meth:`~discopy.pivotal.Diagram.dual_trace`, so we introduce cup and
+        cap boxes, one pair per wire: the whole onion of ``n`` pairs goes to
+        one constructor call rather than being composed pair by pair. So does a
+        category whose ``trace_factory`` is ``dual_trace`` itself, e.g.
+        :class:`~discopy.tensor.Diagram`; one overriding it with another class
+        method gets the nest its own factory builds, like
+        :meth:`Hypergraph.explicit_trace`.
 
         >>> from discopy import compact, feedback
         >>> x = feedback.Ty('x')
@@ -1695,11 +1697,13 @@ class CMap[category](
         type(self).assert_istraced()
         assert_istraceable(self, n, left)
         factory = self.category.trace_factory
-        if isclass(factory):
+        if isclass(factory) and not issubclass(
+                self.category, PivotalCategory):
             return self.from_box(self.to_diagram().trace(n, left))
         # pylint: disable-next=import-outside-toplevel  # pivotal imports us
         from discopy.pivotal import Diagram as Pivotal
-        if factory.__func__ is not Pivotal.trace_factory.__func__:
+        if not isclass(factory)\
+                and factory.__func__ is not Pivotal.dual_trace.__func__:
             result = self
             for _ in range(n):
                 result = factory.__func__(type(self), result, left)

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="115.2pt" height="86.4pt" viewBox="0 0 115.2 86.4" xmlns="http://www.w3.org/2000/svg" version="1.1"><style type="text/css">@media (prefers-color-scheme: dark) {[id^="dark-stroke"] path { stroke: #ffffff !important; } [id^="dark-fill"] g, [id^="dark-fill"] use { fill: #ffffff !important; stroke: #ffffff !important; }}</style>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 86.4 
+L 115.2 86.4 
+L 115.2 0 
+L 0 0 
+L 0 86.4 
+z
+" style="fill: none"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 9.6 79.2 
+L 105.6 79.2 
+L 105.6 7.2 
+L 9.6 7.2 
+L 9.6 79.2 
+z
+" clip-path="url(#p0c606a4dba)" style="fill: none"/>
+   </g>
+   <g id="dark-stroke-1">
+    <path d="M 57.6 43.2 
+Q 33.6 43.2 33.6 61.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-2">
+    <path d="M 57.6 43.2 
+Q 81.6 43.2 81.6 61.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-3">
+    <path d="M 33.6 7.2 
+Q 33.6 25.2 33.6 25.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-4">
+    <path d="M 33.6 25.2 
+Q 33.6 43.2 57.6 43.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-5">
+    <path d="M 81.6 7.2 
+Q 81.6 25.2 81.6 25.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-6">
+    <path d="M 81.6 25.2 
+Q 81.6 43.2 57.6 43.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-7">
+    <path d="M 33.6 61.2 
+Q 33.6 79.2 33.6 79.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-8">
+    <path d="M 81.6 61.2 
+Q 81.6 79.2 81.6 79.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-fill-9">
+    <defs>
+     <path id="m30c8031d09" d="M 0 7.281827 
+C 1.931163 7.281827 3.783491 6.514567 5.149029 5.149029 
+C 6.514567 3.783491 7.281827 1.931163 7.281827 0 
+C 7.281827 -1.931163 6.514567 -3.783491 5.149029 -5.149029 
+C 3.783491 -6.514567 1.931163 -7.281827 0 -7.281827 
+C -1.931163 -7.281827 -3.783491 -6.514567 -5.149029 -5.149029 
+C -6.514567 -3.783491 -7.281827 -1.931163 -7.281827 0 
+C -7.281827 1.931163 -6.514567 3.783491 -5.149029 5.149029 
+C -3.783491 6.514567 -1.931163 7.281827 0 7.281827 
+z
+" style="stroke: #000000"/>
+    </defs>
+    <g clip-path="url(#p0c606a4dba)">
+     <use xlink:href="#m30c8031d09" x="57.6" y="43.2" style="stroke: #000000"/>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p0c606a4dba">
+   <rect x="0" y="0" width="115.2" height="86.4"/>
+  </clipPath>
+ </defs>
+</svg>

@@ -307,17 +307,29 @@ class Diagram(monoidal.Diagram, cat.Arrow, LinearCategory):
                 if order[i] < order[i + 1]:
                     continue
                 left, right = types[i], types[i + 1]
-                if isinstance(left.inside[0], BangOb):
-                    exchange = cls.exchange(left.inside[0].arg, right)
-                elif isinstance(right.inside[0], BangOb):
-                    exchange = cls.exchange(right.inside[0].arg, left, True)
-                else:
-                    raise AxiomError(messages.NOT_BANGED.format(dom))
-                result = result >> dom[:0].tensor(*types[:i]) @ exchange\
+                result = result >> dom[:0].tensor(*types[:i])\
+                    @ cls.crossing(left, right)\
                     @ dom[:0].tensor(*types[i + 2:])
                 order[i], order[i + 1] = order[i + 1], order[i]
                 types[i], types[i + 1] = right, left
         return result
+
+    @classmethod
+    def crossing(cls, left: Ty, right: Ty) -> Diagram:
+        """
+        The crossing of two adjacent wires that :meth:`wiring` moves past
+        each other, an :meth:`exchange` of the banged one: two wires that are
+        not banged do not cross.
+
+        Parameters:
+            left : The wire on the left.
+            right : The wire on the right.
+        """
+        if isinstance(left.inside[0], BangOb):
+            return cls.exchange(left.inside[0].arg, right)
+        if isinstance(right.inside[0], BangOb):
+            return cls.exchange(right.inside[0].arg, left, True)
+        raise AxiomError(messages.NOT_BANGED.format(left @ right))
 
     def __call__(self, *arguments: TermBase) -> TermBase:
         """

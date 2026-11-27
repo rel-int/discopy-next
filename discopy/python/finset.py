@@ -702,6 +702,6 @@ for name in (
         "currying_left", "currying_right", "currying_eta_left",
         "currying_eta_right", "currying_naturality_left",
         "currying_naturality_right", "counit", "unit", "curry_left",
-        "curry_right", "ev_left", "ev_right"):
+        "curry_right", "ev_left", "ev_right", "trace_duals"):
     setattr(Cospan, name, getattr(Cospan, name).inapplicable(
         messages.NAT_HAS_NO_ADJOINTS))

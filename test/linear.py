@@ -102,6 +102,25 @@ def test_Functor_sends_the_bang_through_the_codomain():
     assert G(f.bang()) == tensor.Box('!f', tensor.Dim(4), tensor.Dim(5))
 
 
+def test_symmetric_and_markov_structure_of_the_bang():
+    from discopy.linear import markov, symmetric
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    for module in (symmetric, markov):
+        g = module.Box('f', x, y)
+        F = Functor({x: x, y: y}, {f: g}, cod=module.Diagram)
+        assert F(Exchange(x, y)) == module.Swap(x.bang(), y)
+        assert F(Exchange(x, y, True)) == module.Swap(y, x.bang())
+        assert F(f.bang()) == g.bang()
+    F = Functor({x: x, y: y}, {f: markov.Box('f', x, y)}, cod=markov.Diagram)
+    assert F(Contraction(x)) == markov.Copy(x.bang())
+    assert F(Weakening(x)) == markov.Discard(x.bang())
+    assert F(Dereliction(x)) == markov.Dereliction(x)
+    assert isinstance(markov.Swap(x, y), markov.Function)
+    g = markov.Box('f', x, x)
+    assert x(lambda a: g(a)).eval() == g
+
+
 def test_bang_is_drawn_with_an_exclamation_mark():
     x, y = Ty('x'), Ty('y')
     drawing = (Contraction(x) >> Box('f', x, y).bang() @ Dereliction(x))\

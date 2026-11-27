@@ -215,7 +215,8 @@ from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
 from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import (
+    AxiomError, assert_istraceable, factory_name, from_tree)
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
 from discopy.optyx.utils.misc import (
@@ -249,7 +250,10 @@ class PhotonNumberPreservation(Enum):
 
 
 class Ob(frobenius.Wire):
-    """Basic object in an optyx Diagram: bit or mode"""
+    """
+    Basic object in an optyx Diagram: bit or mode, delayed as a stream is,
+    with a time step.
+    """
 
 
 HeadOb, TailOb = feedback.structural_wires(Ob)
@@ -318,20 +322,43 @@ class Diagram(frobenius.Diagram):
 
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
+
+    def trace(self, n=1, left=False) -> Diagram:
+        """
+        The trace of the last ``n`` wires, the first when ``left``, bent with
+        the cups and caps of the category, see
+        :meth:`~discopy.pivotal.Diagram.dual_trace`: its
+        :meth:`feedback` is a delayed loop of its own.
+
+        Parameters:
+            n : The number of wires to trace.
+            left : Whether to trace on the left rather than the right.
+        """
+        assert_istraceable(self, n, left)
+        result = self
+        for _ in range(n):
+            result = self.trace_factory(result, left)
+        return result
 
     @classmethod
     def cup_factory(cls, left: Ty, right: Ty) -> Spider:
         """
         The cup of an optyx type is its spider with two legs in, as in any
-        frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
-        and :meth:`trace` bends its wires with both, so the cap comes out as
-        the spider with two legs out and `cap_factory` is never reached.
+        frobenius category, and its cap the spider with two legs out:
+        :meth:`trace` bends its wires with both.
 
         >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
         >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
         """
         left.assert_isadjoint(right)
         return cls.spider_factory(2, 0, left)
+
+    @classmethod
+    def cap_factory(cls, left: Ty, right: Ty) -> Spider:
+        """ The cap of an optyx type, the dagger of its cup. """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(0, 2, left)
 
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
@@ -793,7 +820,7 @@ class Box(frobenius.Box, Diagram):
         :meth:`truncation` the dagger of the truncation of the box.
 
         A box declares itself self-adjoint with ``is_dagger=None``, as
-        :data:`discopy.quantum.gates.SWAP` does, and is then its own dagger.
+        :data:`~discopy.quantum.gates.SWAP` does, and is then its own dagger.
 
         >>> f = Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2))
         >>> print(f[::-1])

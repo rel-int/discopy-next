@@ -151,7 +151,7 @@ def test_Hypergraph_depth_counts_states_and_effects():
     scalar, f = Box('s', Ty(), Ty()), Box('f', x, x)
     for diagram, depth in [
             (state, 1), (effect, 1), (scalar, 1), (state >> effect, 2),
-            (f @ (state >> effect), 2), (f >> f, 2), (f.trace(), 3)]:
+            (f @ (state >> effect), 2), (f >> f, 2), (f.trace().open_traces(), 3)]:
         assert diagram.depth() == len(diagram.foliation()) == depth
     sx = symmetric.Ty('x')
     assert symmetric.Box('f', symmetric.Ty(), sx).depth() == 1
@@ -1275,12 +1275,12 @@ def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
 def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
     """
     The onion in one call *is* the pivotal trace, so it is built only when
-    ``trace_factory`` is pivotal's own class method: a category overriding it
-    gets the nest its own factory builds, one wire at a time, rather than the
-    cups and caps it never asked for.
+    ``trace_factory`` is pivotal's own ``Trace`` box: a category overriding it
+    with a class method gets the nest its own factory builds, one wire at a
+    time, rather than the cups and caps it never asked for.
     """
     from discopy import frobenius, pivotal
-    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+    pivotal_trace, calls = pivotal.Diagram.dual_trace.__func__, []
 
     def overridden(cls, diagram, left=False):
         calls.append(left)

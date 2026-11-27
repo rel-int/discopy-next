@@ -7,6 +7,7 @@ A compact diagram is a symmetric closed diagram, see
 :mod:`~discopy.closed.symmetric`, with internal hom ``x ⊸ y = x* @ y``: its
 evaluation and currying are the cups and caps of :mod:`~discopy.rigid`.
 
+>>> from discopy import closed
 >>> x, y, z = map(Ty, "xyz")
 >>> f = Box('f', x @ y, z)
 >>> assert isinstance(f, closed.symmetric.Diagram)
@@ -79,25 +80,28 @@ from typing import ClassVar
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
 from discopy import (
-    symmetric, ribbon, pivotal, closed, feedback, cmap, hypergraph,
+    symmetric, ribbon, pivotal, feedback, cmap, hypergraph,
     interaction)
 from discopy.abc import (
     BalancedTracedCategory, CompactCategory, DaggerMonoidalCategory,
     RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.cat import factory
+from discopy.feedback.closed import symmetric as traced
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 
 
-class Layer(symmetric.Layer, pivotal.Layer):
+class Layer(feedback.symmetric.Layer, pivotal.Layer):
     """ A compact layer with permutation plumbing and rigid rotation. """
 
 
 @factory
-class Diagram(ribbon.Diagram, closed.symmetric.Diagram, CompactCategory):
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+class Diagram(ribbon.Diagram, traced.Diagram, CompactCategory):
     """
-    A compact diagram is a ribbon diagram and a symmetric closed diagram.
+    A compact diagram is a ribbon diagram and a symmetric closed feedback
+    diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -131,7 +135,6 @@ class Diagram(ribbon.Diagram, closed.symmetric.Diagram, CompactCategory):
     permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
     layer_factory = Layer
-    trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
 
 
 for name in ("braid_factory", "twist_factory", "term_factory",
@@ -139,7 +142,8 @@ for name in ("braid_factory", "twist_factory", "term_factory",
     setattr(Diagram, name, vars(symmetric.Diagram)[name])
 
 
-class Box(symmetric.Box, ribbon.Box, Diagram):
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+class Box(ribbon.Box, traced.Box, Diagram):
     """
     A compact box is a symmetric and ribbon box in a compact diagram.
 
@@ -170,7 +174,7 @@ class Cap(ribbon.Cap, Box):
     """
 
 
-class Permutation(symmetric.Permutation, Box):
+class Permutation(traced.Permutation, Box):
     """
     A compact permutation is a symmetric permutation in a compact category.
 
@@ -186,9 +190,9 @@ class Permutation(symmetric.Permutation, Box):
     r = property(lambda self: self.rotate(left=False))
 
 
-class Swap(Permutation, symmetric.Swap, ribbon.Braid, Box):
+class Swap(Permutation, traced.Swap, Box):
     """
-    A compact swap is a symmetric swap and a ribbon braid.
+    A compact swap is a symmetric swap in a compact diagram.
 
     Parameters:
         left (pivotal.Ty) : The type on the top left and bottom right.
@@ -196,7 +200,7 @@ class Swap(Permutation, symmetric.Swap, ribbon.Braid, Box):
     """
 
 
-class Sum(symmetric.Sum, ribbon.Sum, Box):
+class Sum(ribbon.Sum, traced.Sum, Box):
     """
     A compact sum is a sum of compact diagrams.
 
@@ -207,7 +211,7 @@ class Sum(symmetric.Sum, ribbon.Sum, Box):
     """
 
 
-class Functor(symmetric.Functor, ribbon.Functor):
+class Functor(traced.Functor, ribbon.Functor):
     """
     A compact functor is both a symmetric functor and a ribbon functor.
 

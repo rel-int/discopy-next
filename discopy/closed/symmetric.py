@@ -45,7 +45,7 @@ from functools import cached_property
 from typing import ClassVar
 
 from discopy import closed, cmap, hypergraph, messages, monoidal, symmetric
-from discopy.abc import BalancedCategory, ClosedCategory
+from discopy.abc import BalancedCategory, ClosedSymmetricCategory
 from discopy.cat import factory
 from discopy.utils import factory_name
 
@@ -101,7 +101,7 @@ class Exp(Wire, closed.monoidal.Exp):
 
 @factory
 class Diagram(
-        closed.monoidal.Diagram, symmetric.Diagram, ClosedCategory,
+        closed.monoidal.Diagram, symmetric.Diagram, ClosedSymmetricCategory,
         BalancedCategory):
     """
     A symmetric closed diagram is a biclosed diagram and a symmetric diagram.
@@ -130,7 +130,7 @@ class Diagram(
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
-    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+    currying_symmetry = ClosedSymmetricCategory.currying_symmetry.failing(
         messages.FREE_CURRY)
 
 
