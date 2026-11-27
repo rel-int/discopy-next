@@ -2566,17 +2566,23 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
 
     @axiom
     def bang_trace[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
-            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], mem: Var[C0, M]
+            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], dom: Var[C0, Γ],
+            cod: Var[C0, Δ], mem: Var[C0, M]
     ) -> Equation[Hom[C1, Bang[C1, Γ], Bang[C1, Δ]]]:
         """
         The bang of a trace is the trace over the bang of the memory of the
-        bang conjugated by the laxator, ``T`` being a traced functor.
+        bang conjugated by the laxator, ``T`` being a traced functor. The
+        boundary is bound rather than sliced off ``f``, so that it holds of a
+        category whose objects are not lists, e.g. pairs in ``Int``.
         """
-        dom, cod = (x[:len(x) - len(mem)] for x in (f.dom, f.cod))
         inside = cls.laxator(dom, mem) >> f.bang() >> cls.colaxator(cod, mem)
         return cls.equation_factory(
-            f.trace(len(mem)).bang(),
-            inside.trace(mem=cls.banged(mem)))  # ty: ignore[unknown-argument]
+            f.trace(
+                dom=dom, cod=cod, mem=mem  # ty: ignore[unknown-argument]
+            ).bang(),
+            inside.trace(
+                dom=cls.banged(dom), cod=cls.banged(cod),
+                mem=cls.banged(mem)))
 
     @axiom
     def reflexive_tensor_retract(cls) -> Equation[Hom[
