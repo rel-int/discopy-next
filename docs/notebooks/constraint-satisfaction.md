@@ -89,8 +89,8 @@ assert counts == {
 mo.md(", ".join(f"**{_k}**: {_v} solution(s)" for _k, _v in counts.items()))
 ```
 
-Before searching or learning, [`Language.propagate`](../../_api/discopy.csp.Language.propagate.html) runs arc consistency: each variable starts with a set of candidate values, and each round keeps only the values supported by an assignment of every incident scope.
-It never discards a value that some solution takes, and [`Language.holds`](../../_api/discopy.csp.Language.holds.html) checks whether a complete assignment satisfies every constraint of the instance.
+Before searching or learning, [`Language.propagate`](../../_api/discopy.csp.Language.html#discopy.csp.Language.propagate) runs arc consistency: each variable starts with a set of candidate values, and each round keeps only the values supported by an assignment of every incident scope.
+It never discards a value that some solution takes, and [`Language.holds`](../../_api/discopy.csp.Language.html#discopy.csp.Language.holds) checks whether a complete assignment satisfies every constraint of the instance.
 
 On the tree-shaped maze, `propagate` narrows all 16 edges to singletons — the unique path of length 10 from `S` to `G`.
 On a $4 \times 4$ Sudoku with five clues, `propagate` likewise deduces the whole board; drop one clue to restore the symmetry between digits `2` and `3` (values `1` and `2` in code), and arc consistency stops with pairs of candidates on the eight unfixed cells.
@@ -189,7 +189,8 @@ mo.md(f"""
 In [`discopy.neural.lattice`](../../_api/discopy.neural.lattice.html), a $9 \times 9$ Sudoku puzzle is carried as a candidate lattice `x` in $\{0, 1\}^{B \times 81 \times 9}$: each given clue is one-hot and each blank cell starts with all nine digits alive.
 One supervision step (`factor_net.step`) runs 10 cycles of 5 message-passing rounds, reads the keep/kill (`bce`), symbol (`sm`) and conflict (`conf`) heads off the answer trace, kills candidates below threshold (never touching a given), and pins one multi-candidate cell when no conflict fires.
 
-At test time, [`lattice.solve`](../../_api/discopy.neural.lattice.solve.html) steps parallel chains of candidate lattices, resetting chains that enter conflict, and any accepted board is checked directly by `sudoku_language.holds(sudoku_graph, assignment)` — without needing a stored solution.
+At test time, [`lattice.solve`](../../_api/discopy.neural.lattice.solve.html) steps parallel chains of candidate lattices, resetting chains that enter conflict, and grades each accepted board against its stored solution with `grade`, `lattice.exact` by default.
+`sudoku_language.holds(sudoku_graph, assignment)` checks a board against the constraints themselves instead, with no stored solution.
 Below is one untrained step on a 30-clue $9 \times 9$ board, showing the candidate-set sizes ($1$–$9$) per cell before and after projection:
 
 ```python {.marimo}
