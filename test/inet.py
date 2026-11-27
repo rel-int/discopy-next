@@ -94,6 +94,12 @@ def test_custom_signature_and_closure():
     reduced = net.reduce()
     assert reduced == Net.from_wires(sig, [], [(0, 1)])
     assert eval(repr(reduced)) == reduced
+    one_way = Signature(
+        {"a": 1, "b": 1},
+        lambda s1, s2: rhs_wire if (s1, s2) == (Symbol("a"), Symbol("b"))
+        else None)
+    assert one_way.rule("b", "a") == rhs_wire.swap_halves(1, 1)
+    assert len(one_way.hypergraph_rules(("b", "a"))) == 1
 
     gen_rhs = Net.from_wires(
         base, ["c", "c"],
@@ -135,6 +141,8 @@ def test_from_hypergraph_and_custom_roundtrip():
     with raises(ValueError):
         Net.from_hypergraph(
             Box("γ", x, x).to_hypergraph(), signature=combinators())
+    with raises(ValueError):
+        Net.from_hypergraph(Box("f", Ty("y"), Ty("y")).to_hypergraph())
     inconsistent = (
         Box("f", x, x).to_hypergraph() @ Box("f", x, x @ x).to_hypergraph())
     with raises(ValueError):

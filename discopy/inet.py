@@ -192,7 +192,12 @@ class Signature:
                 rhs = self.rules[s2, s1]
                 return rhs.swap_halves(self.arity(s2), self.arity(s1))
             return None
-        return self.rules(s1, s2)
+        rhs = self.rules(s1, s2)
+        if rhs is None and s1 != s2:
+            rhs = self.rules(s2, s1)
+            if rhs is not None:
+                rhs = rhs.swap_halves(self.arity(s2), self.arity(s1))
+        return rhs
 
     def box(self, symbol: Symbol | str) -> frobenius.Box:
         """Encode ``symbol`` as a :class:`discopy.frobenius.Box`."""
@@ -418,10 +423,11 @@ class Net:
         if not self.active:
             return self
         rewriter, steps = Rewriter(self), 0
-        while rewriter.step():
-            steps += 1
-            if max_steps is not None and steps > max_steps:
+        while rewriter.live():
+            if max_steps is not None and steps == max_steps:
                 raise RuntimeError(f"Exceeded {max_steps} reduction steps.")
+            rewriter.step()
+            steps += 1
         return rewriter.to_net()
 
     def to_hypergraph(self, n_dom: int = 0) -> frobenius.Hypergraph:
@@ -483,6 +489,11 @@ class Net:
         """
         if not graph.is_bijective:
             raise ValueError("Hypergraph is not bijective.")
+        x = frobenius.Ty("x")
+        if any(t != x for t in graph.spider_types) or any(
+                box.dom != x or box.cod != x ** len(box.cod)
+                for box in graph.boxes):
+            raise ValueError("A net has one wire type, x.")
         cells, arities = cls.boxes_to_symbols(graph.boxes)
         if signature is None:
             signature = cls.infer_signature(arities)
@@ -744,24 +755,34 @@ class Rewriter:
             c1, c2 = self.cell_of[first_port], self.cell_of[second_port]
             self.active.append((min(c1, c2), max(c1, c2)))
 
+    def live(self) -> bool:
+        """Drop stale active pairs; return whether a live one remains."""
+        while self.active:
+            c1, c2 = self.active[-1]
+            p1, p2 = self.ports[c1], self.ports[c2]
+            if (self.cells[c1] is not None and self.cells[c2] is not None
+                    and p1 is not None and p2 is not None
+                    and self.link[p1[0]] == p2[0]):
+                return True
+            self.active.pop()
+        return False
+
     def step(self) -> bool:
         """Rewrite the next live active pair; return ``False`` if none."""
-        while self.active:
-            c1, c2 = self.active.pop()
-            s1, s2 = self.cells[c1], self.cells[c2]
-            p1, p2 = self.ports[c1], self.ports[c2]
-            if s1 is None or s2 is None or p1 is None or p2 is None:
-                continue
-            if self.link[p1[0]] != p2[0]:
-                continue
-            rhs = self.net.signature.rule(s1, s2)
-            if rhs is None:
-                raise KeyError((s1, s2))
-            self.delete_cell(c1)
-            self.delete_cell(c2)
-            self.substitute(p1[1:] + p2[1:], rhs)
-            return True
-        return False
+        if not self.live():
+            return False
+        c1, c2 = self.active.pop()
+        s1, s2 = self.cells[c1], self.cells[c2]
+        p1, p2 = self.ports[c1], self.ports[c2]
+        assert s1 is not None and s2 is not None
+        assert p1 is not None and p2 is not None
+        rhs = self.net.signature.rule(s1, s2)
+        if rhs is None:
+            raise KeyError((s1, s2))
+        self.delete_cell(c1)
+        self.delete_cell(c2)
+        self.substitute(p1[1:] + p2[1:], rhs)
+        return True
 
     def delete_cell(self, cell_idx: int) -> None:
         """Remove ``cell_idx`` from the live cell tables."""
