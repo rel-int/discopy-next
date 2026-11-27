@@ -914,6 +914,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   network whose bond dimension exceeds one, rather than failing with
   `LinAlgError` inside Quimb's stabilized QR, and `test_fix.py` checks
   `max_chi=1` against the real `QuimbBackend` ([next#442]).
+- The label of an exponential wire is made of the labels of its base and
+  exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
+  `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
 
 - A box with as many outputs as inputs, e.g. a swap drawn as a box, draws
   each output straight down from the input above it, rather than bending the
@@ -2148,6 +2151,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- Read the Docs embeds the notebooks the `build` workflow renders on `main`
+  instead of linking to their sources, still running none itself: a
+  `notebooks` job pushes them to the `rendered-notebooks` branch, whose
+  tarball `docs/export_notebooks.py` downloads when `DISCOPY_RENDERED_NOTEBOOKS`
+  names it, as `docs/conf.py` does on Read the Docs ([next#765]).
+
 - `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
   run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
   `--check` and the docs build, which give it a page linking to its source,
@@ -2783,6 +2792,8 @@ for the changelog of `1.2.1` and earlier.
 [next#742]: https://github.com/rel-int/discopy-next/pull/742
 [next#745]: https://github.com/rel-int/discopy-next/pull/745
 [next#748]: https://github.com/rel-int/discopy-next/pull/748
+[next#762]: https://github.com/rel-int/discopy-next/pull/762
+[next#765]: https://github.com/rel-int/discopy-next/pull/765
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728

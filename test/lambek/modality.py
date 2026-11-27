@@ -66,3 +66,9 @@ def test_functor_into_a_category_that_is_not_closed():
     assert {type(box) for box in seen if box.name.startswith(
         ("Contraction", "Dereliction", "Exchange"))} == {
             Contraction, Dereliction, Exchange}
+
+
+def test_drawing_names_bang_under_exponentials():
+    assert likes.cod.to_drawing().inside[0].name == "!(!(!N >> S) << N)"
+    assert his.cod.to_drawing().inside[0].name == "(!(!N >> N) << N)"
+    assert str(his.cod) == "((N.bang() >> N).bang() << N)"
