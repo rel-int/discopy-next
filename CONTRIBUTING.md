@@ -94,7 +94,8 @@ instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 (e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
 fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. A notebook listed in `UNEXECUTED`, e.g. the old optyx
+and `--check` expects it to fail: it fails when such a notebook executes, so the entry is
+removed once its bug is fixed. A notebook listed in `UNEXECUTED`, e.g. the old optyx
 README `optyx/readme_example`, runs only when named: neither `--check` nor the docs build runs
 it, and its page links to its source. Each notebook runs from its own directory on the `discopy`
 of the script's own tree, so a git worktree checks its own code, not the main checkout's
