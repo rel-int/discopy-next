@@ -37,6 +37,6 @@
 
 - [x] test/cat.py:696 base dataflow Head/Tail/FollowedBy need examples or exclusion
 - [x] messages.py NO_DATAFLOW wording
-- [ ] syntax.rst: architecture diagram omits dataflow; grammar of the clause
+- [x] syntax.rst: architecture diagram omits dataflow; grammar of the clause
 - [ ] dataflow HeadOb/TailOb dagger raises
 - [ ] StreamWire validates is_constant
