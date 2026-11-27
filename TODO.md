@@ -12,4 +12,4 @@
 - [x] Repoint the tooling that reads [Unreleased]: checkboxes finish, next-checks changelog gate, merge-main driver, CONTRIBUTING, AGENTS
 - [x] Rename ADRs 0001-0011 to YYYY-MM-DD-slug.md, update index.md and every reference
 - [x] Repurpose test/adr.py: dated-slug filenames, every ADR cross-reference resolves
-- [ ] Open the PR saying it reverses #695's ruling; comment on #679, #690, #706, #734, #737
+- [x] Open the PR saying it reverses #695's ruling; comment on #679, #690, #706, #734, #737
