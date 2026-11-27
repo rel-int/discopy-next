@@ -165,6 +165,24 @@ class Ty[natural](Pregroup, TestableGeneric):
         return st.tuples(types, types).map(lambda pair: cls(*pair))
 
     @classmethod
+    def alphabet(cls) -> tuple[Ty, ...] | None:
+        """
+        The integer types of one atom of :attr:`natural`, positive or
+        negative: every integer type is a tensor of them, the negative halves
+        in the order :attr:`negatives` gives, or :obj:`None` when the
+        natural types state no alphabet.
+
+        >>> from discopy.pivotal import Ty as T
+        >>> x = T('a')
+        >>> assert Ty[T].alphabet()[:2] == (Ty[T](x), Ty[T](T(), x))
+        """
+        atoms = cls.natural.alphabet()
+        if atoms is None:
+            return None
+        return tuple(sign for x in atoms
+                     for sign in (cls(x), cls(cls.natural(), x)))
+
+    @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate pairs of atomic :attr:`natural` types. """
         # pylint: disable=unused-argument  # a pair has one colour

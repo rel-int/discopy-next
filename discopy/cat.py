@@ -232,6 +232,16 @@ class Ob(Serialisable["Ob"]):
 
         return st.sampled_from(GENERATORS).map(cls)
 
+    @classmethod
+    def alphabet(cls) -> tuple[Ob, ...]:
+        """
+        The objects named after :data:`discopy.testable.GENERATORS`, those
+        :meth:`strategy` draws: an object is atomic, formed by no rule.
+
+        >>> assert Ob.alphabet()[0] == Ob('a')
+        """
+        return tuple(map(cls, GENERATORS))
+
     def to_tree(self) -> dict:
         """
         Serialise a DisCoPy object, see :func:`dumps`.

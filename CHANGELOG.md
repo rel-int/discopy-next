@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `cat.Ob.alphabet()` is the objects named after `testable.GENERATORS`, and
+  `interaction.Ty.alphabet()` the integer types of one atom of its natural types, positive or
+  negative, so that the objects of `cat.Arrow`, `op.Category`, `interaction.Diagram` and every
+  `lens` category state an alphabet, as those of the monoidal categories do.
+
 - `generator_strategy(dom=..., cod=..., name=...)` draws the generator of a given name between
   given objects wherever terms are derived from generators: a box of a free category
   (`Box.strategy` takes `name`), its image in `Hypergraph[C]` and `CMap[C]`, and any matrix of
