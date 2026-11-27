@@ -1,4 +1,6 @@
-from discopy import rigid
+from pytest import raises
+
+from discopy import monoidal
 from discopy.lambek.modality import (
     Ty, Box, Diagram, Eval, Dereliction, Contraction, Exchange, Functor)
 
@@ -50,19 +52,20 @@ def test_strict_and_sloppy_contractions():
 
 
 def test_functor_into_a_category_that_is_not_closed():
-    # rigid diagrams have an ev, but they are not a closed category
+    with raises(TypeError):
+        Functor(ob_map={}, ar_map={}, cod=monoidal.Diagram)
     seen = []
 
     def ar_map(box):
         seen.append(box)
-        return rigid.Box(box.name, F(box.dom), F(box.cod))
-    F = Functor(ob_map=lambda x: rigid.Ty(str(x)), ar_map=ar_map,
-                cod=rigid.Diagram)
-    assert F(Eval(VP)) == rigid.Box(
-        Eval(VP).name, rigid.Ty("N.bang()", "(N.bang() >> S)"),
-        rigid.Ty("S"))
+        return monoidal.Box(box.name, F(box.dom), F(box.cod))
+    F = monoidal.Functor(
+        ob_map=lambda x: monoidal.Ty(str(x)), ar_map=ar_map)
+    assert F(Eval(VP)) == monoidal.Box(
+        Eval(VP).name, monoidal.Ty("N.bang()", "(N.bang() >> S)"),
+        monoidal.Ty("S"))
     for term in (strict, sloppy):
-        assert term.eval(F).cod == rigid.Ty("S", "S")
+        assert F(term.eval()).cod == monoidal.Ty("S", "S")
     assert {type(box) for box in seen if box.name.startswith(
         ("Contraction", "Dereliction", "Exchange"))} == {
             Contraction, Dereliction, Exchange}

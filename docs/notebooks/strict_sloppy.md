@@ -52,7 +52,7 @@ Each reading is first a term of `discopy.lambek.modality`, the Lambek
 calculus `!L*` of the paper: its words have the types of §3.3, a type
 called on a function, `N.bang()(lambda x: ...)`, binds `x`, and a variable
 of banged type `!A` used twice is copied by a `Contraction` and read by a
-`Dereliction`. A `modality.Functor` then sends the term to an optyx diagram
+`Dereliction`. A monoidal functor then sends the term to an optyx diagram
 of photons, made of the boxes of `discopy.optyx.core.zw`: `Create`, `W` and
 its dagger, `Z` spiders, `Endo` for amplitudes and `Select`. That diagram is
 evaluated by optyx, and its amplitudes on one photon per output are the
@@ -69,7 +69,8 @@ import numpy as np
 from discopy.linear.monoidal import BangOb
 from discopy.closed.monoidal import Exp
 from discopy.lambek.modality import (
-    Ty, Box, Eval, Contraction, Dereliction, Exchange, Functor)
+    Ty, Box, Eval, Contraction, Dereliction, Exchange)
+from discopy import monoidal
 from discopy.matrix import OptEinsum
 from discopy.optyx.core.diagram import Diagram, Mode
 from discopy.optyx.core.zw import W, ZBox, Create, Select, Endo
@@ -299,12 +300,14 @@ order = {"V": (1, 2, 0), "his": (1, 2, 0)}
 
 ## 4. From `!L*` to photons
 
-A `modality.Functor` into optyx diagrams sends each type to modes: an atom
+A monoidal functor into optyx diagrams sends each type to modes: an atom
 to two, `!x` to the modes of `x`, whose Fock space they carry, and an
 exponential `x >> y` or `y << x` to one photon over the product of the modes
-of `x` and `y`, a matrix. optyx diagrams are not a closed category, so the
-functor sends exponentials and evaluations through its `ob_map` and
-`ar_map`, like any other generator.
+of `x` and `y`, a matrix. A `modality.Functor` would send exponentials and
+evaluations through the compact structure of optyx diagrams, so the reading
+is sent by a plain `monoidal.Functor` from the underlying monoidal category,
+which takes exponentials, evaluations and the structural boxes through its
+`ob_map` and `ar_map`, like any other generator.
 
 `Eval` goes to the gate of a Kronecker delta, which contracts the argument
 with the matching index of the function. An argument of banged type `!x` is
@@ -376,8 +379,8 @@ def meaning(term, spider):
     """
     key = (str(term), spider.name)
     if key not in computed:
-        functor = Functor(ob_map=ob, ar_map=ar(spider), cod=Diagram)
-        computed[key] = amplitudes(term.eval(functor), (2, 2))
+        functor = monoidal.Functor(ob_map=ob, ar_map=ar(spider), cod=Diagram)
+        computed[key] = amplitudes(functor(term.eval()), (2, 2))
     return computed[key]
 ```
 
