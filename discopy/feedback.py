@@ -1486,9 +1486,7 @@ __getattr__ = deprecated_alias(__name__, {
     "Discard": "discopy.markov.Discard",
 })
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
-    Diagram)
-Term = Variable | Constant | Application | Kappa
+TermBase = kappa_calculus(Diagram)
 
 
 Bubble = Box.from_args

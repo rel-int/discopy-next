@@ -768,6 +768,8 @@ class TermBase(monoidal.TermBase):
     ...
     ValueError: Expected banged variables to share, got a.
     """
+    arrow = Diagram
+
     @staticmethod
     def wire(functor, wiring: list[int], dom: Ty):
         """
@@ -778,25 +780,7 @@ class TermBase(monoidal.TermBase):
         return functor(functor.dom.wiring(wiring, dom))
 
 
-class Variable(TermBase, monoidal.Variable):
-    """
-    A variable with a name and a type of one wire, an identity diagram.
-
-    Parameters:
-        name : The name of the variable.
-        cod : The type of the variable.
-    """
-
-
-class Constant(TermBase, monoidal.Constant):
-    """
-    A box as a term, with its domain as stack.
-
-    Parameters:
-        box : The box.
-    """
-
-
+@TermBase.extend
 class Application(TermBase, monoidal.Application):
     """
     The application of a term to an argument with no stack, which shares
@@ -839,6 +823,7 @@ class Application(TermBase, monoidal.Application):
         return self.wire(functor, wiring, self.dom) >> super().eval(functor)
 
 
+@TermBase.extend
 class Kappa(TermBase, monoidal.Kappa):
     """
     The abstraction of a block of ``variables`` of the ``body``, as in a
@@ -868,7 +853,6 @@ class Kappa(TermBase, monoidal.Kappa):
     ValueError: Expected a block of variables next to the stack of f(b), \
 got a, b.
     """
-    above = None
 
     @staticmethod
     def used(variables, body) -> tuple:
@@ -935,9 +919,6 @@ got a, b.
         return self.wire(functor, wiring, self.dom) >> body.eval(functor)
 
 
-TermBase.functor = Functor.id(Diagram)
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa
 Diagram.TermBase = Ty.TermBase = TermBase
 
 

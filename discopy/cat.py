@@ -137,6 +137,7 @@ from discopy.testable import (
     FUEL, GENERATORS, Equation as AbstractEquation, Equivalence, Rule,
     Serialisable, TestableGeneric, axiom)
 from discopy.utils import (  # noqa: F401
+    classproperty,
     factory,
     factory_key,
     factory_name,
@@ -2063,11 +2064,14 @@ class TermBase(Serialisable, AlphaEquivalence):
     offset: int | None
     cod: Any
     serialised_attrs: ClassVar[tuple[str, ...]]
-    functor: ClassVar[Functor]
     Variable: ClassVar[type[Variable]]
     Constant: ClassVar[type[Constant]]
     Application: ClassVar[type[Application]]
     Kappa: ClassVar[type[Kappa]]
+    arrow: ClassVar[type] = Arrow
+    functor = classproperty(lambda cls: cls.arrow.Functor.id(cls.arrow))
+    factory = classproperty(lambda cls: next(
+        level for level in cls.__mro__ if "arrow" in vars(level)))
 
     strategy = classmethod(AlphaEquivalence.strategy.__func__)
 
@@ -2120,7 +2124,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         """ The types of one wire a type is made of: itself, if any. """
         return [typ] if typ else []
 
-    def types(self, variables: Sequence[Variable]):
+    def types(self, variables: Sequence["Variable"]):
         """ The type of some variables: that of the one of a category. """
         variable, = variables
         return variable.cod
@@ -2131,7 +2135,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         return self.stack or self.types(self.freevars)
 
     @property
-    def constants(self) -> list[Constant]:
+    def constants(self) -> list["Constant"]:
         """ The constants of the term, in order of occurrence. """
         return []
 
@@ -2206,7 +2210,7 @@ class TermBase(Serialisable, AlphaEquivalence):
             arguments, self)
 
     def substitute(
-            self, substitution: dict[Variable, TermBase]) -> TermBase:
+            self, substitution: dict["Variable", TermBase]) -> TermBase:
         """
         The term with terms of no stack substituted for free variables,
         each in place and renaming the bound variables it would capture.
@@ -2224,7 +2228,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         # pylint: disable=unused-argument  # a constant has no variable
         return self
 
-    def count(self, variable: Variable) -> int:
+    def count(self, variable: "Variable") -> int:
         """
         The number of free occurrences of a variable: at most one in a
         linear term, any number where variables are copied and discarded,
@@ -2250,7 +2254,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         return self.freevars[:offset], self.stack, self.freevars[offset:]
 
     @classmethod
-    def bind(cls, variables: Sequence[Variable], body: TermBase,
+    def bind(cls, variables: Sequence["Variable"], body: TermBase,
              offset: int = 0) -> TermBase:
         """
         The kappa of some variables in a body, at the ``offset`` only when
@@ -2295,7 +2299,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         >>> f = Constant(Box('f', x, x))
         >>> assert f.expand() == x(lambda x: f(x))
         """
-        variables: list[Variable] = []
+        variables: list["Variable"] = []
         for typ in self.wires(self.stack):
             variables.append(self.Variable.fresh(
                 "x", typ, self, *variables))
@@ -2377,7 +2381,7 @@ class TermBase(Serialisable, AlphaEquivalence):
 
     @staticmethod
     def bound_name(letters: Sequence[str | None], level: int,
-                   shadowed: Variable | None = None) -> str:
+                   shadowed: "Variable | None" = None) -> str:
         """
         The name of the variable bound at a level: its letter and the level,
         or the name of the variable it ``shadowed`` when the letter is
@@ -2468,6 +2472,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         return AbstractEquation(diagram.to_term().eval(), diagram)
 
 
+@TermBase.slot
 class Variable(TermBase):
     """
     A variable with a name and a type, an identity arrow.
@@ -2537,6 +2542,7 @@ class Variable(TermBase):
         return cls(name, cod)
 
 
+@TermBase.slot
 class Constant(TermBase):
     """
     A box as a term, with its domain as stack. It prints as the name of the
@@ -2576,6 +2582,7 @@ class Constant(TermBase):
         return self.identity(functor)(self.box)
 
 
+@TermBase.slot
 class Application(TermBase):
     """
     The application of a term to an argument with no stack, of the type of
@@ -2676,6 +2683,7 @@ type y.
                 scopes, [other.arg for other in others], depth)
 
 
+@TermBase.slot
 class Kappa(TermBase):
     """
     The abstraction of the variable of a ``body`` with no stack: it becomes
@@ -2852,14 +2860,15 @@ class Kappa(TermBase):
         first: those of a category that has the boxes of its constants. A
         kappa that this level refuses is of the lowest that accepts it,
         e.g. only a category with discards binds a variable its body does
-        not use.
+        not use. Each level names the one above it itself, a kappa built
+        for a level that adds no way to bind a variable inherits none.
         """
-        level = cls.above
+        level = vars(cls).get("above")
         while level is not None and all(
                 issubclass(constant.box.ar, level.functor.cod)
                 for constant in body.constants):
             yield level
-            level = level.above
+            level = vars(level).get("above")
 
 
 type Term = Variable | Constant | Application | Kappa
@@ -2888,24 +2897,16 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
     return kappa(body)(expression)
 
 
-TERMS = {
-    "TermBase": "A term of the kappa calculus of :mod:`~discopy.{}`.",
-    "Variable": "A variable of the terms of :mod:`~discopy.{}`.",
-    "Constant": "A box of :mod:`~discopy.{}` as a term.",
-    "Application": "An application of terms of :mod:`~discopy.{}`.",
-    "Kappa": "A kappa abstraction of terms of :mod:`~discopy.{}`."}
-
-
-def kappa_calculus(
-        diagram: type) -> tuple[type, type, type, type, type]:
+def kappa_calculus(diagram: type) -> type:
     """
-    The :class:`TermBase`, :class:`Variable`, :class:`Constant`,
-    :class:`Application` and :class:`Kappa` of a level of the hierarchy
-    that adds no way to bind a variable, generated rather than written by
-    hand: each subclasses the one of every level ``diagram`` subclasses and
-    lives in its module. The terms evaluate in ``diagram`` by default, are
-    generated with its boxes and read its structural boxes, e.g. a braid,
-    as constants like any other.
+    The :class:`TermBase` of a level of the hierarchy that adds no way to
+    bind a variable, generated rather than written by hand: it subclasses
+    the one of every level ``diagram`` subclasses, lives in its module and
+    builds its :class:`Variable`, :class:`Constant`, :class:`Application`
+    and :class:`Kappa` as any slot does, see
+    :class:`~discopy.testable.Slot`. The terms evaluate in ``diagram`` by
+    default, are generated with its boxes and read its structural boxes,
+    e.g. a braid, as constants like any other.
 
     This is for the levels below :mod:`~discopy.biclosed`: from there up a
     type applied to a Python function is a lambda abstraction, see
@@ -2918,32 +2919,24 @@ def kappa_calculus(
 
     Example
     -------
-    >>> from discopy.braided import Ty, Box, Braid, Diagram, Kappa, Constant
+    >>> from discopy.braided import Ty, Box, Braid, Diagram, Kappa
     >>> x, y = Ty('x'), Ty('y')
     >>> f = Box('f', y @ x, x)
     >>> term = (Braid(x, y) >> f).to_term()
     >>> print(term)
     (x @ y)(lambda x0, x1: let(Braid(x, y)(x0, x1), lambda x2, x3: f(x2, x3)))
     >>> assert isinstance(term, Kappa) and term.eval() == Braid(x, y) >> f
-    >>> assert Kappa.__mro__[2].__module__ == "discopy.monoidal"
+    >>> assert Kappa is Diagram.TermBase.Kappa
     """
     parents: list = list(dict.fromkeys(
         base.TermBase for base in diagram.__bases__
         if hasattr(base, "TermBase")))
-    module, level = diagram.__module__, diagram.__module__.split('.')[-1]
-    base = subclass("TermBase", parents, module, TERMS["TermBase"].format(
-        level))
+    module = diagram.__module__
+    base = subclass("TermBase", parents, module, (
+        f"A term of the kappa calculus of :mod:`~{module}`."))
     base.strategy = classmethod(TermBase.strategy.__func__)
-    base.functor = diagram.Functor.id(diagram)
-    for name in ("Variable", "Constant", "Application", "Kappa"):
-        attr = name
-        former = subclass(name, [base] + [
-            getattr(parent, attr) for parent in parents
-        ], module, TERMS[name].format(level))
-        setattr(base, attr, former)
-    base.Kappa.above, diagram.TermBase = None, base
-    return (base, base.Variable, base.Constant,
-            base.Application, base.Kappa)
+    base.arrow, diagram.TermBase = diagram, base
+    return base
 
 
 class AlphaEquation(AbstractEquation):
@@ -2963,8 +2956,5 @@ class AlphaEquation(AbstractEquation):
         return term.alpha_eq(*others)
 
 
-TermBase.functor = Functor.id(Arrow)
 Arrow.TermBase = TermBase
 TermBase.Equation = AlphaEquation
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa

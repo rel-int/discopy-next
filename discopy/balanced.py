@@ -479,9 +479,7 @@ class Equation(braided.Equation):
     """ The :class:`braided.Equation` of balanced diagrams. """
 
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
-    Diagram)
-Term = Variable | Constant | Application | Kappa
+TermBase = kappa_calculus(Diagram)
 
 
 Bubble = Diagram.Box.from_args

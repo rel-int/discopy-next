@@ -3160,6 +3160,7 @@ class TermBase(cat.TermBase):
     cod: Ty
     Sampler: ClassVar[type[Sampler]]
 
+    arrow = Diagram
     strategy = classmethod(cat.TermBase.strategy.__func__)
 
     @staticmethod
@@ -3286,6 +3287,7 @@ class TermBase(cat.TermBase):
         .failing(messages.STATEMENTS_DO_NOT_COMMUTE)
 
 
+@TermBase.extend
 class Variable(TermBase, cat.Variable):
     """
     A variable with a name and a type of one wire, an identity diagram.
@@ -3311,6 +3313,7 @@ class Variable(TermBase, cat.Variable):
         self.stack = cod[:0]
 
 
+@TermBase.extend
 class Constant(TermBase, cat.Constant):
     """
     A box as a term, with its domain as stack. It prints as the name of the
@@ -3329,6 +3332,7 @@ class Constant(TermBase, cat.Constant):
     """
 
 
+@TermBase.extend
 class Application(TermBase, cat.Application):
     """
     The application of a term to an argument with no stack, which takes the
@@ -3387,6 +3391,7 @@ type y.
         return left @ self.arg.eval(functor) @ right >> func.eval(functor)
 
 
+@TermBase.extend
 class Kappa(TermBase, cat.Kappa):
     """
     The abstraction of a block of ``variables`` of the ``body``, contiguous
@@ -3594,6 +3599,7 @@ class InterchangeEquation(Equation):
         return result
 
 
+@TermBase.slot
 @dataclass
 class Sampler:
     """
@@ -3696,10 +3702,7 @@ class Sampler:
         return self.terms.bind(variables, body, len(left))(expression)
 
 
-TermBase.functor, TermBase.Sampler = Functor.id(Diagram), Sampler
 Diagram.TermBase = TermBase
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa
 
 __getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
 

@@ -273,7 +273,7 @@ class Exchange(bang.Exchange, Box):
 
 Id = Term.id
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Term)
+TermBase = kappa_calculus(Term)
 Ty.TermBase = TermBase
 
 export(__name__)

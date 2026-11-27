@@ -1005,6 +1005,7 @@ class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
     >>> print(diagram.to_term().normal_form())
     (x @ x)(lambda x0, x1: f(x1, g(x0)))
     """
+    arrow = Diagram
     strategy = classmethod(balanced.TermBase.strategy.__func__)
 
     @classmethod
@@ -1047,39 +1048,8 @@ class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
         return Equation(diagram.to_term().eval(), diagram)
 
 
-class Variable(TermBase, balanced.Variable):  # ty: ignore[unsupported-base]
-    """
-    A variable with a name and a type of one wire, an identity diagram.
-
-    Parameters:
-        name : The name of the variable.
-        cod : The type of the variable.
-    """
-
-
-class Constant(TermBase, balanced.Constant):  # ty: ignore[unsupported-base]
-    """
-    A box as a term, with its domain as stack.
-
-    Parameters:
-        box : The box.
-    """
-
-
-class Application(
-        TermBase, balanced.Application):  # ty: ignore[unsupported-base]
-    """
-    The application of a term to an argument with no stack, as in a
-    monoidal category: the context of the argument goes where the first
-    inputs of the stack were.
-
-    Parameters:
-        func : The term that is applied.
-        arg : The argument, a term with no stack.
-    """
-
-
-class Kappa(TermBase, balanced.Kappa):  # ty: ignore[unsupported-base]
+@TermBase.extend
+class Kappa(TermBase, balanced.Kappa):
     """
     The abstraction of some of the free ``variables`` of the ``body``, in
     any order and from anywhere in its context: they join its stack, which
@@ -1125,7 +1095,8 @@ class Kappa(TermBase, balanced.Kappa):  # ty: ignore[unsupported-base]
         anchor = body.offset if body.stack else body.freevars.index(used[0])
         return len(set(body.freevars[:anchor]).difference(variables))
 
-    def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
+    def __init__(self, variables: tuple[cat.Variable, ...],
+                 body: cat.TermBase,
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # no block of variables
         assert_isinstance(body, cat.TermBase)
@@ -1147,9 +1118,7 @@ class Kappa(TermBase, balanced.Kappa):  # ty: ignore[unsupported-base]
         return self.wire(functor, wiring, self.dom) >> body.eval(functor)
 
 
-type Term = Variable | Constant | Application | Kappa
-
-
+@TermBase.extend
 @dataclass
 class Sampler(monoidal.Sampler):
     """
@@ -1170,9 +1139,6 @@ class Sampler(monoidal.Sampler):
         return bound[start:] + bound[:start]
 
 
-TermBase.functor, TermBase.Sampler = Functor.id(Diagram), Sampler
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa
 Diagram.TermBase, monoidal.Kappa.above = TermBase, Kappa
 
 

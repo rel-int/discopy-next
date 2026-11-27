@@ -484,7 +484,7 @@ def export(module_name: str) -> None:
     module = sys.modules[module_name]
     for level in list(vars(module).values()):
         if not isinstance(level, type)\
-                or vars(level).get("factory") is not level\
+                or getattr(level, "factory", None) is not level\
                 or level.__module__ != module_name:
             continue
         for name, slot in slots(level).items():
@@ -522,7 +522,8 @@ def exports(module_name: str) -> Callable[[str], type]:
         from discopy.testable import slots
         module = sys.modules[module_name]
         for level in list(vars(module).values()):
-            if isinstance(level, type) and vars(level).get("factory") is level\
+            if isinstance(level, type)\
+                    and getattr(level, "factory", None) is level\
                     and level.__module__ == module_name:
                 value = getattr(level, name, None)
                 if not isinstance(value, type) and name in slots(level):

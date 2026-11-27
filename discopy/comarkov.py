@@ -581,9 +581,7 @@ class Equation(symmetric.Equation):
     up_to = staticmethod(Diagram.to_hypergraph)
 
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
-    Diagram)
-Term = Variable | Constant | Application | Kappa
+TermBase = kappa_calculus(Diagram)
 
 
 Bubble = Diagram.Box.from_args

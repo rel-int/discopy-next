@@ -329,9 +329,7 @@ class Equation(monoidal.Equation):
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
-TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
-    Diagram)
-Term = Variable | Constant | Application | Kappa
+TermBase = kappa_calculus(Diagram)
 
 
 Bubble = Diagram.Box.from_args

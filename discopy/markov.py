@@ -963,6 +963,7 @@ class TermBase(symmetric.TermBase):
     >>> assert Equation(unused.to_term().eval(), unused)
     >>> assert not Equation(unused, Diagram.discard(x) @ x)
     """
+    arrow = Diagram
     strategy = classmethod(symmetric.TermBase.strategy.__func__)
 
     @classmethod
@@ -989,25 +990,7 @@ class TermBase(symmetric.TermBase):
         return Equation(term.expand().eval(), term.eval())
 
 
-class Variable(TermBase, symmetric.Variable):
-    """
-    A variable with a name and a type of one wire, an identity diagram.
-
-    Parameters:
-        name : The name of the variable.
-        cod : The type of the variable.
-    """
-
-
-class Constant(TermBase, symmetric.Constant):
-    """
-    A box as a term, with its domain as stack.
-
-    Parameters:
-        box : The box.
-    """
-
-
+@TermBase.extend
 class Application(TermBase, symmetric.Application):
     """
     The application of a term to an argument with no stack: the variables
@@ -1052,6 +1035,7 @@ class Application(TermBase, symmetric.Application):
         return self.wire(functor, wiring, self.dom) >> super().eval(functor)
 
 
+@TermBase.extend
 class Kappa(TermBase, symmetric.Kappa):
     """
     The abstraction of some ``variables`` in a ``body``, in any order and
@@ -1088,9 +1072,7 @@ class Kappa(TermBase, symmetric.Kappa):
         return len(set(variables)) == len(variables)
 
 
-type Term = Variable | Constant | Application | Kappa
-
-
+@TermBase.extend
 @dataclass
 class Sampler(symmetric.Sampler):
     """
@@ -1115,9 +1097,6 @@ class Sampler(symmetric.Sampler):
             else bound[1:] if kind == 2 else bound
 
 
-TermBase.functor, TermBase.Sampler = Functor.id(Diagram), Sampler
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa
 Diagram.TermBase, symmetric.Kappa.above = TermBase, Kappa
 
 

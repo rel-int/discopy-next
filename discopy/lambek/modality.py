@@ -136,27 +136,9 @@ class Functor(bang.Functor, categorial.Functor):
 
 class TermBase(bang.TermBase):
     """ A kappa term of ``!L*``, see :class:`~discopy.bang.TermBase`. """
+    arrow = Diagram
 
 
-class Variable(TermBase, bang.Variable):
-    """ A variable of ``!L*``. """
-
-
-class Constant(TermBase, bang.Constant):
-    """ A box of ``!L*`` as a term. """
-
-
-class Application(TermBase, bang.Application):
-    """ An application of ``!L*``, which shares banged variables. """
-
-
-class Kappa(TermBase, bang.Kappa):
-    """ A kappa abstraction of ``!L*``. """
-
-
-TermBase.functor = Functor.id(Diagram)
-TermBase.Variable, TermBase.Constant = Variable, Constant
-TermBase.Application, TermBase.Kappa = Application, Kappa
 Diagram.TermBase = Ty.TermBase = TermBase
 
 export(__name__)
