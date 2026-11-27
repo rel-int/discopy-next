@@ -9,6 +9,7 @@ drawing
 
     planegraph
     backend
+    bracketing
     typst_ast
     widget
     nicer

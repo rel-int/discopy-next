@@ -48,6 +48,7 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "bubble_opening": lambda _: False,
     "bubble_closing": lambda _: False,
     "frame_boundary": lambda _: False,
+    "draw_as_bracket": lambda _: False,  # The dotted frame of a bracket.
     "frame_colour": lambda _: "lightgrey",
     # Whether a reflection of the drawing, not the dagger of the diagram,
     # mirrors the drawings nested in a box.

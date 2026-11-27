@@ -826,7 +826,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
                  getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
-            for flag in ("frame_boundary", "always_draw_label"):
+            for flag in (
+                    "frame_boundary", "always_draw_label", "draw_as_bracket"):
                 if getattr(old, flag, False):
                     setattr(new, flag, True)
             for attr, default in (
