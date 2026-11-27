@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `generator_strategy(dom=..., cod=..., name=...)` draws the generator of a given name between
+  given objects wherever terms are derived from generators: a box of a free category
+  (`Box.strategy` takes `name`), its image in `Hypergraph[C]` and `CMap[C]`, and any matrix of
+  `Matrix`, which has no name, so that a sampler outside discopy can make the leaves of the
+  terms it derives with one call per class.
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args

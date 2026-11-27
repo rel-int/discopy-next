@@ -3150,6 +3150,13 @@ class Hypergraph[category](
         return dom, cod, box_types, wires, opened
 
     @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None, name=None):
+        """ Generate the generators of the hypergraphs of a category: the
+        image of one of its generators, see :meth:`from_box`. """
+        return cls.category.generator_strategy(
+            dom=dom, cod=cod, name=name).map(cls.from_box)
+
+    @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
         """
         Turn a box into a hypergraph with binary spiders for each wire.

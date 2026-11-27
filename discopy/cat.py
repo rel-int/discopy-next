@@ -370,12 +370,14 @@ class FreeCategory(Category):
         return terms()
 
     @classmethod
-    def generator_strategy(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None, name=None):
         """
         Generate the generators of the free category as terms of it, from
-        ``dom`` to ``cod`` when given: a path of one :attr:`Atom`.
+        ``dom`` to ``cod`` when given, named ``name`` when given: a path of
+        one :attr:`Atom`.
         """
-        return cls.Atom.strategy(dom=dom, cod=cod).map(
+        named = {} if name is None else {"name": name}
+        return cls.Atom.strategy(dom=dom, cod=cod, **named).map(
             lambda generator: cls.ar(
                 inside=(generator, ), dom=generator.dom, cod=generator.cod))
 
@@ -475,9 +477,18 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         return cls.search(**params)
 
     @classmethod
-    def generator_strategy(cls, *, dom=None, cod=None):
-        """ Generate the boxes of the category, see :meth:`Box.strategy`. """
-        return cls.Box.strategy(dom=dom, cod=cod)
+    def generator_strategy(cls, *, dom=None, cod=None, name=None):
+        """ Generate the boxes of the category, named ``name`` when given,
+        see :meth:`Box.strategy`.
+
+        >>> from hypothesis import find
+        >>> x, y = Ob('x'), Ob('y')
+        >>> box = find(Arrow.generator_strategy(dom=x, cod=y, name="f"),
+        ...            lambda _: True)
+        >>> assert box == Box("f", x, y)
+        """
+        named = {} if name is None else {"name": name}
+        return cls.Box.strategy(dom=dom, cod=cod, **named)
 
     def __setstate__(self, state):
         if '_dom' in state:  # Backward compatibility
@@ -825,18 +836,20 @@ cat.Ob('y'), data=[42]),))
 
     @classmethod
     def strategy(
-            cls, *, types=None, dom=None, cod=None):
+            cls, *, types=None, dom=None, cod=None, name=None):
         """
         Generate fresh free boxes with optional exact boundaries, each named
-        by an identifier, as the law of :meth:`str_transparency` asks.
+        by an identifier, as the law of :meth:`str_transparency` asks, or
+        by ``name`` when given.
         """
         from hypothesis import strategies as st
 
         types = cls.ob.strategy() if types is None else types
         doms = types if dom is None else st.just(dom)
         cods = types if cod is None else st.just(cod)
-        return st.tuples(st.uuids(), doms, cods).map(
-            lambda args: cls(f"f_{args[0].hex}", args[1], args[2]))
+        names = st.uuids().map(lambda uuid: f"f_{uuid.hex}")\
+            if name is None else st.just(name)
+        return st.tuples(names, doms, cods).map(lambda args: cls(*args))
 
     def __setstate__(self, state):
         if '_name' in state:  # Backward compatibility
