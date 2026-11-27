@@ -466,24 +466,43 @@ python -m build
 
 ## Add a changelog entry
 
-Every user-facing change adds one bullet to the `[Unreleased]` section of
-[CHANGELOG.md](CHANGELOG.md), under its heading (Keep a Changelog's `Added`, `Changed`,
-`Deprecated`, `Removed`, `Fixed`, or `Project` for the repo's own tooling and process), citing
-the pull request as a reference link defined with the others at the bottom of the file:
-`[#N]` for discopy/discopy, `[next#N]` for rel-int/discopy-next. A merge conflict there resolves by hand to `main`'s
-file plus your own bullet(s), since git's union merge can bring back lines one side deleted.
+Every user-facing change adds a fragment to [`changelog.d/`](changelog.d/), one file per
+entry, rather than a line of [CHANGELOG.md](CHANGELOG.md), so that two pull requests never
+conflict on it. A fragment is `changelog.d/<slug>.<section>.md`: `<slug>` is the name of the
+branch, `/` read as `-`, and `<section>` one of `added`, `changed`, `deprecated`, `removed`,
+`fixed`, or `project` for the repo's own tooling and process (Keep a Changelog's headings). A
+second entry in the same section is `<slug>.<section>.2.md`. Its text is the bullet without
+its `- `, citing the pull request as an inline link, `[next#N](https://github.com/rel-int/discopy-next/pull/N)`
+for rel-int/discopy-next, `[#N](https://github.com/discopy/discopy/pull/N)` for
+discopy/discopy, e.g. `changelog.d/amp-qp-layout.added.md`:
+
+```markdown
+`discopy.drawing.optimiser`, a layout by quadratic programming
+([next#688](https://github.com/rel-int/discopy-next/pull/688)).
+```
+
+The `changelog` workflow fails a pull request that changes `discopy/` and adds no fragment,
+and one that adds a fragment named otherwise; label the pull request `no-changelog` when
+nobody using DisCoPy would notice the change.
 
 ## Record a design decision
 
 A design decision, i.e. a ruling on how the library is shaped rather than a fix or a feature, gets
-one [architecture decision record](docs/adr/index.md) in `docs/adr/`, in the pull request that
-makes the change. The changelog says what changed; the record says why, and a decision that
-reverses it supersedes it with a new one.
+one [architecture decision record](docs/adr/index.md) in `docs/adr/`, named
+`YYYY-MM-DD-<slug>.md` after the day it is accepted, in the pull request that makes the change.
+The changelog says what changed; the record says why, and a decision that reverses it supersedes
+it with a new one. A record has no number on this repo: it gets one when it is sliced upstream.
 
 ## Release a version
 
-Before tagging, rename the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md) to the new
-version and date, and commit it.
+Before tagging, compile the fragments into a section of [CHANGELOG.md](CHANGELOG.md) for the
+new version with [towncrier](https://towncrier.readthedocs.io), configured in
+`pyproject.toml`, which deletes them, and commit both:
+
+```shell
+uvx towncrier build --version X.X.X --draft  # read it first
+uvx towncrier build --version X.X.X --yes
+```
 
 New versions (tag with 'X.X.X') of the package are released on [PyPI](https://pypi.org/project/discopy/) using `uv publish`.
 You should run the following commands from a clean clone of the repo:

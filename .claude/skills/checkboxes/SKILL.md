@@ -1,6 +1,6 @@
 ---
 name: checkboxes
-description: Start, claim, tick, extend and finish a branch's TODO.md on discopy-next (RULES.md 1-3), one command per step, each one commit pushed; finish checks the CHANGELOG.md bullet and its link definitions. Use instead of editing TODO.md by hand for a mutex claim, a ticked box, a review round or the deletion that hands a PR to review.
+description: Start, claim, tick, extend and finish a branch's TODO.md on discopy-next (RULES.md 1-3), one command per step, each one commit pushed; finish checks the branch adds a changelog.d/ fragment. Use instead of editing TODO.md by hand for a mutex claim, a ticked box, a review round or the deletion that hands a PR to review.
 ---
 
 # checkboxes
@@ -28,6 +28,6 @@ next-coordinator's `new-worktree.sh` does it) plus `--trailer LINE`; the session
   and pushed once more; any other push or commit failure is undone and reported.
 - A claim older than 12 h is stale and reclaimable; one with no date needs `--force`, as does
   `done` on someone's fresh claim or on an unclaimed box (`--filed` needs no claim).
-- `finish` needs a new bullet under `## [Unreleased]` in HEAD's CHANGELOG.md since the merge
-  base with `--base` (default `origin/main`), a definition for each ref it cites, new
-  definitions in number order. `--no-changelog` (no user-facing change) only warns.
+- `finish` needs a fragment added to `changelog.d/` since the merge base with `--base` (default
+  `origin/main`), and every fragment the branch adds or edits named
+  `changelog.d/<slug>.<section>.md`. `--no-changelog` (no user-facing change) only warns.

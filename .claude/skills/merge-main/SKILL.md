@@ -31,3 +31,7 @@ Edge cases: a plain `git merge`/`git pull` uses the driver once the SessionStart
 `merge.changelog.driver`; without it (no hook, or GitHub's "Update branch" button) git merges
 CHANGELOG.md as text. The driver keeps CRLF and odd bytes; identical bullets added on both sides
 appear once.
+
+A branch cut before `changelog.d/` still adds bullets under `## [Unreleased]`: the driver keeps
+them there. Move each into a fragment, `changelog.d/<slug>.<section>.md` with its links inline,
+and take `main`'s CHANGELOG.md, which holds released versions only.
