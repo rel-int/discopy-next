@@ -18,6 +18,6 @@
 - [WIP] @T-7f2f8ff8-2026-11-27 20:08 compact.py:193 compact.Swap is a ribbon.Braid again
 - [x] compact.py:214 delayed compact boxes through traced.Functor: check, answer
 - [x] feedback/cat.py:234 Arrow.generator_factory is feedback.cat.Box
-- [WIP] @T-7f2f8ff8-2026-11-27 20:08 feedback/cat.py:97 a delayed bubble prints its reset bubble, delayed
+- [x] feedback/cat.py:97 a delayed bubble prints its reset bubble, delayed
 - [WIP] @T-7f2f8ff8-2026-11-27 20:08 feedback/cat.py:196 Box.from_tree checks its time step as __init__ does
 - [WIP] @T-7f2f8ff8-2026-11-27 20:08 linear/symmetric.py:64 permutation-aware linear terms (codex and cubic): file as an issue
