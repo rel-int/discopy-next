@@ -927,6 +927,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `quantum.tk.to_tk` drops destructively measured qubits when
+  `Measure(override_bits=True)` overrides existing bits, so gates and
+  measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
+  phases and backend tensor entries without calling `numpy.ravel`,
+  `circuit.Box.array` stacks backend scalars with `matrix.asarray`,
+  `QuantumGate.is_deterministic` detaches tensors before converting to NumPy
+  and `U1.array` converts its constants in the active backend, so `CRz`,
+  `CRx`, `CU1` and `QuantumGate` keep gradients under PyTorch and JAX
+  ([next#445]).
 - The API docs show short names: a page is titled with the last part of its
   name, which it lost when its package did not import it, e.g.
   `neural.cell`, module tables and references to modules and objects drop
