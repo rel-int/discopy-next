@@ -375,8 +375,8 @@ class Diagram(symmetric.Diagram, DaggerDataflowCategory):
         The stream of a dataflow diagram, in the :attr:`stream_factory` of
         the free category on its boxes: a wire ``x`` goes to the sequence
         ``x0, x1, ...``, or to ``x`` at each step when it is constant, and a
-        box ``f`` to the sequence ``f0, f1, ...`` with the :data:`FLAGS` of
-        ``f``.
+        box ``f`` to the sequence ``f0, f1, ...`` with the data and the
+        :data:`FLAGS` of ``f``.
 
         >>> x = Ty(Wire('x', is_constant=False))
         >>> f = Box('f', x, x)
@@ -395,6 +395,7 @@ class Diagram(symmetric.Diagram, DaggerDataflowCategory):
         def ar(box):
             flags = {flag: getattr(box, flag) for flag in FLAGS
                      if hasattr(cod.category.box_factory, flag)}
+            flags["data"] = box.data
             return cod.sequence(
                 str(box), functor(box.dom), functor(box.cod),
                 box_factory=lambda *args: cod.category.box_factory(

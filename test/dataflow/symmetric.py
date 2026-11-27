@@ -139,3 +139,10 @@ def test_up_to_streams_tells_apart_what_the_laws_identify():
     assert up_to_streams((f >> Box('h', y, x)).tail)\
         != up_to_streams(f.tail >> Box('k', y, x).tail)
 
+
+def test_to_stream_keeps_the_data_of_a_box():
+    x = Ty(Wire('x', is_constant=False))
+    f, g = Box('f', x, x, data=1), Box('f', x, x, data=2)
+    assert f.to_stream().later.now.data == 1
+    assert up_to_streams(f) != up_to_streams(g)
+
