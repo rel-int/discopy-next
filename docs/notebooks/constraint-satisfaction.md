@@ -93,7 +93,7 @@ Before searching or learning, [`Language.propagate`](../../_api/discopy.csp.Lang
 It never discards a value that some solution takes, and [`Language.holds`](../../_api/discopy.csp.Language.holds.html) checks whether a complete assignment satisfies every constraint of the instance.
 
 On the tree-shaped maze, `propagate` narrows all 16 edges to singletons — the unique path of length 10 from `S` to `G`.
-On a $4 \times 4$ Sudoku with five clues, `propagate` likewise deduces the whole board; drop one clue to restore the symmetry between digits `1` and `2`, and arc consistency stops with pairs of candidates on the eight unfixed cells.
+On a $4 \times 4$ Sudoku with five clues, `propagate` likewise deduces the whole board; drop one clue to restore the symmetry between digits `2` and `3` (values `1` and `2` in code), and arc consistency stops with pairs of candidates on the eight unfixed cells.
 
 ```python {.marimo}
 maze_domains = maze_language.propagate(maze_graph)
