@@ -15,7 +15,7 @@ delayed.
 Note that these diagrams are planar, so that e.g. :mod:`~discopy.pivotal`
 diagrams are traced in this sense. See :mod:`~discopy.symmetric` for the usual
 notion of trace, :mod:`~discopy.markov` for the syntax of streams and
-:mod:`discopy.stream` for its interpretation, the main example of a feedback
+:mod:`~discopy.stream` for its interpretation, the main example of a feedback
 category.
 
 Summary
@@ -93,13 +93,13 @@ and a left trace with ``left=True``:
 .. image:: /_static/traced/left-trace.svg
     :align: center
 
-The laws are stated once on :class:`discopy.abc.FeedbackCategory`, those of
+The laws are stated once on :class:`~discopy.abc.FeedbackCategory`, those of
 a traced category being the same laws with the delay the identity, plus
-yanking from :class:`discopy.abc.TracedCategory`. Under each law, feedback
+yanking from :class:`~discopy.abc.TracedCategory`. Under each law, feedback
 comes first, checked on the nose where it can be and otherwise drawn and
 checked up to a functor into streams, then the trace on symmetric diagrams,
 checked on the nose for vanishing and joining and otherwise with
-:class:`discopy.symmetric.Equation`, i.e. up to hypergraph isomorphism:
+:class:`~discopy.symmetric.Equation`, i.e. up to hypergraph isomorphism:
 equality of planar traced diagrams is not implemented.
 
 >>> from discopy import stream, symmetric
@@ -202,7 +202,8 @@ this can only be checked up to extensional equivalence of streams.
     :align: center
 
 For a trace, the delay is the identity and the morphism slides without
-delay, up to the hypergraph isomorphism of :class:`discopy.symmetric.Equation`:
+delay, up to the hypergraph isomorphism of
+:class:`~discopy.symmetric.Equation`:
 
 >>> sliding_left = symmetric.Equation(
 ...     (t >> k @ s).trace(left=True),
@@ -288,7 +289,7 @@ class Wire(monoidal.Wire):
     `is_constant` for whether the object is interpreted as a constant stream.
 
     The time step and constancy are keywords, so that a wire of a level below,
-    e.g. a :class:`discopy.pivotal.Wire`, passes its own arguments through.
+    e.g. a :class:`~discopy.pivotal.Wire`, passes its own arguments through.
 
     Parameters:
         name : The name of the object.
@@ -558,7 +559,7 @@ class Diagram(monoidal.Diagram, TracedCategory):
         back is the memory itself and :attr:`feedback_factory` when it is its
         delay. The keyword form ``dom``, ``cod``, ``mem`` is primary, the
         positional ``n`` its fallback, see
-        :meth:`discopy.abc.FeedbackCategory.split_memory`.
+        :meth:`~discopy.abc.FeedbackCategory.split_memory`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> f = Box('f', x @ (x @ y).delay(), x @ x @ y)
@@ -1415,7 +1416,7 @@ def structural_boxes(
     written by hand: each subclasses the one of every level ``diagram``
     subclasses and ``box``, lives in their module and is bound to the
     factory of ``diagram`` that builds it. A level whose trace is not a
-    bubble, e.g. made of cups and caps in :mod:`discopy.pivotal`, keeps its
+    bubble, e.g. made of cups and caps in :mod:`~discopy.pivotal`, keeps its
     own :attr:`Diagram.trace_factory`.
 
     Parameters:

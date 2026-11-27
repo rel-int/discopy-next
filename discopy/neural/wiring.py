@@ -19,7 +19,7 @@ route messages along it is a table of indices:
   with DisCoPy compiles to the same tables;
 * :func:`decompose` and :func:`families` read a wiring invariant under a
   group of symmetries as signed sums of :class:`Block`, the partitions the
-  group's orbitals are made of, which :mod:`discopy.neural.geometric` sums
+  group's orbitals are made of, which :mod:`~discopy.neural.geometric` sums
   over by reductions rather than gathers.
 
 The tables are tuples of integers, so this module imports no tensor

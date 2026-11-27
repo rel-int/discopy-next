@@ -233,7 +233,7 @@ class Hypergraph[category](
     - an optional mapping :class:`SpiderTypes` from spiders to types
     - an optional mapping :class:`Phases` from spiders to phases, over a
       hypergraph category whose spiders have phases, e.g.
-      :class:`discopy.quantum.zx.Hypergraph`
+      :class:`~discopy.quantum.zx.Hypergraph`
 
     A :class:`Boundary` is just a pair of input and output :class:`Wires`.
 
@@ -403,7 +403,7 @@ class Hypergraph[category](
     def reduce_phase(phase):
         """
         The phase a spider keeps for a given one, the phase itself here and
-        modulo a turn in :class:`discopy.quantum.zx.Hypergraph`.
+        modulo a turn in :class:`~discopy.quantum.zx.Hypergraph`.
         """
         return phase
 
@@ -714,7 +714,7 @@ class Hypergraph[category](
     def permutation(cls, xs: Sequence[int], doms: Sequence) -> "Hypergraph":
         """
         The hypergraph that encodes a given permutation, with the same
-        semantics as :meth:`discopy.symmetric.Diagram.permutation` but
+        semantics as :meth:`~discopy.symmetric.Diagram.permutation` but
         built directly as wires rather than as a chain of swap boxes,
         i.e. in time linear rather than quadratic in ``len(xs)``.
 
@@ -763,10 +763,10 @@ class Hypergraph[category](
         """
         Raise ``AxiomError`` unless ``right`` is the right adjoint of
         ``left``, asked of the objects when they know, as
-        :class:`discopy.rigid.Ty` does, otherwise the adjoint of a type is
+        :class:`~discopy.rigid.Ty` does, otherwise the adjoint of a type is
         its wires in reverse order, each its own adjoint: a type with no
         adjoints has no dagger to take of them either, which ``left[::-1]``
-        would, e.g. turning the shape of a :class:`discopy.tensor.Dim`.
+        would, e.g. turning the shape of a :class:`~discopy.tensor.Dim`.
 
         >>> from discopy.neural.network import Dims
         >>> from discopy.tensor import Dim
@@ -813,7 +813,7 @@ class Hypergraph[category](
         """
         The caps of a type and its left adjoint, e.g. ``Cap(x, x.l)`` and
         ``Cap(x.r, x)``, read the other way round from :meth:`cups` as
-        :class:`discopy.rigid.Cap` is from :class:`discopy.rigid.Cup`: boxes
+        :class:`~discopy.rigid.Cap` is from :class:`~discopy.rigid.Cup`: boxes
         over a rigid category that is not compact and wiring from compact
         categories on.
 
@@ -840,7 +840,7 @@ class Hypergraph[category](
     def rotate(self, left=False):
         """
         The rotation of a hypergraph, called with ``.l`` and ``.r``: its
-        :meth:`transpose`, as for a :class:`discopy.cmap.CMap` and for any
+        :meth:`transpose`, as for a :class:`~discopy.cmap.CMap` and for any
         functor, i.e. the boxes stay as they are and the wires bend around
         them, with cups and caps that are wiring from compact categories on
         and boxes below.
@@ -876,7 +876,7 @@ class Hypergraph[category](
         e.g. for symmetric diagrams, then the result is just one big trace box
         wrapped up as a hypergraph, whatever ``n``, since the trace of ``n``
         wires of a diagram is its ``n`` one-wire traces nested, see
-        :meth:`discopy.feedback.Diagram.feedback`. Nesting them on the diagram
+        :meth:`~discopy.feedback.Diagram.feedback`. Nesting them on the diagram
         converts the hypergraph once instead of once per wire.
 
         Otherwise, we assume that the trace factory is a class method, e.g.
@@ -2307,7 +2307,7 @@ class Hypergraph[category](
 
         Over a category with merges and no copies, i.e. a
         :class:`ComarkovCategory` that is not a :class:`MarkovCategory`
-        such as :class:`discopy.python.additive.Function`, the tensor is a
+        such as :class:`~discopy.python.additive.Function`, the tensor is a
         disjoint union and the hypergraph is evaluated by
         :meth:`pass_token` instead.
 
@@ -2372,7 +2372,7 @@ class Hypergraph[category](
         it leaves on a codomain wire. A wire may have any number of
         producers, i.e. the token may reach it from several places, and a
         directed cycle is a while loop, as in the trace of
-        :class:`discopy.python.additive.Function`.
+        :class:`~discopy.python.additive.Function`.
 
         Parameters:
             obj : The value carried by the token.
@@ -2491,7 +2491,7 @@ class Hypergraph[category](
         The box of a spider is inserted right after its last producer, or
         at its first consumer when it has none, but after every state that
         carries an offset and never past its first consumer. So a state keeps
-        the scan in which :meth:`discopy.monoidal.Diagram.to_hypergraph`
+        the scan in which :meth:`~discopy.monoidal.Diagram.to_hypergraph`
         recorded its offset: it comes before every box of the diagram that
         became wiring, and the first consumer of a spider reads a wire out of
         one.
@@ -3329,12 +3329,12 @@ class Hypergraph[category](
         Downgrade to :class:`Diagram`, called by :code:`print`. When the
         hypergraph is boundary-connected, the boxes are grouped into wide
         layers (a foliation) rather than a staircase, by scanning the boundary
-        in one pass; this is what :meth:`discopy.symmetric.Diagram.foliation`
+        in one pass; this is what :meth:`~discopy.symmetric.Diagram.foliation`
         relies on.
 
         The open wires are scanned from left to right by a :class:`Decoder`,
         placing the boxes in the order of :attr:`boxes`. An offset recorded
-        on a state by :meth:`discopy.monoidal.Diagram.to_hypergraph` is a hint
+        on a state by :meth:`~discopy.monoidal.Diagram.to_hypergraph` is a hint
         read in the scan of this pass, which :meth:`make_bijective` keeps as
         it was recorded, its spider boxes coming after every such state; a
         hint past the end of the scan, e.g. one given by hand, is clamped to
@@ -3664,14 +3664,14 @@ class Decoder:
     """
     A diagram being decoded from a :class:`Wiring`, with the wires open below
     it from left to right, i.e. the scan. It is the one decoder of
-    :meth:`Hypergraph.to_diagram` and :meth:`discopy.cmap.CMap.to_diagram`,
+    :meth:`Hypergraph.to_diagram` and :meth:`~discopy.cmap.CMap.to_diagram`,
     which differ in the order they place the boxes in, in where a box with
     no domain goes and in whether boxes side by side share a layer.
 
     Each box gathers its domain wires at its offset with one permutation, see
-    :meth:`discopy.python.finset.Permutation.gather`, emitted with
-    :meth:`discopy.abc.SymmetricCategory.from_permutation`, i.e. a
-    :class:`discopy.symmetric.Permutation` box when the category has a native
+    :meth:`~discopy.python.finset.Permutation.gather`, emitted with
+    :meth:`~discopy.abc.SymmetricCategory.from_permutation`, i.e. a
+    :class:`~discopy.symmetric.Permutation` box when the category has a native
     one and its ``permutation`` otherwise, then its codomain wires replace
     them in the scan.
 
@@ -3740,7 +3740,7 @@ class Decoder:
         with its offset in the scan, as one layer of :attr:`category`. It is
         whiskered box by box instead when a layer cannot hold it: when one of
         them is a diagram rather than a box, or in a category with no layers,
-        e.g. a :class:`discopy.tensor.Tensor` in a ``CMap[Tensor]``.
+        e.g. a :class:`~discopy.tensor.Tensor` in a ``CMap[Tensor]``.
         """
         if not hasattr(self.diagram, "layer_factory") or not all(
                 isinstance(box, cat.Box) for box, _ in self.layer):

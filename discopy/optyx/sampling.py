@@ -3,7 +3,7 @@ Overview
 --------
 
 Sampling the outputs of closed diagrams with feedback loops, tick after
-tick: :meth:`discopy.optyx.channel.Diagram.sample`.
+tick: :meth:`~discopy.optyx.channel.Diagram.sample`.
 
 Any such diagram is sampled by its :class:`Unravelling`, a quantum
 trajectory: one tick runs :meth:`one_step` box by box on a :class:`CQState`,
@@ -885,7 +885,7 @@ transmissivity=1.0, efficiency=1.0, visible=(0,), indistinguishability=1.0)
     def from_diagram(cls, diagram, indistinguishability: float = 1.,
                      source: Source = None):
         """
-        The recurrent network of a :class:`discopy.optyx.channel.Diagram` with
+        The recurrent network of a :class:`~discopy.optyx.channel.Diagram` with
         feedback loops: its :meth:`one_step` is dilated to a passive matrix
         from the memory, the inputs and the created photons to the outputs,
         the memory and the environment of its discards and losses, then
@@ -1285,7 +1285,8 @@ def observe(vector: np.ndarray, axes: list, rng: np.random.Generator):
 
 class Unravelling:
     """
-    The quantum trajectories of a closed :class:`discopy.optyx.channel.Diagram`
+    The quantum trajectories of a closed
+    :class:`~discopy.optyx.channel.Diagram`
     with feedback loops, whatever it holds: optical modes, qubits,
     measurements, classical boxes and classically controlled boxes.
 

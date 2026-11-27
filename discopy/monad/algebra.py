@@ -22,7 +22,7 @@ evaluating is evaluating twice. A homomorphism from ``(A, a)`` to
 
 Every monad has the free algebra ``(M(X), mu_X)`` on any type ``X``, see
 :meth:`Algebra.free`, and the free algebras span a full subcategory
-isomorphic to the Kleisli category, see :mod:`discopy.monad.free`. The
+isomorphic to the Kleisli category, see :mod:`~discopy.monad.free`. The
 other algebras depend on the monad:
 
 * an algebra of :attr:`~discopy.kleisli.monad.Maybe` is a pointed type,

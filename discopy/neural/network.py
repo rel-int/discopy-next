@@ -13,10 +13,10 @@ of the next, tensor ``@`` runs two side by side, :meth:`Network.copy` sends
 an activation to several layers, :meth:`Network.discard` drops one and
 :meth:`Network.trace` feeds an output back into an input, as a recurrent
 network does. Networks form the free traced Markov and comarkov category on
-their boxes, see :mod:`discopy.markov`, :mod:`discopy.comarkov` and
-:mod:`discopy.feedback`. A feedforward network
+their boxes, see :mod:`~discopy.markov`, :mod:`~discopy.comarkov` and
+:mod:`~discopy.feedback`. A feedforward network
 compiles to a function on tensors with :meth:`Network.to_function`, which
-:mod:`discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
+:mod:`~discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
 as it is, and to its reverse derivative with :meth:`Network.to_lens`, a
 :class:`Lens` whose ``put`` is backpropagation.
 
@@ -133,7 +133,7 @@ class Dims(monoidal.Ty):
     generator_factory = Dim
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+    instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
     def __init__(self, *inside: int | Dim, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -280,7 +280,7 @@ class Network(markov.Diagram, comarkov.Diagram):
         the functor sending every leg to ``tensor`` and every box to its
         :meth:`Box.forward`, with the copy, discard and swap of
         :class:`python.Function`. The function is what ``jax.jit`` compiles
-        and :class:`discopy.neural.torch.Module` runs.
+        and :class:`~discopy.neural.torch.Module` runs.
 
         Parameters:
             tensor : The type of the tensors on the legs, e.g. ``jax.Array``
@@ -702,7 +702,7 @@ class Lens(lens.Symmetric, MarkovCategory):
     network and returns its outputs then the tape, i.e. its residual,
     ``backward`` takes the tape and the gradients of the outputs to the
     gradients of the inputs. They form a Markov category as those of
-    :class:`discopy.lens.Comarkov` do, with the sum of the gradients as
+    :class:`~discopy.lens.Comarkov` do, with the sum of the gradients as
     merge and zero as its unit.
 
     Parameters:
@@ -731,9 +731,9 @@ class Lens(lens.Symmetric, MarkovCategory):
     Note
     ----
     The tape of a composition is the tensor of the tapes, see
-    :meth:`discopy.lens.Symmetric.then`, so that the backward pass of a
+    :meth:`~discopy.lens.Symmetric.then`, so that the backward pass of a
     network runs each layer forward once, where the ``put`` of a
-    :class:`discopy.lens.Markov` runs the ``get`` of what comes first again,
+    :class:`~discopy.lens.Markov` runs the ``get`` of what comes first again,
     once per layer after it.
     """
     category = python.Function

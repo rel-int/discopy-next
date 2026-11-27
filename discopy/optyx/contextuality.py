@@ -3,9 +3,9 @@ Overview
 --------
 
 The distributions of the outcomes of a diagram for each choice of settings,
-the empirical model :meth:`discopy.quantum.contextuality.Model.from_diagram`
+the empirical model :meth:`~discopy.quantum.contextuality.Model.from_diagram`
 computes the contextual fraction of, and the message-passing scenario of a
-:class:`discopy.optyx.interaction.CMap`, where the nodes measure what they
+:class:`~discopy.optyx.interaction.CMap`, where the nodes measure what they
 predict after exchanging messages.
 
 Functions
@@ -49,7 +49,7 @@ controlling a phase on its qubit before it is measured:
 0.414214
 
 The measurements maximising the contextual fraction of a setup are found by
-:func:`discopy.quantum.contextuality.ascend`. Here the settings of each
+:func:`~discopy.quantum.contextuality.ascend`. Here the settings of each
 party are two free phases, and from a contextual starting point the ascent
 reaches the Tsirelson bound, each party's settings a quarter turn apart:
 
@@ -235,7 +235,7 @@ def dual_rail_measurement(angles: Sequence[float]) -> Diagram:
 class MessagePassingScenario:  # pylint: disable=too-many-instance-attributes
     """
     The measurement scenario of a combinatorial map of recurrent channels,
-    :class:`discopy.optyx.interaction.CMap`, whatever the physical systems
+    :class:`~discopy.optyx.interaction.CMap`, whatever the physical systems
     on its wires.
 
     The parties are the nodes with a prediction, the system a node writes
@@ -268,7 +268,7 @@ class MessagePassingScenario:  # pylint: disable=too-many-instance-attributes
             by default, which is what a bit chooses between.
         normalise : Whether to condition the model on the success of a
             postselection in the map, see
-            :meth:`discopy.quantum.contextuality.Model.normalise`.
+            :meth:`~discopy.quantum.contextuality.Model.normalise`.
 
     >>> from discopy.optyx.qubits import Ket
     >>> from discopy.optyx.interaction import Box, CMap
@@ -353,7 +353,7 @@ class MessagePassingScenario:  # pylint: disable=too-many-instance-attributes
         """
         The angles maximising the contextual fraction: the most contextual
         of :code:`restarts` uniformly random sets of angles is the starting
-        point of :func:`discopy.quantum.contextuality.ascend`, which takes
+        point of :func:`~discopy.quantum.contextuality.ascend`, which takes
         the remaining keyword arguments. The fraction is zero on the
         non-contextual polytope and the ascent does not move there, which
         is what the restarts are for; when none is contextual, the first

@@ -554,11 +554,11 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         Return a generator which yields normalization steps, yanking snakes
         before it interchanges boxes with
-        :meth:`discopy.monoidal.Diagram.normalize`, whose note says where
+        :meth:`~discopy.monoidal.Diagram.normalize`, whose note says where
         these planar rewrites apply.
 
         Parameters:
-            left : Passed to :meth:`discopy.monoidal.Diagram.normalize`.
+            left : Passed to :meth:`~discopy.monoidal.Diagram.normalize`.
 
         Example
         -------
@@ -573,7 +573,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         g >> f[::-1] >> f >> h
 
         A diagram with more than one box in a layer is split into staircases
-        first, see :meth:`discopy.monoidal.Diagram.to_staircases`, and that
+        first, see :meth:`~discopy.monoidal.Diagram.to_staircases`, and that
         is the first step.
 
         >>> snake = n @ cap >> cup @ n
@@ -797,7 +797,7 @@ class Box(biclosed.Box, Diagram):
     def rotate(self, left=False):
         """
         The rotation of a rigid box, which its dagger keeps, as in a dagger
-        pivotal category, see :meth:`discopy.pivotal.Diagram.conjugate`.
+        pivotal category, see :meth:`~discopy.pivotal.Diagram.conjugate`.
 
         >>> f = Box('f', Ty('a'), Ty('b'))
         >>> assert f.r[::-1] == f[::-1].r and f.r[::-1].z == 1
