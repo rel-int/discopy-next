@@ -112,8 +112,9 @@ from __future__ import annotations
 from discopy import feedback, hypergraph
 from discopy.cat import factory
 from discopy.dataflow import symmetric
+# pylint: disable-next=unused-import
 from discopy.dataflow.symmetric import (  # noqa: F401
-    Wire, HeadOb, TailOb, Ty)  # pylint: disable=unused-import
+    Wire, HeadOb, TailOb, Ty)
 from discopy.feedback import markov
 from discopy.markov import (  # noqa: F401  pylint: disable=unused-import
     Equation)

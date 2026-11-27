@@ -10,9 +10,10 @@ is constant. A diagram has a :attr:`StreamDiagram.head` and a
 :attr:`StreamDiagram.tail`, and :class:`FollowedBy` is the isomorphism from
 ``x.head @ x.tail.delay()`` to ``x``, the ``fby`` of Lucid.
 
-This package holds the structure as mixins, which a level of the hierarchy
-takes as they are, each class of the level subclassing its mixin and the
-class of the feedback level below: :mod:`~discopy.dataflow.symmetric` over
+This package holds the structure as mixins over the classes of
+:mod:`discopy.feedback`, which a level of the hierarchy takes as they are,
+each class of the level subclassing its mixin and the class of the feedback
+level it extends: :mod:`~discopy.dataflow.symmetric` over
 :mod:`discopy.feedback.symmetric`, since monoidal streams are defined over
 symmetric categories, and :mod:`~discopy.dataflow.markov` over
 :mod:`discopy.feedback.markov`. See :mod:`discopy.stream` for their
@@ -67,7 +68,7 @@ from discopy.abc import DaggerCategory
 from discopy.utils import AxiomError, factory_name, from_tree
 
 
-class StreamWire:
+class StreamWire(feedback.Wire):
     """
     The mixin of a wire that carries a stream: a :attr:`head`, a
     :attr:`tail` and whether it :attr:`is_constant`, a keyword it takes on
@@ -129,7 +130,7 @@ class StreamWire:
         return result
 
 
-class HeadOb:
+class HeadOb(StreamWire):
     """
     The mixin of the head of a wire, interpreted as the first element of a
     stream followed by the constant stream on the empty type.
@@ -186,7 +187,7 @@ class HeadOb:
         return cls(from_tree(tree['arg']), tree.get('time_step', 0))
 
 
-class TailOb:
+class TailOb(StreamWire):
     """
     The mixin of the tail of a wire that is not constant, interpreted as the
     stream starting from the second time step.
@@ -208,7 +209,7 @@ class TailOb:
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
 
 
-class StreamTy:
+class StreamTy(feedback.Ty):
     """ The mixin of a type whose wires carry streams. """
     @property
     def head(self):
@@ -221,7 +222,7 @@ class StreamTy:
         return self.factory(*(x.tail for x in self.inside if x.tail))
 
 
-class StreamDiagram:
+class StreamDiagram(feedback.Diagram):
     """
     The mixin of a diagram with a :attr:`head`, a :attr:`tail` and
     :meth:`followed_by`, each built by its factory.
@@ -246,7 +247,7 @@ class StreamDiagram:
         return cls.followed_by_factory(dom)
 
 
-class Head:
+class Head(feedback.Box):
     """
     The mixin of the head of a diagram, interpreted as the first element
     followed by the identity stream on the empty type.
@@ -297,7 +298,7 @@ class Tail(Head):
     part = "tail"
 
 
-class FollowedBy:
+class FollowedBy(feedback.Box):
     """
     The mixin of the isomorphism between `x.head @ x.tail.delay()` and `x`,
     the ``fby`` of Lucid: in the category of streams, it is the identity.
@@ -308,7 +309,7 @@ class FollowedBy:
         time_step : The number of times it has been delayed.
     """
     serialised_attrs = ("arg", "is_dagger", "time_step")
-    arg = None  # shadows Box.arg, the type rather than a diagram
+    arg = None  # a type, not the diagram Box.arg reads
 
     def __init__(self, arg, is_dagger=False, time_step=0):
         self.arg = arg
@@ -327,7 +328,9 @@ class FollowedBy:
             + f"({repr(self.arg)}{is_dagger}{time_step})"
 
     def delay(self, n_steps=1):
-        return type(self)(self.arg, self.is_dagger, self.time_step + n_steps)
+        return type(self)(
+            self.arg, self.is_dagger,
+            self.time_step + n_steps)  # ty: ignore[unsupported-operator]
 
     def reset(self):
         return type(self)(self.arg, self.is_dagger)
@@ -358,7 +361,7 @@ class FollowedBy:
                    tree.get('time_step', 0))
 
 
-class Functor:
+class Functor(feedback.Functor):
     """
     The mixin of a functor that sends heads, tails and followed-bys to those
     of its codomain, e.g. :class:`discopy.stream.Stream`. Into a codomain
@@ -375,7 +378,8 @@ class Functor:
             if not isinstance(other, FollowedBy):
                 return getattr(self(other.arg), other.part)
             arg = other.dom if other.is_dagger else other.cod
-            result = self.cod.followed_by(self(arg))
+            result = self.cod.followed_by(  # ty: ignore[call-non-callable]
+                self(arg))
             return result.dagger() if other.is_dagger\
                 and issubclass(self.cod, DaggerCategory)\
                 and self.cod.has_dagger() else result
