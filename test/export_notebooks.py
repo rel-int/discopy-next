@@ -1,6 +1,7 @@
 """Check that docs/export_notebooks.py runs the notebooks it is asked for,
 on the discopy of its own tree."""
 
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,37 @@ def test_the_docs_extra_installs_what_the_optyx_notebooks_need():
     """The docs build installs the optyx extra and joblib, so that it renders
     the notebooks of ``optyx/`` rather than their fallback link pages."""
     assert installs(EXTRAS, "optyx") | {"joblib"} <= installs(EXTRAS, "docs")
+
+
+@pytest.mark.parametrize("published", [True, False])
+def test_a_build_that_runs_none_embeds_those_main_rendered(
+        tmp_path, monkeypatch, published):
+    """Read the Docs runs no notebook: it embeds the HTML the workflow pushed
+    to the rendered-notebooks branch, and links to the source of a notebook
+    the branch lacks, of an unexecuted one, or of all when it is not there."""
+    branch = tmp_path / "discopy-next-rendered-notebooks"
+    for name in ["diagrams", "optyx/fixpoints", "optyx/readme_example"]:
+        (branch / f"{name}.html").parent.mkdir(parents=True, exist_ok=True)
+        (branch / f"{name}.html").write_text(f"<p>{name}</p>")
+    (branch / "COMMIT").write_text("0123456789abcdef\n")
+    tarball = tmp_path / "rendered-notebooks.tar.gz"
+    with tarfile.open(tarball, "w:gz") as archive:
+        archive.add(branch, branch.name)
+    pages = {}
+    monkeypatch.setenv(export_notebooks.SKIP, "1")
+    monkeypatch.setenv(export_notebooks.RENDERED, (
+        tarball if published else tmp_path / "missing.tar.gz").as_uri())
+    monkeypatch.setattr(export_notebooks, "HTML_DIR", tmp_path / "html")
+    monkeypatch.setattr(export_notebooks, "export", pytest.fail)
+    monkeypatch.setattr(export_notebooks, "write_page", lambda nb, **kw: (
+        pages.setdefault(export_notebooks.name_of(nb), kw)))
+
+    export_notebooks.generate()
+
+    embedded = {"rendered": True, "commit": "0123456789abcdef"}
+    skipped = {"rendered": False, "skipped": True}
+    assert pages["diagrams"] == pages["optyx/fixpoints"]\
+        == (embedded if published else skipped)
+    assert pages["qnlp"] == pages["optyx/readme_example"] == skipped
+    assert (tmp_path / "html" / "optyx" / "fixpoints.html").exists()\
+        is published
