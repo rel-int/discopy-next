@@ -20,9 +20,9 @@ Dataflow Programming" (Di Lavore et al. 2022), with `discopy.stream` as their se
   over symmetric categories, and none of the primitives copies. Its classes hold the structure,
   `Wire` (`head`, `tail`, `is_constant`), `Ty`, `Diagram` (`head`, `tail`, `followed_by` and
   their factories), `HeadOb`, `TailOb`, `Head`, `Tail`, `FollowedBy` and `Functor`, and the
-  package's `__init__` only its docstring. A level above it, e.g. `dataflow.markov` over
-  `feedback.markov`, is one class per class of the base level mixed into its feedback level,
-  written out, nothing generated.
+  package's `__init__` only documents the package and imports its two levels. A level above it,
+  e.g. `dataflow.markov` over `feedback.markov`, is one class per class of the base level mixed
+  into its feedback level, written out, nothing generated.
 - A dataflow functor sends the primitives to those of its codomain, e.g. `stream.Stream`, and
   raises on a codomain without them, whether its map is a mapping or a callable: they are the
   structure of the category, not generators. The hypergraph of a dataflow diagram has them, so

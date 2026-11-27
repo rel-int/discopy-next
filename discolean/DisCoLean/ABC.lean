@@ -342,8 +342,8 @@ structure DataflowCategory.Functor (cat : DataflowCategory Ob Hom) (cat' : Dataf
   map_tail : ∀ (f : Hom), map (cat.tail f) = cat'.tail (map f)
   map_followed_by : ∀ (X : Ob), map (cat.followed_by X) = cat'.followed_by (ob X)
 
-/-- `discopy.abc.DaggerDataflowCategory`: A dagger dataflow category is a `DaggerCategory` and a `DataflowCategory` whose head and tail commute with the dagger, and whose followed-by is unitary, i.e. its dagger is its inverse. -/
-structure DaggerDataflowCategory (Ob : Type u) (Hom : Type v) extends DaggerCategory Ob Hom, DataflowCategory Ob Hom where
+/-- `discopy.abc.DaggerDataflowCategory`: A dagger dataflow category is a `DaggerMonoidalCategory` and a `DataflowCategory` whose head and tail commute with the dagger, and whose followed-by is unitary, i.e. its dagger is its inverse. -/
+structure DaggerDataflowCategory (Ob : Type u) (Hom : Type v) extends DaggerMonoidalCategory Ob Hom, DataflowCategory Ob Hom where
 
 /-- The head commutes with the dagger. -/
 def DaggerDataflowCategory.head_dagger (cat : DaggerDataflowCategory Ob Hom) : Prop :=
@@ -358,13 +358,13 @@ def DaggerDataflowCategory.followed_by_unitarity (cat : DaggerDataflowCategory O
   ∀ (X : Ob), (cat.comp (cat.followed_by X) (cat.dagger (cat.followed_by X)), cat.comp (cat.dagger (cat.followed_by X)) (cat.followed_by X)) = (cat.id (cat.dom (cat.followed_by X)), cat.id X)
 
 /-- The laws of `DaggerDataflowCategory`. -/
-structure DaggerDataflowCategory.Laws (cat : DaggerDataflowCategory Ob Hom) : Prop extends toDaggerCategory : DaggerCategory.Laws cat.toDaggerCategory, toDataflowCategory : DataflowCategory.Laws cat.toDataflowCategory where
+structure DaggerDataflowCategory.Laws (cat : DaggerDataflowCategory Ob Hom) : Prop extends toDaggerMonoidalCategory : DaggerMonoidalCategory.Laws cat.toDaggerMonoidalCategory, toDataflowCategory : DataflowCategory.Laws cat.toDataflowCategory where
   head_dagger : cat.head_dagger
   tail_dagger : cat.tail_dagger
   followed_by_unitarity : cat.followed_by_unitarity
 
 /-- A functor of `DaggerDataflowCategory`: it preserves each of its operations. -/
-structure DaggerDataflowCategory.Functor (cat : DaggerDataflowCategory Ob Hom) (cat' : DaggerDataflowCategory Ob' Hom') extends toDaggerCategory : DaggerCategory.Functor cat.toDaggerCategory cat'.toDaggerCategory, toDataflowCategory : DataflowCategory.Functor cat.toDataflowCategory cat'.toDataflowCategory where
+structure DaggerDataflowCategory.Functor (cat : DaggerDataflowCategory Ob Hom) (cat' : DaggerDataflowCategory Ob' Hom') extends toDaggerMonoidalCategory : DaggerMonoidalCategory.Functor cat.toDaggerMonoidalCategory cat'.toDaggerMonoidalCategory, toDataflowCategory : DataflowCategory.Functor cat.toDataflowCategory cat'.toDataflowCategory where
 
 /-- `discopy.abc.ResiduatedMonoid`: A monoid is residuated when it comes with methods `over` and `under` with syntactic sugar `<<` and `>>`. -/
 structure ResiduatedMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where

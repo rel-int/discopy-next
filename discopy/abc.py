@@ -1058,9 +1058,9 @@ class DataflowCategory[
 
 class DaggerDataflowCategory[
         C0: ColouredMonoid, C1: DaggerDataflowCategory](
-            DaggerCategory[C0, C1], DataflowCategory[C0, C1]):
+            DaggerMonoidalCategory[C0, C1], DataflowCategory[C0, C1]):
     """
-    A dagger dataflow category is a :class:`DaggerCategory` and a
+    A dagger dataflow category is a :class:`DaggerMonoidalCategory` and a
     :class:`DataflowCategory` whose head and tail commute with the dagger,
     and whose followed-by is unitary, i.e. its dagger is its inverse.
     """
