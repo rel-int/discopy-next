@@ -15,3 +15,4 @@
 - [WIP] @T-6271be71-c7d7-4ae7-bf06-85bc2b06ce22-2026-11-26 17:01 Generator(Slot, Rule): rule and premises on root classes, one functor dispatch through box.rule, Rule.admissible
 - [ ] Plumbing as an admissible rule; structural_boxes read from declarations, the boundary law replacing assert_structural_boxes
 - [ ] Regenerate DisCoLean/ABC.lean if needed, remove the shim, docs and changelog
+- [WIP] @T-6271be71-c7d7-4ae7-bf06-85bc2b06ce22-2026-11-27 14:07 Remove the redundant late bindings (Functor rebindings, Ty term classes as slots) and rewrite README, notebook, doctest and test examples off the legacy override pattern
