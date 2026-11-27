@@ -732,6 +732,11 @@ def test_symmetric_group_algebra():
     assert S3.is_valid() and S3.dim == 6 and not S3.is_commutative()
 
 
+def test_double_of_s3_is_valid():
+    D = Double(GroupAlgebra(Symmetric[3]))
+    assert D.dim == 36 and D.is_valid()
+
+
 def test_anyons_of_double_s3():
     D, anyons = double_of_s3_and_anyons()
     dims = [int(np.prod(a.inside)) for a in anyons]
