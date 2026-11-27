@@ -1120,16 +1120,16 @@ class Hypergraph(hypergraph.Hypergraph):
             max_scalars=1):
         """
         Generate graph-like ZX hypergraphs: green spiders wired by
-        :meth:`discopy.hypergraph.Hypergraph.draw_any` with Hadamard
+        :meth:`~discopy.hypergraph.Hypergraph.draw_any` with Hadamard
         :data:`H` boxes (so a spider behind Hadamards on its legs is red),
         rational phases in :attr:`phases_drawn` and a Clifford or zero
         :class:`Number` scalar.
 
         Parameters:
-            dom : The domain, sampled from :meth:`discopy.rigid.Nat.strategy`
+            dom : The domain, sampled from :meth:`~discopy.rigid.Nat.strategy`
                 if ``None``.
             cod : The codomain, sampled from
-                :meth:`discopy.rigid.Nat.strategy` if ``None``.
+                :meth:`~discopy.rigid.Nat.strategy` if ``None``.
             min_leaves : The minimum number of :data:`H` boxes.
             max_leaves : The maximum number of :data:`H` boxes.
             max_scalars : The maximum number of zero-legged spiders, one
