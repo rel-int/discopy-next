@@ -388,32 +388,6 @@ GitHub workflow runs all four on `main` and on a pull request touching
 `benchmark/test_egraph.py`, which the test replays, or what installs the
 environment.
 
-## Build the paper
-
-`paper/` holds the source of the tool paper, in [Typst](https://typst.app), and it is checked
-as the code is. `test/paper_build.py` runs its Python listings in order in one namespace, as
-`test/readme.py` runs the README's, draws each figure from the value a listing named, once
-with the Typst backend and once with the TikZ one, writes its LaTeX with `paper/transpile.py`,
-and compiles both where their compiler is installed:
-
-```shell
-uv sync --group all
-uv run pytest test/paper_build.py -rs
-uv run python -m paper.build --pdf  # paper/main.pdf from Typst, paper/latex.pdf from LaTeX
-```
-
-Typst downloads the CeTZ package on its first run. The LaTeX build needs `latexmk` and what
-`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs: its test is
-skipped without `latexmk`, and fails with it when a package is missing. A `python` fence of the paper runs, a `py` fence is shown and not run, and
-`#drawing("name")` is the drawing of the value `name` of the listings. `paper/transpile.py`
-reads the part of Typst its docstring lists and raises `Unsupported` on anything else: write
-the paper within it, or add the LaTeX of what you need to it. The references are those of the
-docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
-committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
-request that touches the paper or the library its listings run. The tests that build the paper
-are marked `slow`, since its listings import PyTorch and JAX: on a pull request that workflow
-is what runs them.
-
 ## Build the docs
 
 You can build the documentation locally with [sphinx](https://www.sphinx-doc.org/en/master/):
