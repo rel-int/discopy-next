@@ -428,7 +428,7 @@ def test_str_transparency():
     F = closed.Ty('F')
     assert closed.Ty.str_transparency(term=(E * F) >> E.product(F, E))
     U = closed.Ty(closed.Unitype())
-    assert closed.Ty.str_transparency(term=E.product(U) >> U.delay())
+    assert closed.Ty.str_transparency(term=E.product(U) >> U)
     assert find(Box.strategy(), lambda _: True).name.isidentifier()
     for clash in [monoidal.Box('x', x, x), monoidal.Box('Id', x, x)]:
         with raises(NameError):

@@ -132,7 +132,7 @@ from typing import TYPE_CHECKING, Self, SupportsIndex
 from networkx import DiGraph
 from networkx.algorithms.isomorphism import is_isomorphic
 
-from discopy import feedback, markov, messages, monoidal
+from discopy import markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory, Nat
 from discopy.testable import (
     GENERATORS, Equation, Hom, Obj, Serialisable, TestableGeneric, Var,
@@ -224,12 +224,10 @@ class Join(markov.Box):
     The join of parallel diagrams, an e-box of the string diagrams of a
     semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
     a slot for each term. It is deterministic when it has one term, which is,
-    and affine when every term is, discarding being idempotent. It delays as
-    a feedback bubble does, its terms staying as they are inside.
+    and affine when every term is, discarding being idempotent.
 
     Parameters:
-        terms : The diagrams joined, with the same domain and codomain, that
-            of the join at time step zero.
+        terms : The diagrams joined, with the same domain and codomain.
         params : Passed to :meth:`markov.Box.from_args`, e.g. by
             :meth:`dagger`.
 
@@ -247,27 +245,23 @@ class Join(markov.Box):
     """
     is_id_on_objects = True
     serialised_attrs = (
-        "*args", "dom", "cod", "name", "is_dagger", "data", "time_step")
+        "*args", "dom", "cod", "name", "is_dagger", "data")
 
-    def __init__(self, *terms, dom=None, cod=None, name="", time_step=0,
-                 **params):
+    def __init__(self, *terms, dom=None, cod=None, name="", **params):
         terms = tuple(params.pop("args", ())) or terms
         dom, cod = (
-            given if given is not None
-            else self.common(terms, attr).delay(time_step)
+            given if given is not None else self.common(terms, attr)
             for attr, given in [("dom", dom), ("cod", cod)])
         params.pop("method", None)
         markov.Box.__init__(self, name, dom, cod, args=terms, method="join",
-                            time_step=time_step, **params)
+                            **params)
         for term in terms:
-            assert_isparallel(
-                self, term.delay(self.time_step) if self.time_step else term)
+            assert_isparallel(self, term)
         self.deterministic = len(terms) == 1 and terms[0].is_deterministic
         self.affine = all(term.is_affine for term in terms)
 
     def __str__(self):
-        return f"Join({', '.join(map(str, self.args))})"\
-            + feedback.str_delayed(self.time_step)
+        return f"Join({', '.join(map(str, self.args))})"
 
 
 def distribute(diagram: monoidal.Diagram) -> markov.Sum:

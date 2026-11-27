@@ -66,7 +66,7 @@ import itertools
 import cotengra
 import numpy as np
 
-from discopy.bang import BangOb
+from discopy.linear.monoidal import BangOb
 from discopy.biclosed import Exp
 from discopy.lambek.modality import (
     Ty, Box, Eval, Contraction, Dereliction, Exchange, Functor)

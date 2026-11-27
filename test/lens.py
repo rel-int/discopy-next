@@ -31,7 +31,10 @@ def equal(left, right):
 
 
 def traced():
-    return Traced(X, Y, f.forward, f.backward, m)
+    from discopy.feedback.symmetric import Box, Ty as T
+    x, x_, y, y_, m = map(T, ["x", "x'", "y", "y'", "m"])
+    return Traced(lens.Ty[T](x, x_), lens.Ty[T](y, y_), Box('f', x, y @ m),
+                  Box("f'", m @ y_, x_), m)
 
 
 def test_ty():
@@ -118,8 +121,14 @@ def test_to_int():
     assert f.to_int().dom == IntTy[T](x, x_)
     assert f.to_int().cod == IntTy[T](y, y_)
     assert f.to_int().inside == f.forward @ y_ >> y @ f.backward
-    assert (f >> g).to_int().inside.to_hypergraph()\
-        == (f.to_int() >> g.to_int()).inside.to_hypergraph()
+    from discopy.feedback.symmetric import Box as FBox, Ty as FT
+    a, a_, b, b_, c, c_, r, q = map(
+        FT, ["a", "a'", "b", "b'", "c", "c'", "r", "q"])
+    A, B, C = (lens.Ty[FT](*pair) for pair in ((a, a_), (b, b_), (c, c_)))
+    first = Traced(A, B, FBox('f', a, b @ r), FBox("f'", r @ b_, a_), r)
+    second = Traced(B, C, FBox('g', b, c @ q), FBox("g'", q @ c_, b_), q)
+    assert (first >> second).to_int().inside.to_hypergraph()\
+        == (first.to_int() >> second.to_int()).inside.to_hypergraph()
     assert Symmetric.id(X).to_int().inside.to_hypergraph()\
         == f.to_int().id(IntTy[T](x, x_)).inside.to_hypergraph()
 
@@ -129,6 +138,8 @@ def random_traced(seed):
     Random lenses over a traced category: types of length up to two, the
     residual on either side of each leg and square pairs to trace over.
     """
+    from discopy.feedback.symmetric import Box, Diagram, Ty as T
+    Ty = lens.Ty[T]
     rng, names = random.Random(seed), iter(range(100))
 
     def ty(k=None):
@@ -155,6 +166,7 @@ def swap_negatives(X, U):
     The swap of negative halves from `to_int(X @ U)` to `to_int(X) @ to_int(U)`
     that `to_int` is monoidal up to, since an integer type reverses them.
     """
+    from discopy.feedback.symmetric import Diagram, Ty as T
     (x, x_), (u, u_), Int = X, U, IntTy[T]
     return IntDiagram[Diagram](
         x @ u @ Diagram.swap(u_, x_), Int(*(X @ U)), Int(*X) @ Int(*U))
@@ -337,6 +349,8 @@ def test_learner():
 
 
 def test_trace_takes_the_keyword_form():
+    from discopy.feedback.symmetric import Box, Ty as T
+    Ty = lens.Ty[T]
     x, x_, u, u_, m = map(T, ["x", "x'", "u", "u'", "m"])
     X, U = Ty(x, x_), Ty(u, u_)
     f = Traced(X @ U, X @ U, Box('f', x @ u, x @ u @ m),

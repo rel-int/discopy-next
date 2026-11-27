@@ -121,12 +121,13 @@ knows about a law, in one line, with one of four words.
   smaller level of the hierarchy.
 
 The yanking equation of a traced category shows two of these at once.
-The free balanced diagrams are lists of layers where a trace is a bubble,
-and yanking is false on them, on the smallest term there is. The same law
-holds on symmetric diagrams modulo their translation to hypergraphs.
+The free balanced traced diagrams of `discopy.feedback.balanced` are
+lists of layers where a trace is a bubble, and yanking is false on them,
+on the smallest term there is. The same law holds on symmetric diagrams
+modulo their translation to hypergraphs.
 
 ```python
-from discopy import balanced, symmetric
+from discopy.feedback import balanced, symmetric
 from discopy.testable import AxiomFailure
 
 counterexample = balanced.Diagram.yanking.falsify()

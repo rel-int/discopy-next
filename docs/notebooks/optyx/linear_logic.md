@@ -9,7 +9,7 @@ import marimo as mo
 
 # From a linear term with bangs to an optical protocol
 
-A term of `discopy.optyx.term` is a diagram of `discopy.bang`, the free
+A term of `discopy.optyx.term` is a diagram of `discopy.linear.monoidal`, the free
 linear category, on the dual-rail `qubit`: it uses each wire once unless its
 type is banged, as `!qubit` may be copied by `Contraction`, discarded by
 `Weakening` and read once by `Dereliction`. Over quantum states, `!` is the
@@ -45,7 +45,7 @@ The non-linear term `λx. (H x, H x)` uses its argument twice. Its translation
 into linear logic gives `x` the type `!qubit`, applies the bang of `H` and
 contracts the result into two copies, each one derelicted.
 
-A term of `discopy.bang` is a kappa term of `discopy.monoidal`, the planar
+A term of `discopy.linear.monoidal` is a kappa term of `discopy.monoidal`, the planar
 terms that every module below `biclosed` shares, where a variable of a banged
 type may be used any number of times: it is copied by `Contraction` and moved
 by `Exchange`, any other variable is used once and in order. A box called on
