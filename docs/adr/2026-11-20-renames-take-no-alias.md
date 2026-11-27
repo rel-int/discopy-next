@@ -1,4 +1,4 @@
-# 1. A renamed module keeps no alias
+# A renamed module keeps no alias
 
 ## Context
 

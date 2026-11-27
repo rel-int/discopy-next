@@ -1,4 +1,4 @@
-# 5. A fast specialised implementation lands beside the slow general one that checks it
+# A fast specialised implementation lands beside the slow general one that checks it
 
 ## Context
 
@@ -28,4 +28,5 @@ specialised implementation is a representation beside the others, not a level of
 
 ## Status
 
-Accepted, 2026-11-14. Interaction nets are not built yet: #542 is open.
+Accepted, 2026-11-14. Interaction nets are `discopy.inet`, built by
+[#760](https://github.com/rel-int/discopy-next/pull/760).

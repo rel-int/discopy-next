@@ -1,4 +1,4 @@
-# 2. Equality counts `is_dagger`
+# Equality counts `is_dagger`
 
 ## Context
 

@@ -1,4 +1,4 @@
-# 4. A box is mapped by its method: bubbles fuse into boxes, each level gets its plumbing
+# A box is mapped by its method: bubbles fuse into boxes, each level gets its plumbing
 
 ## Context
 

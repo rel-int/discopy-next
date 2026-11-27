@@ -1,4 +1,4 @@
-# 11. Path matrices add formally
+# Path matrices add formally
 
 ## Context
 

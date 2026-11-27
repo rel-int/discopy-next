@@ -1,4 +1,4 @@
-# 6. The tool paper is written in Typst, its LaTeX transpiled
+# The tool paper is written in Typst, its LaTeX transpiled
 
 ## Context
 
@@ -21,4 +21,4 @@ listings and draws each figure with both the Typst and the TikZ backends
 
 ## Status
 
-Superseded by [0007](0007-the-tool-paper-in-latex.md).
+Superseded by [`2026-11-17-the-tool-paper-in-latex.md`](2026-11-17-the-tool-paper-in-latex.md).

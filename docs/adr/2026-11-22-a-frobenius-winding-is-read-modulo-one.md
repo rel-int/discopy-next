@@ -1,4 +1,4 @@
-# 10. A frobenius winding is read modulo one
+# A frobenius winding is read modulo one
 
 ## Context
 

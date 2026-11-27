@@ -1,8 +1,8 @@
-# 7. The tool paper is LaTeX only
+# The tool paper is LaTeX only
 
 ## Context
 
-[0006](0006-the-tool-paper-in-typst.md) made the paper Typst source with transpiled LaTeX. A day
+[`2026-11-16-the-tool-paper-in-typst.md`](2026-11-16-the-tool-paper-in-typst.md) made the paper Typst source with transpiled LaTeX. A day
 later toumix reversed it, 2026-11-17, on
 [#564](https://github.com/rel-int/discopy-next/issues/564): "I think we're going back on our typst
 decision and moving back to just LaTeX for the paper". The same day he moved the draft to the

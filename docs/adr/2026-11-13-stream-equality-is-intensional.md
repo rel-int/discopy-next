@@ -1,4 +1,4 @@
-# 3. Stream equality is intensional
+# Stream equality is intensional
 
 ## Context
 
