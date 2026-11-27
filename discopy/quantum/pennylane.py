@@ -287,9 +287,9 @@ class PennyLaneCircuit:
         if backend == 'honeywell.hqs':
             try:
                 backend_config['machine'] = backend_config.pop('device')
-            except KeyError:
+            except KeyError as error:
                 raise ValueError('When using the honeywell.hqs provider, '
-                                 'a device must be specified.')
+                                 'a device must be specified.') from error
         elif 'device' in backend_config:
             backend_config['backend'] = backend_config.pop('device')
 
