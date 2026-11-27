@@ -88,6 +88,11 @@ class Exp(Wire, closed.monoidal.Exp):
         "The name of an exponential is its undelayed print, read when needed."
         return str(self.reset())
 
+    @property
+    def drawing_name(self) -> str:
+        return closed.monoidal.Exp.drawing_name.fget(self)\
+            + feedback.str_delayed(self.time_step)
+
     def __repr__(self):
         return factory_name(type(self))\
             + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"

@@ -799,3 +799,10 @@ def test_functor_keeps_the_whisker_of_a_nested_trace():
     for d in [(f.trace() @ x).trace(), (x @ f.trace()).trace(),
               (f.trace() >> Box('g', x, x)).trace(left=True)]:
         assert F(d) == d
+
+
+def test_drawing_name_of_a_delayed_exponential():
+    from discopy.feedback.closed import markov, monoidal, symmetric
+    for level in (monoidal, symmetric, markov):
+        x, y = level.Ty('x'), level.Ty('y')
+        assert (x >> y).delay().to_drawing().inside[0].name == "(x >> y).d"

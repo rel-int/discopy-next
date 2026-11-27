@@ -98,6 +98,11 @@ class Exp(Wire, closed.symmetric.Exp):
         return closed.symmetric.Exp.__str__(self)\
             + feedback.str_delayed(self.time_step)
 
+    @property
+    def drawing_name(self) -> str:
+        return closed.symmetric.Exp.drawing_name.fget(self)\
+            + feedback.str_delayed(self.time_step)
+
     def __repr__(self):
         return factory_name(type(self))\
             + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
