@@ -327,7 +327,20 @@ class Exp(Wire):
         return hash(repr(self))
 
     def __str__(self):
-        return f"({self.base} ** {self.exponent})"
+        return self.show(self.base, self.exponent)
+
+    def show(self, base, exponent) -> str:
+        """ The print of an exponential, given that of its base and exponent.
+        """
+        return f"({base} ** {exponent})"
+
+    @property
+    def drawing_name(self) -> str:
+        """
+        The label of an exponential wire, made of the labels of its base and
+        exponent, e.g. ``(!x >> y)`` rather than ``(x.bang() >> y)``.
+        """
+        return self.show(self.base.to_drawing(), self.exponent.to_drawing())
 
     def atoms(self) -> list:
         """ The atoms of an exponential: those of its base and exponent. """
@@ -363,8 +376,8 @@ class Over(Exp):
         base : The base type.
         exponent : The exponent type.
     """
-    def __str__(self):
-        return f"({self.base} << {self.exponent})"
+    def show(self, base, exponent) -> str:
+        return f"({base} << {exponent})"
 
 
 class Under(Exp):
@@ -375,8 +388,8 @@ class Under(Exp):
         base : The base type.
         exponent : The exponent type.
     """
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
 
 
 @factory

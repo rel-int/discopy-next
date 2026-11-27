@@ -3336,9 +3336,11 @@ class Hypergraph[category](
         factory = cls if cls.category is category else cls[category]
         if any(isinstance(box, cat.Sum) for box in old.boxes):
             raise AxiomError(messages.NO_SUMS.format(factory_name(factory)))
-        functor = factory.functor(
-            ob_map=lambda typ: typ, ar_map=factory.from_box,
-            dom=category, cod=factory)
+        functor = next(
+            functor for functor in factory.functor.__mro__
+            if issubclass(factory, getattr(functor, "requires", object)))(
+                ob_map=lambda typ: typ, ar_map=factory.from_box,
+                dom=category, cod=factory)
         trace = getattr(category, "trace_factory", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()

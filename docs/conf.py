@@ -112,11 +112,16 @@ html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL", "https://docs.discopy.org")
 
 
-# Read the Docs links to each notebook rather than running it, as a pull
-# request's build does: run one after another they take longer than its
-# 15-minute limit on their own. The `build` workflow renders them on `main`.
+# Read the Docs runs no notebook, as a pull request's build does: run one
+# after another they take longer than its 15-minute limit on their own. It
+# embeds instead those the `build` workflow rendered on `main` and pushed to
+# the `rendered-notebooks` branch, and links to the source of the others.
 if os.environ.get("READTHEDOCS") == "True":
-    os.environ.setdefault("DISCOPY_SKIP_NOTEBOOKS", "1")
+    import export_notebooks
+    os.environ.setdefault(export_notebooks.SKIP, "1")
+    os.environ.setdefault(
+        export_notebooks.RENDERED, "{}/archive/refs/heads/{}.tar.gz".format(
+            export_notebooks.REPOSITORY, export_notebooks.BRANCH))
 
 
 def setup(app):

@@ -91,8 +91,8 @@ class Exp(Wire, closed.monoidal.Exp):
         "The name of an exponential is its print, read when needed."
         return Exp.__str__(self)
 
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
 
     def __repr__(self):
         return factory_name(type(self))\

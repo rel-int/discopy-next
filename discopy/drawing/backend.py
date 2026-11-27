@@ -992,6 +992,14 @@ class Backend(ABC):
         return typ is not None and getattr(
             typ.inside[0], "frame_boundary", False)
 
+    @staticmethod
+    def same_colour_on_both_sides(typ):
+        """ Whether the regions on either side of a wire have one colour. """
+        if typ is None or not typ.inside:
+            return True
+        x = typ.inside[0]
+        return str(getattr(x, "dom", None)) == str(getattr(x, "cod", None))
+
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
         for node in graph.nodes:
@@ -1004,9 +1012,12 @@ class Backend(ABC):
         for source, target in self.visible_edges(graph):
             source_position = graph.positions[source]
             target_position = graph.positions[target]
-            # The sides of a frame are drawn with zero width.
-            is_frame_boundary = self.is_frame_boundary(source)\
-                or self.is_frame_boundary(target)
+            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
+            # The sides of a frame are drawn with zero width only between two
+            # regions of the same colour, e.g. the slot of an equation's term.
+            is_frame_boundary = (self.is_frame_boundary(source)
+                                 or self.is_frame_boundary(target))\
+                and self.same_colour_on_both_sides(typ)
             if source.kind in ["dom", "box_cod"]:
                 self.draw_wire_label(source.x, *source_position, **params)
             if source_position == target_position:
@@ -1015,7 +1026,6 @@ class Backend(ABC):
                    for n in (source, target)):
                 continue  # crossings are drawn on their own
             bend_out, bend_in = source.kind == "box", target.kind == "box"
-            typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),
@@ -1182,9 +1192,13 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        if box.is_conjugate or box.is_transpose:
-            asymmetry *= -1
-        points[i] = points[i].shift(x=asymmetry)
+        if box.nested is not None:
+            # Along its long sides a slant is hard to see: chop a corner off.
+            points = self.chop_corner(points, i, 2 * asymmetry)
+        else:
+            if box.is_conjugate or box.is_transpose:
+                asymmetry *= -1
+            points[i] = points[i].shift(x=asymmetry)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
@@ -1200,6 +1214,27 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
 
+    @staticmethod
+    def chop_corner(points, i, size):
+        """
+        A polygon with its ``i``-th corner cut off, ``size`` along both of
+        its sides, e.g. the box of a variant of a box with args.
+
+        >>> square = [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)]
+        >>> Backend.chop_corner(square, 2, .25)[1:4]
+        [Point(x=0, y=1), Point(x=0.75, y=1.0), Point(x=1.0, y=0.75)]
+        """
+        if not size:
+            return points
+        corner = points[i]
+
+        def towards(point):
+            dx, dy = point.x - corner.x, point.y - corner.y
+            length = sqrt(dx * dx + dy * dy)
+            return corner.shift(x=dx * size / length, y=dy * size / length)
+        return points[:i] + [towards(points[i - 1]), towards(
+            points[(i + 1) % len(points)])] + points[i + 1:]
+
     def draw_nested(self, box, corners, centre, **params):
         """
         Draw the drawings nested in a box left to right, one under the other,
@@ -1207,8 +1242,9 @@ class Backend(ABC):
         :class:`Transposed`, centred in the space right of the box's label,
         and return the centre of that label, on the left of the box. Their
         wires plug into the edges of the background, a line separates each
-        from the next, so that no two regions meet without one, and a
-        daggered box reflects them, the last on top.
+        from the next, so that no two regions meet without one. A reflected
+        drawing reflects them, the last on top, and a transposed box or a
+        conjugate turns them half way round, as it is turned itself.
         """
         nested = box.nested
         width = sum(drawing.width for drawing in nested)
@@ -1219,15 +1255,16 @@ class Backend(ABC):
         x, y = (start + right - height) / 2, centre[1] - width / 2
         self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
                           (x, y + width), facecolor=box.frame_colour)
-        offset = 0
+        turn = bool(box.is_transpose or box.is_conjugate)
+        flip, offset = box.mirror_nested != turn, 0
         for drawing in nested:
             offset += drawing.width
-            origin = Point(x, y + offset - drawing.width if box.is_dagger
+            origin = Point(x, y + offset - drawing.width if flip
                            else y + width - offset)
-            Transposed(self, origin, drawing, flip=box.is_dagger)\
+            Transposed(self, origin, drawing, flip=flip, reverse=turn)\
                 .draw_drawing(drawing, **params)
             if offset < width:
-                edge = y + offset if box.is_dagger else y + width - offset
+                edge = y + offset if flip else y + width - offset
                 self.draw_bezier([Point(x + t * height / 3, edge)
                                   for t in range(4)], adaptive=False)
         return Point((left + start) / 2, centre[1])
@@ -1533,7 +1570,10 @@ class Transposed(Backend):
         origin : The bottom left corner of the transposed drawing.
         graph : The drawing, for its width and height.
         flip : Whether to reflect the transposed drawing along the
-            horizontal axis too, e.g. inside a daggered box.
+            horizontal axis too, e.g. inside a reflected box.
+        reverse : Whether to reflect it along the vertical axis too, so
+            that it goes from right to left, e.g. with ``flip`` it is turned
+            half way round inside a transposed box.
 
     Example
     -------
@@ -1547,8 +1587,9 @@ class Transposed(Backend):
         :align: center
     """
     def __init__(self, parent: Backend, origin: Point, graph: Drawing,
-                 flip=False):
+                 flip=False, reverse=False):
         self.parent, self.origin, self.flip = parent, origin, flip
+        self.reverse = reverse
         self.textpad, self.lift = DEFAULT["textpad"][0], False
         self.width, self.height = graph.width, graph.height
         super().__init__()
@@ -1556,7 +1597,7 @@ class Transposed(Backend):
     def map(self, point) -> Point:
         """ The image of a point of the drawing on the parent backend. """
         x, y = point
-        return Point(self.origin.x + self.height - y,
+        return Point(self.origin.x + (y if self.reverse else self.height - y),
                      self.origin.y + (x if self.flip else self.width - x))
 
     def draw_boundary(self, graph, *args, **params):

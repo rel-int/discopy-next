@@ -52,14 +52,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   to, e.g. `Nat` for `abc.PRO`, and `discolean/` proves the coherence of
   `discopy.monoidal`:
   Diagram(S) is the free model of the laws of `monoidal.Diagram` ([next#671]).
-- The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
+- `discopy.lambek.modality`, the Lambek calculus with a relevant modality
+  `!L*` of arXiv:2110.10641: the categorial types and diagrams of
+  `discopy.lambek.categorial` with the bang and the structural boxes of
+  `discopy.bang`, and the kappa terms of `discopy.bang` whose functions are
+  applied by `Eval`. Its `Functor` sends the exponentials through the closed
+  structure of its codomain only when that is a closed category, and through
+  `ob_map` and `ar_map` otherwise ([next#691]).
+- The notebook `docs/notebooks/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
-  Bill does too.*, each reading a `closed` lambda term sent by a functor
-  into a subclass of `tensor.Diagram` whose `copy` is an optyx diagram, with
-  the Fock space of `!` as photons on modes. The paper's k-extension is the W node of
-  `discopy.optyx.core.zw` and its basis copy the Z spider; anaphora, ellipsis and both readings are checked against
-  the paper's formulas, and the two readings are shown to be two maps
-  ([next#674]).
+  Bill does too.*, with photons: each reading is a term of
+  `discopy.lambek.modality` whose words have the paper's types, sent by a
+  functor to a diagram of `discopy.optyx.core.zw` where a word vector is one
+  photon over modes, `!` the bosonic Fock space of those modes, the paper's
+  k-extension the W node and its basis copy the Z spider. Anaphora, ellipsis
+  and both readings are checked against the paper's formulas, and the two
+  readings are shown to be two maps ([next#674], [next#691]).
 - The kappa calculus, the first-order half of the lambda calculus: each
   module below the closed categories has terms of its own, `Variable`,
   `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
@@ -592,8 +600,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `compact.Diagram` are closed, with `x ⊸ y = x* @ y`: evaluation and currying
   stay cups and caps. `feedback.closed` is a package too, its
   `feedback.closed.markov` the `feedback.closed` module before, over
-  `closed.markov`. The old names keep no alias, and a tree or pickle saved
-  under them does not load ([next#743]).
+  `closed.markov`. A `lambek.modality.Functor` needs a biclosed codomain and
+  raises when constructed into any other, instead of sending exponentials
+  through `ob_map` at call time: into `Tensor`, compact hence closed, `N >> S`
+  is the internal hom and `Eval` a cup, and the strict and sloppy notebook,
+  which wants exponentials as generators, sends the underlying monoidal
+  diagram with a `monoidal.Functor`. The old names keep no alias, and a tree
+  or pickle saved under them does not load ([next#743]).
 
 - The hierarchy of `docs/adr/0014-traced-levels-with-duals.md`, drawn in
   the architecture diagram of the docs by `docs/architecture.py`:
@@ -957,6 +970,33 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   leaves the `notebooks` extra ([next#715]).
 
 ### Fixed
+
+- The label of an exponential wire is made of the labels of its base and
+  exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
+  `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
+
+- A box with as many outputs as inputs, e.g. a swap drawn as a box, draws
+  each output straight down from the input above it, rather than bending the
+  wire below into the next box when the labels of its inputs and outputs have
+  different widths ([next#748]).
+
+- The dagger, transpose and conjugate of a box with args keep its
+  `drawing_name`, and when its args are drawn in another direction its box has
+  a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
+  and a transpose or a conjugate turns its args half way round with it
+  ([next#745]).
+
+- A kappa term of `discopy.bang` copies, exchanges and discards its banged
+  variables with the boxes of the domain of the functor that evaluates it,
+  so that a subclass, e.g. `discopy.lambek.modality`, sends its own
+  structural boxes through `ar_map` ([next#691]).
+- `ZBox.truncation` of `discopy.optyx.core.zw` accepts a dimension given as
+  a NumPy integer, e.g. the output of a W dagger, so a Z spider with two
+  inputs or more no longer fails to truncate after one ([next#691]).
+- The sides of a frame and of its slots are drawn with a black edge, as
+  those of boxes and bubbles are, wherever the regions on either side have
+  different colours, rather than with zero width, e.g. around each term of
+  an equation between coloured diagrams ([next#742]).
 
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
@@ -2168,6 +2208,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- Read the Docs embeds the notebooks the `build` workflow renders on `main`
+  instead of linking to their sources, still running none itself: a
+  `notebooks` job pushes them to the `rendered-notebooks` branch, whose
+  tarball `docs/export_notebooks.py` downloads when `DISCOPY_RENDERED_NOTEBOOKS`
+  names it, as `docs/conf.py` does on Read the Docs ([next#765]).
+
 - `docs/notebooks/optyx/readme_example.md`, the old optyx README, is no longer
   run by CI: `UNEXECUTED` in `docs/export_notebooks.py` keeps it out of
   `--check` and the docs build, which give it a page linking to its source,
@@ -2780,6 +2826,7 @@ for the changelog of `1.2.1` and earlier.
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
+[next#691]: https://github.com/rel-int/discopy-next/pull/691
 [next#692]: https://github.com/rel-int/discopy-next/pull/692
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
@@ -2799,6 +2846,11 @@ for the changelog of `1.2.1` and earlier.
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
+[next#742]: https://github.com/rel-int/discopy-next/pull/742
+[next#745]: https://github.com/rel-int/discopy-next/pull/745
+[next#748]: https://github.com/rel-int/discopy-next/pull/748
+[next#762]: https://github.com/rel-int/discopy-next/pull/762
+[next#765]: https://github.com/rel-int/discopy-next/pull/765
 [next#726]: https://github.com/rel-int/discopy-next/pull/726
 [next#727]: https://github.com/rel-int/discopy-next/pull/727
 [next#728]: https://github.com/rel-int/discopy-next/pull/728
