@@ -16,13 +16,13 @@ Dataflow Programming" (Di Lavore et al. 2022), with `discopy.stream` as their se
 
 ## Decision
 
-- `discopy.dataflow` holds the structure as mixins: `StreamWire` (`head`, `tail`,
-  `is_constant`), `StreamTy`, `StreamDiagram` (`head`, `tail`, `followed_by` and their
-  factories), `HeadOb`, `TailOb`, `Head`, `Tail`, `FollowedBy` and `Functor`. A level is one
-  class per mixin over its feedback level, written out, nothing generated.
 - `dataflow.symmetric` is the base level, over `feedback.symmetric`: monoidal streams are defined
-  over symmetric categories, and none of the primitives copies. `dataflow.markov` is over
-  `feedback.markov` and `dataflow.symmetric`.
+  over symmetric categories, and none of the primitives copies. Its classes hold the structure,
+  `Wire` (`head`, `tail`, `is_constant`), `Ty`, `Diagram` (`head`, `tail`, `followed_by` and
+  their factories), `HeadOb`, `TailOb`, `Head`, `Tail`, `FollowedBy` and `Functor`, and the
+  package's `__init__` only its docstring. A level above it, e.g. `dataflow.markov` over
+  `feedback.markov`, is one class per class of the base level mixed into its feedback level,
+  written out, nothing generated.
 - A dataflow functor sends the primitives to those of its codomain, e.g. `stream.Stream`. Into a
   codomain without them, a callable map, e.g. that of `to_hypergraph`, takes them as generators,
   and a mapping that does not have them raises.

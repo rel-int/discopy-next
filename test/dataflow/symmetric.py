@@ -17,7 +17,7 @@ def test_invalid_inputs():
 
 
 def test_Head_Tail_FollowedBy_to_tree():
-    from discopy.dataflow import symmetric
+    from discopy import dataflow
     x, y = Ty(Wire('x', is_constant=False)), Ty('y')
     f = Box('f', x, y)
     for term in (x.head, x.tail, x.head.delay(), f.head, f.tail, f.tail.delay(2),
