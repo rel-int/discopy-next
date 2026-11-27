@@ -11,5 +11,5 @@
 - [x] remove HeadOb, TailOb, Head, Tail, FollowedBy, is_constant from feedback and every level, structural_wires, the Functor branches, Dim/Nat/Dims heads, circuit and optyx heads
 - [x] move the fib, random-walk and walk doctests, test_walk/test_fibonacci and the notebook to dataflow; plumbing tests to test/dataflow.py
 - [x] docs API, CHANGELOG, ADR
-- [ ] next-checks green, PR opened
+- [x] next-checks green, PR opened
 - [x] Alexis's layout change: dataflow is a package, mixins in __init__, dataflow.symmetric the base level, dataflow.markov over it and feedback.markov
