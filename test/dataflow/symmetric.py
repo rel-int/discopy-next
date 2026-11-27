@@ -114,3 +114,12 @@ def test_terms_evaluate_back_to_dataflow():
         d = diagram.id(diagram.ob('x'))
         assert d.to_term().eval() == d
         assert type(d.to_term().eval()) is diagram
+
+
+def test_callable_maps_take_heads_as_generators():
+    from discopy import symmetric
+    x, y = Ty('x'), symmetric.Ty('y')
+    f, g = Box('f', x, x), symmetric.Box('g', y, y)
+    F = Functor(lambda _: y, lambda box: g if box != f else None,
+                cod=symmetric.Diagram)
+    assert F(f.head) == F(f.tail) == g

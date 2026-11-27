@@ -379,11 +379,10 @@ class Functor(feedback.Functor):
     """
     The mixin of a functor that sends heads, tails and followed-bys to those
     of its codomain, e.g. :class:`discopy.stream.Stream`. Into a codomain
-    that has none, they are boxes and wires like any other: a callable map,
-    e.g. that of :meth:`discopy.symmetric.Diagram.to_hypergraph`, sends them
-    as it sends a generator, a mapping sends them to their images as
-    generators, not as the bubbles of their args, and raises on those it
-    does not have rather than make them up.
+    that has none, they are generators, not the bubbles of their args: a
+    callable map, e.g. that of :meth:`discopy.symmetric.Diagram.to_hypergraph`,
+    is called on them, and a mapping sends them to their images and raises
+    on those it does not have rather than make them up.
     """
     def __call__(self, other):
         if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy))\
@@ -401,16 +400,16 @@ class Functor(feedback.Functor):
         mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
             if isinstance(other, (HeadOb, TailOb))\
             else (self.ar_map.mapping, other)
-        if not isinstance(mapping, Mapping):
-            return super().__call__(other)
-        if key not in mapping:
+        if isinstance(mapping, Mapping) and key not in mapping:
             raise AxiomError(messages.NO_DATAFLOW.format(
                 factory_name(self.cod)))
         if isinstance(other, (HeadOb, TailOb)):
             return super().__call__(other)
-        result = mapping[other]
+        result = self.ar_map[other]
         return result if isinstance(result, self.cod)\
-            else self.cod(result, self(other.dom), self(other.cod))
+            else self.cod(
+                result,  # ty: ignore[invalid-argument-type]  # e.g. an array
+                self(other.dom), self(other.cod))
 
 
 # The levels subclass these mixins, so they are imported last.
