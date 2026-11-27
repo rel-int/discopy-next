@@ -235,7 +235,8 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError, factory_name, from_tree
+from discopy.utils import (
+    AxiomError, factory_name, from_tree)
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
@@ -434,6 +435,7 @@ class Diagram(frobenius.Diagram):
 
     ob = Ty
     grad = tensor.Diagram.grad
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
     boundary = diagram.Diagram.boundary
     unroll = diagram.Diagram.unroll
     one_step = diagram.Diagram.one_step
@@ -450,6 +452,14 @@ class Diagram(frobenius.Diagram):
         """
         left.assert_isadjoint(right)
         return cls.spider_factory(2, 0, left)
+
+    @classmethod
+    def cap_factory(cls, left: Ty, right: Ty) -> Spider:
+        """ The cap of a channel type, the dagger of its cup. """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(0, 2, left)
+
+    trace = diagram.Diagram.trace
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:

@@ -84,7 +84,7 @@ def bases(cls):
 def test_bases():
     assert bases(ribbon.Diagram)[:2] == [
         ":class:`pivotal.Diagram <discopy.pivotal.Diagram>`",
-        ":class:`balanced.Diagram <discopy.balanced.Diagram>`"]
+        ":class:`balanced.Diagram <discopy.feedback.closed.balanced.Diagram>`"]
     assert bases(symmetric.Box)[0] == (
         ":class:`balanced.Box <discopy.balanced.Box>`")
     assert bases(symmetric.Box)[1] is symmetric.Diagram

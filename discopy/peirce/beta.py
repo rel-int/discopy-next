@@ -137,6 +137,7 @@ class Diagram(alpha.Diagram, frobenius.Diagram):
     """
     ob = Ty
     strategy = no_strategy
+    trace_factory = classmethod(frobenius.Diagram.dual_trace.__func__)
 
     def bubble(self, *args, **params) -> Cut:
         """ The :class:`Cut` of a diagram, the bubble of this category. """

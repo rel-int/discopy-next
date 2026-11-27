@@ -53,10 +53,11 @@ Summary
     DaggerMonoidalCategory
     SpacialCategory
     PRO
+    DelayCategory
     FeedbackCategory
     TracedCategory
     ResiduatedMonoid
-    BiclosedCategory
+    ClosedMonoidalCategory
     ComonadCategory
     LinearCategory
     Pregroup
@@ -68,7 +69,7 @@ Summary
     PROP
     MarkovCategory
     ComarkovCategory
-    ClosedCategory
+    ClosedSymmetricCategory
     ClosedMarkovCategory
     BalancedCategory
     BalancedTracedCategory
@@ -678,17 +679,11 @@ class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
     """
 
 
-class FeedbackCategory[
-        C0: ColouredMonoid, C1: FeedbackCategory](MonoidalCategory[C0, C1]):
+class DelayCategory[C0, C1: DelayCategory](Category[C0, C1]):
     """
-    A feedback category is a :class:`MonoidalCategory` with a monoidal
-    endofunctor :meth:`delay` and an operator :meth:`feedback` from
-    morphisms ``x @ m.delay() -> y @ m`` to morphisms ``x -> y``, see
-    :cite:t:`KatisEtAl02` and :cite:t:`DiLavoreEtAl22`.
-
-    The laws of feedback are stated once here: vanishing, joining, strength,
-    tightening and sliding. A :class:`TracedCategory` is a feedback category
-    whose delay is the identity.
+    A delay category is a :class:`Category` with an endofunctor
+    :meth:`delay`, the part of a :class:`FeedbackCategory` that needs no
+    tensor. :mod:`~discopy.feedback.cat` is the free one.
     """
     def delay(self, n_steps: int = 1) -> C1:
         """
@@ -700,6 +695,40 @@ class FeedbackCategory[
         del n_steps
         return self  # ty: ignore[invalid-return-type]
 
+    @axiom
+    def delay_unit[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Delaying by no time step is the identity. """
+        return cls.equation_factory(f.delay(0), f)
+
+    @axiom
+    def delay_composition[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]
+    ) -> Equation[Hom[
+            C1, Delay[C1, Delay[C1, A]], Delay[C1, Delay[C1, B]]]]:
+        """ Delaying twice is delaying by two time steps. """
+        return cls.equation_factory(f.delay().delay(), f.delay(2))
+
+    @rule
+    def delaying[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Hom[C1, Delay[C1, A], Delay[C1, B]]:
+        """ The delay of a morphism by one time step. """
+        return f.delay()
+
+
+class FeedbackCategory[
+        C0: ColouredMonoid, C1: FeedbackCategory](
+            DelayCategory[C0, C1], MonoidalCategory[C0, C1]):
+    """
+    A feedback category is a :class:`MonoidalCategory` and a
+    :class:`DelayCategory` whose delay is monoidal, with an operator
+    :meth:`feedback` from morphisms ``x @ m.delay() -> y @ m`` to morphisms
+    ``x -> y``, see :cite:t:`KatisEtAl02` and :cite:t:`DiLavoreEtAl22`.
+
+    The laws of feedback are stated once here: vanishing, joining, strength,
+    tightening and sliding. A :class:`TracedCategory` is a feedback category
+    whose delay is the identity.
+    """
     @abstractmethod
     def feedback(
             self, n: int | None = None, left: bool = False, *,
@@ -721,20 +750,6 @@ class FeedbackCategory[
             cod : The codomain of the feedback.
             mem : The memory to feed back.
         """
-
-    @axiom
-    def delay_unit[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
-        """ Delaying by no time step is the identity. """
-        return cls.equation_factory(f.delay(0), f)
-
-    @axiom
-    def delay_composition[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]
-    ) -> Equation[Hom[
-            C1, Delay[C1, Delay[C1, A]], Delay[C1, Delay[C1, B]]]]:
-        """ Delaying twice is delaying by two time steps. """
-        return cls.equation_factory(f.delay().delay(), f.delay(2))
 
     @axiom
     def vanishing[A: Obj[C0], B: Obj[C0]](
@@ -791,12 +806,6 @@ class FeedbackCategory[
         return cls.equation_factory(
             (f >> y @ k).feedback(dom=x, cod=y, mem=k.cod),
             (x @ k.delay() >> f).feedback(dom=x, cod=y, mem=k.dom))
-
-    @rule
-    def delaying[A: Obj[C0], B: Obj[C0]](
-            cls, f: Hom[C1, A, B]) -> Hom[C1, Delay[C1, A], Delay[C1, B]]:
-        """ The delay of a morphism by one time step. """
-        return f.delay()
 
     @rule
     def feedback_right[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
@@ -1106,11 +1115,13 @@ class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
         return other.under(self)
 
 
-class BiclosedCategory[
-        C0: ResiduatedMonoid, C1: BiclosedCategory](MonoidalCategory[C0, C1]):
+class ClosedMonoidalCategory[
+        C0: ResiduatedMonoid, C1: ClosedMonoidalCategory](
+            MonoidalCategory[C0, C1]):
     """
-    A biclosed category is a :class:`MonoidalCategory` with methods :code:`ev`
-    and :code:`curry` for the evaluation and currying of morphisms.
+    A closed monoidal category, also called biclosed, is a
+    :class:`MonoidalCategory` with methods :code:`ev` and :code:`curry` for the
+    evaluation and currying of morphisms.
 
     We also assume the type for objects comes with methods for left and right
     exponentials :code`x << y` and :code`x >> y`.
@@ -1663,10 +1674,12 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
         return other.r @ self
 
 
-class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
+class RigidCategory[C0: Pregroup, C1: RigidCategory](
+        ClosedMonoidalCategory[C0, C1]):
     """
-    A rigid category is a :class:`BiclosedCategory` with a :class:`Pregroup` as
-    object type and methods for :code:`cups` and :code:`caps`.
+    A rigid category is a :class:`ClosedMonoidalCategory` with a
+    :class:`Pregroup` as object type and methods for :code:`cups` and
+    :code:`caps`.
     """
     @classmethod
     @abstractmethod
@@ -1723,9 +1736,10 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
 
     def base_and_exponent(self, n: int, left: bool) -> tuple[C0, C0]:
         """
-        Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup has
-        no exponential object to read the exponent off the codomain: it is the
-        ``n`` objects at the end resp. the start of the codomain, dualised.
+        Contrary to :meth:`ClosedMonoidalCategory.base_and_exponent`, a
+        pregroup has no exponential object to read the exponent off the
+        codomain: it is the ``n`` objects at the end resp. the start of the
+        codomain, dualised.
 
         Parameters:
             n : The number of objects to uncurry.
@@ -1831,7 +1845,10 @@ class PivotalCategory[
     """
     A pivotal category is a :class:`RigidCategory` where the left and right
     adjoints coincide, hence it is also a :class:`TracedCategory`, a planar
-    one with no swap to yank.
+    one with no swap to yank: a feedback category whose delay is the
+    identity by default, as the twist of a :class:`CompactCategory` is. A
+    category may choose another delay, a strong monoidal endofunctor, which
+    preserves duals.
     """
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
@@ -1847,6 +1864,22 @@ class PivotalCategory[
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, L[B], L[A]]]:
         """ The left and right transposes are equal. """
         return cls.equation_factory(f.transpose(left=True), f.transpose())
+
+    @axiom
+    def trace_duals[Γ: Obj[C0], Δ: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[Γ, M], Tensor[Δ, M]], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, Γ, Δ]]:
+        """
+        The trace is a cap, then the morphism, then a cup: the trace stays a
+        primitive, as a spider stays distinct from a cup, and this law says
+        what it is.
+        """
+        n = len(mem)
+        dom, cod = f.dom[:len(f.dom) - n], f.cod[:len(f.cod) - n]
+        return cls.equation_factory(
+            f.trace(n),
+            dom @ cls.caps(mem, mem.r) >> f @ mem.r
+            >> cod @ cls.cups(mem, mem.r))
 
 
 class BraidedCategory[
@@ -2315,13 +2348,13 @@ class ComarkovCategory[
         return cls.merge(x, n)
 
 
-class ClosedCategory[
-        C0: ResiduatedMonoid, C1: ClosedCategory](
-            BiclosedCategory[C0, C1], SymmetricCategory[C0, C1]):
+class ClosedSymmetricCategory[
+        C0: ResiduatedMonoid, C1: ClosedSymmetricCategory](
+            ClosedMonoidalCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
-    A closed category is a symmetric :class:`BiclosedCategory`, i.e. a
-    symmetric monoidal closed category, see :class:`ClosedMarkovCategory`
-    for one with copy and discard.
+    A closed symmetric category is a symmetric :class:`ClosedMonoidalCategory`,
+    i.e. a symmetric monoidal closed category, see
+    :class:`ClosedMarkovCategory` for one with copy and discard.
     """
 
     @axiom
@@ -2337,10 +2370,10 @@ class ClosedCategory[
 
 class ClosedMarkovCategory[
         C0: ResiduatedMonoid, C1: ClosedMarkovCategory](
-            ClosedCategory[C0, C1], MarkovCategory[C0, C1]):
+            ClosedSymmetricCategory[C0, C1], MarkovCategory[C0, C1]):
     """
-    A closed Markov category is a :class:`ClosedCategory` with copy and
-    discard, i.e. which is also a :class:`MarkovCategory`.
+    A closed Markov category is a :class:`ClosedSymmetricCategory` with copy
+    and discard, i.e. which is also a :class:`MarkovCategory`.
     """
 
 
@@ -2586,10 +2619,10 @@ class GoISituation[C0: ColouredMonoid, C1: GoISituation](
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](
-        RibbonCategory[C0, C1], ClosedCategory[C0, C1]):
+        RibbonCategory[C0, C1], ClosedSymmetricCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
-    :class:`ClosedCategory`, i.e. with cups, caps and swaps and where
+    :class:`ClosedSymmetricCategory`, i.e. with cups, caps and swaps and where
     the twist is the identity. Its internal hom ``x ⊸ y`` is ``x* @ y``,
     so that evaluation and currying are cups and caps, as in a
     :class:`RigidCategory`.
@@ -2598,7 +2631,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
     def twist(cls, dom: C0) -> C1:
         return cls.id(dom)
 
-    currying_symmetry = ClosedCategory.currying_symmetry.inapplicable(
+    currying_symmetry = ClosedSymmetricCategory.currying_symmetry.inapplicable(
         messages.COMPACT_EXPONENTIALS)
 
     @axiom
@@ -2663,6 +2696,19 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         """ Spiders do not see the order of their legs. """
         merge = cls.spiders(2, 1, x)
         return cls.equation_factory(cls.swap(x, x) >> merge, merge)
+
+    @axiom
+    def spider_delay[X: Atom[C0], M: Nat, N: Nat](
+            cls, x: Var[C0, X], m: Var[int, M], n: Var[int, N]
+    ) -> Equation[Hom[C1, Delay[C1, Repeat[X, M]], Delay[C1, Repeat[X, N]]]]:
+        """
+        The delay preserves the spiders, i.e. it is a hypergraph functor:
+        the free delay does, so does the identity delay of a semantic
+        category, and so must any other delay it chooses.
+        """
+        return cls.equation_factory(
+            cls.spiders(m, n, x).delay(),
+            cls.spiders(m, n, cls.id(x).delay().dom))
 
     @rule
     def spider[X: Atom[C0], M: Nat, N: Nat](

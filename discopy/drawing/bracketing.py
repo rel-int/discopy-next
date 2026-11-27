@@ -392,7 +392,7 @@ def free_category(axiom: Axiom) -> type | None:
     >>> print(free_category(TracedCategory.yanking).__module__)
     discopy.compact
     >>> print(free_category(BalancedTracedCategory.yanking).__module__)
-    discopy.compact
+    discopy.ribbon
     """
     if axiom.category is not None and axiom.category.__name__ == "Diagram":
         return axiom.category

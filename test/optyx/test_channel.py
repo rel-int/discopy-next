@@ -443,6 +443,8 @@ def test_a_channel_traces_through_its_own_cup():
     assert np.allclose(np.asarray(
         cnot.trace(left=True).eval().tensor.array).reshape(2, 2), np.ones(
             (2, 2)))
+    with pytest.raises(ValueError):
+        cnot.trace(-1)
     snake = (Diagram.caps(qubit, qubit) @ qubit
              >> qubit @ Diagram.cups(qubit, qubit))
     assert np.allclose(np.asarray(
@@ -463,3 +465,12 @@ def test_a_box_loads_its_own_tree(box):
     loaded = loads(dumps(box))
     assert loaded == box and loaded.to_tree() == box.to_tree()
     assert loads(dumps(box @ box)) == box @ box
+
+
+def test_a_core_diagram_traces_through_its_own_cup():
+    """`trace` of an optyx core diagram bends a wire with its own cup and
+    cap rather than calling its delayed `feedback` (next#744)."""
+    from discopy.optyx.core import diagram as core
+    mode, D = core.mode, core.Diagram
+    assert D.id(mode @ mode).trace()\
+        == mode @ D.caps(mode, mode) >> mode @ D.cups(mode, mode)

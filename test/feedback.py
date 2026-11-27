@@ -357,9 +357,49 @@ def test_delayed_pivotal_diagrams():
         assert eval(repr(box), {'pivotal': pivotal}) == box
 
 
+def test_traced_levels_with_duals():
+    from discopy import compact, frobenius, pivotal, ribbon
+    for module in (pivotal, ribbon, compact, frobenius):
+        x = module.Ty('x')
+        f = module.Box('f', x @ x, x @ x)
+        assert x.delay() != x and x.delay().r == x.r.delay()
+        assert f.trace() == f.feedback() == module.Trace(f)
+        assert f.trace(left=True) == module.Trace(f, left=True)
+        assert f.trace().open_traces() == x @ module.Diagram.caps(x, x.r)\
+            >> f @ x.r >> x @ module.Diagram.cups(x, x.r)
+        assert module.Trace(f, mem=x @ x).open_traces()\
+            == f.trace(2).open_traces()
+        assert f.delay().trace() == f.trace().delay()
+        g = module.Box('g', x @ x.delay(), x @ x)
+        assert isinstance(g.feedback(), module.Feedback)
+        assert not isinstance(g.feedback(), module.Trace)
+        assert g.feedback().open_traces() == g.feedback()
+        k = module.Box('k', x.delay() @ x @ x, x @ x @ x)
+        nested = k.trace().feedback(mem=x, left=True)
+        assert isinstance(nested, module.Feedback)
+        assert nested.open_traces()\
+            == k.trace().open_traces().feedback(mem=x, left=True)
+    spider = frobenius.Spider(1, 2, frobenius.Ty('x'))
+    assert spider.delay() == frobenius.Spider(1, 2, frobenius.Ty('x').d)
+
+
+def test_stream_boxes_raise_into_a_codomain_without_streams():
+    from discopy import frobenius
+    from discopy.tensor import Dim, Tensor
+    x = frobenius.Ty('x')
+    f = frobenius.Box('f', x @ x, x @ x)
+    F = frobenius.Functor(
+        {x: Dim(2)}, {f: list(range(16))}, cod=Tensor[int])
+    assert F(f.trace()) == F(f.trace().open_traces())
+    assert F(f.delay()) == F(f)
+    for box in (f.head, f.tail, frobenius.FollowedBy(x)):
+        with raises(KeyError):
+            F(box)
+
+
 def test_time_stepped_wires_below_feedback():
-    from discopy import pivotal, frobenius
-    from discopy.feedback import markov
+    from discopy import compact, frobenius, pivotal
+    from discopy.feedback import closed, markov
     x = markov.Ty('x')
     assert x.delay() != x and x.delay().inside[0].time_step == 1
     f = markov.Box('f', x @ x.delay(), x @ x)
@@ -371,6 +411,24 @@ def test_time_stepped_wires_below_feedback():
     assert isinstance(g.feedback(), pivotal.Feedback)
     assert g.delay().time_step == 1
     assert frobenius.Ty('z').delay().r == frobenius.Ty('z').r.delay()
+    y = closed.monoidal.Ty('y')
+    g = closed.monoidal.Box('g', y @ y.delay(), y @ y)
+    assert isinstance(g.feedback(), closed.monoidal.Feedback)
+    assert g.delay().time_step == 1 and (y << y).delay() != y.d << y.d
+    h = closed.monoidal.Box('h', y @ y, y @ y)
+    traced = (h.curry() @ y >> closed.monoidal.Diagram.ev(y @ y, y)).trace()
+    assert traced.to_compact() == (
+        h.curry() @ y >> closed.monoidal.Diagram.ev(y @ y, y)
+    ).to_compact().trace()
+    c = h.curry()
+    assert (c + c).to_compact() == c.to_compact() + c.to_compact()
+    k = closed.monoidal.Box('k', y @ y.d, y @ y)
+    g = k.curry() @ y.d >> closed.monoidal.Diagram.ev(y @ y, y.d)
+    assert g.feedback(mem=y).to_compact() == g.to_compact().feedback(mem=y)
+    for level in (closed.monoidal, closed.markov):
+        z = level.Ty('z')
+        F = level.Functor({z: compact.Ty('z')}, {}, cod=compact.Diagram)
+        assert F(level.Eval(z << z).delay()) == F(level.Eval(z << z)).delay()
 
 
 def test_FollowedBy_delay():
@@ -390,7 +448,8 @@ def test_generated_boxes_at_every_level():
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
-                   compact, frobenius, closed.markov, network):
+                   compact, frobenius, closed.monoidal, closed.balanced,
+                   closed.symmetric, closed.markov, network):
         diagram = getattr(module, "Diagram", getattr(module, "Network", None))
         for name in ("Feedback", "Trace", "FollowedBy", "Head", "Tail"):
             cls = getattr(module, name)
@@ -412,8 +471,7 @@ def test_generated_boxes_at_every_level():
                                         'discopy.feedback').feedback}) == box
             assert pickle.loads(pickle.dumps(box)) == box
             assert loads(dumps(box)) == box
-    assert pivotal.Diagram.trace_factory.__func__\
-        is pivotal.Diagram.__dict__['trace_factory'].__func__
+    assert pivotal.Diagram.trace_factory is pivotal.Trace
 
 
 def test_Functor_sends_equal_heads_to_equal_images():
@@ -508,7 +566,8 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
     from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.utils import dumps, loads
     modules = (feedback, balanced, symmetric, markov, comarkov, pivotal,
-               ribbon, compact, frobenius, closed.markov)
+               ribbon, compact, frobenius, closed.monoidal, closed.balanced,
+               closed.symmetric, closed.markov)
     namespace = {module.__name__.split('.')[-1]: module for module in modules}
     for module in modules:
         x, y = module.Ty('x'), module.Ty('y')
@@ -690,3 +749,67 @@ def test_foliation_idempotence():
         foliated = diagram.foliation()
         assert Equation(diagram, foliated)
         assert foliated.foliation() == foliated
+
+
+def test_free_delay_category():
+    import pickle
+    from discopy.feedback import cat
+    from discopy.utils import dumps, loads
+    x, y = cat.Ob('x'), cat.Ob('y')
+    f = cat.Box('f', x, y, data=[1]).delay(2)
+    for term in (x.delay(), f, f >> f[::-1], f.bubble(name="b").delay()):
+        assert loads(dumps(term)) == term
+        assert pickle.loads(pickle.dumps(term)) == term
+    assert f.delay(-2) == cat.Box('f', x, y, data=[1]) != f
+    assert f.bubble().delay().args == (f, )
+    with raises(NotImplementedError):
+        f.delay(-3)
+    with raises(TypeError):
+        cat.Box('f', x, y, time_step=1.5)
+    g = cat.Box('g', x, y)
+    assert str(g.bubble().delay()) == "(g).bubble().d"
+    assert eval(str(g.bubble().delay()), {'g': g}) == g.bubble().delay()
+    for time_step, error in ((-1, NotImplementedError), (1.5, TypeError)):
+        with raises(error):
+            cat.Box.from_tree(dict(f.to_tree(), time_step=time_step))
+    assert cat.Arrow.generator_factory is cat.Box
+
+
+def test_draw_the_trace_of_ribbons():
+    from discopy import config
+    from discopy.feedback import balanced
+    x = balanced.Ty('x')
+    for left in (False, True):
+        ribbon = balanced.Braid(x, x).trace(left=left).to_braided()
+        drawing = ribbon.to_drawing()
+        assert len(drawing.dom) == len(drawing.cod) == len(ribbon.dom) == 2
+        braid = balanced.Braid(x, x).to_braided().to_drawing()
+        assert drawing.width == braid.width + 1 + config.DRAWING_DEFAULT[
+            "ribbon_width"]
+
+
+def test_functor_into_matrix_delays_only_unmapped_boxes():
+    from discopy.matrix import Matrix
+    x = Ty('x')
+    f = Box('f', x, x)
+    ob = {x: 1, x.delay(): 1}
+    assert Functor(ob, {f.delay(): [[2]]}, cod=Matrix[int])(f.delay())\
+        == Matrix[int]([2], 1, 1)
+    assert Functor(ob, {f: [[3]]}, cod=Matrix[int])(f.delay())\
+        == Matrix[int]([3], 1, 1)
+
+
+def test_functor_keeps_the_whisker_of_a_nested_trace():
+    x = Ty('x')
+    f = Box('f', x @ x, x @ x)
+    F = Functor(lambda ob: ob, lambda box: box)
+    for d in [(f.trace() @ x).trace(), (x @ f.trace()).trace(),
+              (f.trace() >> Box('g', x, x)).trace(left=True)]:
+        assert F(d) == d
+
+
+def test_drawing_name_of_a_delayed_exponential():
+    from discopy.feedback.closed import markov, monoidal, symmetric
+    for level in (monoidal, symmetric, markov):
+        x, y = level.Ty('x'), level.Ty('y')
+        assert (x >> y).delay().to_drawing().inside[0].name == "(x >> y).d"

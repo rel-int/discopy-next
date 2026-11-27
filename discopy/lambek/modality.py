@@ -63,7 +63,7 @@ read by dereliction for ``sleeps : N\\S``, the other passed to the anaphor
 from __future__ import annotations
 
 from discopy.linear import monoidal as bang
-from discopy.abc import BiclosedCategory
+from discopy.abc import ClosedMonoidalCategory
 from discopy.cat import factory
 from discopy.lambek import categorial
 from discopy.utils import get_origin
@@ -145,16 +145,16 @@ class Laxator(bang.Laxator, Box):
 
 class Functor(bang.Functor, categorial.Functor):
     """
-    A functor from ``!L*`` into a biclosed category: the exponentials,
-    evaluation and currying go through the closed structure of the codomain,
-    and the bang and the structural boxes through its bang when it is
-    linear. Into a category that is not biclosed, e.g. a monoidal one, send
+    A functor from ``!L*`` into a closed monoidal category: the
+    exponentials, evaluation and currying go through the closed structure of
+    the codomain, and the bang and the structural boxes through its bang when
+    it is linear. Into a category that is not closed, e.g. a monoidal one, send
     the underlying monoidal diagram with a :class:`~discopy.monoidal.Functor`,
     which takes them through ``ob_map`` and ``ar_map`` like generators.
 
     Example
     -------
-    Into tensors, which are compact hence biclosed, ``N >> S`` is the internal
+    Into tensors, which are compact hence closed, ``N >> S`` is the internal
     hom ``N* @ S`` and its evaluation a cup.
 
     >>> from discopy import tensor
@@ -170,16 +170,16 @@ class Functor(bang.Functor, categorial.Functor):
     >>> Functor(ob_map={}, ar_map={}, cod=monoidal.Diagram)
     Traceback (most recent call last):
     ...
-    TypeError: A functor from !L* needs a biclosed codomain, got ...
+    TypeError: A functor from !L* needs a closed monoidal codomain, got ...
     """
     dom = cod = Diagram
-    requires = BiclosedCategory
+    requires = ClosedMonoidalCategory
 
     def __init__(self, ob_map, ar_map, **params):
         cod = params.get("cod") or type(self).cod
         if not issubclass(get_origin(cod), self.requires):
-            raise TypeError(
-                f"A functor from !L* needs a biclosed codomain, got {cod}.")
+            raise TypeError("A functor from !L* needs a closed monoidal "
+                            f"codomain, got {cod}.")
         super().__init__(ob_map, ar_map, **params)
 
 
