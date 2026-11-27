@@ -633,6 +633,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   copy and discard of a banged object for its contraction and weakening,
   with no default bang ([next#744]).
 
+- The head, the tail and the followed-by of streams leave `discopy.feedback`
+  for a package of their own, `discopy.dataflow`, after "Monoidal Streams
+  for Dataflow Programming": its `__init__` holds them as mixins, the wire
+  with its `head`, `tail` and `is_constant`, the type, the diagram with its
+  `head`, `tail` and `followed_by`, the `Head`, `Tail` and `FollowedBy` boxes
+  and the functor that maps them, and `dataflow.symmetric` and
+  `dataflow.markov` are the levels over `feedback.symmetric` and
+  `feedback.markov`. `HeadOb`, `TailOb`, `Head`, `Tail`, `FollowedBy` and
+  `Wire.is_constant` go from `feedback` and from every level that generated
+  them, with no alias, and so do `feedback.structural_wires` and the heads of
+  `quantum.circuit` and `optyx` wires: a tree or pickle saved with them does
+  not load. A dataflow functor raises when its mapping does not have a head,
+  a tail or a followed-by and its codomain has none of its own, where a
+  feedback functor made up a bubble; `Nat`, `Dim` and `Dims` lose the
+  `head` and `tail` that were themselves ([next#768]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -2864,6 +2880,7 @@ for the changelog of `1.2.1` and earlier.
 [next#737]: https://github.com/rel-int/discopy-next/pull/737
 [next#743]: https://github.com/rel-int/discopy-next/pull/743
 [next#744]: https://github.com/rel-int/discopy-next/pull/744
+[next#768]: https://github.com/rel-int/discopy-next/pull/768
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
