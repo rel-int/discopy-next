@@ -355,6 +355,7 @@ class Exp(Wire):
         return self.base if isinstance(self, Under) else self.exponent
 
 
+@Ty.slot
 class Over(Exp):
     """
     An :code:`exponent` type over a :code:`base` type, called with :code:`<<`.
@@ -367,6 +368,7 @@ class Over(Exp):
         return f"({self.base} << {self.exponent})"
 
 
+@Ty.slot
 class Under(Exp):
     """
     A :code:`base` type under an :code:`exponent` type, called with :code:`>>`.
@@ -1012,6 +1014,7 @@ class TermBase(Diagram.Box, AlphaEquivalence):
             for term in terms))
 
 
+@Ty.slot
 class Constant(TermBase):
     """
     A constant term with a string as name and a :class:`Ty`, i.e. a term with
@@ -1059,6 +1062,7 @@ class Constant(TermBase):
         return f"{self.cod!s}({self.name!r})"
 
 
+@Ty.slot
 class Variable(TermBase):
     """
     A variable with a string as name and a :class:`Ty`.
@@ -1098,6 +1102,7 @@ class Variable(TermBase):
     __repr__ = Constant.__repr__
 
 
+@Ty.slot
 class Application(TermBase):
     """
     The application either ``function(argument)`` of a term ``function`` of
@@ -1203,6 +1208,7 @@ class Application(TermBase):
                 scopes, [other.argument for other in others], depth)
 
 
+@Ty.slot
 class Abstraction(TermBase):
     serialised_attrs = ("var", "body", "left")
     var: Variable
@@ -1538,11 +1544,5 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 Bubble = Diagram.Box.from_args
 
-Ty.Over = Over
-Ty.Under = Under
-Ty.Constant = Constant
-Ty.Variable = Variable
-Ty.Application = Application
-Ty.Abstraction = Abstraction
 
 export(__name__)

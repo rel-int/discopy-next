@@ -217,6 +217,7 @@ class Exp(Wire, biclosed.Exp):
             + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
 
 
+@Ty.slot
 class Product(Wire):
     """
     The product of a tuple of types, which is not strictly associative,
@@ -1067,6 +1068,7 @@ type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
 
 
+@Ty.extend
 class Constant(TermBase, biclosed.Constant):
     """
     A constant term, evaluated in a context by discarding it. It prints as
@@ -1102,6 +1104,7 @@ class Constant(TermBase, biclosed.Constant):
             >> biclosed.Constant.eval(self, functor)
 
 
+@Ty.extend
 class Variable(TermBase, biclosed.Variable):
     "A variable, evaluated in a context by discarding the other variables."
     serialised_attrs = biclosed.Variable.serialised_attrs
@@ -1116,6 +1119,7 @@ class Variable(TermBase, biclosed.Variable):
         return substitution.inside.get(self, self)
 
 
+@Ty.extend
 class Application(TermBase, biclosed.Application):
     """
     The application ``function(argument)`` of a term to another.
@@ -1161,6 +1165,7 @@ class Application(TermBase, biclosed.Application):
             self.argument.substitute(substitution))
 
 
+@Ty.extend
 class Abstraction(TermBase, biclosed.Abstraction):
     """
     The abstraction ``var.cod(lambda var: body)`` of a variable in a term,
@@ -1900,10 +1905,5 @@ class Equation(markov.Equation):
 
 Bubble = Box.from_args
 
-Ty.Product = Product
-Ty.Constant = Constant
-Ty.Variable = Variable
-Ty.Application = Application
-Ty.Abstraction = Abstraction
 
 export(__name__)

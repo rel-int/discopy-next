@@ -1476,6 +1476,5 @@ class Equation(frobenius.Equation):
 
 Bubble = Elementwise.from_args
 
-Diagram.Functor = frobenius.Functor
 
 export(__name__)

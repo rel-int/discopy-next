@@ -1134,6 +1134,5 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 Bubble = Elementwise.from_args
 
-Circuit.Functor = frobenius.Functor
 
 export(__name__)

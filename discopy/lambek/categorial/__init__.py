@@ -94,12 +94,14 @@ class Ty(biclosed.Ty):
     Under: ClassVar[type["Under"]]
 
 
+@Ty.extend
 class Over(biclosed.Over):
     "Categorial grammar type ``base << exponent``."
 
     ob = Ty
 
 
+@Ty.extend
 class Under(biclosed.Under):
     "Categorial grammar type ``exponent >> base``."
 
@@ -259,6 +261,7 @@ class TermBase(Diagram.Box, biclosed.TermBase):  # ty: ignore[inconsistent-mro]
         return Diagram.from_categorial(self)
 
 
+@Ty.extend
 class Constant(TermBase, biclosed.Constant):
     serialised_attrs = ("name", "cod")
 
@@ -270,6 +273,7 @@ class Constant(TermBase, biclosed.Constant):
         return self
 
 
+@Ty.extend
 class Variable(TermBase, biclosed.Variable):
     serialised_attrs = biclosed.Variable.serialised_attrs
 
@@ -277,6 +281,7 @@ class Variable(TermBase, biclosed.Variable):
         return self
 
 
+@Ty.extend
 class Abstraction(TermBase, biclosed.Abstraction):
     serialised_attrs = biclosed.Abstraction.serialised_attrs
     var: Variable
@@ -704,10 +709,5 @@ Ty.Application =\
 
 Bubble = Diagram.Box.from_args
 
-Ty.Over = Over
-Ty.Under = Under
-Ty.Constant = Constant
-Ty.Variable = Variable
-Ty.Abstraction = Abstraction
 
 export(__name__)

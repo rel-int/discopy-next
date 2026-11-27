@@ -645,6 +645,7 @@ class TermBase(Diagram.Box, closed.TermBase):
     strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
+@Ty.extend
 class Constant(TermBase, closed.Constant):
     "A constant of the vocabulary of an abstract categorial grammar."
 
@@ -652,14 +653,17 @@ class Constant(TermBase, closed.Constant):
 Word = Constant
 
 
+@Ty.extend
 class Variable(TermBase, closed.Variable):
     "A variable term in an abstract categorial grammar."
 
 
+@Ty.extend
 class Application(TermBase, closed.Application):
     "The application of an abstract term to another."
 
 
+@Ty.extend
 class Abstraction(TermBase, closed.Abstraction):
     "The abstraction of a variable in an abstract term."
 
@@ -690,9 +694,5 @@ from discopy.lambek.abstract import proofnet  # noqa: E402
 
 Bubble = Diagram.Box.from_args
 
-Ty.Constant = Constant
-Ty.Variable = Variable
-Ty.Application = Application
-Ty.Abstraction = Abstraction
 
 export(__name__)

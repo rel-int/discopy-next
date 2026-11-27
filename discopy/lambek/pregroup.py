@@ -296,6 +296,5 @@ __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
 
 Bubble = Box.from_args
 
-Diagram.Functor = frobenius.Functor
 
 export(__name__)

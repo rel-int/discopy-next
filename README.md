@@ -76,7 +76,7 @@ This example is inspired from Pawel Sobocinski's blog post [Crema di Mascarpone 
 
 ```python
 from discopy.utils import factory
-from discopy.symmetric import Ty, Box, Diagram, Permutation, Swap
+from discopy.symmetric import Ty, Box, Diagram
 
 @factory
 class Ingredient(Ty):
@@ -89,14 +89,8 @@ class Recipe(Diagram):
 class CookingStep(Box, Recipe):
   "A cooking step is a box in a recipe diagram."
 
-class CookingPermutation(Permutation, CookingStep):
-  "A permutation of ingredients."
-
-class CookingSwap(CookingPermutation, Swap, CookingStep):
-  "A cooking swap takes two ingredients `X @ Y` and gives `Y @ X`."
-
-Recipe.Swap = CookingSwap  # Recipes need to know how to swap.
-Recipe.Permutation = CookingPermutation
+# Recipes know how to swap: DisCoPy builds Recipe.Swap on first use.
+assert issubclass(Recipe.Swap, Recipe)
 
 egg, white, yolk = Ingredient("egg"), Ingredient("white"), Ingredient("yolk")
 crack = CookingStep("crack", egg, white @ yolk)
@@ -112,7 +106,7 @@ def crack_two_eggs(x, y):
 # ... or in point-free style using parallel (@) and sequential (>>) composition
 
 assert crack_two_eggs == (crack @ crack
-  >> white @ CookingSwap(yolk, white) @ yolk
+  >> white @ Recipe.Swap(yolk, white) @ yolk
   >> merge(white) @ merge(yolk)).foliation()
 
 crack_two_eggs.draw(doctest="docs/_static/readme/crack-eggs.svg")
@@ -150,7 +144,7 @@ empty = Ingredient()
 assert crack_two_eggs_at_once == Recipe(
   dom=egg @ egg, cod=white @ yolk, inside=(
     Layer(crack, crack),
-    Layer(white, CookingSwap(yolk, white), yolk),
+    Layer(white, Recipe.Swap(yolk, white), yolk),
     Layer(merge(white), merge(yolk))))
 
 crack_two_eggs_at_once.draw(

@@ -135,18 +135,12 @@ def test_copy_factory():
     class Recipe(Diagram):
         """ A subclass with its own copies. """
 
-    class RecipeCopy(Copy, Recipe):
-        """ The copy of an ingredient. """
-
-    class RecipeDiscard(Discard, RecipeCopy):
-        """ The discard of an ingredient. """
-
-    Recipe.Copy, Recipe.Discard = RecipeCopy, RecipeDiscard
     x = Ty('x')
-    assert isinstance(Recipe.copy(x).boxes[0], RecipeCopy)
-    assert isinstance(RecipeCopy(x, 0), RecipeDiscard)
+    assert issubclass(Recipe.Copy, Copy) and issubclass(Recipe.Copy, Recipe)
+    assert isinstance(Recipe.copy(x).boxes[0], Recipe.Copy)
+    assert isinstance(Recipe.Copy(x, 0), Recipe.Discard)
     with raises(AxiomError, match="Recipe is not a dagger category"):
-        RecipeCopy(x).dagger()
+        Recipe.Copy(x).dagger()
 
 
 def test_Copy_takes_index():
