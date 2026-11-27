@@ -39,6 +39,7 @@ forgetful functors between the categories go the other way.
     frobenius
     hypergraph
     cmap
+    inet
 
 Utilities shared by every module: serialisation, factories and configuration.
 

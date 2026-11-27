@@ -207,9 +207,12 @@ class Exp(Wire, biclosed.Exp):
         "The name of an exponential is its undelayed print, read when needed."
         return str(self.reset())
 
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"\
-            + feedback.str_delayed(self.time_step)
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
+
+    @property
+    def drawing_name(self) -> str:
+        return super().drawing_name + feedback.str_delayed(self.time_step)
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -325,6 +328,10 @@ class Unitype(Exp):
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
+
+    @property
+    def drawing_name(self) -> str:
+        return str(self)
 
     def atoms(self) -> list:
         """ The unitype names itself undelayed, i.e. its base. """

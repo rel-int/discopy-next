@@ -810,10 +810,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ``config.MAX_EINSUM_INDICES`` indices are contracted with
         :class:`OptEinsum` instead.
 
-        A spider of a hypergraph is an index on any number of arrays, so
-        NumPy's default bound on intermediates, the size of the largest
+        An intermediate of a network can exceed its largest input tensor,
+        so NumPy's default bound on intermediates, the size of the largest
         operand, can forbid every pairwise step and leave one naive sum
-        over all the indices: a hypergraph lifts it for the ``"greedy"``
+        over all the indices: this bound is lifted for the ``"greedy"``
         path, not for ``"optimal"``, whose search it would let explode.
 
         Parameters:
@@ -839,9 +839,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         params = dict(self.params, optimize=self.optimize)\
             if isinstance(contractor, (NumPy, JAX, Contractor))\
             else self.params
-        if isinstance(other, hypergraph.Hypergraph)\
-                and isinstance(contractor, NumPy)\
-                and self.optimize in ("greedy", True):
+        if isinstance(contractor, NumPy) and self.optimize in ("greedy", True):
             params['optimize'] = ("greedy", sys.maxsize)
         array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
