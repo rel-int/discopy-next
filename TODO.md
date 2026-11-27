@@ -8,4 +8,4 @@
 
 - [x] Rebase onto #763 (amp/generators): constructors, providers, alphabet and type equations on slots
 - [x] The generators of a category (declared slots, rules with no hom premise) as the signature its species is read from: `generator_strategy(dom, cod, name)` on every class with rules
-- [ ] Changes needed upstream for law-carrying classes that are not Boltzmann-sampled
+- [WIP] @session_01C7YfAQS26HQesQ3UXcBUjA-2026-11-27 14:05 Changes needed upstream for law-carrying classes that are not Boltzmann-sampled: alphabets of `cat.Ob` and `interaction.Ty`
