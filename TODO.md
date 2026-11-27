@@ -35,7 +35,7 @@
 >         self.is_constant = is_constant
 > ```
 
-- [ ] test/cat.py:696 base dataflow Head/Tail/FollowedBy need examples or exclusion
+- [x] test/cat.py:696 base dataflow Head/Tail/FollowedBy need examples or exclusion
 - [ ] messages.py NO_DATAFLOW wording
 - [ ] syntax.rst: architecture diagram omits dataflow; grammar of the clause
 - [ ] dataflow HeadOb/TailOb dagger raises
