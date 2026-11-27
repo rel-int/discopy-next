@@ -591,6 +591,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
   alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
 
+- A box drawn as a rectangle tells its dagger, transpose and conjugate apart
+  by a corner cut off rather than one shifted, short of its wires, and so does
+  a frame drawn around its args, wide enough for its label in the corner
+  opposite. The drawings nested in a box
+  lie on slots with a margin between them rather than a line, centred in the
+  box, which has its label in the corner opposite its cut, and the wire labels
+  of a drawing turned half way round hang along their wire. The args of a
+  box's dagger, transpose and conjugate are drawn as the reflection, the half
+  turn and the reflection of those of the box, in reverse order when the box
+  is turned or flipped across them, while the args it holds stay as they were
+  ([next#764]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -606,9 +618,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `argument`, in its trees too, and a tree with the old keys still loads
   ([next#729]).
 
-- In a left-to-right drawing, wire labels sit above their wires, and a line
-  separates each of the args nested in a box from the next, so that no two
-  regions meet without one ([next#733]).
+- In a left-to-right drawing, wire labels sit above their wires
+  ([next#733]).
 
 - The architecture diagram of the syntax moves from the docstring of
   `discopy.abc` to the syntax page of the docs, with the sentence that
@@ -2897,6 +2908,7 @@ for the changelog of `1.2.1` and earlier.
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
 [next#746]: https://github.com/rel-int/discopy-next/pull/746
+[next#764]: https://github.com/rel-int/discopy-next/pull/764
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

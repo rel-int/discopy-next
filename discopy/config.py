@@ -51,7 +51,6 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "frame_colour": lambda _: "lightgrey",
     # Whether a reflection of the drawing, not the dagger of the diagram,
     # mirrors the drawings nested in a box.
-    "mirror_nested": lambda _: False,
     "draw_as_permutation": lambda _: False,
     "permutation_indices": lambda _: None,  # Used for drawing permutations.
     "draw_as_braid": lambda _: False,
@@ -122,6 +121,8 @@ DRAWING_DEFAULT: dict[str, Any] = {
     "fontsize_spiders": 12,
     "margins": (0, 0),
     "textpad": (2**-4, 2**-4),
+    # The margin between the drawings nested in a box, see draw_nested.
+    "nested_margin": .25,
     "facecolor": "white",
     "edgecolor": "black",
     "use_tikzstyles": False,

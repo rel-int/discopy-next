@@ -850,6 +850,19 @@ class Box(biclosed.Box, Diagram):
         return not self.is_dagger and self.z and bool(self.z % 2)
 
     def to_drawing(self):
+        if self.args and self.z and all(
+                hasattr(arg, "rotate")
+                and type(arg).draw_left_to_right == self.draw_left_to_right
+                for arg in self.args):
+            # A box drawn around its args is turned with them: each one as
+            # many times as the box, and side by side in reverse order when
+            # turned an odd number of times, i.e. half way round.
+            args = self.args[::-1] if self.z % 2 else self.args
+            for _ in range(abs(self.z)):
+                args = tuple(arg.rotate(left=self.z < 0) for arg in args)
+            box = copy.copy(self)
+            box.args = args
+            return super(Box, box).to_drawing()
         result = super().to_drawing()
         if not self.args:
             result.is_transpose = self.is_transpose
