@@ -381,8 +381,9 @@ class Functor(feedback.Functor):
     of its codomain, e.g. :class:`discopy.stream.Stream`. Into a codomain
     that has none, they are boxes and wires like any other: a callable map,
     e.g. that of :meth:`discopy.symmetric.Diagram.to_hypergraph`, sends them
-    as it sends a generator, and a mapping that does not have them raises
-    rather than make them up.
+    as it sends a generator, a mapping sends them to their images as
+    generators, not as the bubbles of their args, and raises on those it
+    does not have rather than make them up.
     """
     def __call__(self, other):
         if not isinstance(other, (HeadOb, TailOb, Head, FollowedBy))\
@@ -400,10 +401,16 @@ class Functor(feedback.Functor):
         mapping, key = (self.ob_map.mapping, self.dom.ob(other))\
             if isinstance(other, (HeadOb, TailOb))\
             else (self.ar_map.mapping, other)
-        if isinstance(mapping, Mapping) and key not in mapping:
+        if not isinstance(mapping, Mapping):
+            return super().__call__(other)
+        if key not in mapping:
             raise AxiomError(messages.NO_DATAFLOW.format(
                 factory_name(self.cod)))
-        return super().__call__(other)
+        if isinstance(other, (HeadOb, TailOb)):
+            return super().__call__(other)
+        result = mapping[other]
+        return result if isinstance(result, self.cod)\
+            else self.cod(result, self(other.dom), self(other.cod))
 
 
 # The levels subclass these mixins, so they are imported last.

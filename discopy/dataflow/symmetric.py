@@ -54,7 +54,7 @@ Example
 from __future__ import annotations
 
 from discopy import dataflow, feedback, hypergraph
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.feedback import symmetric
 from discopy.symmetric import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -197,3 +197,6 @@ Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)
+Term = Variable | Constant | Application | Kappa

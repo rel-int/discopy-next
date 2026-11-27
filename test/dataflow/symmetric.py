@@ -96,3 +96,21 @@ def test_HeadOb_TailOb_dagger():
         assert type(term.dagger().inside[0]) is type(term.inside[0])
     with raises(TypeError):
         Wire('x', is_constant=1)
+
+
+def test_mapped_heads_are_generators_into_a_codomain_without_streams():
+    from discopy import symmetric
+    x, y = Ty('x'), symmetric.Ty('y')
+    f, g = Box('f', x, x), symmetric.Box('g', y, y)
+    F = Functor({x: y, x.head: y}, {f.head: g, f.tail: g},
+                cod=symmetric.Diagram)
+    assert F(f.head) == F(f.tail) == g
+    assert F(f.head >> f.head) == g >> g
+
+
+def test_terms_evaluate_back_to_dataflow():
+    from discopy.dataflow import markov
+    for diagram in (Diagram, markov.Diagram):
+        d = diagram.id(diagram.ob('x'))
+        assert d.to_term().eval() == d
+        assert type(d.to_term().eval()) is diagram
