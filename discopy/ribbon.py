@@ -151,7 +151,7 @@ class Diagram(pivotal.Diagram, traced.Diagram, RibbonCategory):
                 the diagram as is, i.e. without doubling it into dual rails.
             colour : The name of the colour filling the inside of each ribbon
                 (or a function from object to colour name), see
-                :func:`discopy.balanced.double_rail`.
+                :func:`~discopy.balanced.double_rail`.
 
         Example
         -------
@@ -228,7 +228,7 @@ class DualRailBraid(balanced.DualRailBraid, Box):
 
     See also
     --------
-    :class:`discopy.balanced.DualRailBraid`
+    :class:`~discopy.balanced.DualRailBraid`
     """
 
     def rotate(self, left=False):
@@ -242,7 +242,7 @@ class DualRailTwist(balanced.DualRailTwist, Box):
 
     See also
     --------
-    :class:`discopy.balanced.DualRailTwist`
+    :class:`~discopy.balanced.DualRailTwist`
     """
 
     def rotate(self, left=False):
@@ -389,7 +389,7 @@ class Functor(pivotal.Functor, traced.Functor):
 class DualRail(balanced.DualRail, Functor):
     """
     The functor sending a ribbon diagram to its dual rail encoding, extending
-    :class:`discopy.balanced.DualRail` with the folding of :class:`Cup` and
+    :class:`~discopy.balanced.DualRail` with the folding of :class:`Cup` and
     :class:`Cap` into a single box each and the doubling of a generator into a
     box on the rails of its ribbons.
 

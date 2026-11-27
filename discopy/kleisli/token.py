@@ -21,7 +21,7 @@ is a position in the term together with the environment it reads its
 variables from and the stack of what is left to do, and it travels in two
 directions: :class:`Down` into a subterm still to be evaluated, :class:`Up`
 out of one carrying a :obj:`Value`. One transition is a channel in
-:mod:`discopy.kleisli.additive`, from an entry plus the two directions to an
+:mod:`~discopy.kleisli.additive`, from an entry plus the two directions to an
 exit plus the two directions
 
 .. math::
@@ -378,7 +378,7 @@ class Machine[monad](NamedGeneric):
     def bind(self, values, resume: Callable):
         """
         Feed every value of a monadic value into ``resume``, i.e. the
-        Kleisli composition of :mod:`discopy.kleisli.channel` written for a
+        Kleisli composition of :mod:`~discopy.kleisli.channel` written for a
         monadic value rather than a channel.
 
         Parameters:

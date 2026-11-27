@@ -2,7 +2,7 @@
 
 """
 The free symmetric linear category, i.e. a symmetric monoidal category with
-a bang, see :mod:`discopy.linear.monoidal`: the :class:`Exchange` that makes
+a bang, see :mod:`~discopy.linear.monoidal`: the :class:`Exchange` that makes
 a banged object central is the swap by default, as a symmetric category is
 balanced with the trivial twist.
 

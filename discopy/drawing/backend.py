@@ -415,6 +415,21 @@ def bezier_subcurve(points, t0, t1):
     return split(right, (t1 - t0) / (1 - t0))[0]
 
 
+def segment_crossing(a, b, c, d):
+    """
+    The parameters ``(s, t)`` at which the segment from ``a`` to ``b``
+    crosses the segment from ``c`` to ``d``, or ``None`` if they do not.
+    """
+    denominator = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0])
+    if not denominator:
+        return None
+    s = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0]))\
+        / denominator
+    t = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]))\
+        / denominator
+    return (s, t) if 0 <= s <= 1 and 0 <= t <= 1 else None
+
+
 def bezier(points, t):
     """
     The point at parameter ``t`` of a Bezier curve of any degree, by de
@@ -593,7 +608,7 @@ class Backend(ABC):
         """
         Draws a half circle (or ellipse if ``depth`` differs from the radius)
         from ``(left, centre)`` to ``(right, centre)`` with vertical sides up
-        to ``end``, e.g. the fold of a :class:`discopy.ribbon.DualRailCup`,
+        to ``end``, e.g. the fold of a :class:`~discopy.ribbon.DualRailCup`,
         see :meth:`half_circle_beziers`.
         """
         if end != centre:
@@ -616,24 +631,98 @@ class Backend(ABC):
         outer = min(radius, RIBBON_FOLD_DEPTH)
         return outer, outer - ribbon
 
-    def fill_strand_band(
-            self, first: tuple[Point, Point], second: tuple[Point, Point],
-            middle, color, gap=0):
+    @staticmethod
+    def offset_strand(curve, distance, t0=0., t1=1., pieces=4, samples=32):
         """
-        Fills the band between the two parallel braid strands of a ribbon,
-        see :meth:`draw_dual_rail_braid`. A non-zero ``gap`` breaks the band
-        around the crossing, matching the broken strands, so the ribbon going
-        under is shadowed by the one going over.
+        The curve parallel to the cubic Bezier ``curve`` at ``distance`` to
+        its left, between the parameters ``t0`` and ``t1``, as cubic Beziers:
+        each piece of the curve moved along the normal at its ends, with its
+        tangents scaled by the speed of the parallel, one minus ``distance``
+        times the curvature. Where the curve turns tighter than ``distance``,
+        the parallel on the inside of the turn folds over itself: the fold,
+        found where a polyline of ``samples`` points crosses itself, is cut
+        out, as from the edge of a band of constant width, and each of the
+        spans left is drawn in ``pieces``.
         """
-        a, b = (self.braid_strand(*first, middle),
-                self.braid_strand(*second, middle))
+        def derivatives(t):
+            first = [3 * (
+                (1 - t) ** 2 * (curve[1][i] - curve[0][i])
+                + 2 * (1 - t) * t * (curve[2][i] - curve[1][i])
+                + t ** 2 * (curve[3][i] - curve[2][i])) for i in (0, 1)]
+            second = [6 * (
+                (1 - t) * (curve[2][i] - 2 * curve[1][i] + curve[0][i])
+                + t * (curve[3][i] - 2 * curve[2][i] + curve[1][i]))
+                for i in (0, 1)]
+            return first, second
+
+        def normal(t):
+            (dx, dy), _ = derivatives(t)
+            norm = sqrt(dx ** 2 + dy ** 2)
+            return -dy * distance / norm, dx * distance / norm
+
+        def speed(t):  # The speed of the parallel over that of the curve.
+            (dx, dy), (ddx, ddy) = derivatives(t)
+            return 1 - distance * (dx * ddy - dy * ddx) / sqrt(
+                dx ** 2 + dy ** 2) ** 3
+
+        def offset(t):
+            (x, y), (nx, ny) = bezier(curve, t), normal(t)
+            return Point(x + nx, y + ny)
+
+        ts = [t0 + (t1 - t0) * k / samples for k in range(samples + 1)]
+        points, spans, i = list(map(offset, ts)), [t0], 0
+        while i < samples:
+            for j in range(samples - 1, i + 1, -1):
+                crossing = segment_crossing(
+                    points[i], points[i + 1], points[j], points[j + 1])
+                if crossing is not None:
+                    spans += [ts[i] + crossing[0] * (ts[i + 1] - ts[i]),
+                              ts[j] + crossing[1] * (ts[j + 1] - ts[j])]
+                    i = j
+                    break
+            i += 1
+        result = []
+        for start, end in zip(spans[::2], spans[1::2] + [t1]):
+            for k in range(pieces):
+                a, b = (start + (end - start) * n / pieces for n in (k, k + 1))
+                piece = bezier_subcurve(curve, a, b)
+                start_point, end_point = offset(a), offset(b)
+                result.append([start_point, Point(*(
+                    start_point[i] + (piece[1][i] - piece[0][i]) * speed(a)
+                    for i in (0, 1))), Point(*(
+                        end_point[i] - (piece[3][i] - piece[2][i]) * speed(b)
+                        for i in (0, 1))), end_point])
+        return result
+
+    def ribbon_strand(self, rails, middle, gap=0):
+        """
+        The two rails of a ribbon crossing the horizontal line at height
+        ``middle``, as the pair of :meth:`offset_strand` on either side of
+        the :meth:`braid_strand` of its centre, one pair for each span left
+        by a non-zero ``gap`` around the crossing, so that the ribbon keeps
+        its width all the way across.
+        """
+        (source0, target0), (source1, target1) = rails
+        centre = self.braid_strand(
+            Point(*lerp(source0, source1, .5)),
+            Point(*lerp(target0, target1, .5)), middle)
+        half = (source1[0] - source0[0]) / 2
         spans = [(0, 1)] if not gap else [(0, 0.5 - gap), (0.5 + gap, 1)]
-        for t0, t1 in spans:
-            a_sub, b_sub = (
-                bezier_subcurve(a, t0, t1), bezier_subcurve(b, t0, t1))
-            self.draw_filled_shape(a_sub[0], [
-                ("curve", a_sub[1], a_sub[2], a_sub[3]), ("line", b_sub[3]),
-                ("curve", b_sub[2], b_sub[1], b_sub[0])], color)
+        return [(self.offset_strand(centre, half, t0, t1),
+                 self.offset_strand(centre, -half, t0, t1))
+                for t0, t1 in spans]
+
+    def fill_strand_band(self, first, second, color):
+        """
+        Fills the band between the two rails ``first`` and ``second`` of a
+        ribbon, given as lists of cubic Beziers, see :meth:`ribbon_strand`.
+        """
+        self.draw_filled_shape(first[0][0], [
+            step for piece in first
+            for step in [("line", piece[0]), ("curve", *piece[1:])]] + [
+            step for piece in reversed(second)
+            for step in [("line", piece[3]),
+                         ("curve", piece[2], piece[1], piece[0])]], color)
 
     def draw_braid_strand(self, source, target, middle, gap=0, adaptive=True):
         """
@@ -1045,7 +1134,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cup(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCup` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCup` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cup is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1069,7 +1158,7 @@ class Backend(ABC):
 
     def draw_dual_rail_cap(self, positions, node, **params):
         """
-        Draws a :class:`discopy.ribbon.DualRailCap` as a single constant-width
+        Draws a :class:`~discopy.ribbon.DualRailCap` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cap is flattened into a half ellipse, see :meth:`fold_depths`.
@@ -1112,11 +1201,11 @@ class Backend(ABC):
         """
         The nodes joined by each rail of a dual rail box, as
         :meth:`crossing_wires` gives the strands of a crossing: a
-        :class:`discopy.balanced.DualRailBraid` sends the ribbon of inputs
+        :class:`~discopy.balanced.DualRailBraid` sends the ribbon of inputs
         ``(0, 1)`` to outputs ``(2, 3)`` and vice-versa, a
-        :class:`discopy.balanced.DualRailTwist` sends each rail back to its
-        own position, a :class:`discopy.ribbon.DualRailCup` (resp.
-        :class:`discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
+        :class:`~discopy.balanced.DualRailTwist` sends each rail back to its
+        own position, a :class:`~discopy.ribbon.DualRailCup` (resp.
+        :class:`~discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
         onto ``3`` and ``1`` onto ``2``, see :meth:`draw_dual_rail_braid`,
         :meth:`draw_dual_rail_twist`, :meth:`draw_dual_rail_cup` and
         :meth:`draw_dual_rail_cap`.
@@ -1176,6 +1265,8 @@ class Backend(ABC):
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
+            if getattr(node.box, "frame_corner", None) is not None:
+                self.draw_frame_corner(graph.positions, node, **params)
             if node.box.draw_as_spider or node.box.draw_as_wires:
                 continue
             for attribute, method in drawing_methods:
@@ -1192,19 +1283,20 @@ class Backend(ABC):
         i = (0 if box.is_conjugate else
              1 if box.is_transpose else
              2 if box.is_dagger else 3)
-        if box.nested is not None:
-            # Along its long sides a slant is hard to see: chop a corner off.
-            points = self.chop_corner(points, i, 2 * asymmetry)
-        else:
-            if box.is_conjugate or box.is_transpose:
-                asymmetry *= -1
-            points[i] = points[i].shift(x=asymmetry)
+        # The cut stops short of the wires, three quarters of the way.
+        wires = [positions[Node(kind, i=k, j=j, x=x)][0]
+                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)]
+                 for k, x in enumerate(xs)]
+        size = min([2 * asymmetry] + [
+            .75 * abs(x - points[i][0]) for x in wires])
+        corners, points = points, self.chop_corner(points, i, size)
         if box.shape == "triangle":
             points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
         label = positions[node]
         if box.nested is not None:
-            label = self.draw_nested(box, points, label, **params)
+            label = self.draw_nested(box, corners, corners[(i + 2) % 4],
+                                     **params)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *label,
@@ -1214,11 +1306,66 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
 
+    def draw_frame_corner(self, positions, node, **params):
+        """
+        Draws the corners of a frame on its top or bottom edge, i.e. the
+        opening or the closing of the bubble its ``box`` draws, as those of a
+        box: the ``frame_corner`` of :meth:`chop_corner` cut off, short of the
+        wires through the edge, and the label ``frame_name`` in the corner
+        opposite. The cut is a line across the corner, with the region
+        outside the frame painted over the corner of the frame.
+        """
+        box, j = node.box, node.j
+        top = self.has_boundary_sides(box.cod)
+        kind, sides = ("box_cod", box.cod) if top else ("box_dom", box.dom)
+        (left, _), (right, _) = (positions[Node(kind, i=k, j=j, x=sides[k])]
+                                 for k in (0, len(sides) - 1))
+        y = positions[node].y
+        through, kind_through = (box.dom, "box_dom") if top\
+            else (box.cod, "box_cod")
+        wires = [positions[Node(kind_through, i=k, j=j, x=x)].x
+                 for k, x in enumerate(through)]
+        corners = {0: (left, y), 1: (left, y), 2: (right, y), 3: (right, y)}
+        on_edge = (1, 2) if top else (0, 3)
+        inward = -1 if top else 1
+        cut, label = box.frame_corner, (box.frame_corner + 2) % 4
+        canvas = params.get('boundary_color')
+        outside = getattr(sides.inside[0].dom if cut < 2
+                          else sides.inside[-1].cod, "name", None) or (
+            "white" if canvas is None or self.is_transparent(canvas)
+            else canvas)
+        if cut in on_edge:
+            cx, cy = corners[cut]
+            dx = 1 if cut < 2 else -1
+            size = min([2 * params.get('asymmetry', 0), (right - left) / 2]
+                       + [.75 * abs(x - cx) for x in wires])
+            if size:
+                eps, a, b = .05, Point(cx + dx * size, cy), Point(
+                    cx, cy + inward * size)
+                self.draw_polygon(
+                    a, a.shift(y=-inward * eps),
+                    Point(cx - dx * eps, cy - inward * eps),
+                    b.shift(x=-dx * eps), b,
+                    facecolor=outside, edgecolor=TRANSPARENT)
+                self.draw_polygon(a, b, facecolor=TRANSPARENT)
+        if label in on_edge and box.frame_name\
+                and params.get('draw_box_labels', True):
+            lx, ly = corners[label]
+            dx = text_width(box.frame_name) / 2 + .125
+            inside = getattr(sides.inside[0].cod, "name", None)
+            self.draw_text(
+                box.frame_name, lx + (dx if label < 2 else -dx),
+                ly + inward * .25, ha='center', va='center',
+                color=self.readable_foreground(inside or "white"),
+                fontsize=params.get('fontsize', None),
+                adaptive=inside is None)
+
     @staticmethod
     def chop_corner(points, i, size):
         """
         A polygon with its ``i``-th corner cut off, ``size`` along both of
-        its sides, e.g. the box of a variant of a box with args.
+        its sides or half the shorter side, e.g. to tell a box from its
+        dagger, its transpose and its conjugate.
 
         >>> square = [Point(0, 0), Point(0, 1), Point(1, 1), Point(1, 0)]
         >>> Backend.chop_corner(square, 2, .25)[1:4]
@@ -1226,7 +1373,12 @@ class Backend(ABC):
         """
         if not size:
             return points
-        corner = points[i]
+        points = [Point(*point) for point in points]
+        corner, neighbours = points[i], (
+            points[i - 1], points[(i + 1) % len(points)])
+        lengths = [sqrt((p.x - corner.x) ** 2 + (p.y - corner.y) ** 2)
+                   for p in neighbours]
+        size = min(size, *(length / 2 for length in lengths))
 
         def towards(point):
             dx, dy = point.x - corner.x, point.y - corner.y
@@ -1235,39 +1387,44 @@ class Backend(ABC):
         return points[:i] + [towards(points[i - 1]), towards(
             points[(i + 1) % len(points)])] + points[i + 1:]
 
-    def draw_nested(self, box, corners, centre, **params):
+    def draw_nested(self, box, corners, corner, **params):
         """
         Draw the drawings nested in a box left to right, one under the other,
-        on a background of the box's ``frame_colour``, see
-        :class:`Transposed`, centred in the space right of the box's label,
-        and return the centre of that label, on the left of the box. Their
-        wires plug into the edges of the background, a line separates each
-        from the next, so that no two regions meet without one. A reflected
-        drawing reflects them, the last on top, and a transposed box or a
-        conjugate turns them half way round, as it is turned itself.
+        each on a slot of the box's ``frame_colour``, see :class:`Transposed`,
+        centred in the box, and return the centre of the box's label, in the
+        given ``corner``: the one opposite its cut corner, i.e. its top left
+        but for its variants. Their wires plug into the edges of their slots,
+        with a margin of the box's colour between one and the next. They are
+        reflected, turned and reordered as the box is: a dagger reflects them
+        along the horizontal axis, the last on top, a conjugate along the
+        vertical one, and a transpose turns them half way round.
         """
-        nested = box.nested
-        width = sum(drawing.width for drawing in nested)
+        nested, margin = box.nested, DEFAULT["nested_margin"]
+        width = sum(drawing.width for drawing in nested)\
+            + margin * (len(nested) - 1)
         height = max(drawing.height for drawing in nested)
         left, right = min(x for x, _ in corners), max(x for x, _ in corners)
-        start = left + (
-            text_width(box.drawing_name) + .25 if box.drawing_name else 0)
-        x, y = (start + right - height) / 2, centre[1] - width / 2
-        self.draw_polygon((x, y), (x + height, y), (x + height, y + width),
-                          (x, y + width), facecolor=box.frame_colour)
-        turn = bool(box.is_transpose or box.is_conjugate)
-        flip, offset = box.mirror_nested != turn, 0
+        bottom, top = min(y for _, y in corners), max(y for _, y in corners)
+        x, y = (left + right - height) / 2, (bottom + top - width) / 2
+        # The reflection along the horizontal axis of a dagger, along the
+        # vertical one of a conjugate and along both, a half turn, of a
+        # transpose.
+        flip = not box.is_conjugate and bool(box.is_dagger or box.is_transpose)
+        turn, offset = bool(box.is_conjugate or box.is_transpose), 0
         for drawing in nested:
-            offset += drawing.width
-            origin = Point(x, y + offset - drawing.width if flip
-                           else y + width - offset)
-            Transposed(self, origin, drawing, flip=flip, reverse=turn)\
+            low = y + offset if flip else y + width - offset - drawing.width
+            self.draw_polygon(
+                (x, low), (x + height, low), (x + height, low + drawing.width),
+                (x, low + drawing.width), facecolor=box.frame_colour)
+            Transposed(self, Point(x, low), drawing, flip=flip, reverse=turn)\
                 .draw_drawing(drawing, **params)
-            if offset < width:
-                edge = y + offset if flip else y + width - offset
-                self.draw_bezier([Point(x + t * height / 3, edge)
-                                  for t in range(4)], adaptive=False)
-        return Point((left + start) / 2, centre[1])
+            offset += drawing.width + margin
+        # The label lies in the band between the slots and the box's side.
+        dx = text_width(box.drawing_name) / 2 + .125
+        dy = (top - bottom - width) / 4
+        (cx, cy) = corner
+        return Point(cx + (dx if cx == left else -dx),
+                     cy + (dy if cy == bottom else -dy))
 
     @staticmethod
     def triangle_corners(positions, node):
@@ -1315,7 +1472,7 @@ class Backend(ABC):
             Point(x, apex) for x in reversed(tips)]
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Discard` box. """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         for i in range(len(box.dom)):
@@ -1330,7 +1487,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -1342,7 +1499,7 @@ class Backend(ABC):
 
     def draw_dual_rail_braid(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailBraid`, i.e. the two ribbons
+        Draws a :class:`~discopy.balanced.DualRailBraid`, i.e. the two ribbons
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1357,18 +1514,18 @@ class Backend(ABC):
         over, under = (left, right) if box.is_dagger else (right, left)
         # Fill (and stroke) under first, then over: the band going under is
         # broken around the crossing so the one going over is clearly on top.
+        # The rails are parallel to the centre of their ribbon, not to each
+        # other's strand, so the band keeps its width across the crossing.
         for (ribbon, color), gap in [(under, 0.2), (over, 0)]:
-            if color is not None:  # Fill the band between the two strands.
-                self.fill_strand_band(
-                    ribbon[0], ribbon[1], y_middle, color, gap)
-        for (ribbon, color), gap in [(under, 0.2), (over, 0)]:
-            for source, target in ribbon:
-                self.draw_braid_strand(source, target, y_middle, gap,
-                                       adaptive=color is None)
+            for first, second in self.ribbon_strand(ribbon, y_middle, gap):
+                if color is not None:
+                    self.fill_strand_band(first, second, color)
+                for piece in first + second:
+                    self.draw_bezier(piece, adaptive=color is None)
 
     def draw_dual_rail_twist(self, positions, node, **params):
         """
-        Draws a :class:`discopy.balanced.DualRailTwist`, i.e. the two rails of
+        Draws a :class:`~discopy.balanced.DualRailTwist`, i.e. the two rails of
         a ribbon crossing each other twice in quick succession.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
@@ -1441,7 +1598,7 @@ class Backend(ABC):
                                    adaptive=color is None)
 
     def draw_brakets(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Ket` box. """
+        """ Draws a :class:`~discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
         is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
@@ -1463,7 +1620,7 @@ class Backend(ABC):
                 fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
+        """ Draws a :class:`~discopy.quantum.gates.Controlled` gate. """
         box, j = node.box, node.j
         distance = box.distance
         c_size = len(box.controlled.dom)
@@ -1650,6 +1807,11 @@ class Transposed(Backend):
             if not self.cod_is_after():
                 point = point.shift(y=2 * self.textpad)
             params = dict(params, verticalalignment="bottom")
+            # A label hangs along its wire, away from where it starts.
+            (x0, _), _ = self.compose((0, 0))
+            (x1, _), _ = self.compose((0, 1))
+            if x1 > x0:
+                params["horizontalalignment"] = "right"
         canvas.draw_text(text, *point, **params)
 
     def draw_node(self, i, j, **params):
@@ -1705,7 +1867,7 @@ class TikZ(Backend):
         """
         The length of one unit of a drawing, at which the label of a box fits
         it: the layout measures a label at twelve points in inches, see
-        :func:`discopy.utils.text_width`, and TikZ sets it at
+        :func:`~discopy.utils.text_width`, and TikZ sets it at
         :attr:`LABEL_SIZE` points.
 
         >>> TikZ.unit()
@@ -1852,8 +2014,10 @@ class TikZ(Backend):
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
         if is_wire_label:
-            options += ", anchor=north west" if alignment == "top"\
-                else ", anchor=south west"
+            vertical = "north" if alignment == "top" else "south"
+            horizontal = "east" if params.get(
+                "horizontalalignment") == "right" else "west"
+            options += f", anchor={vertical} {horizontal}"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         color = params.get("color")
@@ -2166,10 +2330,12 @@ class Typst(Backend):
         # Wire labels use va='top' (see draw_wire_label); park them to the
         # right of the wire like TikZ's ``anchor=west``, so the stroke does
         # not strike through the glyph.
+        side = "east" if params.get("horizontalalignment") == "right"\
+            else "west"
         if params.get("verticalalignment", "center") == "top":
-            extra["anchor"] = Str("west")
+            extra["anchor"] = Str(side)
         elif params.get("verticalalignment", "center") == "bottom":
-            extra["anchor"] = Str("south-west")
+            extra["anchor"] = Str(f"south-{side}")
         inner, math = self.math_label(text)
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)
@@ -2315,7 +2481,7 @@ class Typst(Backend):
         matplotlib draws it: a square, a triangle pointing up or down, a
         plus sign in its colour or else a disc. Nothing when its colour is
         transparent: such a spider is just its label, e.g. the symbol of an
-        :class:`discopy.monoidal.Equation`.
+        :class:`~discopy.monoidal.Equation`.
 
         >>> from discopy.frobenius import Ty, Spider
         >>> spider = Spider(1, 1, Ty('x'))
@@ -2601,7 +2767,7 @@ class Matplotlib(Backend):
         Draws the spiders, grouped by shape and by whether they adapt to a
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
-        its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+        its label, e.g. the symbol of an :class:`~discopy.monoidal.Equation`,
         which leaves no patch on a coloured page. The labels are drawn at
         ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """

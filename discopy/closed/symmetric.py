@@ -4,7 +4,7 @@
 The free symmetric closed category, i.e. a symmetric monoidal category with
 exponentials, where left and right exponentials coincide:
 ``x << y == x ** y == y >> x``. It has no copy and no discard, see
-:mod:`discopy.closed.markov` for those.
+:mod:`~discopy.closed.markov` for those.
 
 Summary
 -------
@@ -65,7 +65,7 @@ class Ty(closed.monoidal.Ty):
 
     Its terms, those of the linear lambda calculus, are not implemented: a
     type applied to a name or a function raises, see
-    :mod:`discopy.closed.markov` for the terms of a closed Markov category.
+    :mod:`~discopy.closed.markov` for the terms of a closed Markov category.
 
     >>> x('a')
     Traceback (most recent call last):

@@ -2,7 +2,7 @@
 
 """
 The free comarkov feedback category, i.e. comarkov diagrams with feedback,
-whose wires carry a time step, the dual of :mod:`discopy.feedback.markov`.
+whose wires carry a time step, the dual of :mod:`~discopy.feedback.markov`.
 
 Summary
 -------

@@ -103,7 +103,7 @@ steps: `==` on a stream is intensional, see :class:`Ty`.
 >>> assert symmetric.Equation(
 ...     LHS.now, id_dom.permute(*pi) >> RHS.now.permute(*pi))
 
-See :mod:`discopy.feedback` for the other axioms for feedback categories.
+See :mod:`~discopy.feedback` for the other axioms for feedback categories.
 """
 from __future__ import annotations
 
@@ -403,7 +403,7 @@ class Memory:  # pylint: disable=too-few-public-methods  # a subscript only
     """
     The boxes :func:`up_to_memory` closes the memory with: ``Memory[B]`` is
     a subclass of the boxes ``B`` of the underlying category, built once and
-    pickled by its subscript, as a :class:`discopy.utils.NamedGeneric` is. A
+    pickled by its subscript, as a :class:`~discopy.utils.NamedGeneric` is. A
     box compares its class, so no box a user builds is read as one of them.
 
     >>> import pickle
@@ -446,7 +446,7 @@ def up_to_memory(term: Stream):
     closed by a :class:`Memory` box, a state in and an effect out: the
     isomorphism of hypergraphs forgets the order of boxes, so two terms are
     equal when a permutation of the memory of one gives the other. Over a
-    category with no boxes, e.g. :class:`discopy.python.Function`, it is
+    category with no boxes, e.g. :class:`~discopy.python.Function`, it is
     :func:`up_to_steps`, the memory in order.
 
     >>> x, y, m, n = map(Ty.sequence, "xymn")
@@ -647,7 +647,7 @@ class Stream[category](FeedbackCategory, TestableGeneric):
 
     def to_tree(self) -> dict:
         """
-        A stream has no tree, see :func:`discopy.utils.dumps`.
+        A stream has no tree, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps
         >>> dumps(Stream.sequence("f", Ty('x'), Ty('x')))
@@ -865,7 +865,7 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
             mem: Ty | None = None) -> Stream:
         """
         The delayed feedback of a monoidal stream, in either form of
-        :meth:`discopy.abc.FeedbackCategory.feedback`, on the right only.
+        :meth:`~discopy.abc.FeedbackCategory.feedback`, on the right only.
 
         Parameters:
             n : The number of objects to feed back.

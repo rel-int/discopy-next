@@ -185,7 +185,7 @@ class Function(Category[Ty, "Function"]):
 
     def to_tree(self) -> dict:
         """
-        A function has no tree, see :func:`discopy.utils.dumps`.
+        A function has no tree, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps
         >>> dumps(Function(abs, int, int))

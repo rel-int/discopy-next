@@ -16,7 +16,7 @@ representable Markov category :cite:p:`FritzEtAl23`, whose distribution
 functor is right adjoint to the inclusion of the deterministic morphisms by
 a symmetric monoidal adjunction (their Proposition 3.15), or the Fock
 space of
-:mod:`discopy.optyx`, see the notebook :doc:`/notebooks/optyx/linear_logic`;
+:mod:`~discopy.optyx`, see the notebook :doc:`/notebooks/optyx/linear_logic`;
 neither is built here.
 
 Summary

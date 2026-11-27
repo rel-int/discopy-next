@@ -74,7 +74,7 @@ from typing import ClassVar
 
 from discopy import messages, tensor, frobenius
 from discopy.cat import factory
-from discopy.matrix import backend
+from discopy.matrix import asarray, backend
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance, deprecated_alias, factory_name
 
@@ -186,7 +186,7 @@ class Ty(frobenius.Ty):
     generator_factory = Wire
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+    instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
@@ -231,7 +231,7 @@ class Circuit(tensor.Diagram[complex]):
         or it discards qubits.
 
         Mixed circuits can be evaluated only by a
-        :class:`ChannelFunctor` not a :class:`discopy.tensor.Functor`.
+        :class:`ChannelFunctor` not a :class:`~discopy.tensor.Functor`.
         """
         def both_kinds(ty):
             return len({x.is_quantum for x in ty.inside}) == 2
@@ -263,20 +263,21 @@ class Circuit(tensor.Diagram[complex]):
 
         Parameters
         ----------
-        others : :class:`discopy.quantum.circuit.Circuit`
+        others : :class:`~discopy.quantum.circuit.Circuit`
             Other circuits to process in batch.
         backend : pytket.Backend, optional
             Backend on which to run the circuit, if none then we apply
-            :class:`discopy.tensor.Functor` or :class:`ChannelFunctor` instead.
+            :class:`~discopy.tensor.Functor` or :class:`ChannelFunctor`
+            instead.
         mixed : bool, optional
-            Whether to apply :class:`discopy.tensor.Functor`
+            Whether to apply :class:`~discopy.tensor.Functor`
             or :class:`ChannelFunctor`.
-        contractor : :class:`discopy.matrix.Backend` or callable, optional
+        contractor : :class:`~discopy.matrix.Backend` or callable, optional
             The backend whose ``einsum`` contracts the network, e.g.
-            :class:`discopy.matrix.NumPy` or a
-            :class:`discopy.matrix.Contractor` such as
-            :class:`discopy.matrix.Quimb`, see
-            :meth:`discopy.tensor.Functor.contract`, or a
+            :class:`~discopy.matrix.NumPy` or a
+            :class:`~discopy.matrix.Contractor` such as
+            :class:`~discopy.matrix.Quimb`, see
+            :meth:`~discopy.tensor.Functor.contract`, or a
             :class:`tensornetwork` contractor. A mixed circuit without a
             tensornetwork contractor composes its channels layer by layer,
             with no network for a backend to contract.
@@ -295,7 +296,7 @@ class Circuit(tensor.Diagram[complex]):
         Examples
         --------
         We can evaluate a pure circuit (i.e. with :code:`not circuit.is_mixed`)
-        as a unitary :class:`discopy.tensor.Tensor` or as a :class:`Channel`:
+        as a unitary :class:`~discopy.tensor.Tensor` or as a :class:`Channel`:
 
         >>> from discopy.quantum import *
 
@@ -314,7 +315,7 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert circuit.eval() == Channel(dom=CQ(), cod=CQ(), array=[1])
 
         We can execute any circuit on a `pytket.Backend` and get a
-        :class:`discopy.tensor.Tensor` of real-valued probabilities.
+        :class:`~discopy.tensor.Tensor` of real-valued probabilities.
 
         >>> circuit = Ket(0, 0) >> sqrt(2) @ H @ X >> CX >> Measure() @ Bra(0)
         >>> from discopy.quantum.tk import mockBackend  # doctest: +EXTRA
@@ -381,7 +382,7 @@ class Circuit(tensor.Diagram[complex]):
 
         Parameters
         ----------
-        others : :class:`discopy.quantum.circuit.Circuit`
+        others : :class:`~discopy.quantum.circuit.Circuit`
             Other circuits to process in batch.
         backend : pytket.Backend, optional
             Backend on which to run the circuit, if none then `numpy`.
@@ -713,7 +714,7 @@ class Circuit(tensor.Diagram[complex]):
 
         Returns
         -------
-        :class:`discopy.quantum.pennylane.PennylaneCircuit`
+        :class:`~discopy.quantum.pennylane.PennyLaneCircuit`
         """
         from discopy.quantum.pennylane import to_pennylane
         return to_pennylane(self, probabilities=probabilities,
@@ -957,9 +958,12 @@ class Box(tensor.Box[complex], Circuit):
     def array(self):
         """ The array of a quantum box. """
         if self.data is not None:
+            array = asarray(self.data, dtype=complex).reshape(tuple(
+                obj.dim for obj in self.dom.inside + self.cod.inside))
             with backend() as np:
-                return np.array(self.data, dtype=complex).reshape(tuple(
-                    obj.dim for obj in self.dom.inside + self.cod.inside))
+                # numpy's asarray may return a view of the data: copy it,
+                # so that writing to the array leaves the box unchanged
+                return array.copy() if np.__name__ == "numpy" else array
 
     def grad(self, var, **params):
         if var not in self.free_symbols:

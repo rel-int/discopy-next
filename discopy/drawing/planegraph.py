@@ -195,7 +195,7 @@ Coloured regions are also checked as part of the gallery:
     :align: center
 
 The regions of a crossing follow its strands, see
-:meth:`discopy.drawing.backend.Backend.region_separators`:
+:meth:`~discopy.drawing.backend.Backend.region_separators`:
 
 >>> from discopy import symmetric
 >>> red, blue = Colour("red"), Colour("blue")
@@ -318,7 +318,7 @@ class PlaneGraph(NamedTuple):
     def __repr__(self):
         """
         The graph as the adjacency of each of its nodes sorted by
-        :attr:`discopy.utils.Node.index`, rather than its address: the order
+        :attr:`~discopy.utils.Node.index`, rather than its address: the order
         the graph happens to store its nodes in is no part of the plane
         graph, and an adjacency also names a node with no edge, which an
         edge list would lose.
@@ -412,7 +412,7 @@ class Drawing(
 
     def to_tree(self) -> dict:
         """
-        A drawing has no tree, see :func:`discopy.utils.dumps`: serialise the
+        A drawing has no tree, see :func:`~discopy.utils.dumps`: serialise the
         diagram it is the drawing of instead.
 
         >>> from discopy.monoidal import Box
@@ -544,18 +544,20 @@ which to_drawing recomputes.
         The shift of one corner of each box drawn as a polygon when nothing
         else is asked for: :code:`0.125` when some box is a conjugate, a
         transpose or a dagger not drawn as a braid, :code:`0` otherwise,
-        counting the boxes of the drawings nested in its boxes.
+        counting the boxes of the drawings nested in its boxes and the frames
+        drawn around them, see :meth:`Backend.draw_frame_corner`.
         """
         return 0.125 * any(
             box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid) or (
+                box.is_dagger and not box.draw_as_braid) or getattr(
+                box, "frame_corner", 3) not in (None, 3) or (
                 any(nested.asymmetry()
                     for nested in getattr(box, "nested", None) or ()))
             for box in self.boxes)
 
     def to_typst(self, **params):
         """
-        The :class:`discopy.drawing.typst_ast.Document` of the drawing,
+        The :class:`~discopy.drawing.typst_ast.Document` of the drawing,
         whose ``render`` is its Typst source.
 
         >>> from discopy.monoidal import Ty, Box
@@ -1029,7 +1031,7 @@ which to_drawing recomputes.
         """
         Draw a permutation of blocks of wires, the ``i``-th block of its
         codomain being the ``xs[i]``-th of ``doms``, as in
-        :meth:`discopy.abc.SymmetricCategory.permutation`.
+        :meth:`~discopy.abc.SymmetricCategory.permutation`.
 
         >>> from discopy.monoidal import Ty
         >>> x, y, z = map(Ty, "xyz")
@@ -1233,7 +1235,7 @@ which to_drawing recomputes.
             other : The drawing to compose with.
             draw_step_by_step : Whether to return the list of drawings that
                 connect one wire at a time, e.g. for
-                :func:`discopy.drawing.to_gif`, rather than the composite,
+                :func:`~discopy.drawing.to_gif`, rather than the composite,
                 for one ``other`` only.
 
         Example
@@ -1376,18 +1378,22 @@ which to_drawing recomputes.
         """
         The trace of the last ``n`` wires, the first when ``left``, drawn as
         a cap, the drawing and a cup, the loop coming back along each wire
-        with its colours swapped. The wires of a ribbon are traced in one
-        loop, so that the ribbon keeps its width all the way round; other
-        wires one at a time, the last first.
+        with its colours swapped. The two rails of a ribbon are traced in one
+        loop, its cap and cup drawn as the constant-width folds of
+        :class:`~discopy.ribbon.DualRailCap` and
+        :class:`~discopy.ribbon.DualRailCup`, so that the ribbon keeps its
+        width all the way round; other wires one at a time, the last first.
         """
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self
         traced_dom = self.dom[:n] if left else self.dom[-n:]
         traced_cod = self.cod[:n] if left else self.cod[-n:]
-        if n > 1 and not any(
-                getattr(wire, "ribbon", None) for wire in traced_dom.inside):
-            return self.trace(left=left).trace(n=n - 1, left=left)
+        is_ribbon = any(
+            getattr(wire, "ribbon", None) for wire in traced_dom.inside)
+        step = 2 if is_ribbon else 1
+        if n > step:
+            return self.trace(step, left).trace(n - step, left)
         dom = self.dom[n:] if left else self.dom[:-n]
         cod = self.cod[n:] if left else self.cod[:-n]
         back = traced_dom.factory(
@@ -1395,10 +1401,11 @@ which to_drawing recomputes.
         cap_cod, cup_dom = (
             back @ traced_dom, back @ traced_cod) if left else (
             traced_dom @ back, traced_cod @ back)
-        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom),
-                  draw_as_wires=True).to_drawing()
-        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod,
-                  draw_as_wires=True).to_drawing()
+        fold = len(cap_cod) == 4 and is_ribbon
+        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom), draw_as_wires=not fold,
+                  draw_as_dual_rail_cup=fold).to_drawing()
+        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod, draw_as_wires=not fold,
+                  draw_as_dual_rail_cap=fold).to_drawing()
         return (
             cap @ dom >> back @ self >> cup @ cod if left
             else dom @ cap >> self @ back >> cod @ cup)
@@ -1413,10 +1420,13 @@ which to_drawing recomputes.
             for attr in BOX_DRAWING_ATTRIBUTES:
                 if not hasattr(result, attr):
                     setattr(result, attr, getattr(box, attr))
+            if getattr(box, "frame_corner", None) is not None:
+                # The edge of a frame is reflected with its corners.
+                vars(result).update(frame_corner=box.frame_corner ^ 1,
+                                    frame_name=box.frame_name)
             if getattr(box, "nested", None):
                 # The reflection of a transpose is a conjugate, and back.
                 vars(result).update(
-                    mirror_nested=not box.mirror_nested,
                     is_transpose=box.is_conjugate,
                     is_conjugate=box.is_transpose)
             return result
@@ -1640,8 +1650,12 @@ which to_drawing recomputes.
 
     def frame(self, *others: Drawing,
               dom=None, cod=None, name=None, draw_vertically=False,
-              frame_colour=None) -> Drawing:
+              frame_colour=None, min_width=0) -> Drawing:
         """
+        Draw a frame around ``self`` and ``others``, side by side or one on
+        top of the other when ``draw_vertically``, at least ``min_width``
+        wide, e.g. to leave room for a label drawn in one of its corners.
+
         >>> from discopy.monoidal import *
         >>> x, y = Ty('x'), Ty('y')
         >>> f, g, h = Box('f', x, y ** 3), Box('g', y, y @ y), Box('h', x, y)
@@ -1674,8 +1688,12 @@ which to_drawing recomputes.
             ) if draw_vertically else dict(
                 height=max([arg.height for arg in args] + [0]))
         slots = tuple(arg.slot(colour, **params) for arg in args)
-        result = getattr(slots[0], method)(*slots[1:]).bubble(
+        inside = getattr(slots[0], method)(*slots[1:])
+        result = inside.bubble(
             dom, cod, name, draw_as_square=True, frame_sides=True)
+        if result.width < min_width:
+            result = inside.bubble(dom, cod, name, width=min_width,
+                                   draw_as_square=True, frame_sides=True)
         result.reposition_box_dom()
         result.reposition_box_cod()
         return result

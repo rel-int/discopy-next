@@ -262,7 +262,7 @@ class Ty(frobenius.Ty):
 
     Equality is structural rather than nominal: a :class:`Mode` or
     :class:`Bit` equals the plain :class:`Ty` with the same objects,
-    mirroring :class:`discopy.monoidal.PRO`.
+    mirroring :class:`~discopy.monoidal.PRO`.
     """
 
     generator_factory = Ob
@@ -285,6 +285,17 @@ class Mode(Ty):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.n})"
 
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)), 'n': self.n}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        if 'n' in tree:
+            return cls(tree['n'])
+        # a monoidal tree, or an outdated one listing its objects
+        return cls(len(tree['inside'] if 'inside' in tree
+                       else tree['objects']))
+
 
 class Bit(Ty):
     """Qubit type interpreted as the two dimensional complext vector space"""
@@ -295,6 +306,9 @@ class Bit(Ty):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.n})"
+
+    to_tree = Mode.to_tree
+    from_tree = classmethod(Mode.from_tree.__func__)
 
 
 @factory
@@ -311,7 +325,7 @@ class Diagram(frobenius.Diagram):
         """
         The trace of the last ``n`` wires, the first when ``left``, bent with
         the cups and caps of the category, see
-        :meth:`discopy.pivotal.Diagram.dual_trace`: its
+        :meth:`~discopy.pivotal.Diagram.dual_trace`: its
         :meth:`feedback` is a delayed loop of its own.
 
         Parameters:
@@ -355,7 +369,7 @@ class Diagram(frobenius.Diagram):
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
         of a :class:`Diagram`, or a formal
-        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
+        :class:`~discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams.
 
@@ -387,7 +401,7 @@ class Diagram(frobenius.Diagram):
             effect : The boundary plugged in the output memory after the last
                 time step, a diagram with `dom == mem`. `None` gives
                 :meth:`Feedback.default_effect`, the identity on `mem` here
-                and :class:`discopy.optyx.channel.Discard` for a channel
+                and :class:`~discopy.optyx.channel.Discard` for a channel
                 diagram.
 
         The boundaries are set here and read back by :meth:`boundary`:
@@ -454,11 +468,11 @@ class Diagram(frobenius.Diagram):
             -> Diagram:
         """
         Unroll the feedback loops of a diagram `n_steps` times, by
-        interpreting it as a :class:`discopy.stream.Stream`: every box maps
+        interpreting it as a :class:`~discopy.stream.Stream`: every box maps
         to the constant stream and every :class:`Feedback` loop moves its
         memory from the wires to the memory of the stream.
 
-        As in :meth:`discopy.stream.Stream.unroll`, `n_steps` counts
+        As in :meth:`~discopy.stream.Stream.unroll`, `n_steps` counts
         unrollings rather than time steps, so `unroll(0)` is one time step
         and `unroll(n)` is `n + 1` of them.
 
@@ -675,10 +689,10 @@ class Diagram(frobenius.Diagram):
                 cod=self.cod,
                 inside=self.inside,
             )
-        except TypeError:
+        except TypeError as error:
             raise NotImplementedError(
                 "Conversion to PyZX is not implemented for this diagram."
-            )
+            ) from error
         return zx_diagram.to_pyzx()
 
     def inflate(self, d):
@@ -704,7 +718,7 @@ class Diagram(frobenius.Diagram):
 
 
 def array_backend(array) -> str:
-    """The name of the :func:`discopy.matrix.backend` an array belongs to,
+    """The name of the :func:`~discopy.matrix.backend` an array belongs to,
     read from the module of its type.
 
     >>> assert array_backend(np.zeros(2)) == array_backend([0]) == "numpy"
@@ -797,13 +811,13 @@ class Box(frobenius.Box, Diagram):
         Inheriting boxes should implement this method.
         Otherwise it is defined by the array.
 
-        As for :meth:`discopy.cat.Box.dagger`, the dagger keeps the name
+        As for :meth:`~discopy.cat.Box.dagger`, the dagger keeps the name
         and flips :code:`is_dagger`, so the dagger of the dagger is the box
         itself. Its array is the :meth:`array_adjoint`, and its
         :meth:`truncation` the dagger of the truncation of the box.
 
         A box declares itself self-adjoint with ``is_dagger=None``, as
-        :data:`discopy.quantum.gates.SWAP` does, and is then its own dagger.
+        :data:`~discopy.quantum.gates.SWAP` does, and is then its own dagger.
 
         >>> f = Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2))
         >>> print(f[::-1])
@@ -848,6 +862,24 @@ class Box(frobenius.Box, Diagram):
             else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.array is not None:
+            array = self.array
+            if hasattr(array, "detach"):  # a PyTorch tensor, maybe on a GPU
+                array = array.detach().cpu()
+            tree['array'] = np.asarray(array).tolist()
+        if self.is_dagger is None:
+            tree['is_dagger'] = None
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Box:
+        box = super().from_tree(tree)
+        if 'array' in tree:
+            box.array = np.asarray(tree['array'])
+        return box
 
     @staticmethod
     def array_wire_dims(ty: Ty, dims: list[int] = None) -> list[int]:
@@ -1238,6 +1270,10 @@ class Scalar(Box):
         return f"{factory_name(type(self))}"\
             f"({format_number(self.scalar, exact=True)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> Scalar:
+        return cls(tree['data'])
+
     def to_path(self, dtype: type = complex):
         return path.Matrix[dtype]([], 0, 0, scalar=self.scalar)
 
@@ -1365,6 +1401,17 @@ class DualRail(Box):
             args += f"{', ' if args else ''}internal_state={state}"
         return f"{factory_name(type(self))}({args})"
 
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.internal_state is not None:
+            tree['internal_state'] = np.asarray(self.internal_state).tolist()
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> DualRail:
+        return cls(is_dagger=tree.get('is_dagger', False),
+                   internal_state=tree.get('internal_state'))
+
 
 class PhotonThresholdDetector(Box):
     """
@@ -1419,6 +1466,10 @@ class PhotonThresholdDetector(Box):
         dagger = "is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({dagger})"
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> PhotonThresholdDetector:
+        return cls(is_dagger=tree.get('is_dagger', False))
+
     def inflate(self, d):
         from discopy.optyx.core.zw import Add
         dgrm = Add(d) >> PhotonThresholdDetector()
@@ -1452,6 +1503,15 @@ class EmbeddingTensor(tensor.Box):
     def __repr__(self):
         return f"{factory_name(type(self))}"\
             f"({self.input_dim}, {self.output_dim})"
+
+    def to_tree(self) -> dict:
+        return {'factory': factory_name(type(self)),
+                'input_dim': self.input_dim,
+                'output_dim': self.output_dim}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> EmbeddingTensor:
+        return cls(tree['input_dim'], tree['output_dim'])
 
     def conjugate(self):
         return self
@@ -1505,7 +1565,7 @@ class Feedback(Box):
     back to its last `mem` inputs, one time step later.
 
     The delay is real but left unwritten: the memory of `arg` is not typed
-    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
+    with :meth:`~discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
@@ -1676,8 +1736,9 @@ class Functor(frobenius.Functor):
 class Hypergraph(hypergraph.Hypergraph):
     """
     A hypergraph whose functor keeps spiders as boxes: `bit` carries two
-    frobenius structures — :class:`discopy.optyx.core.zx.Z` and
-    :class:`discopy.optyx.core.zx.X` — so neither can dissolve into the wiring,
+    frobenius structures — :class:`~discopy.optyx.core.zx.Z` and
+    :class:`~discopy.optyx.core.zx.X` — so neither can dissolve into the
+    wiring,
     only the symmetric structure of the swaps does.
     """
     functor = symmetric.Functor

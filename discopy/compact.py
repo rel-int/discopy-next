@@ -4,8 +4,8 @@
 The free compact category, i.e. diagrams with swaps, cups and caps.
 
 A compact diagram is a symmetric closed diagram, see
-:mod:`discopy.closed.symmetric`, with internal hom ``x ⊸ y = x* @ y``: its
-evaluation and currying are the cups and caps of :mod:`discopy.rigid`.
+:mod:`~discopy.closed.symmetric`, with internal hom ``x ⊸ y = x* @ y``: its
+evaluation and currying are the cups and caps of :mod:`~discopy.rigid`.
 
 >>> from discopy import closed
 >>> x, y, z = map(Ty, "xyz")
@@ -229,9 +229,9 @@ class Functor(traced.Functor, ribbon.Functor):
 class DualRail(symmetric.DualRail, ribbon.DualRail):
     """
     The functor sending a compact diagram to its dual rail encoding, i.e.
-    :class:`discopy.symmetric.DualRail` sending a :class:`Permutation` to the
-    dual rail braids of its swaps, and :class:`discopy.ribbon.DualRail`
-    otherwise.
+    :class:`symmetric.DualRail <discopy.symmetric.DualRail>` sending a
+    :class:`Permutation` to the dual rail braids of its swaps, and
+    :class:`ribbon.DualRail <discopy.ribbon.DualRail>` otherwise.
 
     >>> x, y, z = map(Ty, "xyz")
     >>> diagram = (Swap(x, y) @ z).to_braided()

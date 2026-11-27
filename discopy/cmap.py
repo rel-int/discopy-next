@@ -1667,11 +1667,11 @@ class CMap[category](
 
         Over a pivotal category, e.g. for compact diagrams, the trace box is
         equal to a cap, the diagram and a cup, see
-        :meth:`discopy.pivotal.Diagram.dual_trace`, so we introduce cup and cap
-        boxes, one pair per wire: the whole onion of ``n`` pairs goes to one
-        constructor call rather than being composed pair by pair. So does a
+        :meth:`~discopy.pivotal.Diagram.dual_trace`, so we introduce cup and
+        cap boxes, one pair per wire: the whole onion of ``n`` pairs goes to
+        one constructor call rather than being composed pair by pair. So does a
         category whose ``trace_factory`` is ``dual_trace`` itself, e.g.
-        :class:`discopy.tensor.Diagram`; one overriding it with another class
+        :class:`~discopy.tensor.Diagram`; one overriding it with another class
         method gets the nest its own factory builds, like
         :meth:`Hypergraph.explicit_trace`.
 
@@ -1925,7 +1925,7 @@ class CMap[category](
         """
         Evaluate the map directly with the ``eval`` of the host category,
         e.g. contract a tensor map in a single ``einsum`` call, see
-        :meth:`discopy.tensor.Diagram.eval`.
+        :meth:`~discopy.tensor.Diagram.eval`.
         """
         return self.category.eval(self, *args, **params)
 
@@ -1948,7 +1948,7 @@ class CMap[category](
         discopy.utils.AxiomError: monoidal.Diagram has no traces for the \
 cycles of this map.
 
-        What remains is decoded by the :class:`discopy.hypergraph.Decoder` of
+        What remains is decoded by the :class:`~discopy.hypergraph.Decoder` of
         :meth:`Hypergraph.to_diagram`: we scan the open wires from left to
         right, and each box gathers its domain wires at the position of the
         first one with a single permutation.
@@ -2304,7 +2304,7 @@ cycles of this map.
     def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
         """
         The domain, boxes and offsets of a diagram whose map this is, one box
-        per layer as :meth:`discopy.monoidal.Diagram.decode` reads them, see
+        per layer as :meth:`~discopy.monoidal.Diagram.decode` reads them, see
         :meth:`sweep`.
 
         Example
@@ -2587,7 +2587,7 @@ cycles of this map.
                 category is not a :class:`SpacialCategory`: the map of a
                 diagram does not say in which face a component that touches
                 nothing else lies, which only a spacial category does not
-                mind, see :mod:`discopy.spacial`.
+                mind, see :mod:`~discopy.spacial`.
 
         Example
         -------

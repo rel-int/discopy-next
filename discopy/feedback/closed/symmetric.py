@@ -3,14 +3,14 @@
 """
 The free symmetric closed feedback category, i.e. symmetric closed diagrams
 with feedback, whose wires carry a time step, see
-:mod:`discopy.feedback.closed.monoidal`.
+:mod:`~discopy.feedback.closed.monoidal`.
 
 With the delay the identity, it is a traced symmetric monoidal closed
-category, of which :mod:`discopy.compact` is the case where the exponential
+category, of which :mod:`~discopy.compact` is the case where the exponential
 of ``x`` is its dual: :cite:t:`HajgatoHasegawa13` show that a traced
 :math:`*`-autonomous category is compact closed. It is the setting of the
 geometry of interaction, :cite:t:`AbramskyEtAl02`, where
-:class:`discopy.interaction.Int` takes a traced category to a compact one.
+:class:`~discopy.interaction.Int` takes a traced category to a compact one.
 
 >>> x, y = Ty('x'), Ty('y')
 >>> f = Box('f', x @ y, x)

@@ -705,10 +705,11 @@ class ProofNet(Testable):
     def strategy(cls, **params):
         """
         Generate the nets of closed linear terms, sampled with no free
-        variables, see :class:`discopy.closed.monoidal.Sampler`.
+        variables, see :class:`~discopy.closed.monoidal.Sampler`.
 
         Parameters:
-            params : Passed to :meth:`discopy.closed.monoidal.TermBase.shapes`.
+            params : Passed to
+                :meth:`~discopy.closed.monoidal.TermBase.shapes`.
         """
         from hypothesis import strategies as st
 

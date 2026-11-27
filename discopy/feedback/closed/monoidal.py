@@ -2,7 +2,7 @@
 
 """
 The free closed monoidal feedback category, i.e. closed monoidal diagrams
-with feedback, whose wires carry a time step, see :mod:`discopy.feedback`.
+with feedback, whose wires carry a time step, see :mod:`~discopy.feedback`.
 
 Its delay is a monoidal endofunctor but not a closed one: an exponential is
 a wire of its own, delayed as a whole, leaving its base and its exponent
@@ -15,11 +15,11 @@ alone, and the delay of an evaluation evaluates the delayed exponential.
 
 With the delay the identity, it is a traced closed monoidal category: a
 curry is the trace of a coevaluation, see :meth:`Diagram.to_compact`, and a
-:mod:`discopy.pivotal` category is one where the exponential of ``x`` is
+:mod:`~discopy.pivotal` category is one where the exponential of ``x`` is
 its adjoint. Its planar diagrams have no swap, so there is no Int here:
 :cite:t:`Hasegawa09` shows that a balanced traced category is closed if and
-only if its embedding into :class:`discopy.interaction.Int` has a right
-adjoint, a theorem that starts at :mod:`discopy.feedback.closed.balanced`.
+only if its embedding into :class:`~discopy.interaction.Int` has a right
+adjoint, a theorem that starts at :mod:`~discopy.feedback.closed.balanced`.
 
 Summary
 -------
