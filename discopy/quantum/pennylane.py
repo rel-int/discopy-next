@@ -34,7 +34,7 @@ circuit will be exactly equivalent to those of the DisCoPy circuit
 
 If `probabilities` is set to True, the output states of the PennyLane
 circuit will be the probabilities of the output states, equivalent
-to appending :class:`discopy.quantum.gates.Measure` to all the
+to appending :class:`~discopy.quantum.gates.Measure` to all the
 open wires in the DisCoPy circuit.
 
 Once a :class:`PennyLaneCircuit` has been constructed, it can be
@@ -132,7 +132,7 @@ def extract_ops_from_tk(tk_circ):
 
     Parameters
     ----------
-    tk_circ : :class:`discopy.quantum.tk.Circuit`
+    tk_circ : :class:`~discopy.quantum.tk.Circuit`
         The pytket circuit to extract the operations from.
 
     Returns
@@ -167,7 +167,7 @@ def get_post_selection_dict(tk_circ):
 
     Parameters
     ----------
-    tk_circ : :class:`discopy.quantum.tk.Circuit`
+    tk_circ : :class:`~discopy.quantum.tk.Circuit`
         The pytket circuit to extract the post-selections from.
 
     Returns
@@ -191,7 +191,7 @@ def to_pennylane(disco_circuit: Circuit, probabilities=False,
 
     Parameters
     ----------
-    disco_circuit : :class:`discopy.quantum.circuit.Circuit`
+    disco_circuit : :class:`~discopy.quantum.circuit.Circuit`
         The DisCoPy circuit to convert to PennyLane.
     probabilities : bool, default: False
         Determines whether the PennyLane
