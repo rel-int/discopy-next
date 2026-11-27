@@ -61,10 +61,11 @@ from discopy.cat import factory
 from discopy.closed.markov import Equation  # noqa: F401
 from discopy.drawing import Drawing
 from discopy.feedback import markov
+from discopy.feedback.closed import symmetric
 from discopy.utils import factory_name, from_tree
 
 
-class Wire(feedback.Wire, closed.markov.Wire):
+class Wire(symmetric.Wire, closed.markov.Wire):
     """ A closed feedback object is a closed object with a time step. """
 
 
@@ -72,12 +73,12 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(closed.markov.Ty, feedback.Ty):
+class Ty(closed.markov.Ty, symmetric.Ty):
     """ A closed feedback type is a closed type and a feedback type. """
     generator_factory = Wire
 
 
-class Exp(Wire, closed.markov.Exp):
+class Exp(Wire, closed.markov.Exp, symmetric.Exp):
     """ An exponential object with a time step, delayed as a whole. """
     ob = Ty
 
@@ -196,7 +197,7 @@ class Unitype(closed.markov.Unitype, Exp):
 
 
 @factory
-class Diagram(closed.markov.Diagram, markov.Diagram):
+class Diagram(closed.markov.Diagram, markov.Diagram, symmetric.Diagram):
     """
     A closed feedback diagram is a closed diagram and a Markov feedback
     diagram.
@@ -240,7 +241,7 @@ class Diagram(closed.markov.Diagram, markov.Diagram):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
 
-class Box(closed.markov.Box, markov.Box, Diagram):
+class Box(closed.markov.Box, markov.Box, symmetric.Box, Diagram):
     """ A closed feedback box is a closed and a Markov feedback box. """
     serialised_attrs = markov.Box.serialised_attrs
 
@@ -387,14 +388,17 @@ class Function(closed.markov.Function, markov.Function, Box):
     """ A function in a closed feedback diagram. """
 
 
-class Permutation(closed.markov.Permutation, markov.Permutation, Box):
+class Permutation(
+        closed.markov.Permutation, markov.Permutation, symmetric.Permutation,
+        Box):
     """ A permutation in a closed feedback diagram. """
 
 
 Function.register(Permutation)
 
 
-class Swap(Permutation, closed.markov.Swap, markov.Swap, Box):
+class Swap(Permutation, closed.markov.Swap, markov.Swap, symmetric.Swap,
+           Box):
     """ A swap in a closed feedback diagram. """
 
 
@@ -406,11 +410,11 @@ class Discard(closed.markov.Discard, markov.Discard, Copy):
     """ A discard in a closed feedback diagram. """
 
 
-class Sum(closed.markov.Sum, markov.Sum, Box):
+class Sum(closed.markov.Sum, markov.Sum, symmetric.Sum, Box):
     """ A closed feedback sum is a closed and a feedback sum. """
 
 
-class Functor(closed.markov.Functor, markov.Functor):
+class Functor(closed.markov.Functor, markov.Functor, symmetric.Functor):
     """
     A closed feedback functor is a closed and a feedback functor: a delayed
     wire or box goes through the delay of the codomain.

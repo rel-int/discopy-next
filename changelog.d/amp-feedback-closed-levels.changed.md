@@ -5,7 +5,8 @@ the architecture diagram of the docs by `docs/architecture.py`:
 `feedback.cat` is the free `abc.DelayCategory`, a category with a delay
 and no tensor, which `abc.FeedbackCategory` now extends.
 `feedback.closed.monoidal`, `feedback.closed.balanced` and
-`feedback.closed.symmetric` are new, beside `feedback.closed.markov`: the
+`feedback.closed.symmetric` are new, beside `feedback.closed.markov`, which
+is under `feedback.closed.symmetric`: the
 free feedback categories over `closed.monoidal`, `feedback.balanced`,
 `closed.symmetric` and `closed.markov`, traced once the delay is the
 identity, and `pivotal`, `ribbon`, `compact` and `frobenius` sit under them,
@@ -21,4 +22,5 @@ category whose trace is not a box, e.g. tensors, circuits or optyx
 channels, takes `Diagram.dual_trace` as its `trace_factory`.
 `linear.symmetric` takes the swap for the exchange and `linear.markov` the
 copy and discard of a banged object for its contraction and weakening,
-with no default bang ([next#744](https://github.com/rel-int/discopy-next/pull/744)).
+with no default bang ([next#744](https://github.com/rel-int/discopy-next/pull/744),
+[next#781](https://github.com/rel-int/discopy-next/pull/781)).
