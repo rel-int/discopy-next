@@ -81,20 +81,20 @@ class Unsupported(Exception):
 class Term:
     """
     A symbol that records what is done to it: a method called on a term, or
-    on the category, is a term with that method as head, the term and the
+    on the category, is a term with that method as symbol, the term and the
     arguments as arguments, and the sort of the result.
 
     Parameters:
-        head : The variable, or the name of the method.
+        symbol : The variable, or the name of the method.
         args : The arguments of the method, terms or numbers.
         sort : ``"Ob"`` for an object, ``"Hom"`` for a morphism.
-        applied : Whether the head is a method rather than a variable.
+        applied : Whether the symbol is a method rather than a variable.
 
     >>> f, g = Term("f"), Term("g")
     >>> print((f >> g).dom)
     dom (comp f g)
     """
-    head: str
+    symbol: str
     args: tuple = ()
     sort: str = "Hom"
     applied: bool = False
@@ -106,9 +106,9 @@ class Term:
 
     @property
     def name(self) -> str:
-        """ The Lean name of the head: ``Ob`` after one returning objects
+        """ The Lean name of the symbol: ``Ob`` after one returning objects
         from objects, as ``tensorOb`` is the tensor of objects. """
-        name = LEAN_NAMES.get(self.head, self.head)
+        name = LEAN_NAMES.get(self.symbol, self.symbol)
         is_object_operation = self.applied and self.sort == "Ob" and all(
             isinstance(arg, Term) and arg.sort == "Ob" for arg in self.args)
         return f"{name}Ob" if is_object_operation else name
@@ -131,7 +131,7 @@ class Term:
     def __getattr__(self, name):
         if name.startswith("_"):
             raise AttributeError(name)
-        if name in ("dom", "cod", "l", "r"):
+        if name in ("dom", "cod", "l", "r", "head", "tail"):
             return Term(name, (self, ), "Ob" if name in ("dom", "cod")
                         else self.sort, True)
         return lambda *args, **kwargs: apply(name, (self, *args), kwargs,
@@ -270,10 +270,11 @@ class Compiled:
         if not prefix:
             return statement
         names = set(names) | set(self.operations())
-        words = statement.replace("(", "( ").replace(")", " )").split(" ")
+        words = statement.replace("(", "( ").replace(")", " )")\
+            .replace(",", " ,").split(" ")
         return " ".join(prefix + word if word in names else word
                         for word in words)\
-            .replace("( ", "(").replace(" )", ")")
+            .replace("( ", "(").replace(" )", ")").replace(" ,", ",")
 
     def operations(self) -> dict[str, str]:
         """ The signature of each operation the declaration applies. """
@@ -443,14 +444,16 @@ SIGNATURE_SORTS = {"C0": "Ob", "C1": "Hom", "int": "Nat", "bool": "Bool"}
 def method(cls: type, name: str) -> tuple[str, str]:
     """
     The Lean name and signature of a method of a class read off its
-    annotations, a morphism ``self`` first unless it is a class method and
-    variadic arguments as one more.
+    annotations, a morphism ``self`` first unless it is a class method, e.g.
+    a property, and variadic arguments as one more.
 
     >>> method(abc.ColouredMonoid, "tensor")
     ('tensor', 'Hom → Hom → Hom')
     """
-    is_classmethod = isinstance(vars(cls)[name], classmethod)
-    signature = inspect.signature(getattr(cls, name))
+    value = vars(cls)[name]
+    is_classmethod = isinstance(value, classmethod)
+    signature = inspect.signature(
+        value.fget if isinstance(value, property) else getattr(cls, name))
     parameters = list(signature.parameters.values())[
         0 if is_classmethod else 1:]
     sorts = [] if is_classmethod else ["Hom"]
@@ -494,7 +497,8 @@ def operations(cls: type) -> dict[str, str]:
     found += [method(cls, name) for name, value in vars(cls).items()
               if getattr(getattr(value, "__func__", value),
                          "__isabstractmethod__", False)
-              and not takes_keywords(getattr(cls, name))]
+              and not takes_keywords(
+                  getattr(value, "fget", None) or getattr(cls, name))]
     for name, signature in found:
         if result.setdefault(name, signature) != signature:
             raise Unsupported(f"{name} is {result[name]} and {signature}")
@@ -596,7 +600,7 @@ def image(value) -> str:
     if not isinstance(value, Term):
         return render(value)
     if not value.applied:
-        return f"{'ob' if value.sort == 'Ob' else 'map'} {value.head}"
+        return f"{'ob' if value.sort == 'Ob' else 'map'} {value.symbol}"
     return " ".join([f"cat'.{value.name}", *map(wrap, map(image, value.args))])
 
 

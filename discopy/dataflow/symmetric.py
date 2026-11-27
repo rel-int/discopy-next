@@ -71,12 +71,15 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from discopy import feedback, hypergraph, messages
-from discopy.abc import DaggerCategory
+from discopy import feedback, hypergraph, messages, stream
+from discopy.abc import (
+    DaggerCategory, DaggerDataflowCategory, DataflowCategory,
+    SymmetricCategory)
 from discopy.cat import factory, kappa_calculus
 from discopy.feedback import symmetric
 from discopy.symmetric import (  # noqa: F401  pylint: disable=unused-import
     Equation)
+from discopy.testable import Equation as AbstractEquation, Obj, Var, axiom
 from discopy.utils import (
     AxiomError, assert_isinstance, factory_name, from_tree)
 
@@ -109,6 +112,24 @@ class Wire(feedback.Wire):
     def __setstate__(self, state):
         state.setdefault('is_constant', True)
         super().__setstate__(state)
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named wires, constant or not. """
+        from hypothesis import strategies as st
+
+        return st.tuples(super().strategy(), st.booleans()).map(
+            lambda args: cls(args[0].name, is_constant=args[1]))
+
+    def atoms(self):
+        """
+        The atom of a wire, its undelayed wire, constant or not, which its
+        string does not show.
+
+        >>> x = Wire('x', is_constant=False)
+        >>> assert Ty(x.delay()).atoms() == [Ty(x)] != Ty('x').atoms()
+        """
+        return [Wire(self.name, is_constant=self.is_constant)]
 
     @property
     def head(self):
@@ -174,6 +195,10 @@ class HeadOb(Wire):
     def __repr__(self):
         time_step = f", time_step={self.time_step}" if self.time_step else ""
         return factory_name(type(self)) + f"({repr(self.arg)}{time_step})"
+
+    def atoms(self):
+        """ The atoms of the head of a wire, those of the wire. """
+        return self.arg.atoms()
 
     def delay(self, n_steps=1):
         return type(self)(self.arg, self.time_step + n_steps)
@@ -241,7 +266,7 @@ class TailOb(Wire):
             f"{arg}.{self.part}", time_step=time_step, is_constant=False)
 
     delay, reset, dagger = HeadOb.delay, HeadOb.reset, HeadOb.dagger
-    __repr__, to_tree = HeadOb.__repr__, HeadOb.to_tree
+    __repr__, to_tree, atoms = HeadOb.__repr__, HeadOb.to_tree, HeadOb.atoms
     from_tree = classmethod(HeadOb.from_tree.__func__)
 
 
@@ -252,6 +277,11 @@ Wire.head_factory, Wire.tail_factory = HeadOb, TailOb
 class Ty(feedback.Ty):
     """ A dataflow type is a feedback type with a head and a tail. """
     generator_factory = Wire
+
+    def atoms(self):
+        """ The atoms of a type, one wire each, see :meth:`Wire.atoms`. """
+        return [self.factory(atom)
+                for wire in self.inside for atom in wire.atoms()]
 
     @property
     def head(self):
@@ -264,12 +294,37 @@ class Ty(feedback.Ty):
         return self.factory(*(x.tail for x in self.inside if x.tail))
 
 
+def up_to_streams(term):
+    """
+    A diagram up to its stream, i.e. the first steps of its
+    :meth:`Diagram.to_stream` up to the order of its memory, see
+    :func:`~discopy.stream.up_to_memory`, a type as itself and a tuple of
+    them each: how the laws of :class:`~discopy.abc.DataflowCategory` that
+    hold of streams but not of their syntax are compared.
+
+    >>> x = Ty(Wire('x', is_constant=False))
+    >>> assert up_to_streams(FollowedBy(x)) == up_to_streams(Id(x))
+    >>> assert up_to_streams((x, FollowedBy(x))) == (x, up_to_streams(Id(x)))
+    """
+    if isinstance(term, tuple):
+        return tuple(map(up_to_streams, term))
+    return term if isinstance(term, Ty)\
+        else stream.up_to_memory(term.to_stream())
+
+
 @factory
-class Diagram(symmetric.Diagram):
+class Diagram(symmetric.Diagram, DaggerDataflowCategory):
     """
     A symmetric dataflow diagram is a symmetric feedback diagram with a
     :attr:`head`, a :attr:`tail` and :meth:`followed_by`, each built by its
     factory.
+
+    The laws of :class:`~discopy.abc.DataflowCategory` hold of their streams,
+    see :func:`up_to_streams`, on the diagrams of the symmetric rules: in a
+    symmetric category, the head of a feedback has no stream, as the memory
+    its first step writes cannot be discarded. A constant type is its own
+    tail, see :meth:`constant_tail`, and the head and the tail commute with
+    the dagger on the nose.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -280,6 +335,62 @@ class Diagram(symmetric.Diagram):
     head_factory: ClassVar[type]
     tail_factory: ClassVar[type]
     followed_by_factory: ClassVar[type]
+    stream_factory = stream.Stream
+
+    (head_monoidality, tail_monoidality, head_idempotence, tail_of_head,
+     head_of_delay, tail_of_delay, followed_by_naturality) = (
+            law.modulo(up_to_streams).weaken(within=SymmetricCategory)
+            for law in (
+                DataflowCategory.head_monoidality,
+                DataflowCategory.tail_monoidality,
+                DataflowCategory.head_idempotence,
+                DataflowCategory.tail_of_head,
+                DataflowCategory.head_of_delay,
+                DataflowCategory.tail_of_delay,
+                DataflowCategory.followed_by_naturality))
+    followed_by_delay = DataflowCategory.followed_by_delay.modulo(
+        up_to_streams)
+    followed_by_unitarity = DaggerDataflowCategory.followed_by_unitarity\
+        .modulo(up_to_streams)
+
+    @axiom
+    def constant_tail[X: Obj[Ty]](
+            cls, x: Var[Ty, X]) -> AbstractEquation[Ty]:
+        """
+        A constant type is its own tail, here the wires of a type that are
+        constant and not delayed.
+        """
+        constant = x.factory(*(
+            wire for wire in x.inside
+            if wire.is_constant and not wire.time_step))
+        return AbstractEquation(constant.tail, constant)
+
+    def to_stream(self) -> stream.Stream:
+        """
+        The stream of a dataflow diagram, in the :attr:`stream_factory` of
+        the free category on its boxes: a wire ``x`` goes to the sequence
+        ``x0, x1, ...``, or to ``x`` at each step when it is constant, and a
+        box ``f`` to the sequence ``f0, f1, ...``.
+
+        >>> x = Ty(Wire('x', is_constant=False))
+        >>> f = Box('f', x, x)
+        >>> print(f.head.to_stream().now)
+        f0
+        >>> print(f.tail.to_stream().now, "|", f.tail.to_stream().later.now)
+        f1 | f2
+        """
+        cod = self.stream_factory
+
+        def ob(typ):
+            wire, = typ.inside
+            return cod.ob(cod.category.ob(wire.name)) if wire.is_constant\
+                else cod.ob.sequence(wire.name)
+
+        def ar(box):
+            return cod.sequence(str(box), functor(box.dom), functor(box.cod))
+
+        functor = self.functor_factory(ob, ar, dom=type(self), cod=cod)
+        return functor(self)
 
     @property
     def head(self):
@@ -501,8 +612,17 @@ class Hypergraph(hypergraph.Hypergraph):
     >>> assert (f >> g).head.to_hypergraph()\\
     ...     == (f >> g).to_hypergraph().head == Head(f >> g).to_hypergraph()
     >>> assert FollowedBy(x).delay().to_hypergraph()\\
-    ...     == Hypergraph[Diagram].followed_by(x).delay()
+    ...     == Hypergraph.followed_by(x).delay()
     """
+    category = Diagram
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The dataflow diagrams, of both levels. """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
+        from discopy.dataflow import markov
+        return Diagram, markov.Diagram
+
     @property
     def head(self):
         """ The hypergraph of the head of the diagram it decodes to. """
@@ -536,7 +656,6 @@ Diagram.sum_factory = Sum
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
 Diagram.hypergraph_factory = Hypergraph
-Hypergraph = Hypergraph[Diagram]
 Id = Diagram.id
 
 TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Diagram)

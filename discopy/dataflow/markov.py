@@ -109,7 +109,8 @@ functions gives the random walk:
 
 from __future__ import annotations
 
-from discopy import feedback
+from discopy import feedback, stream
+from discopy.abc import DaggerDataflowCategory, SymmetricCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.dataflow import symmetric
 # pylint: disable-next=unused-import
@@ -117,14 +118,16 @@ from discopy.dataflow.symmetric import (  # noqa: F401
     Wire, HeadOb, TailOb, Ty)
 from discopy.feedback import markov
 from discopy.markov import (  # noqa: F401  pylint: disable=unused-import
-    Equation)
+    Diagram as MarkovDiagram, Equation)
 
 
 @factory
 class Diagram(markov.Diagram, symmetric.Diagram):
     """
     A Markov dataflow diagram is a Markov feedback diagram and a symmetric
-    dataflow diagram.
+    dataflow diagram, whose stream is one of Markov diagrams. A copy has no
+    dagger, so the head and the tail commute with the dagger on the
+    diagrams of the symmetric rules.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -132,6 +135,11 @@ class Diagram(markov.Diagram, symmetric.Diagram):
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
     ob = Ty
+    stream_factory = stream.Stream[MarkovDiagram]
+    head_dagger, tail_dagger = (
+        law.weaken(within=SymmetricCategory) for law in (
+            DaggerDataflowCategory.head_dagger,
+            DaggerDataflowCategory.tail_dagger))
 
 
 class Box(markov.Box, symmetric.Box, Diagram):

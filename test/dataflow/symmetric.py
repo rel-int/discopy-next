@@ -126,3 +126,16 @@ def test_hypergraph_has_the_primitives():
         assert graph.boxes == (term, ) and graph.to_diagram() == term
     assert f.delay(2).to_hypergraph() == f.to_hypergraph().delay(2)
     assert Equation((f >> f).head, Head(f >> f >> Id(x)))
+
+
+def test_up_to_streams_tells_apart_what_the_laws_identify():
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    f, g = Box('f', x, y), Box('g', x, y)
+    fby = Diagram.followed_by
+    assert up_to_streams(f.head @ f.tail.delay() >> fby(y))\
+        == up_to_streams(fby(x) >> f)\
+        != up_to_streams(f.head @ g.tail.delay() >> fby(y))
+    assert up_to_streams(f.head) != up_to_streams(f.tail)
+    assert up_to_streams((f >> Box('h', y, x)).tail)\
+        != up_to_streams(f.tail >> Box('k', y, x).tail)
+

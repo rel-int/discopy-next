@@ -283,6 +283,89 @@ structure FeedbackCategory.Functor (cat : FeedbackCategory Ob Hom) (cat' : Feedb
   map_feedback : ∀ (f : Hom) (n : Nat), map (cat.feedback f n) = cat'.feedback (map f) n
   map_feedbackDomCodMem : ∀ (f : Hom) (X Y Z : Ob), map (cat.feedbackDomCodMem f X Y Z) = cat'.feedbackDomCodMem (map f) (ob X) (ob Y) (ob Z)
 
+/-- `discopy.abc.DataflowCategory`: A dataflow category is a `FeedbackCategory` with two monoidal endofunctors `head` and `tail`, on its objects and its morphisms, and a natural isomorphism `followed_by` from `x.head @ x.tail.delay()` to `x`, see `DiLavoreEtAl22`: a morphism is a process on streams, its head the first step and its tail the steps after it, which the followed-by, the `fby` of Lucid, puts back together. -/
+structure DataflowCategory (Ob : Type u) (Hom : Type v) extends FeedbackCategory Ob Hom where
+  headOb : Ob → Ob
+  head : Hom → Hom
+  tailOb : Ob → Ob
+  tail : Hom → Hom
+  followed_by : Ob → Hom
+
+/-- The head is a monoidal endofunctor. -/
+def DataflowCategory.head_monoidality (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X Y A B C U V : Ob) (f g h : Hom), cat.dom f = A → cat.cod f = B → cat.dom g = B → cat.cod g = C → cat.dom h = U → cat.cod h = V → (cat.headOb (cat.tensorOb X Y), cat.headOb cat.unitOb, cat.head (cat.id X), cat.head (cat.comp f g), cat.head (cat.tensor f h)) = (cat.tensorOb (cat.headOb X) (cat.headOb Y), cat.unitOb, cat.id (cat.headOb X), cat.comp (cat.head f) (cat.head g), cat.tensor (cat.head f) (cat.head h))
+
+/-- The tail is a monoidal endofunctor. -/
+def DataflowCategory.tail_monoidality (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X Y A B C U V : Ob) (f g h : Hom), cat.dom f = A → cat.cod f = B → cat.dom g = B → cat.cod g = C → cat.dom h = U → cat.cod h = V → (cat.tailOb (cat.tensorOb X Y), cat.tailOb cat.unitOb, cat.tail (cat.id X), cat.tail (cat.comp f g), cat.tail (cat.tensor f h)) = (cat.tensorOb (cat.tailOb X) (cat.tailOb Y), cat.unitOb, cat.id (cat.tailOb X), cat.comp (cat.tail f) (cat.tail g), cat.tensor (cat.tail f) (cat.tail h))
+
+/-- `H∘H = H`: the head of a head is itself. -/
+def DataflowCategory.head_idempotence (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → (cat.headOb (cat.headOb X), cat.head (cat.head f)) = (cat.headOb X, cat.head f)
+
+/-- `T∘H = 1`: a head is over after its first step. -/
+def DataflowCategory.tail_of_head (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → (cat.tailOb (cat.headOb X), cat.tail (cat.head f)) = (cat.unitOb, cat.id cat.unitOb)
+
+/-- `H∘D = 1`: a delay does nothing at its first step. -/
+def DataflowCategory.head_of_delay (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → (cat.headOb (cat.dom (cat.delay (cat.id X) 1)), cat.head (cat.delay f 1)) = (cat.unitOb, cat.id cat.unitOb)
+
+/-- `T∘D = Id`: after its first step, a delay is what it delays. -/
+def DataflowCategory.tail_of_delay (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → (cat.tailOb (cat.dom (cat.delay (cat.id X) 1)), cat.tail (cat.delay f 1)) = (X, f)
+
+/-- The followed-by is natural: a morphism is its head then tail. -/
+def DataflowCategory.followed_by_naturality (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.comp (cat.tensor (cat.head f) (cat.delay (cat.tail f) 1)) (cat.followed_by (cat.cod f)) = cat.comp (cat.followed_by (cat.dom f)) f
+
+/-- The followed-by of a delay is its identity, its domain being the unit followed by the delay. -/
+def DataflowCategory.followed_by_delay (cat : DataflowCategory Ob Hom) : Prop :=
+  ∀ (X : Ob), cat.followed_by (cat.dom (cat.delay (cat.id X) 1)) = cat.id (cat.dom (cat.delay (cat.id X) 1))
+
+/-- The laws of `DataflowCategory`. -/
+structure DataflowCategory.Laws (cat : DataflowCategory Ob Hom) : Prop extends toFeedbackCategory : FeedbackCategory.Laws cat.toFeedbackCategory where
+  head_monoidality : cat.head_monoidality
+  tail_monoidality : cat.tail_monoidality
+  head_idempotence : cat.head_idempotence
+  tail_of_head : cat.tail_of_head
+  head_of_delay : cat.head_of_delay
+  tail_of_delay : cat.tail_of_delay
+  followed_by_naturality : cat.followed_by_naturality
+  followed_by_delay : cat.followed_by_delay
+
+/-- A functor of `DataflowCategory`: it preserves each of its operations. -/
+structure DataflowCategory.Functor (cat : DataflowCategory Ob Hom) (cat' : DataflowCategory Ob' Hom') extends toFeedbackCategory : FeedbackCategory.Functor cat.toFeedbackCategory cat'.toFeedbackCategory where
+  ob_headOb : ∀ (X : Ob), ob (cat.headOb X) = cat'.headOb (ob X)
+  map_head : ∀ (f : Hom), map (cat.head f) = cat'.head (map f)
+  ob_tailOb : ∀ (X : Ob), ob (cat.tailOb X) = cat'.tailOb (ob X)
+  map_tail : ∀ (f : Hom), map (cat.tail f) = cat'.tail (map f)
+  map_followed_by : ∀ (X : Ob), map (cat.followed_by X) = cat'.followed_by (ob X)
+
+/-- `discopy.abc.DaggerDataflowCategory`: A dagger dataflow category is a `DaggerCategory` and a `DataflowCategory` whose head and tail commute with the dagger, and whose followed-by is unitary, i.e. its dagger is its inverse. -/
+structure DaggerDataflowCategory (Ob : Type u) (Hom : Type v) extends DaggerCategory Ob Hom, DataflowCategory Ob Hom where
+
+/-- The head commutes with the dagger. -/
+def DaggerDataflowCategory.head_dagger (cat : DaggerDataflowCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.dagger (cat.head f) = cat.head (cat.dagger f)
+
+/-- The tail commutes with the dagger. -/
+def DaggerDataflowCategory.tail_dagger (cat : DaggerDataflowCategory Ob Hom) : Prop :=
+  ∀ (A B : Ob) (f : Hom), cat.dom f = A → cat.cod f = B → cat.dagger (cat.tail f) = cat.tail (cat.dagger f)
+
+/-- The dagger of the followed-by is its inverse, in both orders. -/
+def DaggerDataflowCategory.followed_by_unitarity (cat : DaggerDataflowCategory Ob Hom) : Prop :=
+  ∀ (X : Ob), (cat.comp (cat.followed_by X) (cat.dagger (cat.followed_by X)), cat.comp (cat.dagger (cat.followed_by X)) (cat.followed_by X)) = (cat.id (cat.dom (cat.followed_by X)), cat.id X)
+
+/-- The laws of `DaggerDataflowCategory`. -/
+structure DaggerDataflowCategory.Laws (cat : DaggerDataflowCategory Ob Hom) : Prop extends toDaggerCategory : DaggerCategory.Laws cat.toDaggerCategory, toDataflowCategory : DataflowCategory.Laws cat.toDataflowCategory where
+  head_dagger : cat.head_dagger
+  tail_dagger : cat.tail_dagger
+  followed_by_unitarity : cat.followed_by_unitarity
+
+/-- A functor of `DaggerDataflowCategory`: it preserves each of its operations. -/
+structure DaggerDataflowCategory.Functor (cat : DaggerDataflowCategory Ob Hom) (cat' : DaggerDataflowCategory Ob' Hom') extends toDaggerCategory : DaggerCategory.Functor cat.toDaggerCategory cat'.toDaggerCategory, toDataflowCategory : DataflowCategory.Functor cat.toDataflowCategory cat'.toDataflowCategory where
+
 /-- `discopy.abc.ResiduatedMonoid`: A monoid is residuated when it comes with methods `over` and `under` with syntactic sugar `<<` and `>>`. -/
 structure ResiduatedMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
   over : Hom → Hom → Hom

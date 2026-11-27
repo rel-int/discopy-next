@@ -834,8 +834,15 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
 
     @classmethod
     def copy(cls, dom: Ty, n: int = 2) -> Stream:
-        """ Construct a stream of diagonal morphisms. """
-        now, cod = cls.category.copy(dom.now, n), dom ** n
+        """
+        Construct a stream of diagonal morphisms, a discard when ``n == 0``.
+
+        >>> from discopy.markov import Diagram
+        >>> x = Ty.sequence('x')
+        >>> assert steps(Stream[Diagram].copy(x, 0).cod) == steps(Ty())
+        """
+        now = cls.category.copy(dom.now, n)
+        cod = dom ** n if n else type(dom)()
         _later = None if dom.is_constant else lambda: cls.copy(dom.later, n)
         return cls(now, dom, cod,
                    _later=_later)

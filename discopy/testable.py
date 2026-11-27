@@ -53,6 +53,8 @@ Summary
     L
     R
     Delay
+    Head
+    Tail
     Bang
     Reflexive
     Over
@@ -525,6 +527,28 @@ class Delay[Coarse, Object](Constructor):
     def form(*args):
         category, obj = args
         return category.id(obj).delay().dom
+
+
+class Head[Object](Constructor):
+    """
+    The head of an object in a signature, ``x.head``, see
+    :class:`~discopy.abc.DataflowCategory`.
+
+    >>> from discopy.dataflow.symmetric import Ty
+    >>> assert Head[Ty('x')] == Ty('x').head
+    """
+    @staticmethod
+    def form(*args):
+        obj, = args
+        return obj.head
+
+
+class Tail[Object](Constructor):
+    """ The tail of an object in a signature, ``x.tail``. """
+    @staticmethod
+    def form(*args):
+        obj, = args
+        return obj.tail
 
 
 class Bang[Coarse, Object](Constructor):

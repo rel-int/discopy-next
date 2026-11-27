@@ -29,6 +29,13 @@ Dataflow Programming" (Di Lavore et al. 2022), with `discopy.stream` as their se
   `to_hypergraph` and `Equation` go through: `dataflow.symmetric.Hypergraph`, the
   `hypergraph_factory` of both levels, has the head and the tail of the diagram it decodes to as
   boxes, the followed-by as a box and a delay of each box and spider.
+- Their laws are `abc.DataflowCategory` and `abc.DaggerDataflowCategory`, stated once as on
+  every other structure: head and tail are monoidal endofunctors, `H∘H = H`, `T∘H = 1`,
+  `H∘D = 1` and `T∘D = Id` are equations of functors checked on an object and a morphism at once,
+  and the followed-by is natural, unitary and the identity on a delay. The free dataflow diagrams
+  satisfy them up to their streams, on the diagrams of the symmetric rules: in a symmetric
+  category the head of a feedback has no stream, as the memory its first step writes cannot be
+  discarded.
 - No other level has them, and `feedback` and `dataflow` keep the same direction of import as
   `feedback` and the plain levels: `dataflow` imports `feedback`, never the converse.
 
