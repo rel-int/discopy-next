@@ -289,7 +289,7 @@ In the free monoid-enriched category, arrows are formal sums of parallel arrows.
 This is implemented by a class `Sum` with an attribute `terms: tuple[Arrow, ...]` and optional attributes `dom` and `cod`.
 
 ```python {.marimo}
-from discopy.sum import Sum
+from discopy.cat import Sum
 
 assert f + f + f == Sum(terms=(f, f, f))
 assert Arrow.zero(x, y) == Sum((), dom=x, cod=y)
@@ -307,7 +307,7 @@ assert f >> (g + g_) == (f >> g) + (f >> g_)
 Sometimes we want to implement a process-valued operator which cannot be expressed in terms of sequential composition.
 For reasons that will become clear in the next section, we call such unary operators on homsets **bubbles**.
 The free category with bubbles can be defined by induction over the level of nesting, i.e. an $(n + 1)$-nested bubble is a box which takes an arrow with $n$-nested bubbles as argument.
-This is implemented by the class `Bubble`, a subclass of `Box` with an attribute `arg: Arrow` and optional arguments `dom` and `cod`.
+This is implemented by `Box` itself: a box is an operation symbol with a tuple of arrows `args`, a generator being a box with none, and `f.bubble(dom=..., cod=...)` is the box with `args=(f, )`.
 
 Examples include the exponential of square matrices (used e.g. in the [Schrödinger equation](https://en.wikipedia.org/wiki/Schr%C3%B6dinger_equation)) and the element-wise application of a non-linear operator (used e.g. as [activation function](https://en.wikipedia.org/wiki/Activation_function) in neural networks).
 Another example is the gradient of a parameterised matrix, check out the [diagrammatic differentiation](../../notebooks/diag-diff.html) notebook!
@@ -317,8 +317,6 @@ Formulae are evaluated by applying a functor into the category of finite sets an
 For example, here is an implementation of **system alpha**, a notation for propositional logic where atoms are given by boxes $P : x \to x$ and conjunction is given by sequential composition.
 
 ```python {.marimo}
-from discopy.cat import Bubble
-
 Mat_B = Matrix[bool]
 
 @factory
@@ -336,8 +334,14 @@ class Atom(Box, Formula):
     def __init__(self, name):
         Box.__init__(self, name, x, x)
 
-class Cut(Bubble, Formula):
-    """ A Cut is a Bubble in a Formula. """
+class Cut(Box, Formula):
+    """ A Cut is a Box in a Formula with one arg, i.e. a bubble. """
+    serialised_attrs = ("*args", )
+
+    def __init__(self, arg, dom=None, cod=None, **params):
+        Box.__init__(
+            self, "", arg.dom if dom is None else dom,
+            arg.cod if cod is None else cod, args=(arg, ), **params)
 
 class Valuation(Functor):
     """ A Valuation is a Functor into Boolean matrices

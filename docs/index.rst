@@ -15,10 +15,11 @@ DisCoPy documentation
 
     api/syntax
     api/semantics
-    api/neural
-    api/quantum
-    api/optyx
+    api/drawing
     api/lambek
+    api/neural
+    api/optyx
+    api/quantum
 
 .. toctree::
     :caption: What is a diagram?
@@ -44,18 +45,14 @@ DisCoPy documentation
     :hidden:
 
     notebooks/optyx/what_is_a_channel
+    notebooks/optyx/readme_example
     notebooks/optyx/fixpoints
     notebooks/optyx/feed_forward_example
     notebooks/optyx/linear_logic
-    notebooks/optyx/compile_to_semm
-    notebooks/optyx/optyx-vqe-experiment
-    notebooks/optyx/bosonic-vqe-2
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
-    notebooks/optyx/strict_sloppy
     notebooks/optyx/zw_examples
     notebooks/optyx/bose_hubbard
-    notebooks/optyx/Compiler
     notebooks/optyx/distributed-412-code
     notebooks/optyx/distributed-422-code
 
@@ -66,6 +63,7 @@ DisCoPy documentation
     notebooks/21-05-03-tallcat
     notebooks/higher-order-discocat
     notebooks/parsing-arithmetic
+    notebooks/strict_sloppy
 
 .. toctree::
     :caption: Machine learning notebooks
@@ -75,6 +73,7 @@ DisCoPy documentation
     notebooks/neural-church
     notebooks/diag-diff
     notebooks/learning-intertwiners
+    notebooks/constraint-satisfaction
 
 .. toctree::
     :caption: Extra

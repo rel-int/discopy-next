@@ -22,7 +22,6 @@ Summary
     Coeval
     Curry
     Sum
-    Bubble
     Functor
     CMap
     TermBase
@@ -93,7 +92,6 @@ from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
-from discopy import sum as formal_sum
 from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
@@ -328,7 +326,20 @@ class Exp(Wire):
         return hash(repr(self))
 
     def __str__(self):
-        return f"({self.base} ** {self.exponent})"
+        return self.show(self.base, self.exponent)
+
+    def show(self, base, exponent) -> str:
+        """ The print of an exponential, given that of its base and exponent.
+        """
+        return f"({base} ** {exponent})"
+
+    @property
+    def drawing_name(self) -> str:
+        """
+        The label of an exponential wire, made of the labels of its base and
+        exponent, e.g. ``(!x >> y)`` rather than ``(x.bang() >> y)``.
+        """
+        return self.show(self.base.to_drawing(), self.exponent.to_drawing())
 
     def atoms(self) -> list:
         """ The atoms of an exponential: those of its base and exponent. """
@@ -364,8 +375,8 @@ class Over(Exp):
         base : The base type.
         exponent : The exponent type.
     """
-    def __str__(self):
-        return f"({self.base} << {self.exponent})"
+    def show(self, base, exponent) -> str:
+        return f"({base} << {exponent})"
 
 
 class Under(Exp):
@@ -376,8 +387,8 @@ class Under(Exp):
         base : The base type.
         exponent : The exponent type.
     """
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
 
 
 @factory
@@ -439,7 +450,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         """
         Bend curry bubbles into coevaluation and feedback, which lands in
         :class:`CMap` as a biclosed category has no trace, see
-        :meth:`discopy.cmap.CMap.to_compact`.
+        :meth:`~discopy.cmap.CMap.to_compact`.
 
         Example
         -------
@@ -604,7 +615,7 @@ class Coeval(Box):
         return self.eval_factory(self.x, self.left)
 
 
-class Curry(monoidal.Bubble, Box):
+class Curry(Box):
     """
     The currying of a biclosed diagram.
 
@@ -631,9 +642,8 @@ class Curry(monoidal.Bubble, Box):
             cod = arg.cod << arg.dom[len(arg.dom) - n:]
         else:
             dom, cod = arg.dom[n:], arg.dom[:n] >> arg.cod
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, drawing_name="$\\Lambda$")
-        Box.__init__(self, name, dom, cod)
+        Box.__init__(self, name, dom, cod, args=(arg, ),
+                     drawing_name="$\\Lambda$")
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.arg!r}, " \
@@ -675,20 +685,14 @@ class Curry(monoidal.Bubble, Box):
         raise AxiomError(messages.CURRY_HAS_NO_DAGGER)
 
 
-class Sum(formal_sum.Sum, Box):
+class Sum(monoidal.Sum, Box):
     """
-    A biclosed sum is a :class:`sum.Sum <discopy.sum.Sum>` and a biclosed box.
+    A biclosed sum is a monoidal sum and a biclosed box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
-    """
-
-
-class Bubble(monoidal.Bubble, Box):
-    """
-    A biclosed bubble is a monoidal bubble and a biclosed box.
     """
 
 
@@ -698,7 +702,6 @@ Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
 
 
 class Functor(monoidal.Functor):
@@ -724,7 +727,7 @@ class Functor(monoidal.Functor):
     >>> assert F(f(x)) == F(f)(F(x))
 
     A :class:`CMap` has no terms, so a term is evaluated into it. Nor has a
-    :class:`discopy.hypergraph.Hypergraph`, nor even :meth:`Diagram.ev`, so a
+    :class:`~discopy.hypergraph.Hypergraph`, nor even :meth:`Diagram.ev`, so a
     term is sent there as the image of its diagram:
 
     >>> assert f(x).to_hypergraph() == f(x).eval().to_hypergraph()
@@ -860,7 +863,7 @@ class Normalising(Testable):
     """
     The laws of beta reduction, for terms with a ``normal_form`` reached by
     each of their :attr:`reduction_strategies`, e.g.
-    :class:`discopy.closed.TermBase`.
+    :class:`~discopy.closed.TermBase`.
     """
     reduction_strategies: ClassVar[tuple] = ()
 
@@ -891,7 +894,7 @@ class Normalising(Testable):
 class TermBase(Box, AlphaEquivalence):
     """
     A term in the internal language of biclosed categories, an
-    :class:`discopy.testable.Equivalence` up to the names of its bound
+    :class:`~discopy.testable.Equivalence` up to the names of its bound
     variables, see :meth:`alpha_eq`.
 
     Attributes:
@@ -1127,29 +1130,32 @@ class Variable(TermBase):
 
 class Application(TermBase):
     """
-    The application either ``func(args)`` of a term ``func`` of type ``Y << X``
-    to a term ``args`` of type ``X`` or ``args(func, left=True)`` of a term
-    ``args`` of type ``X`` fed as input to a term ``func`` of type ``X >> Y``.
+    The application either ``function(argument)`` of a term ``function`` of
+    type ``Y << X`` to a term ``argument`` of type ``X`` or
+    ``argument(function, left=True)`` of a term ``argument`` of type ``X`` fed
+    as input to a term ``function`` of type ``X >> Y``.
 
     Attributes:
-        func (Term): The function being applied.
-        args (Term): The arguments to which the function is applied.
+        function (Term): The function being applied.
+        argument (Term): The argument to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
-    serialised_attrs = ("func", "args", "left")
+    serialised_attrs = ("function", "argument", "left")
 
-    def __init__(self, func: TermBase, args: TermBase, left: bool = False):
-        assert_isinstance(func, TermBase)
-        assert_isinstance(args, TermBase)
-        if not func.cod.is_exp:
-            raise TypeError(messages.NOT_EXPONENTIAL.format(func, func.cod))
-        self.func, self.args, self.left = func, args, left
-        if self.func.cod.exponent != self.args.cod:
+    def __init__(
+            self, function: TermBase, argument: TermBase, left: bool = False):
+        assert_isinstance(function, TermBase)
+        assert_isinstance(argument, TermBase)
+        if not function.cod.is_exp:
+            raise TypeError(
+                messages.NOT_EXPONENTIAL.format(function, function.cod))
+        self.function, self.argument, self.left = function, argument, left
+        if function.cod.exponent != argument.cod:
             raise ValueError(
-                f"Expected {self.func.cod.exponent}, got {self.args.cod}")
-        cod, fname, xname = func.cod.base, str(func), str(args)
+                f"Expected {function.cod.exponent}, got {argument.cod}")
+        cod, fname, xname = function.cod.base, str(function), str(argument)
         name = f"{xname}({fname}, left=True)" if left else f"{fname}({xname})"
-        dom = self.__check_dom__(func, args, left)
+        dom = self.__check_dom__(function, argument, left)
         super().__init__(name, dom, cod)
 
     def __check_dom__(self, func, args, left):
@@ -1162,31 +1168,42 @@ class Application(TermBase):
 
     def eval(self, functor=None):
         functor = functor or self.functor
-        func = self.func.eval(functor=functor)
-        args = self.args.eval(functor=functor)
-        base, exponent = self.func.cod.base, self.func.cod.exponent
+        func = self.function.eval(functor=functor)
+        args = self.argument.eval(functor=functor)
+        base, exponent = self.function.cod.base, self.function.cod.exponent
         ev = functor.cod.ev(
             functor(base), functor(exponent), left=not self.left)
         return args @ func >> ev if self.left else func @ args >> ev
 
     def map(self, functor, context):
         return functor.cod.ob.application_factory(
-            functor.map_term(self.func, context),
-            functor.map_term(self.args, context), self.left)
+            functor.map_term(self.function, context),
+            functor.map_term(self.argument, context), self.left)
 
     def __repr__(self):
-        func, args = repr(self.func), repr(self.args)
+        func, arg = repr(self.function), repr(self.argument)
         left = ", left=True" if self.left else ""
-        return factory_name(type(self)) + f"({func}, {args}{left})"
+        return factory_name(type(self)) + f"({func}, {arg}{left})"
 
     def to_tree(self):
-        return dict(factory=factory_name(type(self)), func=self.func.to_tree(),
-                    args=self.args.to_tree(), left=self.left)
+        return dict(factory=factory_name(type(self)),
+                    function=self.function.to_tree(),
+                    argument=self.argument.to_tree(), left=self.left)
+
+    @staticmethod
+    def subtrees(tree):
+        """
+        The trees of the function and the argument of an application, read
+        from the keys ``func`` and ``args`` of a tree from before they were
+        spelled out.
+        """
+        return tuple(map(from_tree, (
+            tree.get('function', tree.get('func')),
+            tree.get('argument', tree.get('args')))))
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])),
-                   left=tree['left'])
+        return cls(*cls.subtrees(tree), left=tree['left'])
 
     def setoid(self):
         """
@@ -1194,26 +1211,26 @@ class Application(TermBase):
         are, rather than when they print the same between the same types:
         a closed constant prints as its bare name, whatever its type.
         """
-        return factory_key(type(self)), self.func, self.args, self.left
+        return factory_key(type(self)), self.function, self.argument, self.left
 
     @property
     def constants(self):
-        return self.args.constants + self.func.constants if self.left\
-            else self.func.constants + self.args.constants
+        return self.argument.constants + self.function.constants if self.left\
+            else self.function.constants + self.argument.constants
 
     def atoms(self) -> list:
         """ The atoms of an application: those of its function and args. """
-        return self.func.atoms() + self.args.atoms()
+        return self.function.atoms() + self.argument.atoms()
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications on one side, functions and arguments alike. """
         if any(type(other) is not type(self) or other.left != self.left
                for other in others):
             return False
-        return self.func.alpha_eq_under(
-            scopes, [other.func for other in others], depth)\
-            and self.args.alpha_eq_under(
-                scopes, [other.args for other in others], depth)
+        return self.function.alpha_eq_under(
+            scopes, [other.function for other in others], depth)\
+            and self.argument.alpha_eq_under(
+                scopes, [other.argument for other in others], depth)
 
 
 class Abstraction(TermBase):
@@ -1338,7 +1355,7 @@ class Sampler:
         counter : The numbers of the free variables and constants built.
         linear : Whether each bound variable occurs exactly once, in the
             order of the binders, as :mod:`biclosed` requires; a term of
-            :mod:`discopy.closed` may use one any number of times.
+            :mod:`~discopy.closed` may use one any number of times.
         constants : Whether a leaf or the head of a spine may be a
             constant, else a free variable, so that beta reduction reads a
             variable at every head, see :class:`Reducible`.
@@ -1539,7 +1556,7 @@ class Equation(monoidal.Equation):
 class AlphaEquation(cat.AlphaEquation, Equation):
     """
     An :class:`Equation` between terms which holds when they are
-    alpha-equivalent, see :meth:`discopy.cat.AlphaEquivalence.alpha_eq`.
+    alpha-equivalent, see :meth:`~discopy.cat.AlphaEquivalence.alpha_eq`.
 
     Example
     -------
@@ -1553,3 +1570,6 @@ class AlphaEquation(cat.AlphaEquation, Equation):
 TermBase.equivalence_factory = AlphaEquation
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+
+
+Bubble = Box.from_args

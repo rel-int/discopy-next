@@ -4,8 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-  - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,10 +11,9 @@ permissions:
   actions: read
 
 # Supersede a pull request's own runs, but let every commit on main keep the
-# run that proves it green: a main run is where the suite searches new
-# ground, and cancelling it throws that search away. A schedule and a
-# dispatch get a group each, since they share a commit with the push that
-# made it and would otherwise queue behind it.
+# run that proves it green and writes the baseline the next run compares
+# against. A dispatch gets a group of its own, since it shares a commit with
+# the push that made it and would otherwise queue behind it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
     || github.event_name == 'push' && github.sha || github.run_id }}
@@ -27,13 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # A pull request replays what the database remembers and generates a
-      # few examples on top, from a fixed seed so that a run draws the same
-      # examples every time; every other run searches new ground.
-      HYPOTHESIS_PROFILE: >-
-        ${{ github.event_name == 'pull_request' && 'pr' || 'explore' }}
-      PYTEST_ADDOPTS: >-
-        ${{ github.event_name == 'pull_request' && '--hypothesis-seed=0' || '' }}
+      # Every run replays what the database remembers and generates the few
+      # examples of a pull request on top, from a fixed seed so that a run
+      # draws the same examples every time. `explore`'s thousand examples on
+      # every cell of the matrix is some 33 hours, so no run searches deeper
+      # until the strategies draw better terms for less.
+      HYPOTHESIS_PROFILE: pr
+      PYTEST_ADDOPTS: --hypothesis-seed=0
       # The repository whose example database the `shared` profile replays:
       # this one, which uploads it below, rather than the default upstream.
       HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
@@ -76,7 +73,7 @@ jobs:
         if_no_artifact_found: warn
     - name: Run property tests
       run:
-        uv run pytest proptest/ -n auto -p no:benchmark -vrxX
+        uv run pytest proptest/ -n logical -p no:benchmark -vrxX
         --hypothesis-show-statistics
         --proptest-baseline=baseline/proptest-report.json
         --proptest-report=report/proptest-report.json

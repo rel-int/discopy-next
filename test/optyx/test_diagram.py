@@ -225,3 +225,49 @@ def test_a_wire_bends_through_the_spider_with_two_legs():
             snake.to_tensor().eval().array.reshape(2, 2), np.eye(2))
     with pytest.raises(AxiomError, match="not adjoints"):
         Diagram.cups(mode, bit)
+
+
+DIAGRAM_BOXES = [
+    Box("f", bit, mode),
+    Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2) * 1j),
+    Box("f", bit, bit @ bit,
+        array=np.arange(8).reshape(2, 2, 2) * 1j).dagger(),
+    Box("h", bit, bit, array=np.eye(2), is_dagger=None),
+    DualRail(),
+    DualRail(is_dagger=True, internal_state=[1, 0]),
+    EmbeddingTensor(2, 4),
+    EmbeddingTensor(1, 3),
+    Permutation(mode ** 3, [1, 2, 0]),
+    PhotonThresholdDetector(),
+    PhotonThresholdDetector(is_dagger=True),
+    Scalar(0.5 + 1j),
+    Scalar(x),
+    Spider(1, 2, mode),
+    Spider(1, 2, bit, 0.25, is_dagger=True),
+    Swap(mode, bit),
+    Swap(mode, mode).feedback(state=Spider(0, 1, mode)),
+    Scalar(1) + Scalar(2),
+]
+
+
+def test_a_mode_loads_an_outdated_tree():
+    assert Mode.from_tree({"objects": [{}, {}]}) == Mode(2)
+
+
+def test_a_box_writes_the_tree_of_a_tensor_with_a_gradient():
+    torch = pytest.importorskip("torch")
+    box = Box("f", bit, bit, array=torch.eye(2, requires_grad=True))
+    assert box.to_tree()["array"] == [[1.0, 0.0], [0.0, 1.0]]
+
+
+@pytest.mark.parametrize("box", DIAGRAM_BOXES, ids=repr)
+def test_a_diagram_box_loads_its_own_tree(box):
+    from discopy.utils import dumps, loads
+    loaded = loads(dumps(box))
+    assert loaded == box
+    assert loaded.to_tree() == box.to_tree()
+    assert loaded.is_dagger is box.is_dagger
+    if getattr(box, "array", None) is not None:
+        assert np.array_equal(loaded.array, box.array)
+    if isinstance(box, Diagram):
+        assert loads(dumps(box @ box)) == box @ box

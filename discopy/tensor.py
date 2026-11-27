@@ -23,7 +23,7 @@ Summary
     Cap
     Spider
     Sum
-    Bubble
+    Elementwise
     Diff
     Equation
 
@@ -53,7 +53,7 @@ from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, feedback, frobenius, cmap, config, hypergraph,
+    cat, monoidal, rigid, frobenius, cmap, config, hypergraph,
     messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
@@ -553,7 +553,7 @@ class Functor(frobenius.Functor):
     def to_tree(self) -> dict:
         """
         Serialise a tensor functor, its dtype in the name of its codomain,
-        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        see :meth:`~discopy.cat.Functor.to_tree`, unless it has ``params``
         or a ``contractor``.
 
         >>> from discopy.utils import dumps, loads
@@ -608,14 +608,14 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ...     == F(frobenius.Id(n @ n) >> cup)
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
 
-        A hypergraph of :mod:`discopy.frobenius` is contracted as it
+        A hypergraph of :mod:`~discopy.frobenius` is contracted as it
         stands, see :meth:`spider_operands`, any other through its diagram,
         see :meth:`operands`.
 
         >>> graph = (g >> frobenius.Spider(1, 2, n)).to_hypergraph()
         >>> assert F(graph) == F(graph.to_diagram())
         """
-        if isinstance(other, Bubble):
+        if isinstance(other, Elementwise):
             return self(other.arg).map(other.func, self.dtype)
         if isinstance(other, (rigid.Cup, rigid.Cap))\
                 and other.left == other.right:
@@ -810,10 +810,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ``config.MAX_EINSUM_INDICES`` indices are contracted with
         :class:`OptEinsum` instead.
 
-        A spider of a hypergraph is an index on any number of arrays, so
-        NumPy's default bound on intermediates, the size of the largest
+        An intermediate of a network can exceed its largest input tensor,
+        so NumPy's default bound on intermediates, the size of the largest
         operand, can forbid every pairwise step and leave one naive sum
-        over all the indices: a hypergraph lifts it for the ``"greedy"``
+        over all the indices: this bound is lifted for the ``"greedy"``
         path, not for ``"optimal"``, whose search it would let explode.
 
         Parameters:
@@ -839,9 +839,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         params = dict(self.params, optimize=self.optimize)\
             if isinstance(contractor, (NumPy, JAX, Contractor))\
             else self.params
-        if isinstance(other, hypergraph.Hypergraph)\
-                and isinstance(contractor, NumPy)\
-                and self.optimize in ("greedy", True):
+        if isinstance(contractor, NumPy) and self.optimize in ("greedy", True):
             params['optimize'] = ("greedy", sys.maxsize)
         array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
@@ -878,8 +876,14 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
     permutation_factory: ClassVar[type["Permutation"]]
     cup_factory: ClassVar[type["Cup"]]
     cap_factory: ClassVar[type["Cap"]]
-    bubble_factory: ClassVar[type["Bubble"]]
     ob = Dim
+
+    def bubble(self, *args, **params) -> Elementwise:
+        """
+        The :class:`Elementwise` box of a tensor diagram, the bubble of this
+        category: a tensor box with args applies a function elementwise.
+        """
+        return self.elementwise_factory(self, *args, **params)
 
     def __class_getitem__(cls, values):
         """ The dtype of a tensor, or the type parameter that declares a
@@ -942,7 +946,7 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         boxes = list(self.boxes) if dtype is None else []
         for box in boxes:
             inside = box.terms if isinstance(box, Sum)\
-                else (box.arg, ) if isinstance(box, Bubble) else ()
+                else box.args
             boxes += [b for diagram in inside for b in diagram.boxes]
         typed = [Matrix[box.dtype].zero(0, 0)
                  for box in boxes if box.dtype is not None]
@@ -1158,11 +1162,11 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         part the pair of its parts, so that a box holding nan equals itself
         and its hash is stable: the data labels a generator, it is not a
         number being compared. The winding number ``z`` is compared too, as
-        in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
-        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
-        :func:`discopy.utils.factory_name`, a class object hashing as its
-        address and a backend's descriptor, e.g. ``torch.float64``, being no
-        class at all.
+        in :meth:`rigid.Box.setoid <discopy.rigid.Box.setoid>`, and the time
+        step, as in :meth:`feedback.Box.setoid <discopy.feedback.Box.setoid>`.
+        The ``dtype`` is compared by its :func:`~discopy.utils.factory_name`,
+        a class object hashing as its address and a backend's descriptor,
+        e.g. ``torch.float64``, being no class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1293,7 +1297,7 @@ class Spider[dtype](frobenius.Spider, Box[dtype]):
 class Sum[dtype](frobenius.Sum, Box[dtype]):
     """
     A formal sum of tensor diagrams with the same domain and codomain, a
-    frobenius sum with the flags of a :class:`discopy.markov.Sum`.
+    frobenius sum with the flags of a :class:`~discopy.markov.Sum`.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
@@ -1325,15 +1329,17 @@ def func_repr(func: Callable) -> str:
         else f"{func.__module__}.{name}".removeprefix("builtins.")
 
 
-class Bubble(feedback.Bubble, Box):
+class Elementwise(Box):
     """
-    Bubble in a tensor diagram, applies a function elementwise. It is a
-    feedback bubble, so that a circuit bubble delays as one.
+    A tensor box with one arg that applies a function elementwise to the
+    tensor of its arg, which :meth:`Diagram.bubble` builds. It delays as a
+    feedback box with args does, so that a circuit one delays as one. A
+    plain tensor :class:`Box` carries no function.
 
     Parameters
     ----------
-    inside : tensor.Diagram
-        The diagram inside the bubble.
+    arg : tensor.Diagram
+        The diagram inside the box.
     func : callable
         The function to apply, default is :code:`lambda x: int(not x)`.
         A named function prints as its import path, e.g. :code:`abs` or
@@ -1371,42 +1377,71 @@ class Bubble(feedback.Bubble, Box):
     .. image:: /_static/tensor/product-rule.svg
         :align: center
     """
-    serialised_attrs = feedback.Bubble.serialised_attrs + ("func", )
+    serialised_attrs = (
+        "*args", "dom", "cod", "name", "is_dagger", "data", "drawing_name",
+        "draw_as_frame", "draw_as_square", "draw_vertically", "z",
+        "is_deterministic", "is_affine", "time_step", "func")
     func = staticmethod(lambda x: int(not x))
 
     def __new__(cls, *args, data=None, **kwargs):
         return super().__new__(cls, data=data)
 
-    def __init__(self, inside, func=None, **params):
+    def __init__(self, arg=None, dom=None, cod=None, name="", func=None,
+                 time_step=0, **params):
+        arg = params.pop("args", (arg, ))[0] if arg is None else arg
         if func is not None:
             self.func = func
-        super().__init__(inside, **params)
+        dom, cod = (
+            given if given is not None
+            else getattr(arg, attr).delay(time_step)
+            for attr, given in [("dom", dom), ("cod", cod)])
+        params.pop("method", None)
+        params.pop("args", None)
+        Box.__init__(self, name, dom, cod, args=(arg, ),
+                     time_step=time_step, **params)
+
+    @classmethod
+    def from_args(cls, *args, **params) -> Elementwise:
+        return cls(*args, **params)
 
     def setoid(self):
         """
-        Tensor bubbles are equal when their args, methods and funcs are, and
-        they are equal as tensor boxes: their daggers too, and their data by
+        Elementwise boxes are equal when their args and funcs are, and they
+        are equal as tensor boxes: their daggers too, and their data by
         its entries, so that a bubble holding a list hashes as a box does.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
         >>> assert f.bubble(data=np.array([1, 2])) == f.bubble(data=[1, 2])
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
+
+        The func is compared but not hashed, since the hash of a function is
+        its address: equal bubbles keep equal hashes, the same in every
+        interpreter, and two bubbles differing only by their func share one.
+
+        >>> assert f.bubble(func=abs) != f.bubble(func=round)
+        >>> assert hash(f.bubble(func=abs)) == hash(f.bubble(func=round))
         """
         args = tuple(f.setoid() for f in self.args)
-        return (factory_key(type(self)), self.method, self.func)\
+        return (factory_key(type(self)), _Unhashed(self.func))\
             + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
-        if self.func is type(self).func:
-            return super().__repr__()
-        return super().__repr__()[:-1] + f", func={func_repr(self.func)})"
+        kwargs = "" if self.is_id_on_objects else (
+            f", dom={self.dom!r}, cod={self.cod!r}")
+        kwargs += f", name={self.name!r}" if self.name else ""
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        kwargs += "" if data is None else f", data={repr_nonfinite(data)}"
+        kwargs += "" if self.func is type(self).func\
+            else f", func={func_repr(self.func)}"
+        kwargs += f", time_step={self.time_step}" if self.time_step else ""
+        return f"{factory_name(type(self))}({self.arg!r}{kwargs})"
 
     def grad(self, var, **params):
         """
-        The gradient of a bubble is given by the chain rule.
+        The gradient of an elementwise box is given by the chain rule.
 
         >>> from sympy.abc import x  # doctest: +EXTRA
         >>> g = Box('g', Dim(2), Dim(2), [2 * x, 0, 0, x + 1])
@@ -1428,13 +1463,29 @@ class Bubble(feedback.Bubble, Box):
             @ self.arg.grad(var) >> Diagram.spiders(2, 1, self.cod)
 
 
+class _Unhashed:
+    """
+    A component of a setoid compared by equality and left out of the hash,
+    e.g. the func of an :class:`Elementwise`: the hash of a function is its
+    address, which a hash the same in every interpreter cannot hold, see #506.
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        return isinstance(other, _Unhashed) and self.value == other.value
+
+    def __hash__(self):
+        return 0
+
+
 class Diff:
     """
     The derivative with respect to a variable, applied to each entry of a
     tensor by the bubble of :meth:`Box.grad`, an entry with no ``diff``, e.g.
     a number, being a constant. Given a ``func``, it is the derivative of that
     function instead, bound by the variable, as the chain rule of
-    :meth:`Bubble.grad` applies it.
+    :meth:`Elementwise.grad` applies it.
 
     Parameters:
         var : The variable.
@@ -1469,7 +1520,7 @@ class Diff:
             and (self.var, self.func) == (other.var, other.func)
 
     def __hash__(self):
-        return hash((self.var, self.func))
+        return hash(self.var)
 
     def __repr__(self):
         func = "" if self.func is None else f", {func_repr(self.func)}"
@@ -1481,9 +1532,12 @@ Diagram.sum_factory, Diagram.swap_factory = Sum, Swap
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
-Diagram.bubble_factory = Bubble
+Diagram.elementwise_factory = Elementwise
 Id = Diagram.id
 
 
 class Equation(frobenius.Equation):
     """ The :class:`frobenius.Equation` of tensor diagrams. """
+
+
+Bubble = Elementwise.from_args

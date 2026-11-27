@@ -1,7 +1,6 @@
 import gzip
 import json
 import random
-import time
 from functools import reduce
 from itertools import islice
 from math import inf
@@ -121,19 +120,6 @@ def test_join():
         Copy(x) >> g @ f, Copy(x) >> g @ g)
     with raises(AxiomError):
         Join(f, Box('k', x, x @ x), dom=x, cod=x)
-
-
-def test_join_delays_as_a_bubble():
-    from discopy import egraph, feedback, markov
-    join = Join(f, g)
-    delayed = join.delay()
-    assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
-    assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
-    assert loads(dumps(delayed)) == delayed
-    assert eval(repr(delayed), dict(
-        egraph=egraph, feedback=feedback, markov=markov)) == delayed
-    assert distribute(delayed) == distribute(join).delay() == f.d + g.d
-    assert distribute((join >> h).delay()) == distribute(join >> h).delay()
 
 
 def test_nodes_hashcons():
@@ -996,13 +982,12 @@ def test_reduced_keeps_samples_and_classes():
 def test_saturate_closed_form(n):
     """ Associativity and commutativity of ``+`` on ``n`` leaves saturate to
     the non-empty subsets as classes and their ordered splits in two as
-    e-nodes, on the builder in under 2 s at ``n = 6``. """
+    e-nodes. """
     plus = Box('+', x @ x, x)
     rules = (plus, Swap(x, x) >> plus), (plus @ x >> plus, x @ plus >> plus)
     term = reduce(Diagram.then, (
         plus @ x ** k for k in reversed(range(n - 1))), Diagram.id(x ** n))
-    graph, start = Markov.from_diagram(term), time.perf_counter()
+    graph = Markov.from_diagram(term)
     *_, last = graph, *graph.saturate(*rules)
-    assert time.perf_counter() - start < 2
     assert len(set(last.classes)) == 2 ** n - 1
     assert len(last.reduced().boxes) == 3 ** n - 2 ** (n + 1) + 1

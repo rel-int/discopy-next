@@ -3,7 +3,7 @@ Property-based testing of the axioms with `Hypothesis
 <https://hypothesis.readthedocs.io>`_.
 
 An :class:`Axiom` is an equation stated once on an abstract base class of
-:mod:`discopy.abc` and inherited by every category below it, its signature a
+:mod:`~discopy.abc` and inherited by every category below it, its signature a
 sequent: its type parameters are variables, e.g. objects ``A: Obj[C0]``, its
 parameters premises, e.g. a morphism ``f: Hom[C1, A, B]`` from ``A`` to
 ``B``, and its return annotation the type of its output, e.g. an equation
@@ -11,9 +11,9 @@ parameters premises, e.g. a morphism ``f: Hom[C1, A, B]`` from ``A`` to
 :func:`inhabits`. A :class:`Rule` is stated the same way, an operation of
 the structure with a morphism as conclusion:
 the terms of a free category are those its rules derive from boxes, see
-:meth:`discopy.cat.Arrow.search`, and from symmetric categories on also
+:meth:`~discopy.cat.Arrow.search`, and from symmetric categories on also
 those of the combinatorial representation their equations compare by, see
-:meth:`discopy.symmetric.Diagram.strategy`. Every strategy of a free category
+:meth:`~discopy.symmetric.Diagram.strategy`. Every strategy of a free category
 honours any boundary it is asked for.
 
 A law a category breaks is declared :meth:`Declaration.failing` where it
@@ -54,6 +54,7 @@ Summary
     R
     Delay
     Bang
+    Reflexive
     Over
     Under
     Repeat
@@ -282,7 +283,7 @@ class Inequation[T](Equation[T]):
 def quotient(category, term):
     """
     A term up to the equation of its category, i.e. its image under the
-    ``up_to`` of :meth:`discopy.abc.Category.equation_factory`, the term
+    ``up_to`` of :meth:`~discopy.abc.Category.equation_factory`, the term
     itself when the category compares on the nose, so that a construction
     over any category, e.g. a parametric map or a lens, compares its parts
     as that category does.
@@ -533,13 +534,24 @@ class Bang[Coarse, Object](Constructor):
     :class:`Delay` reads the delay, so that a category whose bang is the
     identity reads each object as its own bang.
 
-    >>> from discopy.bang import Ty, Diagram
+    >>> from discopy.linear.monoidal import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
     """
     @staticmethod
     def form(*args):
         category, obj = args
         return category.id(obj).bang().dom
+
+
+class Reflexive[Coarse](Constructor):
+    """
+    The reflexive object of a :class:`~discopy.abc.GoISituation` ``Coarse`` in
+    a signature, i.e. ``Coarse.reflexive()``.
+    """
+    @staticmethod
+    def form(*args):
+        category, = args
+        return category.reflexive()
 
 
 class Over[Base, Exponent](Constructor):
@@ -573,7 +585,7 @@ class Repeat[Object, N](Constructor):
 
 def position(variable: TypeVar, category: type) -> int | None:
     """
-    Which parameter of :meth:`discopy.abc.Category.typeparams` a type
+    Which parameter of :meth:`~discopy.abc.Category.typeparams` a type
     parameter of a class above a category stands for.
 
     The answer is read off the class that defines ``typeparams``. A type
@@ -606,7 +618,7 @@ def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
     ``Hom[C, dom, cod]`` has that boundary, compared by the
-    :meth:`discopy.abc.Category.ob_equation` of ``C``, the value of
+    :meth:`~discopy.abc.Category.ob_equation` of ``C``, the value of
     ``Var[T, x]`` is ``x``, an equation of ``Equation[T]`` has terms of
     type ``T``, as an inequation of ``Inequation[T]`` does, a tuple of
     ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
@@ -650,12 +662,12 @@ class Declaration[**P, T](classmethod):
     :class:`Rule`.
 
     The category is the class the declaration is bound to, e.g.
-    :class:`discopy.cat.Arrow` for those of :class:`discopy.abc.Category`.
+    :class:`~discopy.cat.Arrow` for those of :class:`~discopy.abc.Category`.
     Its function is a classmethod of it, implicitly: its first parameter is
     the category and the others are its arguments, sampled in order. Its
     signature is a sequent: each type parameter is a variable of the sort
     its bound states, ``A: Obj[C0]`` an object, ``X: Atom[C0]`` an atomic
-    one and ``N: Nat`` a number, see :class:`discopy.abc.Nat`, each
+    one and ``N: Nat`` a number, see :class:`~discopy.abc.Nat`, each
     parameter a premise, ``f: Hom[C1, A, B]`` a morphism from ``A`` to
     ``B``, ``x: Var[C0, X]`` the value of an
     object expression and :data:`typing.Self` a term, and the return
@@ -664,7 +676,7 @@ class Declaration[**P, T](classmethod):
     :class:`R`, :class:`Delay`, :class:`Bang`, :class:`Over`, :class:`Under`
     and :class:`Repeat`, which stay expressions until the variables are
     substituted, see :func:`substitute`. The type parameters of the class
-    stating it stand for what :meth:`discopy.abc.Category.typeparams` says,
+    stating it stand for what :meth:`~discopy.abc.Category.typeparams` says,
     see :func:`position`, and the annotations are read as objects, see
     :meth:`annotations`, so that a module stating a law may use ``from
     __future__ import annotations``.
@@ -747,7 +759,15 @@ class Declaration[**P, T](classmethod):
         return f"{factory_name(self.category)}.{self.name}"
 
     def __hash__(self):
-        return hash((self.function, self.category, self.name))
+        """
+        The hash of the name and the category's key, the same in every
+        interpreter: the function is compared but not hashed, and the
+        category is hashed by its :func:`factory_key`, the hash of a function
+        or of a class being its address, see #506.
+        """
+        category = None if self.category is None\
+            else factory_key(self.category)
+        return hash((category, self.name))
 
     def bind(self, category: type[T]) -> Self:
         """ Bind the declaration to a concrete category. """
@@ -836,10 +856,10 @@ class Declaration[**P, T](classmethod):
         """
         Generate the scope and the arguments of the bound declaration: a
         variable of sort ``Obj`` from the strategy of the objects
-        :meth:`discopy.abc.Category.typeparams` names, :obj:`None` for the
+        :meth:`~discopy.abc.Category.typeparams` names, :obj:`None` for the
         single object of a monoid, of sort ``Atom`` from their
         ``generator_strategy`` and of a testable sort, e.g. ``N: Nat``, from
-        its own strategy, see :meth:`discopy.abc.Nat.strategy`, then a premise
+        its own strategy, see :meth:`~discopy.abc.Nat.strategy`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
         and ``params``, a premise ``Var[T, x]`` the value ``x``, a premise
         ``Perm[N]`` a permutation, ``Objs[C0, N]`` that many atomic objects,
@@ -927,8 +947,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``Diagram.yanking = BalancedCategory.yanking.modulo(
-        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
+        ``Diagram.yanking = BalancedTracedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`~discopy.feedback.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -941,7 +961,7 @@ class Axiom[**P, T](Declaration[P, T]):
         category generates with the given parameters, e.g. the rigid
         diagrams of the underlying monoidal category
         ``RigidCategory.dagger_involution.weaken(within=MonoidalCategory)``,
-        see :meth:`discopy.cat.Arrow.search`. Assigned to its own attribute
+        see :meth:`~discopy.cat.Arrow.search`. Assigned to its own attribute
         beside a ``.failing`` declaration, it shows the matrix one expected
         failure and one green cell instead of one blanket expected failure.
         """
@@ -1005,7 +1025,7 @@ class Axiom[**P, T](Declaration[P, T]):
     def draw(self, **params):
         """
         Draw the :meth:`canonical` equation of the law, the parameters those
-        of :meth:`discopy.monoidal.Equation.draw`.
+        of :meth:`~discopy.monoidal.Equation.draw`.
 
         >>> from discopy import rigid
         >>> rigid.Diagram.snake_equations.draw(
@@ -1158,7 +1178,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
     the structure they axiomatise, and says how to generate the terms those
     axioms quantify over with :meth:`strategy`.
 
-    A :class:`discopy.abc.Category` states the laws of a categorical
+    A :class:`~discopy.abc.Category` states the laws of a categorical
     structure, a :class:`Serialisable` those of writing a term down and
     reading it back, which is why the two meet here rather than in either.
     """
@@ -1349,7 +1369,7 @@ class Serialisable[T](Testable[T]):
         term prints the names its own module binds: ``Dim`` in
         ``discopy.tensor`` is the one a tensor is built from. Under both
         come numpy's scalar types whose names ``builtins`` lacks, where
-        :func:`discopy.utils.resolve_factory` reads a ``dtype``, so that
+        :func:`~discopy.utils.resolve_factory` reads a ``dtype``, so that
         ``Tensor[float32]([1.], dom=Dim(1), cod=Dim(1))`` evaluates.
 
         The import is local because the package imports this module.
@@ -1444,7 +1464,7 @@ class Serialisable[T](Testable[T]):
         """
         A term loads back from its pickle, of the same class: the equation
         is between the pairs of a class and a term, since a subscript of a
-        :class:`discopy.utils.NamedGeneric` is part of what a pickle keeps.
+        :class:`~discopy.utils.NamedGeneric` is part of what a pickle keeps.
         """
         loaded = pickle.loads(pickle.dumps(term))
         return Equation((type(loaded), loaded), (type(term), term))

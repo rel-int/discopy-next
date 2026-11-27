@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pytest import raises
 
-from discopy import cat, comarkov, feedback, frobenius, monoidal, op
+from discopy import cat, comarkov, frobenius, monoidal, op
 from discopy.python import additive, finset
 from discopy.comarkov import *
 from discopy.matrix import Matrix
@@ -69,13 +69,12 @@ def test_equations():
 
 def test_repr_and_str():
     x = Ty('x')
-    assert repr(Merge(x, 3)) == "comarkov.Merge(feedback.Ty(feedback.Wire('x')), 3)"
-    assert repr(Noise(x)) == "comarkov.Noise(feedback.Ty(feedback.Wire('x')), 0)"
+    assert repr(Merge(x, 3)) == "comarkov.Merge(monoidal.Ty(monoidal.Wire('x')), 3)"
+    assert repr(Noise(x)) == "comarkov.Noise(monoidal.Ty(monoidal.Wire('x')), 0)"
     assert str(Merge(x)) == "Merge(x)" and str(Noise(x)) == "Merge(x, 0)"
     for box in (Merge(x), Merge(x, 3), Noise(x)):
         assert eval(repr(box), dict(
-            cat=cat, monoidal=monoidal, comarkov=comarkov,
-            feedback=feedback)) == box
+            cat=cat, monoidal=monoidal, comarkov=comarkov)) == box
 
 
 def test_serialisation_and_pickle():
@@ -135,6 +134,8 @@ def test_hypergraph():
 
 
 def test_hypergraph_trace():
+    from discopy.feedback.comarkov import (
+        Box, Equation, Hypergraph, Id, Merge, Trace, Ty)
     x = Ty('x')
     f = Box('f', x @ x, x @ x)
     traced = (Merge(x) @ x >> f).trace()
@@ -176,7 +177,7 @@ def test_Cofunction():
     assert f.cofunc == op.Comarkov(finset.Function([1, 0, 0], 2, 3))
     for box in (f, Merge(x), Swap(x, y)):
         assert eval(repr(box), dict(
-            comarkov=comarkov, feedback=feedback)) == box
+            comarkov=comarkov, monoidal=monoidal)) == box
         assert loads(dumps(box)) == box
 
 

@@ -20,7 +20,6 @@ Summary
     Cup
     Cap
     Sum
-    Bubble
     Functor
     Equation
 
@@ -555,11 +554,11 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         Return a generator which yields normalization steps, yanking snakes
         before it interchanges boxes with
-        :meth:`discopy.monoidal.Diagram.normalize`, whose note says where
+        :meth:`~discopy.monoidal.Diagram.normalize`, whose note says where
         these planar rewrites apply.
 
         Parameters:
-            left : Passed to :meth:`discopy.monoidal.Diagram.normalize`.
+            left : Passed to :meth:`~discopy.monoidal.Diagram.normalize`.
 
         Example
         -------
@@ -574,7 +573,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         g >> f[::-1] >> f >> h
 
         A diagram with more than one box in a layer is split into staircases
-        first, see :meth:`discopy.monoidal.Diagram.to_staircases`, and that
+        first, see :meth:`~discopy.monoidal.Diagram.to_staircases`, and that
         is the first step.
 
         >>> snake = n @ cap >> cup @ n
@@ -798,7 +797,7 @@ class Box(biclosed.Box, Diagram):
     def rotate(self, left=False):
         """
         The rotation of a rigid box, which its dagger keeps, as in a dagger
-        pivotal category, see :meth:`discopy.pivotal.Diagram.conjugate`.
+        pivotal category, see :meth:`~discopy.pivotal.Diagram.conjugate`.
 
         >>> f = Box('f', Ty('a'), Ty('b'))
         >>> assert f.r[::-1] == f[::-1].r and f.r[::-1].z == 1
@@ -851,8 +850,22 @@ class Box(biclosed.Box, Diagram):
         return not self.is_dagger and self.z and bool(self.z % 2)
 
     def to_drawing(self):
+        if self.args and self.z and all(
+                hasattr(arg, "rotate")
+                and type(arg).draw_left_to_right == self.draw_left_to_right
+                for arg in self.args):
+            # A box drawn around its args is turned with them: each one as
+            # many times as the box, and side by side in reverse order when
+            # turned an odd number of times, i.e. half way round.
+            args = self.args[::-1] if self.z % 2 else self.args
+            for _ in range(abs(self.z)):
+                args = tuple(arg.rotate(left=self.z < 0) for arg in args)
+            box = copy.copy(self)
+            box.args = args
+            return super(Box, box).to_drawing()
         result = super().to_drawing()
-        result.is_transpose = self.is_transpose
+        if not self.args:
+            result.is_transpose = self.is_transpose
         return result
 
 
@@ -872,77 +885,6 @@ class Sum(biclosed.Sum, Box):
                 tuple(term.l for term in self.terms), self.cod.l, self.dom.l)
         return self.sum_factory(
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
-
-
-class Bubble(biclosed.Bubble, Box):
-    """
-    A rigid bubble is a biclosed bubble and a rigid box, which rotates as a
-    box does: its winding number turns, its args stay as they are inside.
-
-    Parameters:
-        args (Diagram) : The diagrams inside the bubble.
-        z (int) : The winding number of the bubble.
-        kwargs : Passed to :class:`biclosed.Bubble`.
-
-    Example
-    -------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f = Box('f', x, y)
-    >>> bubble = f.bubble()
-    >>> assert bubble.r.z == 1 and bubble.r.args == (f, )
-    >>> assert (bubble.r.dom, bubble.r.cod) == (y.r, x.r)
-    >>> assert bubble.r.l == bubble == bubble.l.r and bubble.l.l != bubble
-    >>> assert bubble.r != f.r.bubble()
-    >>> print(bubble.l)
-    (f).bubble().l
-
-    Its winding number is one of its :attr:`serialised_attrs`, so that its
-    dagger, its substitutions and its rotations keep it, as a box's do.
-
-    >>> assert bubble.r[::-1] == bubble[::-1].r
-    >>> assert bubble.r[::-1][::-1] == bubble.r
-    >>> from sympy.abc import phi  # doctest: +EXTRA
-    >>> g = Box('g', x, y, data=phi).bubble()
-    >>> assert g.r.subs(phi, 1) == g.subs(phi, 1).r
-    >>> assert g.r.lambdify(phi)(1) == g.lambdify(phi)(1).r
-    """
-    serialised_attrs = biclosed.Bubble.serialised_attrs + ("z", )
-
-    def __init__(self, *args: Diagram, z: int = 0, **kwargs):
-        self.z = z
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        if not self.z:
-            return super().__str__()
-        return str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
-
-    def __repr__(self):
-        if not self.z:
-            return super().__repr__()
-        return super().__repr__()[:-1] + f', z={self.z})'
-
-    def setoid(self):
-        return super().setoid() + (self.z, )
-
-    def to_tree(self) -> dict:
-        """
-        Serialise a rigid bubble, with its winding number.
-
-        >>> from discopy.utils import dumps, loads
-        >>> f = Box('f', Ty('x'), Ty('y')).bubble()
-        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
-        """
-        tree = super().to_tree()
-        if self.z:
-            tree['z'] = self.z
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Bubble:
-        bubble = super().from_tree(tree)
-        bubble.z = tree.get('z', 0)
-        return bubble
 
 
 class Cup(BinaryBoxConstructor, Box):
@@ -1155,7 +1097,6 @@ biclosed.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
-Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 
 
@@ -1167,3 +1108,6 @@ class Equation(biclosed.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+
+
+Bubble = Box.from_args

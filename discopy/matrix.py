@@ -32,7 +32,7 @@ Summary
 See also
 --------
 
-* :class:`discopy.tensor.Tensor` is a subclass of :class:`Matrix` with the
+* :class:`~discopy.tensor.Tensor` is a subclass of :class:`Matrix` with the
   Kronecker product as tensor.
 
 """
@@ -62,6 +62,8 @@ from discopy.utils import (
 if TYPE_CHECKING:
     import sympy
     import quimb.tensor
+    from discopy.kleisli.monad import Monad
+    from discopy.monad.algebra import Algebra
 
 
 @factory
@@ -400,7 +402,7 @@ and 'Matrix[int]'
 
     def to_tree(self) -> dict:
         """
-        Serialise a matrix, see :func:`discopy.utils.dumps`.
+        Serialise a matrix, see :func:`~discopy.utils.dumps`.
 
         The ``dtype`` travels in the factory name, as it does in the
         ``repr``, so that a matrix comes back with the entries it was
@@ -425,13 +427,13 @@ and 'Matrix[int]'
     @classmethod
     def from_tree(cls, tree: dict) -> Matrix:
         """
-        Decode a serialised matrix, see :func:`discopy.utils.loads`.
+        Decode a serialised matrix, see :func:`~discopy.utils.loads`.
 
         Parameters:
             tree : DisCoPy serialisation.
 
         The class the tree names is the subscripted one, so the pair is
-        read through :func:`discopy.utils.from_tree` rather than off the
+        read through :func:`~discopy.utils.from_tree` rather than off the
         bare class, which would infer a ``dtype`` from the array instead.
 
         Example
@@ -531,6 +533,48 @@ and 'Matrix[int]'
                 (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
 
     @classmethod
+    def algebra(cls, monad: Monad, dom: Nat | int, cod: Nat | int) -> Algebra:
+        """
+        The algebra of a monad on the matrices from ``dom`` to ``cod``, by
+        which a functor into matrices extends to the change of base of its
+        domain, see :class:`~discopy.enriched.Functor`: the sum of a list of
+        matrices, for the :attr:`~discopy.kleisli.monad.List` monad.
+
+        Parameters:
+            monad : The monad, the list monad alone here.
+            dom : The domain of the matrices.
+            cod : The codomain of the matrices.
+
+        Raises:
+            TypeError : For any monad but the list monad.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import List
+        >>> total = Matrix[int].algebra(List, 1, 2)
+        >>> total([Matrix([1, 0], 1, 2), Matrix([2, 3], 1, 2)])
+        Matrix[int]([3, 3], dom=Nat(1), cod=Nat(2))
+        >>> assert total([]) == Matrix[int].zero(1, 2)
+
+        The algebra is named by its homset, so that two homsets have two:
+
+        >>> total
+        monad.algebra.Algebra[List]('sum Nat(1) -> Nat(2)', matrix.Matrix[int])
+        >>> assert total != Matrix[int].algebra(List, 2, 1)
+        """
+        # pylint: disable-next=import-outside-toplevel  # kleisli imports us
+        from discopy.kleisli.monad import List
+        # pylint: disable-next=import-outside-toplevel  # kleisli imports us
+        from discopy.monad import algebra
+        if monad != List:
+            raise TypeError(messages.NO_ALGEBRA.format(
+                factory_name(cls), monad))
+        dom, cod = map(cls.ob.cast, (dom, cod))
+        return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
+            f"sum {dom} -> {cod}", cls,
+            lambda matrices: sum(matrices, cls.zero(dom, cod)))
+
+    @classmethod
     def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:
         """
         The matrix that swaps left and right dimensions.
@@ -557,7 +601,7 @@ and 'Matrix[int]'
         """
         The matrix that permutes blocks of dimensions.
 
-        Overrides the default of :class:`discopy.abc.SymmetricCategory`, which
+        Overrides the default of :class:`~discopy.abc.SymmetricCategory`, which
         composes ``len(xs)`` swaps, by writing each block in one pass.
 
         Parameters:

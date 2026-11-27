@@ -567,7 +567,8 @@ class ProofNet(Testable):
                 bound = [("wire", next(wires)) for _ in ports(term.var.cod)]
                 return bound + visit(term.body, scope | {term.var: bound})
             if isinstance(term, Application):
-                func, args = visit(term.func, scope), visit(term.args, scope)
+                func = visit(term.function, scope)
+                args = visit(term.argument, scope)
                 edges.extend(zip(func, args))
                 return func[len(args):]
             if isinstance(term, Variable):
@@ -704,10 +705,10 @@ class ProofNet(Testable):
     def strategy(cls, **params):
         """
         Generate the nets of closed linear terms, sampled with no free
-        variables, see :class:`discopy.biclosed.Sampler`.
+        variables, see :class:`~discopy.biclosed.Sampler`.
 
         Parameters:
-            params : Passed to :meth:`discopy.biclosed.TermBase.shapes`.
+            params : Passed to :meth:`~discopy.biclosed.TermBase.shapes`.
         """
         from hypothesis import strategies as st
 

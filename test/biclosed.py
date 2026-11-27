@@ -327,7 +327,7 @@ def test_deep_terms():
         sys.setrecursionlimit(limit)
     depth = 0
     while isinstance(term, Application):
-        depth, term = depth + 1, term.args
+        depth, term = depth + 1, term.argument
     assert depth == 6000
 
 
@@ -425,7 +425,7 @@ def test_rigid_type_is_biclosed():
     x, y = rigid.Ty('x'), rigid.Ty('y')
     f = rigid.Box('f', x, y)
     assert f.to_rigid() == f and closed.Ty.from_biclosed(x) == closed.Ty('x')
-    assert Functor.id(Diagram)(x) == Ty(rigid.Wire('x'))
+    assert Functor.id(Diagram)(x) == x  # a type of a higher level, next#703
 
 
 def test_pow_is_over():

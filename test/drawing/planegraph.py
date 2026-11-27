@@ -542,6 +542,18 @@ def test_Drawing_permutation_of_blocks():
         Drawing.permutation([1, 0], [x, y, z])
 
 
+def test_wires_between_boxes_stay_vertical():
+    x, y = monoidal.Ty('x'), monoidal.Ty('a_long_label')
+    u, f = monoidal.Box('u', x, x @ y), monoidal.Box('f', x @ y, y @ x)
+    g, h = monoidal.Box('g', y, y), monoidal.Box('h', x, x)
+    drawing = (u >> f >> g @ h).to_drawing()
+    wires = [(s, t) for s, t in drawing.edges
+             if s.kind == "box_cod" and t.kind == "box_dom"]
+    assert len(wires) == 4
+    for source, target in wires:
+        assert drawing.positions[source].x == drawing.positions[target].x
+
+
 def test_readable_foreground():
     # White and light colours get black text, dark colours get white text.
     assert Backend.readable_foreground("white") == "black"
@@ -712,7 +724,7 @@ def classical_controlled():
 
 
 # The matplotlib rendering of classical_controlled() is exercised as a
-# doctest in the Gallery section of discopy/drawing/drawing.py, alongside
+# doctest in the Gallery section of discopy/drawing/planegraph.py, alongside
 # long-controlled; this only checks the TikZ backend, whose bending is
 # computed differently from Matplotlib.
 @tikz_and_compare('controlled-classical.tikz')

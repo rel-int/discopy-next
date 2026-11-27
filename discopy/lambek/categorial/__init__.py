@@ -36,7 +36,6 @@ Summary
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition
-    Bubble
     Functor
     CMap
 
@@ -61,7 +60,7 @@ Summary
 
         bobcat
 
-:mod:`discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
+:mod:`~discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
 extra installs, so it is not imported here: import it on its own.
 """
 
@@ -199,15 +198,6 @@ class Curry(biclosed.Curry, Box):
     """
 
 
-class Bubble(biclosed.Bubble, Box):
-    """
-    A categorial bubble is a biclosed bubble and a categorial box.
-
-    >>> N = Ty('N')
-    >>> assert (Box('f', N, N).bubble() >> Box('g', N, N)).cod == N
-    """
-
-
 class ForwardCrossedComposition(BinaryBoxConstructor, Box):
     """ Forward crossed composition rule. """
     serialised_attrs = ("left", "right")
@@ -283,7 +273,7 @@ class TermBase(Box, biclosed.TermBase):
     def to_abstract(self):
         """
         The abstract term of a categorial term, dropping planarity,
-        see :meth:`discopy.lambek.abstract.Diagram.from_categorial`.
+        see :meth:`~discopy.lambek.abstract.Diagram.from_categorial`.
         """
         from discopy.lambek.abstract import Diagram
         return Diagram.from_categorial(self)
@@ -323,37 +313,38 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
 class FA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
-    serialised_attrs = ("func", "args")
+    serialised_attrs = ("function", "argument")
 
-    def __init__(self, func, args):
-        biclosed.Application.__init__(self, func, args, left=False)
+    def __init__(self, function, argument):
+        biclosed.Application.__init__(self, function, argument, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])))
+        return cls(*cls.subtrees(tree))
 
     def simplify(self):
-        return self.func.simplify()(self.args.simplify())
+        return self.function.simplify()(self.argument.simplify())
 
 
 class BA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
-    serialised_attrs = ("args", "func")
+    serialised_attrs = ("argument", "function")
 
-    def __init__(self, args, func):
-        biclosed.Application.__init__(self, func, args, left=True)
+    def __init__(self, argument, function):
+        biclosed.Application.__init__(self, function, argument, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['args'], tree['func'])))
+        return cls(*cls.subtrees(tree)[::-1])
 
     def simplify(self):
-        return self.args.simplify()(self.func.simplify(), left=True)
+        return self.argument.simplify()(self.function.simplify(), left=True)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.args!r}, {self.func!r})"
+        return factory_name(type(self))\
+            + f"({self.argument!r}, {self.function!r})"
 
 
 class TypeRaising(TermBase):
@@ -461,7 +452,7 @@ class BinaryTerm(TermBase):
     def setoid(self):
         """
         Binary terms are equal when their kinds and sides are, see
-        :meth:`discopy.biclosed.Application.setoid`.
+        :meth:`~discopy.biclosed.Application.setoid`.
         """
         return factory_key(type(self)), self.left, self.right
 
@@ -728,7 +719,6 @@ def parse(sentence, k: int = 1, goal: Ty | None = None
 Id = Diagram.id
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.curry_factory = Curry
-Diagram.bubble_factory = Bubble
 Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable
@@ -738,3 +728,6 @@ Ty.application_factory =\
 Ty.abstraction_factory = Abstraction
 
 Ty.over_factory, Ty.under_factory = Over, Under
+
+
+Bubble = Box.from_args

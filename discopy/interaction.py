@@ -130,11 +130,22 @@ class Ty[natural](Pregroup, TestableGeneric):
     cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
 
     @classmethod
-    def strategy(cls, **params):
-        """ Generate pairs of :attr:`natural` types. """
+    def strategy(cls):
+        """
+        Generate pairs of :attr:`natural` types of at most two generators
+        each: two tell the conventions of cups and caps apart, while the
+        terms of the laws on integer diagrams grow with the square of the
+        width of their types.
+
+        >>> from hypothesis import find
+        >>> from discopy.compact import Ty as T
+        >>> pair = find(Ty[T].strategy(), lambda x: len(x.positive) > 1)
+        >>> assert len(pair.positive) == 2
+        """
         from hypothesis import strategies as st
 
-        types = cls.natural.strategy(**params)
+        types = st.lists(cls.natural.generator_strategy(), max_size=2).map(
+            lambda xs: cls.natural().tensor(*xs))
         return st.tuples(types, types).map(lambda pair: cls(*pair))
 
     @classmethod
@@ -328,7 +339,7 @@ class Diagram[natural](
     ...     == D.id(two).transpose(left=True)
 
     Python functions with tuples as tensor have neither dagger nor twist,
-    their integer diagrams are the lenses of :mod:`discopy.lens`:
+    their integer diagrams are the lenses of :mod:`~discopy.lens`:
 
     >>> from discopy.python import Function
     >>> R = Ty[Function.ob]((float, ), (float, ))
@@ -346,7 +357,9 @@ class Diagram[natural](
         diagrams by yet.
         """
         # pylint: disable-next=import-outside-toplevel  # they import this
-        from discopy import compact, symmetric
+        from discopy import compact
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy.feedback import symmetric
         return (symmetric.Diagram, compact.Diagram)
 
     ar = classproperty(lambda cls: cls)
@@ -428,7 +441,7 @@ class Diagram[natural](
         """
         Whether the integer diagrams have a dagger: when the :attr:`natural`
         category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
-        into integer diagrams over e.g. :class:`discopy.python.Function`
+        into integer diagrams over e.g. :class:`~discopy.python.Function`
         reads a daggered box off its :code:`ar_map`.
 
         >>> from discopy import compact, python
@@ -798,7 +811,7 @@ class Diagram[natural](
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a trace, read off either form of
-        :meth:`discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
+        :meth:`~discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
         since an integer type is not a sequence: ``n`` counts the atoms of
         each half, or one number per half, one by default, and the memory is
         ``mem``, or what ``cod`` leaves of the codomain.
@@ -842,7 +855,7 @@ class Diagram[natural](
     def twist(cls, dom: Ty) -> Diagram:
         """
         The twist of an integer type is the trace of its braid, as in
-        :mod:`discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
+        :mod:`~discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
 
         Parameters:
             dom : The integer type to twist.

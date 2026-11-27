@@ -87,14 +87,17 @@ an example `# doctest: +EXTRA`, usually its import line, e.g.
 docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 `test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
 
-CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`, not on a
-pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
+CI also runs every marimo notebook in `docs/notebooks/` but those of `UNEXECUTED` below on
+each commit of `main`, not on a pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
 instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
 (e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
 fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. Each notebook runs from its own directory on the `discopy`
+and `--check` expects it to fail: it fails when such a notebook executes, so the entry is
+removed once its bug is fixed. A notebook listed in `UNEXECUTED`, e.g. the old optyx
+README `optyx/readme_example`, runs only when named: neither `--check` nor the docs build runs
+it, and its page links to its source. Each notebook runs from its own directory on the `discopy`
 of the script's own tree, so a git worktree checks its own code, not the main checkout's
 editable install.
 
@@ -141,7 +144,8 @@ uv run pytest proptest/ -n auto -p no:benchmark -v
 
 The cells of the matrix are independent, so `-n auto`
 ([pytest-xdist](https://pytest-xdist.readthedocs.io)) runs them on all
-cores, with `-p no:benchmark` unloading the benchmark plugin that is
+cores (`-n logical` on every vCPU, which is what CI uses, where cores and
+vCPUs differ), with `-p no:benchmark` unloading the benchmark plugin that is
 incompatible with it; drop both to run serially, e.g. when debugging a
 single cell.
 
@@ -174,7 +178,8 @@ by default, `pr` for the small budget a pull request runs with, which CI
 runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
-the large one `main` and the nightly run search with. A fourth, `shared`,
+a large one to search with locally: a thousand examples on every cell of
+the matrix is some 33 hours. A fourth, `shared`,
 is `dev` reading the example database that the CI of the repository named
 by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
 `GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
@@ -235,7 +240,8 @@ keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
 The `proptest` GitHub workflow runs this suite on every pull request, on
-`main`, nightly and on manual dispatch. It carries the report
+`main` and on manual dispatch, each at `pr`'s twenty examples under
+`--hypothesis-seed=0`, with one worker per vCPU. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**
@@ -243,6 +249,46 @@ only. A pull request never uploads one, a dispatch on a feature branch that
 legitimately skips a cell cannot become the baseline that cell is missing
 from, and a run that died mid-suite stays available to look at without being
 compared against.
+
+### The corpus
+
+The strategies draw the terms their authors thought of. `proptest/corpus/`
+holds terms they draw rarely or never, written by hand or by a language model,
+e.g. boxes that share a name or carry `data`, bubbles, traces of several wires
+and feedback with a memory of several wires. A module there,
+one per module of `discopy`, defines `CORPUS`, mapping a category to the name
+of one of its laws and that to entries keyed by what each one probes. An entry
+is a thunk returning the arguments of the law by name, with the type variables
+its boundaries do not show, e.g. the memory `M` of a trace; a variable of
+sort `Atom` must be one wire:
+
+```python
+from discopy.symmetric import Box, Diagram, Ty
+
+k = Box("k", Ty("x", "y", "z"), Ty("x", "y", "z"))
+
+CORPUS = {Diagram: {
+    "hypergraph_section": {
+        "a trace of two wires, right": lambda: {"f": k.trace(2)},
+    },
+}}
+```
+
+`proptest/test_corpus.py` replays every entry, with no search and no model
+call, so it runs the same on every pull request:
+
+```shell
+uv run pytest proptest/test_corpus.py -p no:benchmark
+```
+
+An entry whose arguments do not have the types the law asks for, or that the
+law assumes away, e.g. a non-identifier name for `str_transparency`, fails as
+a bad entry rather than a counterexample. To grow the corpus, give a model, or
+an agent session that opens a pull request, the signature of a law and its
+`Axiom.canonical` equation, and ask for arguments of shapes the strategy does
+not draw. An entry that refutes a law is filed as an issue and the law declared
+`failing`; a family of entries the strategy keeps missing becomes a rule or a
+strategy, so that Hypothesis draws and shrinks it itself.
 
 ## Run the benchmarks
 
@@ -309,8 +355,8 @@ the important regressions and speedups.
 package built on [Mathlib](https://github.com/leanprover-community/mathlib4),
 its library `DisCoLean` holding the categories of `discopy.abc` compiled to
 Lean, a model of `egraph.partition`, the pure `EGraph` (`merge`, `add`,
-`rebuild`) and the `Builder`, and one of the diagrams of `monoidal.Diagram`,
-with theorems proved on each, see its [README](discolean/README.md). It needs
+`rebuild`) and the `Builder`, one of the diagrams of `monoidal.Diagram`, and
+one of the terms of `cat` and `monoidal`, with theorems proved on each, see its [README](discolean/README.md). It needs
 the Lean of `discolean/lean-toolchain`, which is that of the Mathlib it
 requires, and lives outside the Python package, outside the wheel and outside
 `testpaths`, so run it explicitly:

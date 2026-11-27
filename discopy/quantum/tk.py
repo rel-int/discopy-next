@@ -189,7 +189,8 @@ class Circuit(tk.Circuit):
 
 def to_tk(circuit):
     """
-    Takes a :class:`discopy.quantum.Circuit`, returns a :class:`Circuit`.
+    Takes a :class:`quantum.Circuit <discopy.quantum.Circuit>`, returns a
+    :class:`Circuit`.
     """
     # bits and qubits are lists of register indices, at layer i we want
     # len(bits) == circuit[:i].cod.count(bit) and same for qubits
@@ -246,24 +247,25 @@ def to_tk(circuit):
             bits = discard_bits(bits, bit_offset, box.n_qubits)
             box = Measure(box.n_qubits, box.destructive)
         if isinstance(box, Measure) and box.override_bits:
-            for j, _ in enumerate(box.dom[:len(box.dom) // 2]):
+            for j in range(box.n_qubits):
                 i_bit = bits[bit_offset + j]
                 i_qubit = qubits[qubit_offset + j]
                 tk_circ.Measure(i_qubit, i_bit)
-            return bits, qubits
-        for j, _ in enumerate(box.dom):
-            i_bit, i_qubit = len(tk_circ.bits), qubits[qubit_offset + j]
-            offset = bit_offset + j if isinstance(box, Measure) else None
-            tk_circ.add_bit(Bit(i_bit), offset=offset)
-            tk_circ.Measure(i_qubit, i_bit)
-            if isinstance(box, Bra):
-                tk_circ.post_select({i_bit: box.bitstring[j]})
-            if isinstance(box, Measure):
-                bits = bits[:bit_offset + j] + [i_bit] + bits[bit_offset + j:]
+        else:
+            for j, _ in enumerate(box.dom):
+                i_bit, i_qubit = len(tk_circ.bits), qubits[qubit_offset + j]
+                offset = bit_offset + j if isinstance(box, Measure) else None
+                tk_circ.add_bit(Bit(i_bit), offset=offset)
+                tk_circ.Measure(i_qubit, i_bit)
+                if isinstance(box, Bra):
+                    tk_circ.post_select({i_bit: box.bitstring[j]})
+                if isinstance(box, Measure):
+                    bits = (bits[:bit_offset + j] + [i_bit]
+                            + bits[bit_offset + j:])
         if isinstance(box, Bra)\
                 or isinstance(box, Measure) and box.destructive:
-            qubits = qubits[:qubit_offset]\
-                + qubits[qubit_offset + len(box.dom):]
+            n_qubits = box.dom.count(qubit)
+            qubits = qubits[:qubit_offset] + qubits[qubit_offset + n_qubits:]
         return bits, qubits
 
     def swap(i, j, unit_factory=Qubit):

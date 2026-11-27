@@ -133,12 +133,12 @@ from operator import index
 
 import numpy as np
 
-from discopy import sum as formal_sum
+from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
-    AxiomError, factory, factory_key, factory_name, resolve_factory,
-    unbiased)
+    AxiomError, factory, factory_key, factory_name, from_tree,
+    resolve_factory, unbiased)
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
@@ -346,6 +346,53 @@ class Matrix(underlying.Matrix):
             + f", scalar={self.scalar})"
         )
 
+    def to_tree(self) -> dict:
+        """
+        The tree names the whole profile, as the representation does.
+
+        The ``array`` a matrix writes is its underlying one, with
+        ``len(creations)`` rows and ``len(selections)`` columns more than
+        its ``dom`` and ``cod``, so a tree without them cannot be read
+        back at all, see :meth:`from_tree`.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> matrix = Matrix(np.array([[1, 1], [1, 0]]), 1, 1,
+        ...                 creations=(1,), selections=(1,), scalar=2j)
+        >>> assert loads(dumps(matrix)) == matrix
+        """
+        return dict(
+            super().to_tree(),
+            creations=self.creations,
+            selections=self.selections,
+            normalisation=self.normalisation,
+            scalar=self.scalar)
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Matrix:
+        """
+        Reads the whole profile back, see :meth:`to_tree`.
+
+        The ``dom`` and ``cod`` of the tree are mode counts, which the
+        constructor turns into the shape of the array together with the
+        creations and the selections, so ``super().from_tree`` would
+        reshape the underlying array into the modes alone.
+
+        Each field of the profile falls back to the default the
+        constructor gives it, so a tree written before they travelled —
+        which is one with no creation and no selection, the only kind that
+        could be read back at all — still loads.
+        """
+        return cls(
+            tree['array'],
+            from_tree(tree['dom']),
+            from_tree(tree['cod']),
+            tuple(tree.get('creations', ())),
+            tuple(tree.get('selections', ())),
+            tree.get('normalisation', 1),
+            tree.get('scalar', 1))
+
     def dilate(self) -> Matrix:
         """
         Returns an equivalent :class:`Matrix` with unitary underlying matrix.
@@ -538,7 +585,7 @@ class Matrix(underlying.Matrix):
         return np.allclose(np.eye(m.shape[0]), m.dot(m.conj().T))
 
 
-class Sum(formal_sum.Sum):
+class Sum(cat.Sum):
     """
     A formal sum of :class:`Matrix` with the same number of modes in and out,
     what :code:`to_path` sends a sum of diagrams to.
@@ -586,7 +633,7 @@ class Sum(formal_sum.Sum):
         """
         The factory a sum builds sums with, which fixes its ``dtype``, so
         that the ring survives every operation of
-        :class:`discopy.sum.Sum` — ``dagger``, ``then``, ``tensor``,
+        :class:`~discopy.cat.Sum` — ``dagger``, ``then``, ``tensor``,
         ``subs`` — including the ones that leave no term to read it from.
         """
         return lambda terms, dom=None, cod=None: type(self)(
@@ -595,10 +642,10 @@ class Sum(formal_sum.Sum):
     def setoid(self):
         """
         A sum is faithfully described by its terms and its boundary, where
-        :meth:`discopy.sum.Sum.setoid` reads a singleton sum as its only
+        :meth:`~discopy.cat.Sum.setoid` reads a singleton sum as its only
         term: a :class:`Matrix` is not an arrow, so it has no setoid. A
         matrix is not hashable either, so neither is a sum: ``__hash__`` is
-        ``None`` rather than the :meth:`discopy.cat.Arrow.__hash__` that
+        ``None`` rather than the :meth:`~discopy.cat.Arrow.__hash__` that
         would raise on the terms.
 
         The ``dtype`` is part of it, as it is of a matrix's own equality,

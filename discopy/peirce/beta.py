@@ -1,14 +1,14 @@
 """
 Peirce's beta graphs: first-order logic as the calculus of neo-Peircean
 relations (NPR) of :cite:t:`BonchiEtAl24`, two cartesian bicategories on the
-same objects, white and black, as :class:`discopy.frobenius` diagrams with
+same objects, white and black, as :mod:`~discopy.frobenius` diagrams with
 every wire coloured by its region.
 
 Peirce's lines of identity are the white spiders. The black structure is the
 white one seen through a cut: the black copy is ``~copy``, the black
 composition :meth:`alpha.Diagram.relative_sum` and the black tensor
 :meth:`alpha.Diagram.par`. A :class:`Model` is a functor into
-:class:`discopy.tensor.Tensor` of ``bool``.
+:class:`~discopy.tensor.Tensor` of ``bool``.
 
 Summary
 -------
@@ -138,6 +138,10 @@ class Diagram(alpha.Diagram, frobenius.Diagram):
     ob = Ty
     strategy = no_strategy
 
+    def bubble(self, *args, **params) -> Cut:
+        """ The :class:`Cut` of a diagram, the bubble of this category. """
+        return Cut(self, *args, **params)
+
     def conjunction(self, other: Diagram) -> Diagram:
         """
         The intersection of two parallel white relations: copy, then both,
@@ -209,7 +213,7 @@ class Swap(Permutation, frobenius.Swap, Box):
     """ A beta swap is a frobenius swap of two wires of one region. """
 
 
-class Cut(alpha.Cut, frobenius.Bubble, Box):
+class Cut(alpha.Cut, Box):
     """
     A beta cut is an :class:`alpha.Cut` around a frobenius diagram.
 
@@ -221,6 +225,10 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
         params.setdefault("is_deterministic", False)
         params.setdefault("is_affine", False)
         super().__init__(arg, dom=dom, cod=cod, **params)
+
+    serialised_attrs = ("*args", ) + tuple(
+        attr for attr in Box.serialised_attrs
+        if attr not in ("*", "args", "method"))
 
     def to_tree(self) -> dict:
         """
@@ -244,7 +252,7 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
         ...     assert eval(repr(cut)) == cut
         """
         flags = "".join(f", {name}=True" for name in self.flags())
-        result = super(markov.Bubble, self).__repr__()
+        result = alpha.Cut.__repr__(self)
         return result[:-1] + flags + ")" if flags else result
 
     @classmethod
@@ -269,7 +277,6 @@ Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.swap_factory = Swap
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.permutation_factory = Permutation
-Diagram.bubble_factory = Cut
 Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Id = Diagram.id

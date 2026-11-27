@@ -50,8 +50,8 @@ def pull_request(sha):
             "event": {"pull_request": {"number": 1}}}
 
 
-def schedule(sha, run_id):
-    return {"workflow": "w", "event_name": "schedule", "sha": sha,
+def dispatch(sha, run_id):
+    return {"workflow": "w", "event_name": "workflow_dispatch", "sha": sha,
             "ref": "refs/heads/main", "run_id": run_id, "event": {}}
 
 
@@ -76,14 +76,14 @@ def test_a_pull_request_supersedes_its_own_runs(concurrency):
         == "True"
 
 
-def test_a_scheduled_proptest_run_never_cancels_a_push():
-    """`proptest` is the only workflow on a schedule and a dispatch, and both
-    fire on the commit a push already ran on."""
+def test_a_dispatched_proptest_run_never_cancels_a_push():
+    """`proptest` is the only workflow on a dispatch, which fires on the
+    commit a push already ran on."""
     with open(GITHUB / "workflows" / "proptest.yml") as file:
         group = yaml.safe_load(file)["concurrency"]["group"]
-    assert evaluate(group, schedule("a", 1)) != evaluate(group, push("a"))
-    assert evaluate(group, schedule("a", 1))\
-        != evaluate(group, schedule("a", 2))
+    assert evaluate(group, dispatch("a", 1)) != evaluate(group, push("a"))
+    assert evaluate(group, dispatch("a", 1))\
+        != evaluate(group, dispatch("a", 2))
 
 
 @pytest.fixture

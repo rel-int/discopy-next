@@ -2,7 +2,7 @@
 
 """
 Monoidal lenses, also called optics, over an underlying `category`, with
-one class for each doctrine as in :mod:`discopy.para`: :class:`Symmetric`
+one class for each doctrine as in :mod:`~discopy.para`: :class:`Symmetric`
 over a symmetric category, :class:`Traced` over a traced one,
 :class:`Markov`, the lenses `(get, put)` of functional programming, over a
 Markov one, i.e. the symmetric lenses whose residual is the input, copied,
@@ -14,13 +14,13 @@ A lens from a pair `(x, x_)` to a pair `(y, y_)` is a residual `m` with a
 the underlying category, see :cite:t:`Riley18`, the residual on the right
 of the forward leg and on the left of the backward one, so that the two
 legs side by side draw as a comb. Composition tensors the residuals, as in
-the category of parametric maps :mod:`discopy.para`: the forward leg is a
+the category of parametric maps :mod:`~discopy.para`: the forward leg is a
 coparametric map with the residual as coparameter, the backward leg a
 parametric map with the residual as parameter :cite:p:`CapucciEtAl21`.
 When the underlying category is cartesian, a lens is a pair `(get, put)`
 with the residual normalised to `x` by copying, the bidirectional accessors
 of :cite:t:`ClarkeEtAl20`; when it is traced, a lens is an integer
-diagram :mod:`discopy.interaction` with the residual as the wire between
+diagram :mod:`~discopy.interaction` with the residual as the wire between
 the two legs. Two lenses are equal when their representatives are; the
 quotient by sliding a morphism across the residual is decided by
 :meth:`Symmetric.to_int` for diagrams in the free traced category and by
@@ -74,6 +74,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from discopy import (
     comarkov, frobenius, interaction, markov, messages, op, symmetric)
+from discopy.feedback import symmetric as traced
 from discopy.abc import (
     ComarkovCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
@@ -377,7 +378,7 @@ class Symmetric[category](SymmetricCategory, TestableGeneric):
         dom.negative` of a lens over a traced category: the two legs side
         by side with the residual as the wire between them, no swap, so that
         composition of lenses is the symmetric feedback of
-        :mod:`discopy.interaction` up to the axioms of traced categories,
+        :mod:`~discopy.interaction` up to the axioms of traced categories,
         and the tensor is that of integer diagrams up to the swap of the
         negative halves.
 
@@ -421,13 +422,13 @@ class Traced(Symmetric, TracedCategory):
     Lenses over a traced category are traced leg by leg: the forward leg
     over the positive halves, with the residual swapped out of the way, the
     backward leg over the negative halves, so that :meth:`Symmetric.to_int`
-    is a traced functor into :mod:`discopy.interaction`.
+    is a traced functor into :mod:`~discopy.interaction`.
 
     Example
     -------
-    >>> from discopy.symmetric import Ty as T, Box, Diagram
+    >>> from discopy.feedback.symmetric import Ty as T, Box, Diagram
     >>> x, x_, u, u_, m = map(T, ["x", "x'", "u", "u'", "m"])
-    >>> X, U = Ty(x, x_), Ty(u, u_)
+    >>> X, U = Ty[T](x, x_), Ty[T](u, u_)
     >>> f = Traced(X @ U, X @ U, Box('f', x @ u, x @ u @ m),
     ...            Box("f'", m @ x_ @ u_, x_ @ u_), m)
     >>> assert f.trace().dom == X == f.trace().cod
@@ -435,6 +436,7 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
+    category = traced.Diagram
     trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
         messages.PAIR_LENGTH)
     trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(
@@ -531,7 +533,7 @@ class Markov(Symmetric):
     reverse derivative of a fan-out sums the gradients, see
     :class:`Comarkov`. A neural network is
     a parametric lens, i.e. a :class:`para.Symmetric <discopy.para.Symmetric>`
-    over `lens.Markov`; see :mod:`discopy.neural`.
+    over `lens.Markov`; see :mod:`~discopy.neural`.
 
     .. admonition:: Summary
 
@@ -556,6 +558,8 @@ class Markov(Symmetric):
 
     unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
     associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
+    tensor_whiskering = Symmetric.tensor_whiskering.failing(
+        messages.LENS_NATURALITY)
     braid_naturality = Symmetric.braid_naturality.failing(
         messages.LENS_BRAID_NATURALITY)
 
@@ -707,7 +711,7 @@ class Comarkov(Markov, MarkovCategory):
     hierarchy with both a copy and a merge: its spiders fuse, which is more
     than the laws of a Markov category ask for. A category with a copy and
     a merge and no law between the two is that of
-    :class:`discopy.neural.network.Network`.
+    :class:`~discopy.neural.network.Network`.
     """
     category = frobenius.Diagram
 
@@ -837,6 +841,8 @@ class Prism(Symmetric):
 
     unitality = Symmetric.unitality.failing(messages.PRISM_NATURALITY)
     associativity = Symmetric.associativity.failing(
+        messages.PRISM_NATURALITY)
+    tensor_whiskering = Symmetric.tensor_whiskering.failing(
         messages.PRISM_NATURALITY)
     braid_naturality = Symmetric.braid_naturality.failing(
         messages.PRISM_BRAID_NATURALITY)
