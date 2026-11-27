@@ -4,3 +4,6 @@ please reorganize the content/joseph/boltzmann directory such that the method th
 - [x] Rebase claude/boltzmann-types onto amp/generators, squashed: its commits conflict one by one with the slots, their net diff only in `CHANGELOG.md`
 - [x] Measure discopy's own strategies on the `pr` budget as the baseline: the skeletons of rel-int/wiki `content/joseph/proptest/` are compared against it there
 - [ ] Decide with the human, after the design review on the wiki page, whether the skeleton sampler moves into `discopy.testable` (it needs only the `Provider` hook and `generator_strategy(dom, cod)`), and whether `abc` alphabets are still needed
+- [ ] File: `CMap[compact.Diagram].cmap_roundtrip` fails on `CMap.from_box(Box('f', a, a, z=1))`: a box with a winding decodes to `f.r`, which reads back as the rotation of `f`, another map
+- [ ] File: `Matrix[int].str_transparency` fails above 1,000 entries, whose string numpy elides
+- [ ] Discuss: no sampler of derivations draws `!L*` in `bang.Diagram` or a curry box in `Hypergraph[closed.Diagram]` and `Hypergraph[lambek.abstract.Diagram]`, so their 8 broken dagger laws are never caught: declare these boxes as rules or generators
