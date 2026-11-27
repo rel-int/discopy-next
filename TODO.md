@@ -1,11 +1,6 @@
-* rebase your discopy-next branch on https://github.com/rel-int/discopy-next/pull/763 and make the most out of the new architecture
-* optimize the shit out of the boltzmann/ library
-* simplify diagrams/ as much as possible, don't try to make ad-hoc adjustments for some axioms or categories, make a clear classification that makes the sampling predictable over a few different sorts of things we want to boltzmann-sample (types, diagrams, terms, cmaps/hypergraphs, ...). even better if you can share as much code across them
-* streamline it, so that every axiom gets:
-   * its own species, also generated from the recoloring signature
-   * when the signature changes in discopy, automatically rebuild the weights and update them in the lake, per structure, reusing past weights as much as possible to hopefully accelerate convergence
-* the sampling should work not just for diagrams, but any law-carrying class. for those that are not sampled via boltzmann, keep them in your discopy-next branch if you ever need to change them
+have a look at the current attempt to devise a new search strategy for discopy-next's property testing suite based on boltzmann sampling. each tuning round takes hours. i think we are overkilling it. what could be a simpler way to test discopy and sample diagrams? grill me on this new design. just focus on the property testing part of it, drop the synthetic data goal and avoid any expensive tuning (we can have some if cheap with few parameters, no need to have a prior over everything). we want to avoid rejection sampling.
+please reorganize the content/joseph/boltzmann directory such that the method that will ultimately be used for property testing is clearly separated from the one meant for generating synthetic data. both should be based on the boltzmann library, but the generated species need not to be the same. analyze the needs for discopy's property testing and investigate from scratch a new way to sample diagrams in such a way that we can have trust in the property testing suite, and avoid timeouts on github CI. make a new branch on top of wiki:claude/boltzmann-per-axiom (call it claude/boltzmann-proptest), and also a new branch off discopy-next:claude/boltzmann-types, rebased on discopy-next:amp/generators.
 
-- [x] Rebase onto #763 (amp/generators): constructors, providers, alphabet and type equations on slots
-- [x] The generators of a category (declared slots, rules with no hom premise) as the signature its species is read from: `generator_strategy(dom, cod, name)` on every class with rules
-- [x] Changes needed upstream for law-carrying classes that are not Boltzmann-sampled: alphabets of `cat.Ob` and `interaction.Ty`
+- [x] Rebase claude/boltzmann-types onto amp/generators, squashed: its commits conflict one by one with the slots, their net diff only in `CHANGELOG.md`
+- [x] Measure discopy's own strategies on the `pr` budget as the baseline: the skeletons of rel-int/wiki `content/joseph/proptest/` are compared against it there
+- [ ] Decide with the human, after the design review on the wiki page, whether the skeleton sampler moves into `discopy.testable` (it needs only the `Provider` hook and `generator_strategy(dom, cod)`), and whether `abc` alphabets are still needed
