@@ -93,6 +93,7 @@ from discopy import (
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, HypergraphCategory)
 from discopy.cat import factory
+from discopy.feedback.closed import markov as traced
 from discopy.python import finset
 from discopy.utils import (
     assert_isatomic, assert_iscomposable, deprecated_alias, factory_key,
@@ -226,7 +227,7 @@ class Layer(compact.Layer):
 
 @factory
 class Diagram(
-        compact.Diagram, markov.Diagram, comarkov.Diagram,
+        compact.Diagram, traced.Diagram, comarkov.Diagram,
         HypergraphCategory):
     """
     A frobenius diagram is a compact, Markov and comarkov diagram.
@@ -359,7 +360,7 @@ class Diagram(
         return F(self)
 
 
-class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
+class Box(traced.Box, compact.Box, comarkov.Box, Diagram):
     """
     A frobenius box is a compact, Markov and comarkov box in a frobenius
     diagram, its rotations keeping its flags as its dagger does, which hold
@@ -699,7 +700,8 @@ class Cap(compact.Cap, Box):
 
 
 class Permutation(
-        compact.Permutation, markov.Permutation, comarkov.Permutation, Box):
+        compact.Permutation, traced.Permutation, comarkov.Permutation,
+        Box):
     """
     A permutation in a Frobenius diagram, i.e. a bijective :class:`Cospan`.
 
@@ -713,7 +715,7 @@ class Permutation(
     tensor, fuse = Cospan.tensor, Cospan.fuse
 
 
-class Swap(Permutation, compact.Swap, markov.Swap, comarkov.Swap, Box):
+class Swap(Permutation, compact.Swap, traced.Swap, comarkov.Swap, Box):
     """
     A frobenius swap is a compact, Markov and comarkov swap in a frobenius
     diagram.
@@ -887,7 +889,7 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
+class Sum(compact.Sum, traced.Sum, comarkov.Sum, Box):
     """
     A Frobenius sum is a sum of Frobenius diagrams.
 
@@ -898,7 +900,7 @@ class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
     """
 
 
-class Functor(compact.Functor, markov.Functor, comarkov.Functor):
+class Functor(compact.Functor, traced.Functor, comarkov.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
 

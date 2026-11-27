@@ -1,63 +1,72 @@
-<!-- Included in docs/api/syntax.rst, i.e. rendered at
-     api/syntax.html: the links are relative to api/. -->
+<!-- Written by docs/architecture.py and included in
+     docs/api/syntax.rst: the links are relative to api/. -->
 <table id="architecture-diagram">
-	<col width="150"/>
-	<col width="150"/>
-	<col width="150"/>
-
-    <tbody>
-	<tr>
-		<td class="api-title"><pre><a href="../api/syntax.html">syntax</a></pre></td>
-	</tr>
-	<tr>
-		<td class="syntax top-left"></td>
-		<td class="syntax top"><pre><a href="../_api/discopy.cat.html">cat</a><br><br>│</pre></td>
-		<td class="syntax top-right"></td>
-	</tr>
-	<tr>
-		<td class="syntax left"><pre><a href="../_api/discopy.cmap.html">cmap</a></pre></td>
-		<td class="syntax"><pre>│</pre></td>
-		<td class="syntax right"><pre><a href="../_api/discopy.hypergraph.html">hypergraph</a></pre></td>
-	</tr>
-	<tr>
-		<td class="syntax left"><pre>       ┌───────<br>│<br>│</pre></td>
-		<td class="syntax"><pre><a href="../_api/discopy.monoidal.html">monoidal</a><br><br>      ├─ <a href="../_api/discopy.linear.html">linear</a><br>      │      </pre></td>
-		<td class="syntax right"><pre>───────┐       <br>       │       <br>       │       </pre></td>
-	</tr>
-	<tr>
-		<td class="syntax left"><pre><a href="../_api/discopy.spacial.html">spacial</a><br><br>│</pre></td>
-		<td class="syntax" rowspan="3"><pre><a href="../_api/discopy.feedback.html">feedback</a><br><br>      │      <br>      │      <br>      │      <br>      │      <br>      │      <br>      └──────</pre></td>
-		<td class="syntax right"><pre><a href="../_api/discopy.closed.monoidal.html">biclosed</a><br><br>│</pre></td>
-	</tr>
-	<tr>
-        <td class="syntax left" rowspan="3"><pre><a href="../_api/discopy.braided.html">braided</a><br><br>│<br>│<br>│<br>│</pre></td>
-        <td class="syntax right"><pre><a href="../_api/discopy.rigid.html">rigid</a><br><br>│</pre></td>
-	</tr>
-	<tr>
-        <td rowspan="2" class="syntax right"><pre><a href="../_api/discopy.pivotal.html">pivotal</a><br><br>│</pre></td>
-	</tr>
-    <tr height="20px">
-        <td class="syntax"></td>
+    <thead>
+    <tr>
+        <th>plain<br><small>&nbsp;</small></th>
+        <th><a href="../_api/discopy.linear.html">linear</a><br><small>a bang</small></th>
+        <th><a href="../_api/discopy.feedback.html">feedback</a><br><small>a delay and a trace</small></th>
+        <th><a href="../_api/discopy.closed.html">closed</a><br><small>exponentials</small></th>
+        <th><a href="../_api/discopy.feedback.closed.html">feedback.closed</a><br><small>both</small></th>
+        <th>duals<br><small>trace = cups at delay 0</small></th>
     </tr>
-	<tr>
-        <td class="syntax left"><pre><a href="../_api/discopy.balanced.html">balanced</a><br><br>│</pre></td>
-        <td class="syntax"><pre>─────────────<br><br><a href="../_api/discopy.interaction.html">interaction</a></pre></td>
-        <td class="syntax right"><pre><a href="../_api/discopy.ribbon.html">ribbon</a><br><br>│</pre></td>
-	</tr>
-	<tr>
-        <td class="syntax left"><pre><a href="../_api/discopy.symmetric.html">symmetric</a><br><br>│</pre></td>
-        <td class="syntax"><pre>─────────────<br><br><a href="../_api/discopy.closed.symmetric.html">closed</a></pre></td>
-        <td class="syntax right"><pre><a href="../_api/discopy.compact.html">compact</a><br><br>│</pre></td>
-	</tr>
-	<tr>
-        <td class="syntax left"><pre><a href="../_api/discopy.markov.html">markov</a> <a href="../_api/discopy.comarkov.html">comarkov</a></pre></td>
-        <td class="syntax"><pre>─────────────</pre></td>
-        <td class="syntax right"><pre><a href="../_api/discopy.frobenius.html">frobenius</a></pre></td>
-	</tr>
-	<tr>
-        <td class="syntax bottom-left"></td>
-        <td class="syntax bottom"></td>
-        <td class="syntax bottom-right"></td>
-	</tr>
-</tbody>
+    </thead>
+    <tbody>
+    <tr>
+        <td><a href="../_api/discopy.cat.html">cat</a><br><img src="../_static/architecture/cat.svg" alt="cat"/></td>
+        <td><a href="../_api/discopy.linear.cat.html">linear.cat</a><br><img src="../_static/architecture/linear.cat.svg" alt="linear.cat"/></td>
+        <td><a href="../_api/discopy.feedback.cat.html">feedback.cat</a><br><img src="../_static/architecture/feedback.cat.svg" alt="feedback.cat"/></td>
+        <td></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td><a href="../_api/discopy.monoidal.html">monoidal</a><br><img src="../_static/architecture/monoidal.svg" alt="monoidal"/></td>
+        <td><a href="../_api/discopy.linear.monoidal.html">linear.monoidal</a><br><img src="../_static/architecture/linear.monoidal.svg" alt="linear.monoidal"/></td>
+        <td><a href="../_api/discopy.feedback.html">feedback</a><br><img src="../_static/architecture/feedback.svg" alt="feedback"/></td>
+        <td><a href="../_api/discopy.closed.monoidal.html">closed.monoidal</a><br><img src="../_static/architecture/closed.monoidal.svg" alt="closed.monoidal"/></td>
+        <td><a href="../_api/discopy.feedback.closed.monoidal.html">feedback.closed.monoidal</a><br><img src="../_static/architecture/feedback.closed.monoidal.svg" alt="feedback.closed.monoidal"/></td>
+        <td><a href="../_api/discopy.pivotal.html">pivotal</a><br><img src="../_static/architecture/pivotal.svg" alt="pivotal"/></td>
+    </tr>
+    <tr>
+        <td><a href="../_api/discopy.spacial.html">spacial</a><br><img src="../_static/architecture/spacial.svg" alt="spacial"/></td>
+        <td></td>
+        <td></td>
+        <td><a href="../_api/discopy.rigid.html">rigid</a><br><img src="../_static/architecture/rigid.svg" alt="rigid"/></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td><a href="../_api/discopy.braided.html">braided</a><br><img src="../_static/architecture/braided.svg" alt="braided"/></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td><a href="../_api/discopy.balanced.html">balanced</a><br><img src="../_static/architecture/balanced.svg" alt="balanced"/></td>
+        <td></td>
+        <td><a href="../_api/discopy.feedback.balanced.html">feedback.balanced</a><br><img src="../_static/architecture/feedback.balanced.svg" alt="feedback.balanced"/></td>
+        <td></td>
+        <td><a href="../_api/discopy.feedback.closed.balanced.html">feedback.closed.balanced</a><br><img src="../_static/architecture/feedback.closed.balanced.svg" alt="feedback.closed.balanced"/></td>
+        <td><a href="../_api/discopy.ribbon.html">ribbon</a><br><img src="../_static/architecture/ribbon.svg" alt="ribbon"/></td>
+    </tr>
+    <tr>
+        <td><a href="../_api/discopy.symmetric.html">symmetric</a><br><img src="../_static/architecture/symmetric.svg" alt="symmetric"/></td>
+        <td><a href="../_api/discopy.linear.symmetric.html">linear.symmetric</a><br><img src="../_static/architecture/linear.symmetric.svg" alt="linear.symmetric"/></td>
+        <td><a href="../_api/discopy.feedback.symmetric.html">feedback.symmetric</a><br><img src="../_static/architecture/feedback.symmetric.svg" alt="feedback.symmetric"/></td>
+        <td><a href="../_api/discopy.closed.symmetric.html">closed.symmetric</a><br><img src="../_static/architecture/closed.symmetric.svg" alt="closed.symmetric"/></td>
+        <td><a href="../_api/discopy.feedback.closed.symmetric.html">feedback.closed.symmetric</a><br><img src="../_static/architecture/feedback.closed.symmetric.svg" alt="feedback.closed.symmetric"/></td>
+        <td><a href="../_api/discopy.compact.html">compact</a><br><img src="../_static/architecture/compact.svg" alt="compact"/></td>
+    </tr>
+    <tr>
+        <td><span class="pair"><a href="../_api/discopy.markov.html">markov</a><br><img src="../_static/architecture/markov.svg" alt="markov"/></span><span class="pair"><a href="../_api/discopy.comarkov.html">comarkov</a><br><img src="../_static/architecture/comarkov.svg" alt="comarkov"/></span></td>
+        <td><a href="../_api/discopy.linear.markov.html">linear.markov</a><br><img src="../_static/architecture/linear.markov.svg" alt="linear.markov"/></td>
+        <td><span class="pair"><a href="../_api/discopy.feedback.markov.html">feedback.markov</a><br><img src="../_static/architecture/feedback.markov.svg" alt="feedback.markov"/></span><span class="pair"><a href="../_api/discopy.feedback.comarkov.html">feedback.comarkov</a><br><img src="../_static/architecture/feedback.comarkov.svg" alt="feedback.comarkov"/></span></td>
+        <td><a href="../_api/discopy.closed.markov.html">closed.markov</a><br><img src="../_static/architecture/closed.markov.svg" alt="closed.markov"/></td>
+        <td><a href="../_api/discopy.feedback.closed.markov.html">feedback.closed.markov</a><br><img src="../_static/architecture/feedback.closed.markov.svg" alt="feedback.closed.markov"/></td>
+        <td><a href="../_api/discopy.frobenius.html">frobenius</a><br><img src="../_static/architecture/frobenius.svg" alt="frobenius"/></td>
+    </tr>
+    </tbody>
 </table>

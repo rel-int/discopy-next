@@ -72,6 +72,7 @@ from typing import ClassVar
 from discopy import cat, cmap, messages, rigid, feedback
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
+from discopy.feedback.closed import monoidal as planar
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 
@@ -93,6 +94,11 @@ class Wire(feedback.Wire, rigid.Wire):
     >>> x = Wire('x', time_step=2)
     >>> assert x.l == x.r == Wire('x', 1, time_step=2) and x.l.l == x
     >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r.d.d'
+
+    The delay is strong monoidal, so it commutes with the adjoints.
+
+    >>> y = Wire('y')
+    >>> assert y.delay().r == y.r.delay() and y.delay() != y
     """
     @property
     def l(self) -> Wire:
@@ -120,10 +126,10 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(rigid.Ty, feedback.Ty):
+class Ty(rigid.Ty, planar.Ty):
     """
     A pivotal type is a rigid type with pivotal objects inside, and a
-    feedback type that can be delayed.
+    closed feedback type that can be delayed.
 
     Parameters:
         inside (Wire) : The objects inside the type.
@@ -151,10 +157,15 @@ class Layer(rigid.Layer, feedback.Layer):
 
 @factory
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
-class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
+class Diagram(rigid.Diagram, planar.Diagram, PivotalCategory):
     """
-    A pivotal diagram is a rigid diagram and a feedback diagram
-    with pivotal types as domain and codomain.
+    A pivotal diagram is a rigid diagram and a closed feedback diagram
+    with pivotal types as domain and codomain. Its delay is the free one,
+    strong monoidal so that it commutes with cups and caps. At delay zero,
+    its feedback is its :class:`Trace`, a box of its own which
+    :meth:`open_traces` sends to a cap, the diagram and a cup; the
+    feedback of a delayed memory stays a :class:`Feedback`, which is not
+    reduced through cups.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -163,8 +174,75 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
     """
     pivotality = PivotalCategory.pivotality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    trace_superposing_left = PivotalCategory.trace_superposing_left
-    trace_superposing_right = PivotalCategory.trace_superposing_right
+
+    def to_drawing(self):
+        return rigid.Diagram.to_drawing(
+            self, functor_factory=feedback.Functor)
+
+    @classmethod
+    def dual_trace(cls, diagram: Diagram, left=False) -> Diagram:
+        """
+        The trace of the last wire of a diagram, the first when ``left``, as
+        a cap, the diagram and a cup: the :attr:`trace_factory` of a category
+        whose trace is not a box of its own, e.g.
+        :class:`~discopy.tensor.Diagram`.
+
+        Parameters:
+            diagram : The diagram to trace.
+            left : Whether to trace on the left or right.
+        """
+        wire = diagram.dom[:1] if left else diagram.dom[-1:]
+        dom, cod = (diagram.dom[1:], diagram.cod[1:]) if left\
+            else (diagram.dom[:-1], diagram.cod[:-1])
+        if left:
+            return cls.cap_factory(wire.r, wire) @ dom >> wire.r @ diagram\
+                >> cls.cup_factory(wire.r, wire) @ cod
+        return dom @ cls.cap_factory(wire, wire.r) >> diagram @ wire.r\
+            >> cod @ cls.cup_factory(wire, wire.r)
+
+    def open_traces(self) -> Diagram:
+        """
+        Send each :class:`Trace` to a cap, its argument and a cup, which is
+        what :meth:`~discopy.abc.PivotalCategory.trace_duals` says it is, and
+        open those inside the args of any other box, e.g. a delayed
+        :class:`Feedback`, which stays a box.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', y @ x, y @ x)
+        >>> assert f.trace().open_traces() == y @ Cap(x, x.r)\\
+        ...     >> f @ x.r >> y @ Cup(x, x.r)
+        >>> assert f.trace(left=True).open_traces()\\
+        ...     == Cap(y.r, y) @ x >> y.r @ f >> Cup(y.r, y) @ x
+        """
+        def image(box):
+            if isinstance(box, Sum):
+                return self.sum_factory(
+                    tuple(term.open_traces() for term in box.terms),
+                    box.dom, box.cod)
+            if box.args and not isinstance(box, Trace):
+                return box.rebuild(
+                    args=tuple(arg.open_traces() for arg in box.args))
+            if not isinstance(box, Trace):
+                return box
+            result = box.arg.open_traces()
+            for _ in box.mem.inside:
+                result = self.dual_trace(result, box.left)
+            return result
+        result = self.id(self.dom)
+        for layer in self.inside:
+            for box, offset in layer.boxes_and_offsets:
+                cod = result.cod
+                result >>= cod[:offset] @ image(box)\
+                    @ cod[offset + len(box.dom):]
+        return result
+
+    trace_duals = PivotalCategory.trace_duals.modulo(open_traces)
+    trace_superposing_left = PivotalCategory.trace_superposing_left.modulo(
+        open_traces)
+    trace_superposing_right = PivotalCategory.trace_superposing_right\
+        .modulo(open_traces)
 
     sum_factory: ClassVar[type["Sum"]]
     box_factory: ClassVar[type["Box"]]
@@ -214,26 +292,6 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         """
         return self.rotate().dagger()
 
-    @classmethod
-    def trace_factory(cls, diagram: Diagram, left=False):
-        """
-        The trace of a pivotal diagram is its pre- and post-composition with
-        cups and caps to form a feedback loop.
-
-        Parameters:
-            diagram : The diagram to trace.
-            left : Whether to trace on the left or right.
-        """
-        traced_wire = diagram.dom[:1] if left else diagram.dom[-1:]
-        dom, cod = (diagram.dom[1:], diagram.cod[1:]) if left\
-            else (diagram.dom[:-1], diagram.cod[:-1])
-        return cls.cap_factory(traced_wire.r, traced_wire) @ dom\
-            >> traced_wire.r @ diagram\
-            >> cls.cup_factory(traced_wire.r, traced_wire) @ cod if left\
-            else dom @ cls.cap_factory(traced_wire, traced_wire.r)\
-            >> diagram @ traced_wire.r\
-            >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
-
     dagger_involution = DaggerCategory.dagger_involution
     dagger_involution_rigid = DaggerCategory.dagger_involution.weaken(
         within=RigidCategory)
@@ -255,7 +313,7 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
-class Box(rigid.Box, feedback.Box, Diagram):
+class Box(rigid.Box, planar.Box, Diagram):
     """
     A pivotal box is a rigid box in a pivotal diagram.
 
@@ -330,7 +388,7 @@ class Cap(rigid.Cap, Box):
 
 
 # pylint: disable-next=inconsistent-mro  # astroid's, not Python's
-class Sum(rigid.Sum, feedback.Sum, Box):
+class Sum(rigid.Sum, planar.Sum, Box):
     """
     A pivotal sum is a sum of pivotal diagrams.
 
@@ -341,7 +399,7 @@ class Sum(rigid.Sum, feedback.Sum, Box):
     """
 
 
-class Functor(rigid.Functor, feedback.Functor):
+class Functor(rigid.Functor, planar.Functor):
     """
     A pivotal functor is a rigid functor on a pivotal category.
 

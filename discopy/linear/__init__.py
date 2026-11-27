@@ -11,6 +11,8 @@ module for each level the bang makes sense at.
 
     cat
     monoidal
+    symmetric
+    markov
 
 :mod:`linear.cat <discopy.linear.cat>` is the comonad, the
 :class:`cat.Dereliction` ``!x -> x`` and the :class:`cat.Digging`
@@ -19,9 +21,11 @@ module for each level the bang makes sense at.
 :class:`monoidal.Contraction` and :class:`monoidal.Weakening` of the comonoid
 on a banged object, the :class:`monoidal.Laxator` and the
 :class:`monoidal.Exchange`, which makes a banged object central rather than
-the category symmetric. Linear logic and
+the category symmetric. :mod:`~discopy.linear.symmetric` takes the swap
+for the exchange and :mod:`~discopy.linear.markov` the copy and discard of a
+banged object for its contraction and weakening. Linear logic and
 :mod:`~discopy.feedback` do not import each other: they meet in
 :class:`~discopy.abc.GoISituation`.
 """
 
-from discopy.linear import cat, monoidal  # noqa: F401
+from discopy.linear import cat, monoidal, symmetric, markov  # noqa: F401

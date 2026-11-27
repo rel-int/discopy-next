@@ -213,6 +213,7 @@ The regions of a crossing follow its strands, see
 from __future__ import annotations
 
 import itertools
+from copy import copy
 from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
@@ -221,7 +222,8 @@ import networkx as nx
 
 from discopy import messages
 from discopy.drawing import backend, Node, Point
-from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
+from discopy.config import (
+    BOX_DRAWING_ATTRIBUTES, COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.abc import (
     DaggerMonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.python import finset
@@ -341,6 +343,17 @@ class PlaneGraph(NamedTuple):
             sorted(self.positions.items(), key=lambda item: key(item[0])))
         return f"PlaneGraph(graph=nx.DiGraph({adjacency}), "\
                f"positions={positions})"
+
+
+def swap_colours(wire):
+    """
+    The wire a trace loops back along, the colours on its sides swapped,
+    e.g. a ribbon edge coming back up on the other side of its ribbon.
+    """
+    result = copy(wire)
+    result.dom, result.cod = wire.cod, wire.dom
+    result.ribbon = COLOUR_DRAWING_ATTRIBUTES["ribbon"](result)
+    return result
 
 
 @factory
@@ -1369,22 +1382,40 @@ which to_drawing recomputes.
         return result
 
     def trace(self, n=1, left=False) -> Drawing:
+        """
+        The trace of the last ``n`` wires, the first when ``left``, drawn as
+        a cap, the drawing and a cup, the loop coming back along each wire
+        with its colours swapped. The two rails of a ribbon are traced in one
+        loop, its cap and cup drawn as the constant-width folds of
+        :class:`~discopy.ribbon.DualRailCap` and
+        :class:`~discopy.ribbon.DualRailCup`, so that the ribbon keeps its
+        width all the way round; other wires one at a time, the last first.
+        """
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self
-        if n > 1:
-            return self.trace(left=left).trace(n=n - 1, left=left)
-        dom = self.dom[1:] if left else self.dom[:-1]
-        cod = self.cod[1:] if left else self.cod[:-1]
-        traced_dom = self.dom[:1] if left else self.dom[-1:]
-        traced_cod = self.cod[:1] if left else self.cod[-1:]
-        cap_cod, cup_dom = traced_dom ** 2, (
-            traced_dom @ traced_cod if left else traced_cod @ traced_dom)
-        cup = Box('cup', cup_dom, Ty(), draw_as_wires=True).to_drawing()
-        cap = Box('cap', Ty(), cap_cod, draw_as_wires=True).to_drawing()
+        traced_dom = self.dom[:n] if left else self.dom[-n:]
+        traced_cod = self.cod[:n] if left else self.cod[-n:]
+        is_ribbon = any(
+            getattr(wire, "ribbon", None) for wire in traced_dom.inside)
+        step = 2 if is_ribbon else 1
+        if n > step:
+            return self.trace(step, left).trace(n - step, left)
+        dom = self.dom[n:] if left else self.dom[:-n]
+        cod = self.cod[n:] if left else self.cod[:-n]
+        back = traced_dom.factory(
+            *map(swap_colours, reversed(traced_dom.inside)))
+        cap_cod, cup_dom = (
+            back @ traced_dom, back @ traced_cod) if left else (
+            traced_dom @ back, traced_cod @ back)
+        fold = len(cap_cod) == 4 and is_ribbon
+        cup = Box('cup', cup_dom, Ty.id(cup_dom.dom), draw_as_wires=not fold,
+                  draw_as_dual_rail_cup=fold).to_drawing()
+        cap = Box('cap', Ty.id(cap_cod.dom), cap_cod, draw_as_wires=not fold,
+                  draw_as_dual_rail_cap=fold).to_drawing()
         return (
-            cap @ dom >> traced_dom @ self >> cup @ cod if left
-            else dom @ cap >> self @ traced_dom >> cod @ cup)
+            cap @ dom >> back @ self >> cup @ cod if left
+            else dom @ cap >> self @ back >> cod @ cup)
 
     def dagger(self) -> Drawing:
         """ The reflection of a drawing along the the horizontal axis. """

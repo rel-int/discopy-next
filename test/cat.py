@@ -689,6 +689,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "symmetric.Swap": "c(x, y)",
     "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
     "feedback.Box": 'c("f", x, y, data=v).delay()',
+    "feedback.cat.Box": 'c("f", x, y, data=v).delay()',
     "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
     "feedback.Feedforward": "c(box(c, x @ y, x @ y.delay(), v))",
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
@@ -717,10 +718,11 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "linear.monoidal.Laxator": "c(x, y)",
     "closed.monoidal.{Eval,Coeval}": "c(x << y)",
     "closed.symmetric.{Eval,Coeval} closed.markov.{Eval,Coeval}": "c(x << y)",
-    "feedback.closed.markov.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "feedback.closed.{monoidal,balanced,symmetric,markov}.{Eval,Coeval}":
+    "c(x << y, time_step=1)",
     "closed.{monoidal,symmetric,markov}.Curry":
     "c(box(c, x @ y, x, v), 1, False)",
-    "feedback.closed.markov.Curry":
+    "feedback.closed.{monoidal,balanced,symmetric,markov}.Curry":
     "c(box(c, x @ y, x, v), 1, False, time_step=1)",
     "closed.monoidal.Constant": 'c("c", x, data=v)',
     "{closed.markov,lambek.categorial}.Constant "
@@ -854,21 +856,20 @@ BROKEN = {
         "closed.markov.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "lambek.categorial.*Composition": "a crossed composition has none",
-        PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
         "!L* has no rule from its codomain back to its domain",
         "{closed.markov,markov,lambek.abstract,feedback.closed.markov,"
-        "feedback.markov}"
+        "feedback.markov,linear.markov}"
         ".{Copy,Discard,Function} "
         "{comarkov,feedback.comarkov}.{Cofunction,Merge,Noise}":
         "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Feedforward,Trace,Head,Tail,FollowedBy}":
+        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Feedforward,Trace}":
+        "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace":
         "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },

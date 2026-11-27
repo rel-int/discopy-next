@@ -92,7 +92,8 @@ cap becomes a ribbon folding back.
 
 from typing import ClassVar
 
-from discopy import rigid, pivotal, balanced, feedback
+from discopy import pivotal, balanced, feedback
+from discopy.feedback.closed import balanced as traced
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -101,9 +102,11 @@ from discopy.utils import from_tree
 
 
 @factory
-class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+class Diagram(pivotal.Diagram, traced.Diagram, RibbonCategory):
     """
-    A ribbon diagram is a pivotal diagram and a balanced diagram.
+    A ribbon diagram is a pivotal diagram and a balanced closed feedback
+    diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -118,24 +121,6 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
     twist_factory: ClassVar[type["Twist"]]
     sum_factory: ClassVar[type["Sum"]]
     dual_rail_factory: ClassVar[type["DualRail"]]
-
-    def trace(self, n=1, left=False):
-        """
-        The trace of a ribbon diagram.
-
-        Parameters:
-            n : The number of wires to trace.
-            left : Whether to trace the wires on the left or right.
-        """
-        if not n:
-            return self
-        if left:
-            return self.caps(self.dom[:n].r, self.dom[:n]) @ self.dom[n:]\
-                >> self.dom[:n].r @ self\
-                >> self.cups(self.cod[:n].r, self.cod[:n]) @ self.cod[n:]
-        return self.dom[:-n] @ self.caps(self.dom[-n:], self.dom[-n:].r)\
-            >> self @ self.dom[-n:].r\
-            >> self.cod[:-n] @ self.cups(self.cod[-n:], self.cod[-n:].r)
 
     def cup(self, x, y):
         """
@@ -179,10 +164,13 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
         .. image:: /_static/balanced/twist_dual_rail.svg
         """
-        return self.to_braided(width, colour)
+        if width == 0:
+            return self
+        return self.open_traces().to_braided(width, colour)
 
 
-class Box(pivotal.Box, balanced.Box, Diagram):
+# pylint: disable-next=inconsistent-mro  # astroid's, not Python's
+class Box(pivotal.Box, traced.Box, Diagram):
     """
     A ribbon box is a pivotal and balanced box in a ribbon diagram.
 
@@ -213,7 +201,7 @@ class Cap(pivotal.Cap, Box):
     """
 
 
-class Braid(balanced.Braid, Box):
+class Braid(traced.Braid, Box):
     """
     A ribbon braid is a balanced braid in a ribbon diagram.
 
@@ -358,7 +346,7 @@ class DualRailCap(Box):
         return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
-class Twist(balanced.Twist, Box):
+class Twist(traced.Twist, Box):
     """
     Balanced twist in a ribbon category.
 
@@ -372,7 +360,7 @@ class Twist(balanced.Twist, Box):
         return type(self)(self.dom.r, self.is_dagger)
 
 
-class Sum(rigid.Sum, feedback.Sum, Box):
+class Sum(pivotal.Sum, traced.Sum, Box):
     """
     A ribbon sum is a sum of ribbon diagrams.
 
@@ -383,7 +371,7 @@ class Sum(rigid.Sum, feedback.Sum, Box):
     """
 
 
-class Functor(pivotal.Functor, balanced.Functor):
+class Functor(pivotal.Functor, traced.Functor):
     """
     A ribbon functor is both a pivotal functor and a balanced functor.
 
@@ -421,7 +409,7 @@ class DualRail(balanced.DualRail, Functor):
             return DualRailCup(self(other.dom[:1]), self(other.dom[1:]))
         if isinstance(other, Cap):
             return DualRailCap(self(other.cod[:1]), self(other.cod[1:]))
-        if isinstance(other, (Braid, Twist)):
+        if isinstance(other, (balanced.Braid, Twist)):
             return super().__call__(other)  # A single dual rail box crossing.
         if isinstance(other, Box) and not other.time_step\
                 and not other.args and not isinstance(

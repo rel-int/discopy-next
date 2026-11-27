@@ -1447,12 +1447,12 @@ def test_CMap_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
 def test_CMap_explicit_trace_keeps_an_overridden_factory(monkeypatch):
     """
     The onion in one call *is* the pivotal trace, so it is built only when
-    ``trace_factory`` is pivotal's own class method: a category overriding it
-    gets the nest its own factory builds, one wire at a time, rather than the
-    cups and caps it never asked for.
+    ``trace_factory`` is pivotal's own ``Trace`` box: a category overriding it
+    with a class method gets the nest its own factory builds, one wire at a
+    time, rather than the cups and caps it never asked for.
     """
     from discopy import frobenius, pivotal
-    pivotal_trace = pivotal.Diagram.trace_factory.__func__
+    pivotal_trace = pivotal.Diagram.dual_trace.__func__
     for module in (compact, frobenius):
         x = module.Ty('x')
         cmap = module.Box('f', x ** 8, x ** 8).to_map()
