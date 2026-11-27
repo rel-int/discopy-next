@@ -25,6 +25,7 @@ from discopy import (
     hypergraph,
     egraph,
     cmap,
+    inet,
     interaction,
     feedback,
     stream,

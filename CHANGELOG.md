@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.inet`: interaction nets on flat port lists (`Symbol`, `Signature`,
+  `Net`, `Rewriter`) and the symmetric interaction combinators `combinators`
+  with optional labels on duplicators `δ`, checked against double-pushout
+  rewriting in `discopy.hypergraph`, together with their Geometry of
+  Interaction token machine `Net.path` checked against `Net.to_int` in
+  `Int(python.additive.Function)` ([next#542]).
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -2714,6 +2721,7 @@ for the changelog of `1.2.1` and earlier.
 [next#539]: https://github.com/rel-int/discopy-next/pull/539
 [next#540]: https://github.com/rel-int/discopy-next/pull/540
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
+[next#542]: https://github.com/rel-int/discopy-next/issues/542
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
 [next#550]: https://github.com/rel-int/discopy-next/pull/550
