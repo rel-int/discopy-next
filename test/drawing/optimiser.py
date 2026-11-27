@@ -158,6 +158,14 @@ def test_a_wire_crossing_itself_is_not_valid():
     assert not snake.is_valid(z)
 
 
+def test_the_frame_holds_the_boxes():
+    drawing = to_pivotal_drawing(
+        pivotal.Box('f', px @ px @ px, py).transpose())
+    corners = drawing.framed().positions.values()
+    assert max(p.x for p in corners) <= drawing.width
+    assert max(p.y for p in corners) <= drawing.height
+
+
 def test_the_empty_diagram():
     drawing = to_pivotal_drawing(pivotal.Id())
     assert not drawing.boxes and not drawing.positions

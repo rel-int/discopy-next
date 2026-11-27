@@ -1233,10 +1233,11 @@ class PlanarMap:
                     (relabel.get(u, u), relabel.get(v, v))
                     for u, v in zip(path, path[1:]))
         graph.add_nodes_from(positions)
-        width = max(p.x for p in positions.values()) + .25\
-            if positions else 0
-        height = max([float(z[self.offset("height")])]
-                     + [p.y for p in positions.values()])
+        extent = np.concatenate([np.array(list(positions.values())).reshape(
+            -1, 2)] + [self.corners(z, k) + [shift, 0]
+                       for k in range(len(self.boxes))])
+        width = extent[:, 0].max() + .25 if len(extent) else 0
+        height = extent[:, 1].max(initial=float(z[self.offset("height")]))
         return Optimised(
             PlaneGraph(graph, positions), drawing.dom, drawing.cod,
             tuple(boxes), max(width, 1 if boxes else 0), height, _check=False)
