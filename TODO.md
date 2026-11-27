@@ -7,7 +7,7 @@
 > - Move the interpreted uses to `dataflow`: the fib and random-walk doctests in `stream.py` (~48-102), `test_walk`/`test_fibonacci` in `test/markov.py` (~237-290), the categorical-deep-learning notebook (~231-257), the `markov.py:176-186` walk. Plumbing tests (~30: serialisation, dagger, delay, generated subclasses, functor boundary) move to `test/dataflow.py` or go.
 > - Add `dataflow` to the docs API (syntax section) and a CHANGELOG line; an ADR if it fits the repo's practice.
 
-- [ ] discopy/dataflow.py: the mixins, Diagram on feedback.markov, Functor raising into a codomain without streams
+- [x] discopy/dataflow.py: the mixins, Diagram on feedback.markov, Functor raising into a codomain without streams
 - [ ] remove HeadOb, TailOb, Head, Tail, FollowedBy, is_constant from feedback and every level, structural_wires, the Functor branches, Dim/Nat/Dims heads, circuit and optyx heads
 - [ ] move the fib, random-walk and walk doctests, test_walk/test_fibonacci and the notebook to dataflow; plumbing tests to test/dataflow.py
 - [ ] docs API, CHANGELOG, ADR
