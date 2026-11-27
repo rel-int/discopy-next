@@ -63,5 +63,5 @@
 >
 > Useful? React with 👍 / 👎.
 
-- [ ] dataflow/__init__.py:406 mapped head/tail go to their images, not bubbles
+- [x] dataflow/__init__.py:406 mapped head/tail go to their images, not bubbles
 - [ ] dataflow/symmetric.py:192 term factories bound to both dataflow levels
