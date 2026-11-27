@@ -16,6 +16,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Interaction token machine `Net.path` checked against `Net.to_int` in
   `Int(python.additive.Function)` ([next#542]).
 
+- `cat.Ob.alphabet()` is the objects named after `testable.GENERATORS`, and
+  `interaction.Ty.alphabet()` the integer types of one atom of its natural types, positive or
+  negative, so that the objects of `cat.Arrow`, `op.Category`, `interaction.Diagram` and every
+  `lens` category state an alphabet, as those of the monoidal categories do.
+
+- `generator_strategy(dom=..., cod=..., name=...)` draws the generator of a given name between
+  given objects wherever terms are derived from generators: a box of a free category
+  (`Box.strategy` takes `name`), its image in `Hypergraph[C]` and `CMap[C]`, and any matrix of
+  `Matrix`, which has no name, so that a sampler outside discopy can make the leaves of the
+  terms it derives with one call per class.
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -34,6 +45,33 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `symmetric`, `frobenius` and `interaction` ones; the dagger laws of
   `markov` and `comarkov` fail on their copies, discards, merges and noises
   ([next#730]).
+
+- `abc.ColouredMonoid.alphabet` gives the atoms the formation rules start from, in a canonical
+  order: a tuple when finitely many, e.g. the uncoloured wires named after
+  `testable.GENERATORS` of a free `Ty`, `Nat(1)` or the Python types of `List[type]`, an
+  unbounded iterator otherwise, e.g. `Dim(n)` from two or the digits and qudits of a circuit, and
+  `None` when a class does not say.
+
+- The equations of the objects are axioms of their classes: `abc.Pregroup` states
+  `adjoint_involution`, `adjoint_contravariance_left` and `_right`, `residuation_over` and
+  `residuation_under`, and `abc.DelayMonoid` `delay_monoidality` and `delay_unit`, so that the
+  property matrix checks them on every class of types.
+
+- `testable.PROVIDERS` holds `Provider`s, partial maps from a declaration to a strategy of its
+  sequents, which `Declaration.sequents` tries in order before drawing them itself, so that a
+  plugin, e.g. a Boltzmann sampler, supplies the arguments of the laws it covers without patching
+  `Axiom.sequents`. `Declaration.provider` names the one that draws, and each cell of the
+  property matrix notes it.
+
+- The constructors of object expressions in `discopy.testable` are rules: `Constructor`
+  subclasses `Rule`, and each constructor is the formation rule of the class of objects whose
+  structure it is. The objects of a category are the morphisms of a coloured monoid, whose `cut`
+  is the `Tensor` and whose `ax` the `Unit`; `abc.ColouredMonoid` adds `form_repeat`,
+  `ResiduatedMonoid` `form_over` and `form_under`, `Pregroup` `form_l` and `form_r`, and the new
+  `abc.DelayMonoid` and `abc.BangMonoid`, the objects of feedback and linear categories,
+  `form_delay` and `form_bang`. `Testable.constructors` lists them, so that objects are derived
+  from rules as morphisms are. `feedback.Ty` is a `DelayMonoid`, `bang.Ty` a `BangMonoid` and
+  `biclosed.Ty` a `ResiduatedMonoid`.
 
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
@@ -1054,6 +1092,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Spider`, `And`, `Or` and the value-initialised `classical` boxes), while
   `ClassicalFunction` and `BitControlledPhaseShift` raise `TypeError` on
   `to_tree` since JSON cannot hold a Python callable ([next#731]).
+
+- `feedback.Ty.delay` keeps the colour of a unit: a type with no wire is its own delay, as
+  `abc.DelayMonoid.delay_unit` states.
+
+- `comarkov.Diagram.Spider` builds a spider with no leg out as the trace of a merge,
+  the mirror of `markov`'s traced copy, so that a traced merge reads back from its hypergraph
+  and `hypergraph_section` holds on it.
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a

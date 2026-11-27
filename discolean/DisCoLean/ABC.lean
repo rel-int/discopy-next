@@ -94,6 +94,38 @@ structure ColouredMonoid.Laws (cat : ColouredMonoid Ob Hom) : Prop extends toCat
 structure ColouredMonoid.Functor (cat : ColouredMonoid Ob Hom) (cat' : ColouredMonoid Ob' Hom') extends toCategory : Category.Functor cat.toCategory cat'.toCategory where
   map_tensor : ∀ (f g : Hom), map (cat.tensor f g) = cat'.tensor (map f) (map g)
 
+/-- `discopy.abc.DelayMonoid`: A delay monoid is a `ColouredMonoid` with a monoid endomorphism `delay`, the objects of a `FeedbackCategory`. -/
+structure DelayMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
+  delay : Hom → Nat → Hom
+
+/-- The delay is a monoid endomorphism: it preserves the tensor. -/
+def DelayMonoid.delay_monoidality (cat : DelayMonoid Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (x y : Hom), cat.dom x = A → cat.cod x = B → cat.dom y = B → cat.cod y = C → cat.delay (cat.tensor x y) 1 = cat.tensor (cat.delay x 1) (cat.delay y 1)
+
+/-- The delay is a monoid endomorphism: it preserves the unit. -/
+def DelayMonoid.delay_unit (cat : DelayMonoid Ob Hom) : Prop :=
+  ∀ (X : Ob), cat.delay (cat.id X) 1 = cat.id X
+
+/-- The laws of `DelayMonoid`. -/
+structure DelayMonoid.Laws (cat : DelayMonoid Ob Hom) : Prop extends toColouredMonoid : ColouredMonoid.Laws cat.toColouredMonoid where
+  delay_monoidality : cat.delay_monoidality
+  delay_unit : cat.delay_unit
+
+/-- A functor of `DelayMonoid`: it preserves each of its operations. -/
+structure DelayMonoid.Functor (cat : DelayMonoid Ob Hom) (cat' : DelayMonoid Ob' Hom') extends toColouredMonoid : ColouredMonoid.Functor cat.toColouredMonoid cat'.toColouredMonoid where
+  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
+
+/-- `discopy.abc.BangMonoid`: A bang monoid is a `ColouredMonoid` with an operation `bang`, the objects of a `LinearCategory`. -/
+structure BangMonoid (Ob : Type u) (Hom : Type v) extends ColouredMonoid Ob Hom where
+  bang : Hom → Hom
+
+/-- The laws of `BangMonoid`. -/
+structure BangMonoid.Laws (cat : BangMonoid Ob Hom) : Prop extends toColouredMonoid : ColouredMonoid.Laws cat.toColouredMonoid
+
+/-- A functor of `BangMonoid`: it preserves each of its operations. -/
+structure BangMonoid.Functor (cat : BangMonoid Ob Hom) (cat' : BangMonoid Ob' Hom') extends toColouredMonoid : ColouredMonoid.Functor cat.toColouredMonoid cat'.toColouredMonoid where
+  map_bang : ∀ (f : Hom), map (cat.bang f) = cat'.bang (map f)
+
 /-- `discopy.abc.Monoid`: A monoid is a coloured monoid with a single, trivial colour. -/
 structure Monoid (Hom : Type v) extends ColouredMonoid Unit Hom where
 
@@ -286,12 +318,41 @@ structure ResiduatedMonoid.Functor (cat : ResiduatedMonoid Ob Hom) (cat' : Resid
 
 /-- `discopy.abc.Pregroup`: A pregroup is a residuated monoid where the left and right exponentials are given by tensoring with the chosen left and right duals for each object. -/
 structure Pregroup (Ob : Type u) (Hom : Type v) extends ResiduatedMonoid Ob Hom where
+  l : Hom → Hom
+  r : Hom → Hom
+
+/-- The left adjoint of the right adjoint is the identity, and vice versa. -/
+def Pregroup.adjoint_involution (cat : Pregroup Ob Hom) : Prop :=
+  ∀ (A B : Ob) (x : Hom), cat.dom x = A → cat.cod x = B → cat.l (cat.r x) = x ∧ x = cat.r (cat.l x)
+
+/-- The left adjoint reverses the tensor, `(x @ y).l == y.l @ x.l`. -/
+def Pregroup.adjoint_contravariance_left (cat : Pregroup Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (x y : Hom), cat.dom x = A → cat.cod x = B → cat.dom y = B → cat.cod y = C → cat.l (cat.tensor x y) = cat.tensor (cat.l y) (cat.l x)
+
+/-- The right adjoint reverses the tensor, `(x @ y).r == y.r @ x.r`. -/
+def Pregroup.adjoint_contravariance_right (cat : Pregroup Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (x y : Hom), cat.dom x = A → cat.cod x = B → cat.dom y = B → cat.cod y = C → cat.r (cat.tensor x y) = cat.tensor (cat.r y) (cat.r x)
+
+/-- The exponential over is the tensor with the left adjoint, `x << y == x @ y.l`. -/
+def Pregroup.residuation_over (cat : Pregroup Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (x y : Hom), cat.dom x = A → cat.cod x = B → cat.dom y = C → cat.cod y = B → cat.comp y x = cat.tensor x (cat.l y)
+
+/-- The exponential under is the tensor with the right adjoint, `y >> x == y.r @ x`. -/
+def Pregroup.residuation_under (cat : Pregroup Ob Hom) : Prop :=
+  ∀ (A B C : Ob) (y x : Hom), cat.dom y = A → cat.cod y = C → cat.dom x = A → cat.cod x = B → cat.comp y x = cat.tensor (cat.r y) x
 
 /-- The laws of `Pregroup`. -/
-structure Pregroup.Laws (cat : Pregroup Ob Hom) : Prop extends toResiduatedMonoid : ResiduatedMonoid.Laws cat.toResiduatedMonoid
+structure Pregroup.Laws (cat : Pregroup Ob Hom) : Prop extends toResiduatedMonoid : ResiduatedMonoid.Laws cat.toResiduatedMonoid where
+  adjoint_involution : cat.adjoint_involution
+  adjoint_contravariance_left : cat.adjoint_contravariance_left
+  adjoint_contravariance_right : cat.adjoint_contravariance_right
+  residuation_over : cat.residuation_over
+  residuation_under : cat.residuation_under
 
 /-- A functor of `Pregroup`: it preserves each of its operations. -/
 structure Pregroup.Functor (cat : Pregroup Ob Hom) (cat' : Pregroup Ob' Hom') extends toResiduatedMonoid : ResiduatedMonoid.Functor cat.toResiduatedMonoid cat'.toResiduatedMonoid where
+  map_l : ∀ (f : Hom), map (cat.l f) = cat'.l (map f)
+  map_r : ∀ (f : Hom), map (cat.r f) = cat'.r (map f)
 
 /-- `discopy.abc.BraidedCategory`: A braided category is a `MonoidalCategory` with a method `braid` for the natural isomorphism `x @ y -> y @ x`. -/
 structure BraidedCategory (Ob : Type u) (Hom : Type v) extends SpacialCategory Ob Hom where

@@ -949,6 +949,13 @@ class CMap[category](
         return graphs.map(lambda graph: graph.to_map())
 
     @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None, name=None):
+        """ Generate the generators of the cmaps of a category: the
+        image of one of its generators, see :meth:`from_box`. """
+        return cls.category.generator_strategy(
+            dom=dom, cod=cod, name=name).map(cls.from_box)
+
+    @classmethod
     def from_box(cls, box: "Box") -> "CMap":
         """ Embed a box, wiring its boundary to fresh box ports. """
         left = len(box.dom)

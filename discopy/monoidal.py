@@ -488,6 +488,19 @@ class List[Atom](Monoid["List"], TestableGeneric):
             + f"({', '.join(map(self.generator_repr, self.inside))})"
 
     @classmethod
+    def alphabet(cls) -> tuple[List, ...] | None:
+        """
+        The lists of one Python type, one of :data:`testable.VALUES`, the
+        free monoid on any other generator naming none.
+
+        >>> from discopy.python import Ty
+        >>> assert Ty.alphabet() == tuple(map(Ty, testable.VALUES))
+        """
+        if cls.Atom is not type:
+            return None
+        return tuple(map(cls, testable.VALUES))
+
+    @classmethod
     def generator_strategy(cls):
         """
         Generate the lists of one Python type, one of those
@@ -597,6 +610,18 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         >>> assert len(find(Ty.strategy(), lambda x: len(x) > 1)) == 2
         """
         return cls.search(**{"fuel": 1, **params})
+
+    @classmethod
+    def alphabet(cls) -> tuple[Ty, ...]:
+        """
+        The types of one wire named after :data:`discopy.testable.GENERATORS`,
+        with no colour: a wire with a winding or a time step is formed from
+        them, see :class:`discopy.abc.Pregroup` and
+        :class:`discopy.abc.DelayMonoid`.
+
+        >>> assert Ty.alphabet()[0] == Ty('a')
+        """
+        return tuple(cls(cls.Atom(name)) for name in GENERATORS)
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
@@ -990,6 +1015,16 @@ class Dim(Ty):
     Box = None
     """ No generator of one colour is named, so there is no canonical
     instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def alphabet(cls) -> Iterable[Dim]:
+        """
+        The dimensions of one wire, two and above, unboundedly many.
+
+        >>> from itertools import islice
+        >>> assert list(islice(Dim.alphabet(), 2)) == [Dim(2), Dim(3)]
+        """
+        return (cls(n) for n in count(2))
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):

@@ -226,6 +226,14 @@ class Matrix[dtype](
             lambda matrix: index(matrix.dom) * index(matrix.cod)
             <= max_entries)
 
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None, name=None):
+        """ Generate the generators of a category of matrices: any matrix
+        from ``dom`` to ``cod``, which has no ``name``, see :meth:`strategy`.
+        """
+        del name
+        return cls.strategy(dom=dom, cod=cod)
+
     def cast(self, dtype: type) -> Matrix:
         """
         Cast a matrix to a given ``dtype``, the matrix itself when it

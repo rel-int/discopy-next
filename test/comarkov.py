@@ -219,3 +219,10 @@ def test_dagger():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_traced_merge_hypergraph_section():
+    x = Ty('x')
+    for left in (True, False):
+        f = Merge(x).trace(left=left)
+        assert Diagram.hypergraph_section(f=f)

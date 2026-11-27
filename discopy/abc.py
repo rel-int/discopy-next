@@ -62,7 +62,7 @@ Summary
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from inspect import signature
@@ -342,6 +342,85 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     def __rmatmul__(self: C1, other):
         return self.whisker(other).tensor(self)
 
+    @classmethod
+    def alphabet(cls: type[C1]) -> Iterable[C1] | None:
+        """
+        The atoms the formation rules start from, in a canonical order: a
+        tuple when they are finitely many, an unbounded iterator otherwise,
+        and :obj:`None` when the class does not say. Every other element is
+        formed from them by the rules of :attr:`constructors`, e.g. the
+        adjoints of a :class:`Pregroup`, so an adjoint is not an atom.
+
+        >>> assert Nat.alphabet() == (Nat(1), )
+        """
+        return None
+
+    @Unit
+    def ax[X: Obj[C0]](cls: type[C1], x: Var[C0, X]) -> Hom[C1, X, X]:
+        """ The formation rule of :class:`Unit`: the unit at a colour. """
+        return cls.id(x)
+
+    @Tensor
+    def cut[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, B, C]) -> Hom[C1, A, C]:
+        """ The formation rule of :class:`Tensor`: the tensor of two
+        elements, which is their composition. """
+        return f.tensor(g)
+
+    @Repeat
+    def form_repeat[A: Obj[C0], N: Nat](
+            cls: type[C1], x: Hom[C1, A, A], n: Var[Nat, N]
+    ) -> Hom[C1, A, A]:
+        """ The formation rule of :class:`Repeat`: an element repeated
+        ``n`` times. """
+        return x.tensor(*(index(n) - 1) * [x]) if index(n) else cls.id(x.dom)
+
+
+class DelayMonoid[C0, C1: DelayMonoid](ColouredMonoid[C0, C1]):
+    """
+    A delay monoid is a :class:`ColouredMonoid` with a monoid endomorphism
+    ``delay``, the objects of a :class:`FeedbackCategory`.
+    """
+    @abstractmethod
+    def delay(self: C1, n: int = 1) -> C1:
+        """ The delay of an element by ``n`` time steps. """
+
+    @Delay
+    def form_delay[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, A, B]:
+        """ The formation rule of :class:`Delay`: the delay of an element by
+        one time step. """
+        return x.delay()
+
+    @axiom
+    def delay_monoidality[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, A, C]]:
+        """ The delay is a monoid endomorphism: it preserves the tensor. """
+        return cls.Equation((x @ y).delay(), x.delay() @ y.delay())
+
+    @axiom
+    def delay_unit[X: Obj[C0]](
+            cls: type[C1], x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """ The delay is a monoid endomorphism: it preserves the unit. """
+        return cls.Equation(cls.id(x).delay(), cls.id(x))
+
+
+class BangMonoid[C0, C1: BangMonoid](ColouredMonoid[C0, C1]):
+    """
+    A bang monoid is a :class:`ColouredMonoid` with an operation ``bang``,
+    the objects of a :class:`LinearCategory`.
+    """
+    @abstractmethod
+    def bang(self: C1) -> C1:
+        """ The bang of an element. """
+
+    @Bang
+    def form_bang[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, A, B]:
+        """ The formation rule of :class:`Bang`: the bang of an element. """
+        return x.bang()
+
 
 class Monoid[C1: Monoid](ColouredMonoid[NoneType, C1]):
     """ A monoid is a coloured monoid with a single, trivial colour. """
@@ -476,6 +555,11 @@ class Nat(Monoid["Nat"]):
         from hypothesis import strategies as st
 
         return st.integers(min_value=0, max_value=max_size).map(cls)
+
+    @classmethod
+    def alphabet(cls) -> tuple[Nat, ...]:
+        """ The one atom, ``Nat(1)``. """
+        return (cls(1), )
 
     @classmethod
     def generator_strategy(cls, **_):
@@ -1087,6 +1171,20 @@ class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
     def __rshift__(self, other):
         return other.under(self)
 
+    @Over
+    def form_over[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, base: Hom[C1, A, B], exponent: Hom[C1, C, B]
+    ) -> Hom[C1, A, C]:
+        """ The formation rule of :class:`Over`: ``base << exponent``. """
+        return base << exponent
+
+    @Under
+    def form_under[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, exponent: Hom[C1, A, C], base: Hom[C1, A, B]
+    ) -> Hom[C1, C, B]:
+        """ The formation rule of :class:`Under`: ``exponent >> base``. """
+        return exponent >> base
+
 
 class BiclosedCategory[
         C0: ResiduatedMonoid, C1: BiclosedCategory](MonoidalCategory[C0, C1]):
@@ -1601,6 +1699,57 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
     """
     l: C1
     r: C1
+
+    @L
+    def form_l[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, B, A]:
+        """ The formation rule of :class:`L`: the left adjoint. """
+        return x.l
+
+    @R
+    def form_r[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Hom[C1, B, A]:
+        """ The formation rule of :class:`R`: the right adjoint. """
+        return x.r
+
+    @axiom
+    def adjoint_involution[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ The left adjoint of the right adjoint is the identity, and vice
+        versa. """
+        return cls.Equation(x.r.l, x, x.l.r)
+
+    @axiom
+    def adjoint_contravariance_left[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, C, A]]:
+        """ The left adjoint reverses the tensor, ``(x @ y).l == y.l @ x.l``.
+        """
+        return cls.Equation((x @ y).l, y.l @ x.l)
+
+    @axiom
+    def adjoint_contravariance_right[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, C, A]]:
+        """ The right adjoint reverses the tensor, ``(x @ y).r == y.r @ x.r``.
+        """
+        return cls.Equation((x @ y).r, y.r @ x.r)
+
+    @axiom
+    def residuation_over[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Hom[C1, A, B], y: Hom[C1, C, B]
+    ) -> Equation[Hom[C1, A, C]]:
+        """ The exponential over is the tensor with the left adjoint,
+        ``x << y == x @ y.l``. """
+        return cls.Equation(x << y, x @ y.l)
+
+    @axiom
+    def residuation_under[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, y: Hom[C1, A, C], x: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, C, B]]:
+        """ The exponential under is the tensor with the right adjoint,
+        ``y >> x == y.r @ x``. """
+        return cls.Equation(y >> x, y.r @ x)
 
     def is_adjoint(self: C1, other: C1) -> bool:
         """

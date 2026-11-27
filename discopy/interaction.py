@@ -129,6 +129,21 @@ class Ty[natural](Pregroup, TestableGeneric):
     associativity = Pregroup.associativity.inapplicable(messages.PAIR_TYPES)
     ax = Pregroup.ax.inapplicable(messages.PAIR_TYPES)
     cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
+    form_repeat = Pregroup.form_repeat.inapplicable(messages.PAIR_TYPES)
+    form_over = Pregroup.form_over.inapplicable(messages.PAIR_TYPES)
+    form_under = Pregroup.form_under.inapplicable(messages.PAIR_TYPES)
+    form_l = Pregroup.form_l.inapplicable(messages.PAIR_TYPES)
+    form_r = Pregroup.form_r.inapplicable(messages.PAIR_TYPES)
+    adjoint_involution = Pregroup.adjoint_involution.inapplicable(
+        messages.PAIR_TYPES)
+    adjoint_contravariance_left = Pregroup.adjoint_contravariance_left\
+        .inapplicable(messages.PAIR_TYPES)
+    adjoint_contravariance_right = Pregroup.adjoint_contravariance_right\
+        .inapplicable(messages.PAIR_TYPES)
+    residuation_over = Pregroup.residuation_over.inapplicable(
+        messages.PAIR_TYPES)
+    residuation_under = Pregroup.residuation_under.inapplicable(
+        messages.PAIR_TYPES)
 
     @classmethod
     def strategy(cls):
@@ -148,6 +163,24 @@ class Ty[natural](Pregroup, TestableGeneric):
         types = st.lists(cls.natural.generator_strategy(), max_size=2).map(
             lambda xs: cls.natural().tensor(*xs))
         return st.tuples(types, types).map(lambda pair: cls(*pair))
+
+    @classmethod
+    def alphabet(cls) -> tuple[Ty, ...] | None:
+        """
+        The integer types of one atom of :attr:`natural`, positive or
+        negative: every integer type is a tensor of them, the negative halves
+        in the order :attr:`negatives` gives, or :obj:`None` when the
+        natural types state no alphabet.
+
+        >>> from discopy.pivotal import Ty as T
+        >>> x = T('a')
+        >>> assert Ty[T].alphabet()[:2] == (Ty[T](x), Ty[T](T(), x))
+        """
+        atoms = cls.natural.alphabet()
+        if atoms is None:
+            return None
+        return tuple(sign for x in atoms
+                     for sign in (cls(x), cls(cls.natural(), x)))
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):

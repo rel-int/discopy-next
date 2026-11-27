@@ -93,7 +93,8 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
+    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory,
+    ResiduatedMonoid)
 from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Rule, Serialisable,
     Testable, TestableGeneric, axiom)
@@ -117,7 +118,7 @@ if TYPE_CHECKING:
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(ResiduatedMonoid, monoidal.Ty):
     """
     A biclosed type is a monoidal type that can be exponentiated.
 

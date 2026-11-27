@@ -45,8 +45,9 @@ def test_axiom(law, drawn):
     @settings(phases=phases)
     @given(data=st.data())
     def check(data):
-        scope, arguments = data.draw(
-            law.sequents(**law.params), label=law.name)
+        provider, sequents = law.provider(**law.params)
+        note(f"drawn by {provider}")
+        scope, arguments = data.draw(sequents, label=law.name)
         drawn.add(repr(arguments))
         verdict = law(**arguments)
         note(verdict)

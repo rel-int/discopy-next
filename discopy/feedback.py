@@ -265,7 +265,8 @@ from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
+    DaggerCategory, DelayMonoid, FeedbackCategory,
+    MonoidalCategory, TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -478,13 +479,21 @@ Wire.Head, Wire.Tail = HeadOb, TailOb
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(DelayMonoid, monoidal.Ty):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
     Atom = Wire
 
     def delay(self, n_steps=1):
-        """ The delay of a feedback type by `n_steps`. """
-        return self.factory(*(x.delay(n_steps) for x in self.inside))
+        """
+        The delay of a feedback type by `n_steps`, of each of its wires: the
+        unit at a colour, with no wire, is its own delay.
+
+        >>> from discopy.monoidal import Colour
+        >>> unit = Ty.id(Colour('X'))
+        >>> assert unit.delay() == unit != Ty()
+        """
+        return self.factory(*(x.delay(n_steps) for x in self.inside))\
+            if self.inside else self
 
     @property
     def head(self):

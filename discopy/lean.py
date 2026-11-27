@@ -59,8 +59,8 @@ from typing import Self, TypeVar, get_args, get_origin
 
 from discopy import abc, monoidal
 from discopy.testable import (
-    Atom, Axiom, Declaration, Equation, Hom, Inequation, Obj, Rule, Var,
-    position, substitute)
+    Atom, Axiom, Constructor, Declaration, Equation, Hom, Inequation, Obj,
+    Rule, Var, position, substitute)
 
 LEAN_NAMES = {"then": "comp"}
 """ The Lean names of methods whose own name is a keyword there. """
@@ -381,12 +381,16 @@ def group(binders: list[tuple[str, str]]) -> str:
 def declarations(cls: type) -> dict[str, tuple[Declaration, Compiled]]:
     """
     The rules then the axioms a class states itself, evaluated on symbols,
-    leaving out the axioms it declares inapplicable.
+    leaving out the axioms it declares inapplicable and the formation rules
+    of a class of objects, see :class:`discopy.testable.Constructor`: each
+    one is an operation its structure has already, e.g. ``l`` of a
+    ``Pregroup`` or ``comp`` of a ``ColouredMonoid``.
     """
     result = {}
     for kind in (Rule, Axiom):
         for name, value in vars(cls).items():
-            if isinstance(value, kind):
+            if isinstance(value, kind)\
+                    and not isinstance(value, Constructor):
                 compiled = declaration(cls, value)
                 if compiled.output is not NotImplemented:
                     result[name] = (value, compiled)

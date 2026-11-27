@@ -469,3 +469,45 @@ def test_legacy_factory():
     with warns(DeprecationWarning, match="assign .*Recipe.Box instead"):
         assert Recipe.Box is Step
     assert issubclass(Recipe.Swap, Step)
+
+
+def test_constructors():
+    from discopy import bang, compact, feedback
+    from discopy.testable import Delay, L, Repeat, Tensor, Unit
+    assert sorted(monoidal.Ty.constructors) == ["ax", "cut", "form_repeat"]
+    assert {"form_l", "form_r", "form_over", "form_under", "form_delay"} <= set(
+        compact.Ty.constructors)
+    assert isinstance(compact.Ty.cut, Tensor)
+    assert isinstance(compact.Ty.ax, Unit)
+    assert isinstance(compact.Ty.form_l, L)
+    assert isinstance(feedback.Ty.form_delay, Delay)
+    assert isinstance(monoidal.Ty.form_repeat, Repeat)
+    x, y = compact.Ty('x'), compact.Ty('y')
+    assert compact.Ty.form_l(x @ y) == (x @ y).l
+    assert compact.Ty.form_repeat(x, 0) == compact.Ty()
+    assert compact.Ty.form_repeat(x, 2) == x @ x
+    assert feedback.Ty.form_delay(feedback.Ty('x')) == feedback.Ty('x').delay()
+    assert bang.Ty.form_bang(bang.Ty('x')) == bang.Ty('x').bang()
+    assert "form_l" not in compact.Diagram.rules
+
+
+def test_providers():
+    from hypothesis import given
+    from discopy.testable import PROVIDERS, Provider
+    law, x = Arrow.unitality, Ob('x')
+    f = Box('f', x, x)
+
+    def sequents(declaration, given_, params):
+        return st.just(({}, {"f": f})) if declaration == law else None
+    PROVIDERS.append(Provider("fixed", sequents))
+    try:
+        assert law.provider()[0] == "fixed"
+        assert Arrow.associativity.provider()[0] == "discopy"
+
+        @given(law.arguments())
+        def check(arguments):
+            assert arguments == {"f": f}
+        check()
+    finally:
+        PROVIDERS.pop()
+    assert law.provider()[0] == "discopy"

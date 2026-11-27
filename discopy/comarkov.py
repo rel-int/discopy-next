@@ -134,9 +134,20 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
 
     @classmethod
     def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
-        if phase is not None or n_legs_out != 1:
+        """
+        The spiders of a comarkov category: the merges, with one leg out, and
+        the traces of merges, with none, i.e. what tracing a merge back into
+        its own output encodes to as a hypergraph, the mirror of
+        :meth:`discopy.markov.Diagram.Spider`.
+
+        >>> x = Ty('x')
+        >>> assert Diagram.Spider(1, 0, x) == Merge(x).trace(left=True)
+        """
+        if phase is not None or n_legs_out not in (0, 1):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "merges"))
+        if not n_legs_out:
+            return cls.merge(typ, n_legs_in + 1).trace(left=True)
         return cls.Merge(typ, n_legs_in)
 
     @classmethod
