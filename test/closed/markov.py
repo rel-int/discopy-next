@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pytest import raises
 
-from discopy import biclosed
-from discopy.closed import *
-from discopy.biclosed import Constraints, Sampler
+from discopy import closed
+from discopy.closed.markov import *
+from discopy.closed.monoidal import Constraints, Sampler
 from discopy.utils import dumps, from_tree, loads
 
 
@@ -640,7 +640,7 @@ def test_abstraction_eval_left():
 
 def test_draw_copy_and_swap():
     """
-    `closed.Diagram.to_drawing` routes through `closed.Functor` to get
+    `closed.markov.Diagram.to_drawing` routes through `closed.markov.Functor` to get
     `Curry` and `Eval` right, which used to drag in the markov, symmetric
     and balanced branches calling `copy`, `merge`, `swap`, `braid` and
     `twist` on a `Drawing` that has none of them, see issues #491 and #548.
@@ -724,7 +724,7 @@ def test_equality_reads_the_types_of_constants():
     assert a(lambda x: first) != a(lambda x: second)
     shape, other = (a, [2, 1], [a, b]), [2]
     assert TermBase.alpha_completeness(
-        biclosed.Canonical[TermBase].build(shape, other, ("x", "x")))
+        closed.monoidal.Canonical[TermBase].build(shape, other, ("x", "x")))
 
 
 def test_Sampler_nonlinear():
@@ -742,7 +742,7 @@ def test_Sampler_nonlinear():
 
 
 def test_from_biclosed():
-    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    x, y = closed.monoidal.Ty("x"), closed.monoidal.Ty("y")
     X, Y = Ty("x"), Ty("y")
     assert Ty.from_biclosed(x << y) == Ty.from_biclosed(y >> x) == Y >> X
     assert Ty.from_biclosed(x @ (x >> y)) == X @ (X >> Y)
@@ -757,8 +757,8 @@ def test_from_biclosed():
 
 
 def test_from_biclosed_keeps_the_data_of_constants():
-    x, y, X, Y = biclosed.Ty("x"), biclosed.Ty("y"), Ty("x"), Ty("y")
-    g1, g2 = (biclosed.Constant("g", y << x, data=d) for d in (1, 2))
+    x, y, X, Y = closed.monoidal.Ty("x"), closed.monoidal.Ty("y"), Ty("x"), Ty("y")
+    g1, g2 = (closed.monoidal.Constant("g", y << x, data=d) for d in (1, 2))
     a = x("a")
     assert g1(a).to_closed() != g2(a).to_closed()
     assert g1(a).to_closed() == Constant("g", X >> Y, data=1)(X("a"))
@@ -900,3 +900,4 @@ def test_beta_redex_into_tensor():
                        rng.random(F(v.cod).inside)) for v in context))
         assert np.allclose((states >> redex.eval(F, context)).eval().array,
                            (states >> reduct.eval(F, context)).eval().array)
+

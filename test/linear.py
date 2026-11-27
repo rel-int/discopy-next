@@ -12,11 +12,11 @@ def test_structural_boxes():
 
 
 def test_LinearCategory_is_monoidal_not_biclosed():
-    from discopy import biclosed, compact, rigid, tensor
+    from discopy import closed, compact, rigid, tensor
     from discopy.abc import LinearCategory
     assert issubclass(Diagram, LinearCategory)
     for category in (
-            biclosed.Diagram, compact.Diagram, rigid.Diagram, tensor.Diagram):
+            closed.monoidal.Diagram, compact.Diagram, rigid.Diagram, tensor.Diagram):
         assert not issubclass(category, LinearCategory)
         assert not hasattr(category, "bang")
 

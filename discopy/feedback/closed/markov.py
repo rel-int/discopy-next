@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-The free closed Markov feedback category, i.e. closed diagrams with feedback,
-whose wires carry a time step, see :mod:`~discopy.feedback`.
+The free closed Markov feedback category, i.e. closed Markov diagrams with
+feedback, whose wires carry a time step, see :mod:`~discopy.feedback`.
 
 An exponential and a product are wires of their own, delayed as a whole,
 leaving their factors alone: the delay is not a closed functor.
@@ -57,14 +57,14 @@ from typing import ClassVar
 from discopy import closed, cmap, feedback, hypergraph, messages, monoidal
 from discopy.abc import DaggerMonoidalCategory
 from discopy.cat import factory
-from discopy.closed import (  # noqa: F401  pylint: disable=unused-import
-    Equation)
+# pylint: disable-next=unused-import
+from discopy.closed.markov import Equation  # noqa: F401
 from discopy.drawing import Drawing
 from discopy.feedback import markov
 from discopy.utils import factory_name, from_tree
 
 
-class Wire(feedback.Wire, closed.Wire):
+class Wire(feedback.Wire, closed.markov.Wire):
     """ A closed feedback object is a closed object with a time step. """
 
 
@@ -72,12 +72,12 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(closed.Ty, feedback.Ty):
+class Ty(closed.markov.Ty, feedback.Ty):
     """ A closed feedback type is a closed type and a feedback type. """
     generator_factory = Wire
 
 
-class Exp(Wire, closed.Exp):
+class Exp(Wire, closed.markov.Exp):
     """ An exponential object with a time step, delayed as a whole. """
     ob = Ty
 
@@ -87,11 +87,12 @@ class Exp(Wire, closed.Exp):
         return str(self.reset())
 
     def __str__(self):
-        return closed.Exp.__str__(self) + feedback.str_delayed(self.time_step)
+        return closed.markov.Exp.__str__(self)\
+            + feedback.str_delayed(self.time_step)
 
     @property
     def drawing_name(self) -> str:
-        return closed.Exp.drawing_name.fget(self)\
+        return closed.markov.Exp.drawing_name.fget(self)\
             + feedback.str_delayed(self.time_step)
 
     def __repr__(self):
@@ -99,7 +100,7 @@ class Exp(Wire, closed.Exp):
             + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
 
 
-class Product(closed.Product, Wire):
+class Product(closed.markov.Product, Wire):
     """
     The product of a tuple of types with a time step, delayed as a whole.
 
@@ -114,7 +115,7 @@ class Product(closed.Product, Wire):
         return str(self.reset())
 
     def __eq__(self, other):
-        return closed.Product.__eq__(self, other)\
+        return closed.markov.Product.__eq__(self, other)\
             and (self.time_step, self.is_constant)\
             == (other.time_step, other.is_constant)
 
@@ -122,7 +123,7 @@ class Product(closed.Product, Wire):
         return hash(repr(self))
 
     def __str__(self):
-        return closed.Product.__str__(self)\
+        return closed.markov.Product.__str__(self)\
             + feedback.str_delayed(self.time_step)
 
     def __repr__(self):
@@ -140,7 +141,7 @@ class Product(closed.Product, Wire):
                    is_constant=tree.get('is_constant', True))
 
 
-class Unitype(closed.Unitype, Exp):
+class Unitype(closed.markov.Unitype, Exp):
     """
     The unitype with a time step: delayed, it is the delay of its own
     exponential, which is not its own.
@@ -195,7 +196,7 @@ class Unitype(closed.Unitype, Exp):
 
 
 @factory
-class Diagram(closed.Diagram, markov.Diagram):
+class Diagram(closed.markov.Diagram, markov.Diagram):
     """
     A closed feedback diagram is a closed diagram and a Markov feedback
     diagram.
@@ -239,7 +240,7 @@ class Diagram(closed.Diagram, markov.Diagram):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
 
-class Box(closed.Box, markov.Box, Diagram):
+class Box(closed.markov.Box, markov.Box, Diagram):
     """ A closed feedback box is a closed and a Markov feedback box. """
     serialised_attrs = markov.Box.serialised_attrs
 
@@ -302,7 +303,7 @@ class Timed(Box):
         return super().from_tree(tree).delay(tree.get('time_step', 0))
 
 
-class Eval(Timed, closed.Eval):
+class Eval(Timed, closed.markov.Eval):
     """
     The evaluation of an exponential type, with a time step.
 
@@ -310,17 +311,17 @@ class Eval(Timed, closed.Eval):
     >>> print(Eval(x << y, left=False).delay())
     Eval(y >> x, left=False).d
     """
-    serialised_attrs = closed.Eval.serialised_attrs + ("time_step", )
+    serialised_attrs = closed.markov.Eval.serialised_attrs + ("time_step", )
 
 
-class Coeval(Timed, closed.Coeval):
+class Coeval(Timed, closed.markov.Coeval):
     """ The coevaluation of an exponential type, with a time step. """
-    serialised_attrs = closed.Coeval.serialised_attrs + ("time_step", )
+    serialised_attrs = closed.markov.Coeval.serialised_attrs + ("time_step", )
 
 
-class Curry(Timed, closed.Curry):
+class Curry(Timed, closed.markov.Curry):
     """ The currying of a closed feedback diagram, with a time step. """
-    serialised_attrs = closed.Curry.serialised_attrs + ("time_step", )
+    serialised_attrs = closed.markov.Curry.serialised_attrs + ("time_step", )
 
     def to_drawing(self):
         """
@@ -336,7 +337,7 @@ class Curry(Timed, closed.Curry):
             .trace(self.n, left=not self.left)
 
 
-class Pack(Timed, closed.Pack):
+class Pack(Timed, closed.markov.Pack):
     """
     The packing of a product type, with a time step.
 
@@ -358,10 +359,10 @@ class Pack(Timed, closed.Pack):
         return factory_name(type(self))\
             + f"({product!r}{self.repr_time_step()})"
 
-    __str__ = closed.Box.__str__
+    __str__ = closed.markov.Box.__str__
 
     def to_tree(self):
-        return closed.Pack.to_tree(self) | (
+        return closed.markov.Pack.to_tree(self) | (
             {'time_step': self.time_step} if self.time_step else {})
 
     @classmethod
@@ -370,7 +371,7 @@ class Pack(Timed, closed.Pack):
             'time_step', 0))
 
 
-class Unpack(Timed, closed.Unpack):
+class Unpack(Timed, closed.markov.Unpack):
     """ The unpacking of a product type, with a time step. """
     __init__ = Pack.__init__
 
@@ -382,34 +383,34 @@ class Unpack(Timed, closed.Unpack):
     to_tree, from_tree = Pack.to_tree, classmethod(Pack.from_tree.__func__)
 
 
-class Function(closed.Function, markov.Function, Box):
+class Function(closed.markov.Function, markov.Function, Box):
     """ A function in a closed feedback diagram. """
 
 
-class Permutation(closed.Permutation, markov.Permutation, Box):
+class Permutation(closed.markov.Permutation, markov.Permutation, Box):
     """ A permutation in a closed feedback diagram. """
 
 
 Function.register(Permutation)
 
 
-class Swap(Permutation, closed.Swap, markov.Swap, Box):
+class Swap(Permutation, closed.markov.Swap, markov.Swap, Box):
     """ A swap in a closed feedback diagram. """
 
 
-class Copy(closed.Copy, markov.Copy, Function):
+class Copy(closed.markov.Copy, markov.Copy, Function):
     """ A copy in a closed feedback diagram. """
 
 
-class Discard(closed.Discard, markov.Discard, Copy):
+class Discard(closed.markov.Discard, markov.Discard, Copy):
     """ A discard in a closed feedback diagram. """
 
 
-class Sum(closed.Sum, markov.Sum, Box):
+class Sum(closed.markov.Sum, markov.Sum, Box):
     """ A closed feedback sum is a closed and a feedback sum. """
 
 
-class Functor(closed.Functor, markov.Functor):
+class Functor(closed.markov.Functor, markov.Functor):
     """
     A closed feedback functor is a closed and a feedback functor: a delayed
     wire or box goes through the delay of the codomain.

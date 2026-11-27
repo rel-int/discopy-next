@@ -723,8 +723,8 @@ def token_machine(constants):
 
 
 def test_token_lookup_reads_the_innermost_binder():
-    X, Y = closed.Ty("X"), closed.Ty("Y")
-    x, y = closed.Variable("x", X), closed.Variable("y", Y)
+    X, Y = closed.markov.Ty("X"), closed.markov.Ty("Y")
+    x, y = closed.markov.Variable("x", X), closed.markov.Variable("y", Y)
     assert token.lookup(((x, "inner"), (x, "outer")), x) == "inner"
     assert token.lookup(((x, 0), (y, 1)), y) == 1
     with raises(ValueError):
@@ -746,7 +746,7 @@ def test_token_machine_evaluates_pure_terms():
     of the simply-typed lambda calculus to its value, which is the constant
     itself for a base type and a closure for a function type.
     """
-    X = closed.Ty("X")
+    X = closed.markov.Ty("X")
     identity, c = X(lambda x: x), X("c")
     machine = token.Machine[Maybe]()
 
@@ -758,16 +758,16 @@ def test_token_machine_evaluates_pure_terms():
 
 
 def test_token_machine_needs_a_closed_term_of_the_calculus():
-    X = closed.Ty("X")
+    X = closed.markov.Ty("X")
     machine = token.Machine[Maybe]()
     with raises(ValueError):
-        machine(closed.Variable("z", X))
+        machine(closed.markov.Variable("z", X))
     with raises(ValueError):
         machine((X >> X)("f")(X("c")))
     with raises(ValueError):
         machine.apply(42, 0, ())
     with raises(NotImplementedError):
-        machine.step(token.Down(closed.Box("f", X, X)))
+        machine.step(token.Down(closed.markov.Box("f", X, X)))
 
 
 def test_token_machine_needs_an_iteration_operator():
@@ -776,7 +776,7 @@ def test_token_machine_needs_an_iteration_operator():
     are Elgot, see :mod:`discopy.kleisli.additive`.
     """
     with raises(ValueError):
-        token.Machine[Seed]()(closed.Ty("X")("c"))
+        token.Machine[Seed]()(closed.markov.Ty("X")("c"))
 
 
 def test_token_machine_is_a_traced_channel():
@@ -785,7 +785,7 @@ def test_token_machine_is_a_traced_channel():
     the token to an exit plus the two directions, and the machine is its
     trace over the two directions.
     """
-    X = closed.Ty("X")
+    X = closed.markov.Ty("X")
     machine = token.Machine[Maybe]()
     channel = machine.channel
 
@@ -803,7 +803,7 @@ def test_token_machine_samples_and_scores():
     it came from, and scoring multiplies the weight of the branch it runs
     in, so that the machine returns the unnormalised posterior of Bayes.
     """
-    B, U = closed.Ty("B"), closed.Ty("U")
+    B, U = closed.markov.Ty("B"), closed.markov.Ty("U")
     flip, star = B("flip"), U("*")
     score = (B >> U)("score")
     machine = token_machine({
@@ -823,7 +823,7 @@ def test_token_machine_samples_and_scores():
 
 
 def test_token_machine_loses_all_its_mass_on_an_impossible_observation():
-    B, U = closed.Ty("B"), closed.Ty("U")
+    B, U = closed.markov.Ty("B"), closed.markov.Ty("U")
     flip, star = B("flip"), U("*")
     score = (B >> U)("score")
     machine = token_machine({
@@ -842,7 +842,7 @@ def test_token_machine_is_nondeterministic_over_the_powerset_monad():
     The same machine over another Elgot monad: the powerset monad forgets
     the weights, so a coin comes back as the set of its outcomes.
     """
-    B = closed.Ty("B")
+    B = closed.markov.Ty("B")
     flip, twice = B("flip"), (B >> B)("twice")
     machine = token.Machine[Powerset]({
         flip: frozenset({"heads", "tails"}),
@@ -853,7 +853,7 @@ def test_token_machine_is_nondeterministic_over_the_powerset_monad():
 
 
 def test_token_Machine_repr():
-    machine = token.Machine[Maybe]({closed.Ty("X")("boom"): None})
+    machine = token.Machine[Maybe]({closed.markov.Ty("X")("boom"): None})
     assert repr(machine).startswith("kleisli.token.Machine[Maybe](")
     assert eval(repr(machine), {
         "kleisli": kleisli, "Maybe": Maybe, "closed": closed, "cat": cat
@@ -866,7 +866,7 @@ def test_token_Machine_exits_with_a_value_that_is_a_token():
     direction, so a value that happens to be a token does not re-enter the
     trace, see cubic's review of discopy#639.
     """
-    X = closed.Ty("X")
+    X = closed.markov.Ty("X")
     payload = token.Down(X("d"))
     constant = X("c")
     machine = token.Machine[Powerset]({constant: frozenset({payload})})
@@ -880,7 +880,7 @@ def test_token_Machine_constants_do_not_alias_across_types():
     constants, so they get different interpretations, see cubic's review of
     discopy#639.
     """
-    X, Y = closed.Ty("X"), closed.Ty("Y")
+    X, Y = closed.markov.Ty("X"), closed.markov.Ty("Y")
     x, y = X("c"), Y("c")
     assert x != y
     machine = token.Machine[Maybe]({x: "an X"})

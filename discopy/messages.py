@@ -155,6 +155,13 @@ MARKOV_HAS_NO_DAGGER = (
 COMARKOV_HAS_NO_DAGGER = (
     "A merge or a noise has no dagger: a comarkov category is not a dagger "
     "category.")
+NO_SYMMETRIC_CLOSED_TERMS = (
+    "A symmetric closed type has no terms yet, see discopy.closed.markov.")
+
+COMPACT_EXPONENTIALS = (
+    "A compact category has left and right exponentials y @ x.l and x.r @ y, "
+    "isomorphic and not equal, which the law takes to be one.")
+
 MAP_HAS_NO_ADJOINTS = (
     "A map is compact whatever category hosts it, but a host that is not "
     "rigid has no adjoints or curries for the laws to quantify over.")

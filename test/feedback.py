@@ -390,7 +390,7 @@ def test_generated_boxes_at_every_level():
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
-                   compact, frobenius, closed, network):
+                   compact, frobenius, closed.markov, network):
         diagram = getattr(module, "Diagram", getattr(module, "Network", None))
         for name in ("Feedback", "Trace", "FollowedBy", "Head", "Tail"):
             cls = getattr(module, name)
@@ -454,13 +454,13 @@ def test_structural_boxes_have_no_time_step():
     from discopy.quantum.gates import CX, Copy, Match
     assert Copy().delay(2).time_step == Match().delay(2).time_step == 2
     assert Copy().delay(2).reset() == Copy()
-    x, y = closed.Ty('x'), closed.Ty('y')
+    x, y = closed.markov.Ty('x'), closed.markov.Ty('y')
     copy = markov.Copy(x).delay(42)
     assert copy.time_step is None and copy.dom == x.delay(42)
     assert copy.reset() == copy and str(copy) == "Copy(x.delay(42))"
     assert Box('f', x, x).delay(42).time_step == 42
-    assert closed.Eval(x << y).delay(2).time_step == 2
-    assert closed.Eval(x << y).delay(2).reset() == closed.Eval(x << y)
+    ev = closed.markov.Eval(x << y)
+    assert ev.delay(2).time_step == 2 and ev.delay(2).reset() == ev
     assert CX.delay(2).time_step == 2 and CX.delay(2).reset() == CX
 
 
@@ -508,7 +508,7 @@ def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
     from discopy.feedback import balanced, closed, comarkov, markov, symmetric
     from discopy.utils import dumps, loads
     modules = (feedback, balanced, symmetric, markov, comarkov, pivotal,
-               ribbon, compact, frobenius, closed)
+               ribbon, compact, frobenius, closed.markov)
     namespace = {module.__name__.split('.')[-1]: module for module in modules}
     for module in modules:
         x, y = module.Ty('x'), module.Ty('y')
@@ -561,7 +561,7 @@ def test_Ty_has_canonical_instances():
 
 
 def test_to_compact():
-    from discopy.feedback.closed import Box, Coeval, Curry, Ty
+    from discopy.feedback.closed.markov import Box, Coeval, Curry, Ty
     w, x, y, z = map(Ty, "wxyz")
     f = Box("f", x @ y, z)
 
@@ -590,7 +590,7 @@ def test_to_compact():
 
 
 def test_delay_types():
-    from discopy.feedback.closed import Product, Ty, Unitype
+    from discopy.feedback.closed.markov import Product, Ty, Unitype
     from discopy.utils import dumps, loads
     U = Ty(Unitype())
     x, y = Ty('x'), Ty('y')
@@ -615,7 +615,7 @@ def test_delay_types():
 
 def test_delay_diagrams():
     from discopy.drawing import Drawing
-    from discopy.feedback.closed import (
+    from discopy.feedback.closed.markov import (
         Box, Copy, Diagram, Discard, Functor, Pack, Ty, Unpack)
     from discopy.utils import dumps, loads
     x, y, z = Ty('x'), Ty('y'), Ty('z')
@@ -644,7 +644,7 @@ def test_delay_diagrams():
 
 
 def test_Curry_of_no_wire_maps_as_its_argument():
-    from discopy.feedback.closed import Box, Curry, Diagram, Functor, Ty
+    from discopy.feedback.closed.markov import Box, Curry, Diagram, Functor, Ty
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     f = Box('f', x @ y, z)
     for left in (True, False):

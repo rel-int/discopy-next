@@ -18,20 +18,20 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from discopy import (
-    balanced, biclosed, braided, closed, compact, feedback, frobenius, markov,
+    balanced, braided, closed, compact, feedback, frobenius, markov,
     monoidal, pivotal, ribbon, rigid, symmetric, traced)
 from discopy.cmap import CMap
 from discopy.hypergraph import Hypergraph
 from discopy.utils import factory_name
 
-PLANAR = (monoidal, braided, balanced, traced, biclosed, rigid, pivotal,
+PLANAR = (monoidal, braided, balanced, traced, closed.monoidal, rigid, pivotal,
           ribbon)
 """ The modules whose diagrams have no symmetry, compared syntactically. """
 
-SYMMETRIC = (symmetric, compact)
+SYMMETRIC = (symmetric, closed.symmetric, compact)
 """ The modules whose diagrams are generated through a combinatorial map. """
 
-MARKOV = (markov, closed, frobenius)
+MARKOV = (markov, closed.markov, frobenius)
 """ The modules whose diagrams are generated through a hypergraph. """
 
 MODULES = PLANAR + SYMMETRIC + MARKOV + (feedback, )
@@ -47,7 +47,8 @@ SHAPES = {
     symmetric: lambda graph: graph.is_monogamous,
     compact: lambda graph: graph.is_bijective,
     markov: lambda graph: graph.is_left_monogamous,
-    closed: lambda graph: graph.is_left_monogamous,
+    closed.symmetric: lambda graph: graph.is_monogamous,
+    closed.markov: lambda graph: graph.is_left_monogamous,
     frobenius: lambda graph: True,
 }
 """ The shape of the hypergraphs each category generates. """
@@ -80,7 +81,8 @@ def test_hypergraph_shape(module, data):
         dom=dom, cod=cod, acyclic=acyclic), label="graph")
     assert (graph.dom, graph.cod) == (dom, cod)
     assert SHAPES[module](graph)
-    if acyclic and module in (symmetric, markov, closed):
+    if acyclic and module in (
+            symmetric, closed.symmetric, markov, closed.markov):
         assert graph.is_acyclic
 
 

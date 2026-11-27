@@ -108,9 +108,10 @@ types: a permutation is one layer where it was a staircase of swaps.
 === Lambda terms <sec:terms>
 
 A `Term` is a lambda term in the internal language of a closed category.
-The terms of `biclosed` are planar and linear, with an exponential on
-each side, `x >> y` and `y << x`. Those of `closed`, now the free closed
-Markov category, have one exponential, products with tuples and
+The terms of `closed.monoidal`, the free biclosed category, are planar
+and linear, with an exponential on each side, `x >> y` and `y << x`.
+Those of `closed.markov`, the free closed Markov category, have one
+exponential, products with tuples and
 projections, `let`, and variables that occur any number of times. A type
 applied to a string is a constant, a type applied to a Python function
 is an abstraction, whose variable takes the name of the parameter, and a
@@ -122,8 +123,8 @@ Conversely, `Diagram.to_term` reads a diagram with copies and discards
 as a term with one `let` for each box (@fig:syntax_term). Equality of
 terms is syntactic, and `alpha_eq` is up to the names of bound
 variables. `reduce` contracts beta redexes, leftmost outermost by
-default, down to a head normal form, returned as a `closed.BohmTree`
-whose arguments are reduced when they are read, and `normal_form` is the
+default, down to a head normal form, returned as a `BohmTree` whose
+arguments are reduced when they are read, and `normal_form` is the
 term of that tree. Both take a budget of redexes, since a term need not
 have a normal form: `Unitype` is its own exponential, and its terms are
 those of the untyped lambda calculus. The property matrix checks that
@@ -131,7 +132,7 @@ the normal form is idempotent, keeps the type and is the same for two
 strategies.
 
 ```python
-from discopy.closed import Box, Diagram, Ty, Unitype
+from discopy.closed.markov import Box, Diagram, Ty, Unitype
 
 X, Y, U = Ty('X'), Ty('Y'), Ty(Unitype())
 two = (X >> X)(lambda f: X(lambda x: f(f(x))))
@@ -212,7 +213,8 @@ diagrams and a cap and a cup over compact ones.
 Every module of the hierarchy has an `Equation`, a list of diagrams that
 is true when they are equal up to a function `up_to`. It is the identity
 for the levels with no symmetry, and the translation to hypergraphs for
-`symmetric`, `markov`, `comarkov`, `closed`, `compact` and `frobenius`.
+`symmetric`, `markov`, `comarkov`, `closed.symmetric`, `closed.markov`,
+`compact` and `frobenius`.
 The naturality of the swap is not an equality of lists of layers, and it
 is one of hypergraphs (@fig:syntax_swap).
 
