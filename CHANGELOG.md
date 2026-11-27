@@ -2170,6 +2170,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py --check` fails when a notebook in `KNOWN_BROKEN`
+  executes cleanly, naming the notebook and its issue, so an exemption whose
+  bug has been fixed cannot stay silently ([next#435]).
 - Read the Docs embeds the notebooks the `build` workflow renders on `main`
   instead of linking to their sources, still running none itself: a
   `notebooks` job pushes them to the `rendered-notebooks` branch, whose
