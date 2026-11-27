@@ -203,7 +203,7 @@ this can only be checked up to extensional equivalence of streams.
     :align: center
 
 >>> LHS, RHS = sliding.terms
->>> assert list(map(str, F(LHS).unroll(2).now.dom)) == ["x0", "x1", "x2"]
+>>> assert F(LHS).unroll(2).now.dom == stream.symmetric.Ty("x0", "x1", "x2")
 >>> eq = Equation(*map(lambda f: F(f).unroll(2).now, sliding.terms),
 ...     symbol="$\\\\sim$").draw(
 ...         doctest='docs/_static/feedback/slide-unroll.svg')
