@@ -1027,6 +1027,8 @@ class PlanarMap:
                     & (abs(local[:, 1]) < h - 1e-3)).any():
                 return False
         for i, first in enumerate(lines):
+            if crosses(first, first):
+                return False
             for second in lines[i + 1:]:
                 if crosses(first, second) or np.min(np.linalg.norm(
                         first[:, None] - second[None], axis=2)) < .1:
@@ -1170,8 +1172,9 @@ class PlanarMap:
         drawing, curves = self.drawing, self.curves(z)
         lines = np.concatenate([np.array([s[0], s[3]]) for c in curves
                                 for s in c] + [self.corners(z, k) for k in
-                                               range(len(self.boxes))])
-        shift = .25 - min(lines[:, 0].min(), .25)
+                                               range(len(self.boxes))] + [
+            np.zeros((0, 2))])
+        shift = .25 - lines[:, 0].min(initial=.25)
         boxes, relabel = list(drawing.boxes), {}
         for k, j in enumerate(self.boxes):
             boxes[j] = copy.copy(drawing.boxes[j])

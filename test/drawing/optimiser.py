@@ -140,6 +140,19 @@ def test_crossing_wires_are_not_valid():
     assert not planar.is_valid(z)
 
 
+def test_a_wire_crossing_itself_is_not_valid():
+    snake = PlanarMap.from_drawing(to_drawing(
+        px @ pivotal.Cap(px.r, px) >> pivotal.Cup(px, px.r) @ px))
+    z, points = snake.start.copy(), snake.offset("points")
+    z[points: points + 2] = .3, .4
+    assert not snake.is_valid(z)
+
+
+def test_the_empty_diagram():
+    drawing = to_pivotal_drawing(pivotal.Id())
+    assert not drawing.boxes and not drawing.positions
+
+
 def test_what_it_does_not_draw():
     a = symmetric.Ty('a')
     with pytest.raises(NotImplementedError):
