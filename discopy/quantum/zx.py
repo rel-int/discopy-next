@@ -448,10 +448,10 @@ class Spider(tensor.Spider[complex], Box):
     @staticmethod
     def format_phase(phase) -> str:
         """
-        Format a phase for :meth:`__str__`: a dyadic :class:`Fraction` as its
-        ratio ``p/q`` when the float it evaluates to has a decimal string that
-        reads back as the same fraction, and any other :class:`Fraction` as
-        ``Fraction(p, q)``, so that it reads back.
+        Format a phase for :meth:`__str__`: a :class:`Fraction` as its ratio
+        ``p/q`` when the float it evaluates to has a decimal string that reads
+        back as the same fraction, e.g. ``1/4`` or ``1/10``, and as
+        ``Fraction(p, q)`` otherwise, so that it reads back.
         """
         if isinstance(phase, Fraction):
             try:
