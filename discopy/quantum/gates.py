@@ -368,7 +368,9 @@ def _ravel(data):
     if ndim == 0:
         yield data
     elif ndim and hasattr(data, "reshape"):
-        for item in data.reshape(-1):
+        flat = data.reshape(-1)
+        # a numpy.matrix stays two-dimensional, its flat iterator does not
+        for item in data.flat if flat.ndim != 1 else flat:
             yield from _ravel(item)
     elif isinstance(data, Iterable) and not isinstance(data, (str, bytes)):
         for item in data:

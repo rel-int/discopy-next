@@ -397,3 +397,16 @@ def test_delay(gate):
 def test_eval_repr(gate):
     from discopy.quantum.circuit import Circuit
     assert eval(repr(gate), Circuit.environment()) == gate
+
+
+def test_QuantumGate_reads_a_numpy_matrix():
+    gate = QuantumGate(
+        "U", qubit, qubit, numpy.matrix([[1, 0], [0, 1]]))
+    assert numpy.allclose(gate.array, numpy.eye(2))
+
+
+def test_Box_array_is_not_a_view_of_its_data():
+    data = numpy.eye(2, dtype=complex)
+    box = Box("f", qubit, qubit, data=data)
+    box.array[0, 0] = 5
+    assert box.data[0, 0] == 1
