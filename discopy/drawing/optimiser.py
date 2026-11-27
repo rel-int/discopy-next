@@ -150,8 +150,9 @@ class Waypoints(backend.Backend):  # pylint: disable=abstract-method
     """
     A backend mixin that draws the wires of an :class:`Optimised` drawing:
     each edge from or to a waypoint as a cubic Bezier, along the ``tangent``
-    of a waypoint that has one, else vertical half way down, and every
-    other edge as its backend does.
+    of a waypoint that has one, else vertical half way down, but for an
+    edge of no length, which a waypoint on an end or a turning point has,
+    and every other edge as its backend does.
     """
     def draw_wires(self, graph, **params):
         """ Draw the edges at a waypoint, then the others as before. """
@@ -163,6 +164,8 @@ class Waypoints(backend.Backend):  # pylint: disable=abstract-method
             start, end = graph.positions[source], graph.positions[target]
             if source.kind in ("dom", "box_cod"):
                 self.draw_wire_label(source.x, *start, **params)
+            if start == end:
+                continue
             self.draw_bezier(
                 [start, *controls(source, target, start, end), end],
                 adaptive=self.on_neutral_canvas(

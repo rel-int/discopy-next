@@ -102,6 +102,16 @@ def test_weights_are_not_negative():
 px, py = pivotal.Ty('x'), pivotal.Ty('y')
 
 
+def test_a_waypoint_on_an_end_draws_nothing(tmp_path):
+    drawing = to_pivotal_drawing(
+        px @ pivotal.Cap(px.r, px) >> pivotal.Cup(px, px.r) @ px)
+    curves = [(u, v) for u, v in drawing.edges if "wire" in (u.kind, v.kind)
+              and drawing.positions[u] != drawing.positions[v]]
+    drawing.draw(path=str(tmp_path / "out.tikz"), to_tikz=True)
+    assert (tmp_path / "out.tikz").read_text().count(
+        ".. controls") == len(curves) > 0
+
+
 def test_snake_is_pulled_straight():
     drawing = to_pivotal_drawing(
         px @ pivotal.Cap(px.r, px) >> pivotal.Cup(px, px.r) @ px)
