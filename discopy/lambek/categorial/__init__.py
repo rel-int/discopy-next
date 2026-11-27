@@ -60,7 +60,7 @@ Summary
 
         bobcat
 
-:mod:`discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
+:mod:`~discopy.lambek.categorial.bobcat` needs PyTorch, which the ``lambek``
 extra installs, so it is not imported here: import it on its own.
 """
 
@@ -255,7 +255,7 @@ class TermBase(Diagram.Box, biclosed.TermBase):  # ty: ignore[inconsistent-mro]
     def to_abstract(self):
         """
         The abstract term of a categorial term, dropping planarity,
-        see :meth:`discopy.lambek.abstract.Diagram.from_categorial`.
+        see :meth:`~discopy.lambek.abstract.Diagram.from_categorial`.
         """
         from discopy.lambek.abstract import Diagram
         return Diagram.from_categorial(self)
@@ -437,7 +437,7 @@ class BinaryTerm(TermBase):
     def setoid(self):
         """
         Binary terms are equal when their kinds and sides are, see
-        :meth:`discopy.biclosed.Application.setoid`.
+        :meth:`~discopy.biclosed.Application.setoid`.
         """
         return factory_key(type(self)), self.left, self.right
 

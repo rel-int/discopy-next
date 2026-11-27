@@ -2,13 +2,13 @@
 
 """
 The Lambek calculus with a relevant modality ``!L*``, i.e. the free biclosed
-category of :mod:`discopy.lambek.categorial` with the bang of
-:mod:`discopy.bang`: a banged type ``!x`` may be copied by contraction,
+category of :mod:`~discopy.lambek.categorial` with the bang of
+:mod:`~discopy.bang`: a banged type ``!x`` may be copied by contraction,
 read once by dereliction and moved past any type by exchange, see
 McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
 (`arXiv:2110.10641 <https://arxiv.org/abs/2110.10641>`_).
 
-A term is a kappa term of :mod:`discopy.bang` whose functions are words
+A term is a kappa term of :mod:`~discopy.bang` whose functions are words
 of exponential type, applied by :class:`Eval`: a banged variable used twice
 is copied by :class:`Contraction`, brought where it is read by
 :class:`Exchange`, and every other variable is used once and in order.
@@ -72,7 +72,7 @@ from discopy.utils import export, get_origin
 class Ty(bang.Ty, categorial.Ty):
     """
     A type of ``!L*``, a categorial type whose wires may be banged, called
-    on a Python function for the kappa abstraction of :mod:`discopy.bang`.
+    on a Python function for the kappa abstraction of :mod:`~discopy.bang`.
 
     Example
     -------
@@ -103,7 +103,7 @@ class Functor(bang.Functor, categorial.Functor):
     A functor from ``!L*``: the bang and the structural boxes go through the
     bang of the codomain when it is linear, and the exponentials, evaluation
     and currying through its closed structure when it is closed. Into any
-    other category, e.g. the photonic diagrams of :mod:`discopy.optyx`, they
+    other category, e.g. the photonic diagrams of :mod:`~discopy.optyx`, they
     go through ``ob_map`` and ``ar_map`` like generators.
 
     Example
@@ -135,7 +135,7 @@ class Functor(bang.Functor, categorial.Functor):
 
 
 class TermBase(bang.TermBase):
-    """ A kappa term of ``!L*``, see :class:`discopy.bang.TermBase`. """
+    """ A kappa term of ``!L*``, see :class:`~discopy.bang.TermBase`. """
 
 
 class Variable(TermBase, bang.Variable):

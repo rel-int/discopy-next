@@ -3,7 +3,7 @@
 """
 DisCoPy utility functions: factories, serialisation, assertions and display.
 
-:func:`discopy.cat.factory` and :func:`discopy.hypergraph.pushout` live here
+:func:`~discopy.cat.factory` and :func:`~discopy.hypergraph.pushout` live here
 too, documented where they are used.
 
 Summary
@@ -176,8 +176,8 @@ def identity(x: KT) -> KT:
     """
     The identity function, which every identity functor and transformation is
     built from so that it can be recognised, see
-    :meth:`discopy.cat.Functor.then` and
-    :meth:`discopy.cat.Transformation.then`.
+    :meth:`Functor.then <discopy.cat.Functor.then>` and
+    :meth:`Transformation.then <discopy.cat.Transformation.then>`.
 
     Example
     -------
@@ -1451,7 +1451,7 @@ def factory(cls):
     ----
     The factory method pattern (`FMP`_) is used all over DisCoPy. For
     backward compatibility, the factory is also available as the class
-    property ``cls.ar``, see :class:`discopy.abc.Category`. A subscript of
+    property ``cls.ar``, see :class:`~discopy.abc.Category`. A subscript of
     a factory, e.g. ``Tensor[complex]``, is its own factory, see
     :class:`NamedGeneric`.
 
@@ -1604,8 +1604,8 @@ class RichDisplay:
     https://ipython.readthedocs.io/en/stable/config/integrating.html
 
     Any DisCoPy object with a :meth:`to_drawing` method, e.g. a
-    :class:`discopy.monoidal.Diagram`, a :class:`discopy.drawing.Drawing`
-    or an :class:`discopy.drawing.Equation`, is displayed as an SVG image
+    :class:`~discopy.monoidal.Diagram`, a :class:`~discopy.drawing.Drawing`
+    or an :class:`~discopy.drawing.Equation`, is displayed as an SVG image
     (with a PNG fallback in the mimebundle) when it is the output of a cell
     in Jupyter, marimo and other frontends that support the protocol.
     :meth:`to_widget` shows it as a widget instead, on demand.
@@ -1648,7 +1648,7 @@ class RichDisplay:
 
     def to_widget(self, **params):
         """
-        Draw as a :class:`discopy.drawing.widget.DiagramWidget`, which needs
+        Draw as a :class:`~discopy.drawing.widget.DiagramWidget`, which needs
         `anywidget <https://anywidget.dev>`_.
 
         Parameters:

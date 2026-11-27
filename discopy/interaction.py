@@ -340,7 +340,7 @@ class Diagram[natural](
     ...     == D.id(two).transpose(left=True)
 
     Python functions with tuples as tensor have neither dagger nor twist,
-    their integer diagrams are the lenses of :mod:`discopy.lens`:
+    their integer diagrams are the lenses of :mod:`~discopy.lens`:
 
     >>> from discopy.python import Function
     >>> R = Ty[Function.ob]((float, ), (float, ))
@@ -440,7 +440,7 @@ class Diagram[natural](
         """
         Whether the integer diagrams have a dagger: when the :attr:`natural`
         category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
-        into integer diagrams over e.g. :class:`discopy.python.Function`
+        into integer diagrams over e.g. :class:`~discopy.python.Function`
         reads a daggered box off its :code:`ar_map`.
 
         >>> from discopy import compact, python
@@ -810,7 +810,7 @@ class Diagram[natural](
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a trace, read off either form of
-        :meth:`discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
+        :meth:`~discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
         since an integer type is not a sequence: ``n`` counts the atoms of
         each half, or one number per half, one by default, and the memory is
         ``mem``, or what ``cod`` leaves of the codomain.
@@ -854,7 +854,7 @@ class Diagram[natural](
     def twist(cls, dom: Ty) -> Diagram:
         """
         The twist of an integer type is the trace of its braid, as in
-        :mod:`discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
+        :mod:`~discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
 
         Parameters:
             dom : The integer type to twist.

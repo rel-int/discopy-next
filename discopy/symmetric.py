@@ -154,7 +154,7 @@ class Layer(feedback.Layer):
     layer.
 
     A layer with no crossing is stored exactly as a
-    :class:`discopy.monoidal.Layer`.
+    :class:`~discopy.monoidal.Layer`.
 
     Parameters:
         inside : Generators and plumbing, with at least one generator or one
@@ -205,7 +205,7 @@ class Layer(feedback.Layer):
         """
         Merge two layers of pure plumbing by fusing their boxes, see
         :meth:`Permutation.fuse`, otherwise fall back to
-        :meth:`discopy.monoidal.Layer.merge`.
+        :meth:`~discopy.monoidal.Layer.merge`.
 
         Parameters:
             other : The other layer with which to merge.
@@ -286,7 +286,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
 
     Note
     ----
-    As for :class:`discopy.balanced.Diagram`, our symmetric diagrams are traced
+    As for :class:`~discopy.balanced.Diagram`, our symmetric diagrams are
+    traced
     by default. However now the axioms for trace hold, up to the hypergraph of
     each side: see :class:`Equation`.
 
@@ -380,9 +381,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
         """
         Sample symmetric diagrams through their quotient: a combinatorial map
-        drawn by :meth:`discopy.cmap.CMap.strategy` with at most ``fuel + 1``
+        drawn by :meth:`~discopy.cmap.CMap.strategy` with at most ``fuel + 1``
         boxes, monogamous unless the category has cups and caps, downgraded
-        with :meth:`discopy.cmap.CMap.to_diagram`, which makes its cycles
+        with :meth:`~discopy.cmap.CMap.to_diagram`, which makes its cycles
         explicit as traces and its crossings as swaps.
         """
         return cmap.CMap[cls].strategy(  # ty: ignore[invalid-type-form]
@@ -535,7 +536,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
 
     def merge_layers(self):
         """
-        Merge layers as :meth:`discopy.monoidal.Diagram.merge_layers` does,
+        Merge layers as :meth:`~discopy.monoidal.Diagram.merge_layers` does,
         dropping two layers of plumbing alone that compose to the identity,
         which is the empty diagram rather than a layer, see
         :meth:`Permutation.fuse`.
@@ -577,7 +578,7 @@ class Permutation(Diagram.Box):
     """
     A permutation box, i.e. a :class:`Box` that reorders its input wires.
 
-    A permutation holds a :class:`discopy.python.finset.Permutation` ``perm``
+    A permutation holds a :class:`~discopy.python.finset.Permutation` ``perm``
     as attribute, with the convention that output wire ``i`` comes from input
     wire ``perm[i]``, i.e. ``cod[i] == dom[perm[i]]``.
 
@@ -718,7 +719,7 @@ class Permutation(Diagram.Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a permutation, see :func:`discopy.utils.dumps`.
+        Serialise a permutation, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -928,7 +929,7 @@ class Functor(balanced.Functor):
 class DualRail(balanced.DualRail, Functor):
     """
     The functor sending a symmetric diagram to its dual rail encoding, i.e.
-    :class:`discopy.balanced.DualRail` sending a :class:`Permutation` to the
+    :class:`~discopy.balanced.DualRail` sending a :class:`Permutation` to the
     dual rail braids of its swaps.
 
     >>> x, y, z = map(Ty, "xyz")
@@ -974,7 +975,7 @@ Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
 class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
     """
     A term of a symmetric category, i.e. of the linear kappa calculus: a
-    :class:`discopy.monoidal.TermBase` with exchange, where a :class:`Kappa`
+    :class:`~discopy.monoidal.TermBase` with exchange, where a :class:`Kappa`
     binds its variables in any order, from anywhere in the context.
 
     A variable still occurs once and the context of a term is still in the
@@ -1153,7 +1154,7 @@ type Term = Variable | Constant | Application | Kappa
 class Sampler(monoidal.Sampler):
     """
     Samples a term of a symmetric category as a
-    :class:`discopy.monoidal.Sampler` does, each subterm using its
+    :class:`~discopy.monoidal.Sampler` does, each subterm using its
     variables in an order of its own.
 
     Example

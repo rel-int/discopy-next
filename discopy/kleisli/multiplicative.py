@@ -211,7 +211,7 @@ class Channel[monad](Category, TestableGeneric):
         """
         The equation of a law, compared by the boundary of its terms and
         what the monad observes of their outputs on the arguments of
-        :meth:`discopy.python.multiplicative.Function.arguments`, so that
+        :meth:`~discopy.python.multiplicative.Function.arguments`, so that
         the unit and associativity of composition are those of the monad.
         """
         return Equation(*terms, up_to=lambda term: (

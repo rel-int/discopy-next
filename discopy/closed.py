@@ -6,7 +6,7 @@ products that are not strictly associative.
 Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
 with tuples, projections and ``let``, and reduced to Böhm trees by a
 :class:`Strategy`. Diagrams map to combinatorial maps, i.e.
-:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+:class:`~discopy.cmap.CMap`, with :meth:`~discopy.monoidal.Diagram.to_map`.
 
 Summary
 -------
@@ -72,8 +72,8 @@ Summary
 Axioms
 ------
 
-:meth:`discopy.biclosed.Diagram.curry` and
-:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
+:meth:`~discopy.biclosed.Diagram.curry` and
+:meth:`~discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)
@@ -112,7 +112,7 @@ from discopy.utils import (
 class Wire(feedback.Wire, biclosed.Wire):
     """
     A closed object is a biclosed object with a time step, i.e. a feedback
-    object, as is every wire below :mod:`discopy.feedback`.
+    object, as is every wire below :mod:`~discopy.feedback`.
 
     An exponential and a product are closed objects of their own, delayed as
     a whole, leaving their factors alone: the delay is not a closed functor.
@@ -208,9 +208,12 @@ class Exp(Wire, biclosed.Exp):
         "The name of an exponential is its undelayed print, read when needed."
         return str(self.reset())
 
-    def __str__(self):
-        return f"({self.exponent} >> {self.base})"\
-            + feedback.str_delayed(self.time_step)
+    def show(self, base, exponent) -> str:
+        return f"({exponent} >> {base})"
+
+    @property
+    def drawing_name(self) -> str:
+        return super().drawing_name + feedback.str_delayed(self.time_step)
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -327,6 +330,10 @@ class Unitype(Exp):
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
+
+    @property
+    def drawing_name(self) -> str:
+        return str(self)
 
     def atoms(self) -> list:
         """ The unitype names itself undelayed, i.e. its base. """

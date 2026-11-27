@@ -9,15 +9,15 @@ Python function from a tagged value of ``dom`` to the monadic type
 into the single type a :class:`~discopy.kleisli.monad.Monad` already knows
 how to act on: the bare wire type itself if there is only one, else
 :class:`Tagged`, i.e. a value together with the index of the summand it
-comes from. This mirrors :mod:`discopy.python.additive`, where a value of a
+comes from. This mirrors :mod:`~discopy.python.additive`, where a value of a
 disjoint union is a pair ``(obj, tag)``, with the pair replaced by a class
 of its own for the same reason as in
-:mod:`discopy.kleisli.multiplicative`: a payload inside ``M`` flows through
+:mod:`~discopy.kleisli.multiplicative`: a payload inside ``M`` flows through
 composition as a single value, and a genuine tuple would be mistaken for
 several values to splat.
 
 Disjoint union makes this a genuinely monoidal category, unlike the tuple
-tensor of :mod:`discopy.kleisli.multiplicative`: only one side of ``f + g``
+tensor of :mod:`~discopy.kleisli.multiplicative`: only one side of ``f + g``
 ever runs, so there is no bias in the order of effects and no commutativity
 condition.
 
@@ -289,7 +289,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         """
         The equation of a law, compared by the boundary of its terms and
         what the monad observes of their outputs on the arguments of
-        :meth:`discopy.python.additive.Function.arguments`.
+        :meth:`~discopy.python.additive.Function.arguments`.
         """
         return Equation(*terms, up_to=lambda term: (
             term.dom, term.cod, tuple(
@@ -368,7 +368,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         """
         The disjoint union of two channels, called with :code:`@`: the
         input picks the side that runs, so unlike
-        :meth:`discopy.kleisli.multiplicative.Channel.tensor` this is
+        :meth:`~discopy.kleisli.multiplicative.Channel.tensor` this is
         unbiased.
 
         Parameters:
@@ -430,7 +430,8 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         Parameters:
             n : The number of summands to trace over.
             left : Whether to trace the first rather than the last
-                summands, see :meth:`discopy.abc.SymmetricCategory.left_trace`.
+                summands, see
+                :meth:`~discopy.abc.SymmetricCategory.left_trace`.
 
         Raises:
             ValueError : If the monad has no

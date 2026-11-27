@@ -3,7 +3,7 @@ Peirce's alpha graphs: propositions as diagrams on the unit type, with two
 colours of region, the page :data:`white` and the inside of an odd number of
 cuts :data:`black`, see :cite:t:`BonchiEtAl24`.
 
-A white region is :class:`discopy.tensor.Tensor` of ``bool`` as it is: a box
+A white region is :class:`~discopy.tensor.Tensor` of ``bool`` as it is: a box
 is a relation, composition is ∃ over the middle wire and tensor is ∧. A black
 region is the same structure conjugated by elementwise negation ¬: a black
 box ``R`` is ¬R, black composition is the relative sum and black tensor is
@@ -259,7 +259,7 @@ class Functor(monoidal.Functor):
     """
     An alpha functor is a monoidal functor that sends a :class:`Cut` to the
     cut of its image, or to its elementwise negation in a category of
-    matrices, e.g. :class:`discopy.tensor.Tensor` of ``bool``.
+    matrices, e.g. :class:`~discopy.tensor.Tensor` of ``bool``.
     """
     dom = cod = Diagram
 
@@ -322,7 +322,7 @@ class Model:
     def functor(self, dom: type[Diagram] | None = None) -> monoidal.Functor:
         """
         The functor from a category of diagrams ``dom`` into
-        :class:`discopy.tensor.Tensor` of ``bool`` this model gives.
+        :class:`~discopy.tensor.Tensor` of ``bool`` this model gives.
         """
         dom = self.diagram if dom is None else dom
 

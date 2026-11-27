@@ -93,7 +93,7 @@ class Layer(symmetric.Layer):
     """
     A tensor product of generators and non-empty plumbing, where plumbing is
     a type when it is the identity and a :class:`Cofunction` otherwise, i.e.
-    merges, noise and permutations, the dual of :class:`discopy.markov.Layer`.
+    merges, noise and permutations, the dual of :class:`~discopy.markov.Layer`.
 
     Parameters:
         inside : Generators and plumbing, with at least one generator or one
@@ -167,7 +167,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         """
         A native :class:`Cofunction` box when the category has a matching
         cofunction factory, its decomposition by
-        :meth:`discopy.abc.ComarkovCategory.cofunction` otherwise. A
+        :meth:`~discopy.abc.ComarkovCategory.cofunction` otherwise. A
         bijection becomes the permutation that undoes it, see
         :meth:`from_permutation`, the identity the identity diagram.
 
@@ -202,7 +202,7 @@ class Cofunction(Diagram.Box):
     a cofunction holds an arrow of :class:`op.Comarkov[finset.Function]
     <discopy.op.Comarkov>`, the free comarkov category on one object.
 
-    It is the formal reverse of :class:`discopy.markov.Function` with the
+    It is the formal reverse of :class:`~discopy.markov.Function` with the
     same arguments, which is its dagger in a category that is both. A
     :class:`Layer` stores it as plumbing rather than as a generator. A
     bijection constructs a :class:`Permutation`, a cofunction onto one wire
@@ -299,7 +299,7 @@ class Cofunction(Diagram.Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a cofunction, see :func:`discopy.utils.dumps`.
+        Serialise a cofunction, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -346,7 +346,7 @@ is not a dagger category.
     def tensor(self, *others):
         """
         Tensoring plumbing with plumbing gives one wider cofunction, the
-        dual of :meth:`discopy.markov.Function.tensor`.
+        dual of :meth:`~discopy.markov.Function.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Merge(x).tensor(y, Noise(x))\\
@@ -393,7 +393,7 @@ class Permutation(symmetric.Permutation, Diagram.Box):
     """
     A permutation in a comarkov category, i.e. a bijective
     :class:`Cofunction`, registered as a virtual subclass so that it keeps
-    the constructor of :class:`discopy.symmetric.Permutation`: input ``i``
+    the constructor of :class:`~discopy.symmetric.Permutation`: input ``i``
     goes to the output that reads it.
 
     Parameters:
@@ -499,7 +499,7 @@ class Noise(Merge):
     """
     The noise on an atomic type :code:`x`, i.e. the merge of no copy: the
     state every object of a comarkov category carries, dual to the effect
-    :class:`discopy.markov.Discard` every object of a Markov category
+    :class:`~discopy.markov.Discard` every object of a Markov category
     carries. "The time reversal of a causal theory is eternal noise"
     (toumix, 2026-10-17).
 

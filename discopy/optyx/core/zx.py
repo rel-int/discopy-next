@@ -310,6 +310,11 @@ class Spider(diagram.Spider, ZXBox):
     def __repr__(self):
         return str(self).replace(type(self).__name__, factory_name(type(self)))
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> "Spider":
+        return cls(
+            tree['n_legs_in'], tree['n_legs_out'], tree.get('phase'))
+
     def subs(self, *args):
         phase = cat.rsubs(self.phase, *args)
         return type(self)(len(self.dom), len(self.cod), phase=phase)
@@ -519,6 +524,16 @@ class And(ZXBox):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.n}{dagger})"
 
+    def to_tree(self) -> dict:
+        tree = {'factory': factory_name(type(self)), 'n': self.n}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        return cls(tree['n'], is_dagger=tree.get('is_dagger', False))
+
     def conjugate(self):
         return And(n=self.n, is_dagger=self.is_dagger)
 
@@ -581,6 +596,9 @@ class Or(ZXBox):
     def __repr__(self):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.n}{dagger})"
+
+    to_tree = And.to_tree
+    from_tree = classmethod(And.from_tree.__func__)
 
     def conjugate(self):
         return Or(n=self.n, is_dagger=self.is_dagger)

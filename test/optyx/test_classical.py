@@ -250,3 +250,70 @@ def test_constructors_with_no_argument_are_rejected():
     assert (Digit(1) >> PostselectDigit(1)).eval().prob_dist() == {(): 1.}
     assert np.isclose(
         (Bit(0) >> PostselectBit(0)).double().to_tensor().eval().array, 1)
+
+
+def _classical_tree_terms():
+    from sympy.abc import phi
+    from discopy.optyx import classical
+    from discopy.optyx.core import diagram, zx
+    return [
+        classical.Add(3),
+        classical.And(),
+        classical.And(3),
+        classical.BinaryMatrix([[1, 0], [0, 1]]),
+        classical.BinaryMatrix([1, 1]),
+        BitControlledGate(photonic.Phase(0.5)),
+        BitControlledGate(photonic.Phase(0.5), photonic.Phase(0.25)),
+        BitControlledGate(photonic.Phase(0.5), photonic.Phase(0.25)).dagger(),
+        BitControlledGate(zx.X(1, 1, 0.5), zx.Id(1), classical=True),
+        BitControlledGate(zx.X(1, 1, 0.5), zx.Id(1), classical=True).dagger(),
+        classical.ClassicalBox("cb", diagram.Id(diagram.bit), bit, bit),
+        classical.ControlChannel("cc", diagram.Id(diagram.bit), bit, bit),
+        classical.CopyBit(),
+        classical.CopyBit(3),
+        classical.CopyN(3),
+        classical.Digit(1, 2),
+        classical.DiscardBit(2),
+        classical.DiscardMode(2),
+        classical.Divide(),
+        classical.H(),
+        classical.Mod2(),
+        classical.Multiply(),
+        classical.Not(),
+        classical.Or(),
+        classical.Or(3),
+        PostselectBit(0, 1),
+        PostselectDigit(1, 2),
+        classical.Scalar(0.5),
+        classical.Scalar(phi),
+        classical.Sub(),
+        classical.SwapBit(),
+        classical.SwapN(),
+        classical.X(1, 2, 0.5),
+        classical.X(1, 2, phi),
+        classical.Xor(),
+        classical.Xor(3),
+        classical.Z(1, 2, 0.25),
+        classical.Z(1, 2, phi),
+    ]
+
+
+@pytest.mark.parametrize("term", _classical_tree_terms(), ids=repr)
+def test_a_classical_box_loads_its_own_tree(term):
+    from discopy.utils import dumps, loads
+    loaded = loads(dumps(term))
+    assert loaded == term
+    assert loaded.to_tree() == term.to_tree()
+    assert loads(dumps(term @ term)) == term @ term
+
+
+def test_callable_classical_boxes_have_no_tree():
+    from discopy.optyx import classical
+    from discopy.utils import dumps
+    boxes = [
+        classical.ClassicalFunction(lambda b: [b[0] ^ b[1]], bit ** 2, bit),
+        classical.BitControlledPhaseShift(lambda bits: [0.5 * bits[0]]),
+    ]
+    for box in boxes:
+        with pytest.raises(TypeError, match="has no tree"):
+            dumps(box)

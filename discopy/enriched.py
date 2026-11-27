@@ -26,9 +26,9 @@ A functor ``F: C -> D`` extends to :math:`M_* C \\to D` when each hom of
 each variable: an arrow ``m`` goes to the structure of
 :math:`D(F(A), F(B))` applied to :math:`M(F)(m)`, see :class:`Functor`.
 ``D`` gives this algebra as a classmethod, ``D.algebra(M, dom, cod)``, e.g.
-:meth:`discopy.cat.Arrow.algebra`, the formal sum, and
-:meth:`discopy.matrix.Matrix.algebra`, the sum of matrices, both for the list
-monad.
+:meth:`Arrow.algebra <discopy.cat.Arrow.algebra>`, the formal sum, and
+:meth:`Matrix.algebra <discopy.matrix.Matrix.algebra>`, the sum of matrices,
+both for the list monad.
 
 Summary
 -------
@@ -304,15 +304,15 @@ class Functor(cat.Functor):
     monad ``M``, when the homs of ``D`` are algebras of ``M``: an arrow
     ``m`` from ``A`` to ``B`` goes to the structure of
     ``D.algebra(M, F(A), F(B))`` applied to ``M(F)(m)``, where ``F`` is the
-    ``Functor`` of ``C``, e.g. :class:`discopy.monoidal.Functor`
-    for :class:`discopy.monoidal.Diagram`.
+    ``Functor`` of ``C``, e.g. :class:`~discopy.monoidal.Functor`
+    for :class:`~discopy.monoidal.Diagram`.
 
     Parameters:
         ob_map : Mapping from the objects of ``C`` to those of ``D``.
         ar_map : Mapping from the boxes of ``C`` to the arrows of ``D``.
         dom : The change of base, e.g. ``Arrow[cat.Arrow, List]``.
         cod : The category ``D``, with a classmethod ``algebra``, see
-            :meth:`discopy.cat.Arrow.algebra`.
+            :meth:`~discopy.cat.Arrow.algebra`.
 
     Example
     -------
