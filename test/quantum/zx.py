@@ -628,6 +628,9 @@ def test_Hypergraph_exact_phases_and_clifford_scalars():
     assert Hypergraph.str_transparency(third)
     assert str(Hypergraph.from_diagram(Z(1, 1, Fraction(1, 4))))\
         == "Z(1, 1, 1/4)"
+    fine = Hypergraph.from_diagram(Z(1, 1, Fraction(1, 2 ** 24)))
+    assert str(fine) == "Z(1, 1, Fraction(1, 16777216))"
+    assert Hypergraph.str_transparency(fine)
     tenth = Hypergraph.from_diagram(Z(1, 1, 0.1))
     assert tenth.phases == (Fraction(1, 10), )
     assert Hypergraph.dagger_involution(tenth)

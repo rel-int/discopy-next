@@ -449,12 +449,13 @@ class Spider(tensor.Spider[complex], Box):
     def format_phase(phase) -> str:
         """
         Format a phase for :meth:`__str__`: a dyadic :class:`Fraction` as its
-        ratio ``p/q``, which evaluates to the float it equals, and any other
-        :class:`Fraction` as ``Fraction(p, q)``, so that it reads back.
+        ratio ``p/q`` when the float it evaluates to has a decimal string that
+        reads back as the same fraction, and any other :class:`Fraction` as
+        ``Fraction(p, q)``, so that it reads back.
         """
         if isinstance(phase, Fraction):
             try:
-                exact = float(phase) == phase
+                exact = Fraction(str(float(phase))) == phase
             except OverflowError:
                 exact = phase.denominator == 1
             return str(phase) if exact else repr(phase)
