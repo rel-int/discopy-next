@@ -16,4 +16,5 @@
 - [ ] Plumbing as an admissible rule; structural_boxes read from declarations, the boundary law replacing assert_structural_boxes
 - [ ] Regenerate DisCoLean/ABC.lean if needed, remove the shim, docs and changelog
 - [x] Remove the redundant late bindings (Functor rebindings, Ty term classes as slots) and rewrite README, notebook, doctest and test examples off the legacy override pattern
-- [x] Kappa terms on slots: TermBase a slot of Arrow, Variable/Constant/Application/Kappa/Sampler slots of TermBase, kappa_calculus removed
+- [x] Kappa terms on slots: Variable/Constant/Application/Kappa/Sampler slots of TermBase, which a level still opts into with kappa_calculus (now returning the TermBase alone)
+- [ ] Rebuild and serialisation from serialised_attrs: constructor arguments apart from state (is_dagger, dom/cod, time_step, z) set after construction; default __getnewargs__/to_tree/from_tree/__repr__; closes #169 #410 #476 #666 #720 #731, #747 in part
