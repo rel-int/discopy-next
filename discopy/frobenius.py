@@ -5,7 +5,7 @@ The free symmetric category with a supply of spiders, also known as special
 commutative Frobenius algebras.
 
 Diagrams in the free hypergraph category are faithfully encoded as
-:class:`discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
+:class:`~discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
 
 Summary
 -------
@@ -199,7 +199,7 @@ class Layer(compact.Layer):
     between cospans and generators.
 
     A category below frobenius whose spiders are not its own cospans, e.g.
-    :mod:`discopy.tensor`, keeps them as generators, and only its
+    :mod:`~discopy.tensor`, keeps them as generators, and only its
     permutations as plumbing.
 
     Parameters:
@@ -256,7 +256,7 @@ class Diagram(
         """
         A native :class:`Cospan` box when the category has a matching
         cospan factory, its decomposition by
-        :meth:`discopy.abc.HypergraphCategory.cospan` otherwise. A bijection
+        :meth:`~discopy.abc.HypergraphCategory.cospan` otherwise. A bijection
         becomes :meth:`from_permutation`, the identity the identity diagram.
 
         Parameters:
@@ -411,8 +411,8 @@ class Cospan(Box):
     arrow of the free hypergraph category on one object, see
     :cite:t:`Lack04`. A point that no leg reaches is a spider with no legs.
 
-    It is the :class:`discopy.comarkov.Cofunction` ``left`` into its apex
-    then the :class:`discopy.markov.Function` ``right`` out of it, i.e. its
+    It is the :class:`~discopy.comarkov.Cofunction` ``left`` into its apex
+    then the :class:`~discopy.markov.Function` ``right`` out of it, i.e. its
     merges then its copies. A :class:`Layer` stores it as plumbing. A
     bijection constructs a :class:`Permutation`, a cospan with one point a
     :class:`Spider`, see :meth:`Diagram.from_cospan`, and the points are
@@ -545,7 +545,7 @@ class Cospan(Box):
 
     def to_tree(self) -> dict:
         """
-        Serialise a cospan, see :func:`discopy.utils.dumps`.
+        Serialise a cospan, see :func:`~discopy.utils.dumps`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y = Ty('x'), Ty('y')
@@ -596,7 +596,7 @@ class Cospan(Box):
         Tensoring plumbing with plumbing gives one wider cospan, a run of
         cospans and types coalescing into the disjoint union of their
         apexes, from which point the layers are those of an ordinary
-        :meth:`discopy.monoidal.Diagram.tensor`.
+        :meth:`~discopy.monoidal.Diagram.tensor`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Spider(1, 0, x).tensor(y, Cup(x, x))\\
@@ -837,7 +837,7 @@ class Spider(Box):
         flags, is the spider with its legs swapped. A phased spider is a
         generator: its dagger keeps its phase and is marked as a dagger, so
         that any phase has one, a functor maps it to the dagger of its image,
-        and negating a phase is left to :mod:`discopy.quantum.zx`, where
+        and negating a phase is left to :mod:`~discopy.quantum.zx`, where
         phases form a group.
 
         >>> x = Ty('x')
@@ -905,7 +905,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     A spider with no phase is the Frobenius structure, mapped to the spiders
     of the codomain; a spider with a phase is a generator, mapped by
     ``ar_map`` like any box, e.g. the Z and X spiders of
-    :mod:`discopy.quantum.zx`.
+    :mod:`~discopy.quantum.zx`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) :

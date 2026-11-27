@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Optimisation for the recursive networks of :mod:`discopy.neural`: seeding,
+Optimisation for the recursive networks of :mod:`~discopy.neural`: seeding,
 AdamW decaying the matrices only, a linear warmup then a cosine decay to a
 floor, a bias-corrected weight average and the bounded per-board influence
 of a gradient.

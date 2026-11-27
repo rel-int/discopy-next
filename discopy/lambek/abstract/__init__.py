@@ -48,8 +48,8 @@ Summary
         proofnet
         neural
 
-:mod:`discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
-and is imported here. :mod:`discopy.lambek.abstract.neural` needs PyTorch,
+:mod:`~discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
+and is imported here. :mod:`~discopy.lambek.abstract.neural` needs PyTorch,
 which the ``lambek`` extra installs, so it is not: import it on its own.
 
 Vocabularies and lexicons
@@ -80,7 +80,7 @@ string is a map from positions to positions, a term of type
 ``String = Position >> Position``. A word is a constant of that type, the
 empty string is the identity ``Position(lambda x: x)`` and concatenation is
 composition, ``John.compose(seeks)`` for *John seeks*, see
-:meth:`discopy.closed.markov.TermBase.compose`: the paper writes it
+:meth:`~discopy.closed.markov.TermBase.compose`: the paper writes it
 ``lambda z. x (y z)`` with the first word applied last, here the first word
 is applied first, so a string reads its positions in order.
 
@@ -137,7 +137,7 @@ Categorial grammars
 -------------------
 
 A categorial grammar is a vocabulary of its own, a planar one: a lexicon out
-of it is a :class:`discopy.lambek.categorial.Functor` into abstract terms,
+of it is a :class:`~discopy.lambek.categorial.Functor` into abstract terms,
 sending each atom to a type and each word to a term of the image of its type,
 its strings written per word like every lexicon of the paper.
 :meth:`Diagram.from_categorial` forgets planarity instead, collapsing left and
@@ -245,7 +245,7 @@ is unique, which is what makes the free category unique:
 ...             ARE: Phrase(lambda O: Phrase(lambda X: are(O, X)))})
 
 ``Predicate`` was ``e >> t``, so ``Predicate(lambda P: ...)`` binds a
-predicate. A functor into :class:`discopy.python.Function` prints the Lean,
+predicate. A functor into :class:`~discopy.python.Function` prints the Lean,
 evaluating the lambdas as it goes:
 
 >>> LIFT = '''(∀ (C : {k}) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
@@ -498,7 +498,7 @@ class Function(closed.markov.Function, Box):
     """
     A markov function in an abstract diagram, which copies or discards, so
     that plumbing tensors into a function of this level rather than of
-    :mod:`discopy.closed`.
+    :mod:`~discopy.closed`.
 
     >>> x = Ty('x')
     >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x
@@ -571,7 +571,7 @@ class Lexicon(Functor):
 
         The terms are generated from the constants of the lexicon, its
         ``ar_map`` being a mapping, and evaluated bottom up: ``functor`` sends
-        the image of each constant to a :class:`discopy.python.Function` once,
+        the image of each constant to a :class:`~discopy.python.Function` once,
         and the value of an application is the application of their values,
         since a functor preserves it, unpacked when the argument is several
         wires. The terms are constants applied to such terms, with no
@@ -582,7 +582,7 @@ class Lexicon(Functor):
             target : The value to parse, e.g. a string.
             start : The abstract type of the terms, e.g. sentences.
             depth : The largest number of nested constants.
-            functor : A functor into :class:`discopy.python.Function`.
+            functor : A functor into :class:`~discopy.python.Function`.
 
         Example
         -------
@@ -749,7 +749,7 @@ String = Position >> Position
 The type of strings, maps from positions to positions: a word is a constant
 of type ``String``, ``Position(lambda x: x)`` is the empty string and
 ``John.compose(seeks)`` their concatenation, see
-:meth:`discopy.closed.markov.TermBase.compose`.
+:meth:`~discopy.closed.markov.TermBase.compose`.
 """
 
 # pylint: disable-next=wrong-import-position  # proofnet imports this module

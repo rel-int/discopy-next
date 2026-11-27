@@ -6,7 +6,7 @@ The free algebras of a monad and their homomorphisms.
 Given a :class:`~discopy.kleisli.monad.Monad` ``M``, the free algebra on a
 type ``X`` is ``M(X)`` with the multiplication
 :math:`\\mu_X : M(M(X)) \\to M(X)` as structure, see
-:meth:`discopy.monad.algebra.Algebra.free`. A homomorphism from the free
+:meth:`~discopy.monad.algebra.Algebra.free`. A homomorphism from the free
 algebra on ``X`` to the free algebra on ``Y`` is a function
 ``h : M(X) -> M(Y)`` commuting with the multiplication
 
@@ -24,7 +24,7 @@ and every homomorphism ``h`` restricts along the unit to the channel
 :math:`\\eta_X \\mathbin{;} h`. The two are inverse to each other, so the
 Kleisli category is isomorphic to the category of free algebras, the full
 subcategory of the Eilenberg-Moore category on them, see
-:mod:`discopy.monad.algebra`: Kleisli composition is bind followed by plain
+:mod:`~discopy.monad.algebra`: Kleisli composition is bind followed by plain
 composition.
 
 Summary
@@ -67,7 +67,7 @@ class Homomorphism[monad](Category, TestableGeneric):
     That ``inside`` commutes with the multiplication is not checked: a
     function cannot be compared with another, but the law can be checked
     at a point through the inclusion into the Eilenberg-Moore category, see
-    :meth:`discopy.monad.algebra.Homomorphism.preservation`.
+    :meth:`~discopy.monad.algebra.Homomorphism.preservation`.
 
     Example
     -------

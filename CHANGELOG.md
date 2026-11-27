@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.inet`: interaction nets on flat port lists (`Symbol`, `Signature`,
+  `Net`, `Rewriter`) and the symmetric interaction combinators `combinators`
+  with optional labels on duplicators `δ`, checked against double-pushout
+  rewriting in `discopy.hypergraph`, together with their Geometry of
+  Interaction token machine `Net.path` checked against `Net.to_int` in
+  `Int(python.additive.Function)` ([next#542]).
+
 - A category draws left to right when its `Diagram` class sets
   `draw_left_to_right = True`, and a box whose args are drawn in
   another direction than its own category is drawn as one box with its args
@@ -43,6 +50,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `cat.TermBase` are proved on nameless terms, and a planar linear term of
   `monoidal` evaluates to a diagram of its context, which a diagram with one
   output reads back from, box for box ([next#705]).
+- `quantum.zx.Hypergraph.strategy` draws Hadamard boxes, rational phases
+  and Clifford or zero `Number` scalars ([next#43]).
 
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
@@ -133,6 +142,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a small OCR model (`OCR`) that reads box names and wire types, then decoded
   in the least module it decodes in (`picture.decode_least`); with `train`,
   `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
+- The notebook `docs/notebooks/constraint-satisfaction.md` presents *Tiny
+  Recursive Message Passing* (arXiv:2610.18649) on `discopy.csp` and
+  `discopy.neural`: `csp.sudoku`, `csp.queens`, `csp.cnf` and `csp.maze` as
+  hypergraph diagrams with the maze drawn in the plane, solution counting by
+  `Language.functor(int)`, arc consistency by `Language.propagate` and solution
+  checking by `Language.holds`, and the 9x9 Sudoku `PeerNet` (16,485
+  parameters) and `FactorNet` (16,543 parameters) wired from `csp.scopes` with
+  one untrained lattice step ([next#600]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
@@ -608,6 +625,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   diagram with a `monoidal.Functor`. The old names keep no alias, and a tree
   or pickle saved under them does not load ([next#743]).
 
+- `discopy.drawing.drawing` is renamed `discopy.drawing.planegraph`, with no
+  alias, see `docs/adr/0001-renames-take-no-alias.md` ([next#746]).
+
+- A box drawn as a rectangle tells its dagger, transpose and conjugate apart
+  by a corner cut off rather than one shifted, short of its wires, and so does
+  a frame drawn around its args, wide enough for its label in the corner
+  opposite. The drawings nested in a box
+  lie on slots with a margin between them rather than a line, centred in the
+  box, which has its label in the corner opposite its cut, and the wire labels
+  of a drawing turned half way round hang along their wire. The args of a
+  box's dagger, transpose and conjugate are drawn as the reflection, the half
+  turn and the reflection of those of the box, in reverse order when the box
+  is turned or flipped across them, while the args it holds stay as they were
+  ([next#764]).
+
 - A box is an operation symbol of arity n: `cat.Box` takes `args`, the arrows
   inside it, and the `method` a functor calls on their images, a generator
   being a box with no args. The `Bubble` class of every module fuses into its
@@ -623,9 +655,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `argument`, in its trees too, and a tree with the old keys still loads
   ([next#729]).
 
-- In a left-to-right drawing, wire labels sit above their wires, and a line
-  separates each of the args nested in a box from the next, so that no two
-  regions meet without one ([next#733]).
+- In a left-to-right drawing, wire labels sit above their wires
+  ([next#733]).
 
 - The architecture diagram of the syntax moves from the docstring of
   `discopy.abc` to the syntax page of the docs, with the sentence that
@@ -946,6 +977,34 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `hash` of a `tensor.Elementwise`, a `tensor.Diff` and a
+  `testable.Declaration` depends on no address, so it is the same in every
+  interpreter with `PYTHONHASHSEED` fixed: the function each holds is compared
+  by `==` but left out of the hash, and a declaration's category is hashed by
+  its `factory_key` ([next#506]).
+- `quantum.tk.to_tk` drops destructively measured qubits when
+  `Measure(override_bits=True)` overrides existing bits, so gates and
+  measurements after it act on the remaining qubits; `QuantumGate` keeps 0-d
+  phases and backend tensor entries without calling `numpy.ravel`,
+  `circuit.Box.array` stacks backend scalars with `matrix.asarray`,
+  `QuantumGate.is_deterministic` detaches tensors before converting to NumPy
+  and `U1.array` converts its constants in the active backend, so `CRz`,
+  `CRx`, `CU1` and `QuantumGate` keep gradients under PyTorch and JAX
+  ([next#445]).
+- The API docs show short names: a page is titled with the last part of its
+  name, which it lost when its package did not import it, e.g.
+  `neural.cell`, module tables and references to modules and objects drop
+  the `discopy.` prefix, and the bases of a class name only as much of their
+  path as tells two of them apart, e.g. `pivotal.Diagram, balanced.Diagram`
+  for `ribbon.Diagram`, as references in one paragraph do; `test/api_names.py`
+  checks both. `discopy.drawing` has
+  its own page instead of appearing twice under semantics, and the subpackages
+  follow it in the order lambek, neural, optyx, quantum ([next#746]).
+- `tensor.Functor.contract` lifts NumPy's default bound on intermediates, the
+  size of the largest operand, for combinatorial maps as well as hypergraphs on
+  the `"greedy"` path: when every pairwise step exceeds the largest operand,
+  e.g. `hopf.Double(hopf.GroupAlgebra(Symmetric[3])).is_valid()`, NumPy no
+  longer falls back to one naive sum over all indices ([next#579], [#595]).
 - The label of an exponential wire is made of the labels of its base and
   exponent, so a bang under `<<` or `>>` is drawn `!x` as at the top, e.g.
   `(!N >> S)` rather than `(N.bang() >> S)` ([next#762]).
@@ -960,6 +1019,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a corner cut off, as a box has one slanted, e.g. its top right for a dagger,
   and a transpose or a conjugate turns its args half way round with it
   ([next#745]).
+- `quantum.zx.Hypergraph` keeps spider phases as exact `Fraction`s modulo a
+  turn (decimal floats included, so `dagger` is an involution on
+  `Z(1, 1, 0.1)`), `turn` is exact on the quarter-turns so Clifford scalars
+  round-trip through `to_diagram`, `zx.Spider` writes non-dyadic `Fraction`
+  phases as `Fraction(p, q)` in `__str__` (keeping `p/q` for dyadic ones) and
+  exact phases in `__repr__`, and `zx.Scalar.__str__` formats its number
+  without rounding, with regression cases in `proptest/corpus/zx.py`
+  ([next#718]).
 
 - A kappa term of `discopy.bang` copies, exchanges and discards its banged
   variables with the boxes of the domain of the functor that evaluates it,
@@ -972,12 +1039,36 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   those of boxes and bubbles are, wherever the regions on either side have
   different colours, rather than with zero width, e.g. around each term of
   an equation between coloured diagrams ([next#742]).
+- `optyx.channel.Diagram.fix` and `power_fix` raise `ValueError` naming
+  `max_chi >= 2` when compressed contraction is asked for `max_chi=1` on a
+  network whose bond dimension exceeds one, rather than failing with
+  `LinAlgError` inside Quimb's stabilized QR, and `test_fix.py` checks
+  `max_chi=1` against the real `QuimbBackend` ([next#442]).
+
+- `optyx.channel.Diagram.from_tket` and `optyx.qubits.Circuit` convert a
+  `pytket.Circuit` to an open diagram on `qubit ** n @ bit ** m`, keeping its
+  unitary (global phase included) and routing non-adjacent gates and
+  measurements; `QubitChannel.from_discopy` gains `U1`, `Ry`, `CRy`, `CY`,
+  daggered gates, `Discard` and `Measure` ([next#296]).
+
+- Every remaining box of `optyx.qubits` loads its own tree: `Z` and `X` from
+  their boundary and `data`, `H` with no argument, `Scalar` from `data`,
+  `BitFlipError` and `DephasingError` from `prob`, `Ket` and `Bra` from
+  `value` and their boundary, and `QubitChannel` from `kraus` and `env`
+  ([next#731]).
 
 - A functor reads a type of the level of its domain or above as that type,
   so the identity functor is the identity on types, e.g.
   `monoidal.Functor.id(monoidal.Diagram)` on a box over `rigid.Ty('x')`, its
   images compose and a dict `ob_map` keyed on the type finds it
   ([next#703]).
+- Every remaining box of `optyx.photonic` writes and reads its own tree:
+  `Swap` from `left` and `right`, `Create` and `Select` from `photons`,
+  `Create` and `DualRail` with their `internal_states`, `Gate` from its
+  `array`, `Scalar`, `PhaseShiftDR` and `PhotonLoss` from their `data`,
+  `PhotonThresholdMeasurement` from its domain, and `NumOp` and `HadamardBS`
+  with no argument, so `loads(dumps(...))` round-trips across `optyx.photonic`
+  ([next#731]).
 
 - `optyx` channels and gates load their own tree: `channel.Measure`,
   `Encode` and `Discard` and their `photonic` and `qubits` subclasses from
@@ -994,6 +1085,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   off `discopy.monoidal`, inside the syntax, and the docstring of
   `discopy.bang` no longer compares it to `discopy.para` and `discopy.monad`
   ([next#732]).
+- `optyx.core.diagram`, `optyx.core.zx` and `optyx.classical` types and boxes
+  load their own tree (`Mode`, `Bit`, `Box` with `array` or `is_dagger=None`,
+  `Scalar`, `DualRail`, `PhotonThresholdDetector`, `EmbeddingTensor`, `zx.H`,
+  `Spider`, `And`, `Or` and the value-initialised `classical` boxes), while
+  `ClassicalFunction` and `BitControlledPhaseShift` raise `TypeError` on
+  `to_tree` since JSON cannot hold a Python callable ([next#731]).
 
 - `quantum.zx.H` is self-adjoint by `is_dagger=None`, the flag a self-adjoint
   box of `quantum.circuit` and of optyx already carries, rather than by a
@@ -2183,6 +2280,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py --check` fails when a notebook in `KNOWN_BROKEN`
+  executes cleanly, naming the notebook and its issue, so an exemption whose
+  bug has been fixed cannot stay silently ([next#435]).
 - Read the Docs embeds the notebooks the `build` workflow renders on `main`
   instead of linking to their sources, still running none itself: a
   `notebooks` job pushes them to the `rendered-notebooks` branch, whose
@@ -2496,6 +2596,7 @@ for the changelog of `1.2.1` and earlier.
 [#588]: https://github.com/discopy/discopy/pull/588
 [#590]: https://github.com/discopy/discopy/pull/590
 [#594]: https://github.com/discopy/discopy/pull/594
+[#595]: https://github.com/discopy/discopy/issues/595
 [#603]: https://github.com/discopy/discopy/pull/603
 [#606]: https://github.com/discopy/discopy/pull/606
 [#614]: https://github.com/discopy/discopy/pull/614
@@ -2560,6 +2661,7 @@ for the changelog of `1.2.1` and earlier.
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
 [next#42]: https://github.com/rel-int/discopy-next/issues/42
+[next#43]: https://github.com/rel-int/discopy-next/issues/43
 [next#49]: https://github.com/rel-int/discopy-next/issues/49
 [next#52]: https://github.com/rel-int/discopy-next/issues/52
 [next#56]: https://github.com/rel-int/discopy-next/issues/56
@@ -2641,6 +2743,7 @@ for the changelog of `1.2.1` and earlier.
 [next#293]: https://github.com/rel-int/discopy-next/issues/293
 [next#294]: https://github.com/rel-int/discopy-next/issues/294
 [next#295]: https://github.com/rel-int/discopy-next/issues/295
+[next#296]: https://github.com/rel-int/discopy-next/issues/296
 [next#297]: https://github.com/rel-int/discopy-next/issues/297
 [next#298]: https://github.com/rel-int/discopy-next/issues/298
 [next#299]: https://github.com/rel-int/discopy-next/issues/299
@@ -2732,6 +2835,7 @@ for the changelog of `1.2.1` and earlier.
 [next#539]: https://github.com/rel-int/discopy-next/pull/539
 [next#540]: https://github.com/rel-int/discopy-next/pull/540
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
+[next#542]: https://github.com/rel-int/discopy-next/issues/542
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
 [next#550]: https://github.com/rel-int/discopy-next/pull/550
@@ -2750,6 +2854,7 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#579]: https://github.com/rel-int/discopy-next/issues/579
 [next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#582]: https://github.com/rel-int/discopy-next/pull/582
@@ -2761,6 +2866,7 @@ for the changelog of `1.2.1` and earlier.
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#600]: https://github.com/rel-int/discopy-next/issues/600
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
@@ -2818,6 +2924,7 @@ for the changelog of `1.2.1` and earlier.
 [next#713]: https://github.com/rel-int/discopy-next/pull/713
 [next#714]: https://github.com/rel-int/discopy-next/pull/714
 [next#715]: https://github.com/rel-int/discopy-next/pull/715
+[next#718]: https://github.com/rel-int/discopy-next/issues/718
 [next#721]: https://github.com/rel-int/discopy-next/pull/721
 [next#725]: https://github.com/rel-int/discopy-next/pull/725
 [next#739]: https://github.com/rel-int/discopy-next/pull/739
@@ -2832,12 +2939,15 @@ for the changelog of `1.2.1` and earlier.
 [next#729]: https://github.com/rel-int/discopy-next/pull/729
 [next#703]: https://github.com/rel-int/discopy-next/issues/703
 [next#730]: https://github.com/rel-int/discopy-next/pull/730
+[next#731]: https://github.com/rel-int/discopy-next/issues/731
 [next#732]: https://github.com/rel-int/discopy-next/pull/732
 [next#733]: https://github.com/rel-int/discopy-next/pull/733
 [next#735]: https://github.com/rel-int/discopy-next/pull/735
 [next#736]: https://github.com/rel-int/discopy-next/pull/736
 [next#737]: https://github.com/rel-int/discopy-next/pull/737
 [next#743]: https://github.com/rel-int/discopy-next/pull/743
+[next#746]: https://github.com/rel-int/discopy-next/pull/746
+[next#764]: https://github.com/rel-int/discopy-next/pull/764
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

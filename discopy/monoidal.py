@@ -73,7 +73,7 @@ Terms
 -----
 
 A diagram also reads as a term of the planar linear kappa calculus, see
-:class:`TermBase`: the terms of :mod:`discopy.cat` with a list of variables
+:class:`TermBase`: the terms of :mod:`~discopy.cat` with a list of variables
 as context, each used once and in order.
 
 A term has exactly one output, and the translation between diagrams and
@@ -97,10 +97,10 @@ Traceback (most recent call last):
 ValueError: Expected exactly one output, got y @ z: a term has one.
 
 This loses no diagram where the category has products: a
-:class:`discopy.closed.markov.Pack` box turns any closed diagram into one
-with exactly one output, of :class:`discopy.closed.markov.Product` type. A
+:class:`~discopy.closed.markov.Pack` box turns any closed diagram into one
+with exactly one output, of :class:`~discopy.closed.markov.Product` type. A
 closed diagram reads as a lambda term by default, see
-:meth:`discopy.closed.markov.Diagram.to_term`, and as a kappa term with
+:meth:`~discopy.closed.markov.Diagram.to_term`, and as a kappa term with
 :meth:`TermBase.from_diagram`.
 
 >>> from discopy import closed
@@ -150,10 +150,10 @@ A term is drawn as its diagram:
     :align: center
 
 The modules above have terms of their own, down to
-:mod:`discopy.closed.monoidal` where they are lambda terms: a
-:class:`discopy.symmetric.Kappa` binds its variables in any order, a
-:class:`discopy.markov.Kappa` need not use them and a
-:class:`discopy.markov.Application` may use one twice.
+:mod:`~discopy.closed.monoidal` where they are lambda terms: a
+:class:`symmetric.Kappa <discopy.symmetric.Kappa>` binds its variables in any
+order, a :class:`markov.Kappa <discopy.markov.Kappa>` need not use them and a
+:class:`~discopy.markov.Application` may use one twice.
 """
 
 from __future__ import annotations
@@ -182,7 +182,7 @@ from discopy.testable import (
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
-    COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
+    COLOUR_DRAWING_ATTRIBUTES, DRAWING_DEFAULT, TRANSPARENT)
 from discopy.utils import (
     factory,
     factory_key,
@@ -255,7 +255,7 @@ def uncolour_state(state: dict) -> dict:
     """
     The pickled ``state`` of a wire or a type, with no colour as ``None``:
     a pickle from before ``None`` stood for no colour holds a
-    :class:`Colour` named :data:`discopy.config.TRANSPARENT` instead.
+    :class:`Colour` named :data:`~discopy.config.TRANSPARENT` instead.
     """
     for key in ('dom', 'cod'):
         colour = state.get(key)
@@ -391,7 +391,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
     generator the library uses: ``repr`` is such an expression for an
     ``int``, and for a class it is not — ``repr(int)`` is ``<class 'int'>``
     where the name ``int`` is what reads back — so the free monoid on
-    Python's ``type``, i.e. :obj:`discopy.python.Ty`, prints its atoms with
+    Python's ``type``, i.e. :obj:`~discopy.python.Ty`, prints its atoms with
     :func:`.factory_name` instead. A generator with no such representation
     at all, e.g. ``object()``, has no transparent list until it overrides the
     hook.
@@ -456,7 +456,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         """
         A list's generators can themselves be classes, `python.Ty` being
         `List[type]`, and a class hashes as its address: those take their
-        :func:`discopy.utils.factory_key` here, as a setoid's leading
+        :func:`~discopy.utils.factory_key` here, as a setoid's leading
         component does.
         """
         return hash((factory_key(type(self)), tuple(
@@ -841,7 +841,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         sum of the cell widths ``max(1, right_margin)`` of the objects before
         it: each wire takes up at least a unit, more if its label is longer.
         A wire followed by a region carrying a ``width`` (e.g. the inside of
-        a :class:`discopy.balanced.Ribbon`) is only that width away from the
+        a :class:`~discopy.balanced.Ribbon`) is only that width away from the
         next wire, i.e. the region carries the width.
 
         >>> assert Ty('x', 'y').to_drawing().wire_offsets() == [0, 1]
@@ -883,7 +883,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     ----
     If ``ob`` is ``Nat`` then :class:`Diagram` will automatically turn
     any ``n: int`` into ``Nat(n)``. Thus ``Nat`` never needs to be called,
-    and the resulting diagrams live in a :class:`discopy.abc.PRO`.
+    and the resulting diagrams live in a :class:`~discopy.abc.PRO`.
 
     >>> @factory
     ... class Circuit(abc.PRO, Diagram):
@@ -897,7 +897,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     generator_factory = int
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+    instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
@@ -952,7 +952,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
         """
         The identity: a type whose atoms are not wires has no time step, so
         its :attr:`head` and :attr:`tail` are itself too, see
-        :class:`discopy.feedback.Ty`.
+        :class:`~discopy.feedback.Ty`.
 
         Parameters:
             n_steps : The number of time steps to delay.
@@ -990,7 +990,7 @@ class Dim(Ty):
     generator_factory = int
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+    instance of a law, see :meth:`~discopy.testable.Axiom.canonical`. """
 
     @classmethod
     def generator_strategy(cls, *, dom=None, cod=None):
@@ -1214,7 +1214,7 @@ class Layer(cat.Box, ColouredMonoid):
     def is_plumbing_box(cls, value: Ty | Box) -> bool:
         """
         Whether a component of a layer is plumbing other than a type, e.g. a
-        :class:`discopy.symmetric.Permutation` in a symmetric layer, none in
+        :class:`~discopy.symmetric.Permutation` in a symmetric layer, none in
         a monoidal one.
 
         Parameters:
@@ -1487,11 +1487,11 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         The structural boxes of the free category, i.e. the box classes
         among its factories that draw themselves with a ``strategy`` of
         their own rather than that of its :attr:`box_factory`, e.g.
-        :class:`discopy.braided.Braid` for
-        :attr:`discopy.braided.Diagram.braid_factory`. A box class of
+        :class:`~discopy.braided.Braid` for
+        :attr:`~discopy.braided.Diagram.braid_factory`. A box class of
         another category, e.g. the braid a symmetric diagram inherits from
         a balanced one, and a factory that is a method rather than a class
-        are left out. :func:`discopy.testable.assert_structural_boxes`
+        are left out. :func:`~discopy.testable.assert_structural_boxes`
         checks that each one is written down and read back.
 
         Example
@@ -1799,8 +1799,8 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         identifies diagrams up to moving a scalar across a wire, as
         :meth:`to_hypergraph` does. From braided categories on, a scalar
         slides past a wire anyway, by naturality of the braiding; below, the
-        map presents the free spacial category, see :mod:`discopy.spacial`
-        and :meth:`discopy.cmap.CMap.match`, rather than the free category.
+        map presents the free spacial category, see :mod:`~discopy.spacial`
+        and :meth:`~discopy.cmap.CMap.match`, rather than the free category.
 
         >>> x, c = Ty('x'), Box('c', Ty(), Ty())
         >>> assert c @ x != x @ c and (c @ x).to_map() == (x @ c).to_map()
@@ -1820,7 +1820,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         refused. Every box is a constant, structural ones included, e.g. a
         swap, and no wire is ever copied, discarded or crossed. Closed
         Markov diagrams read as lambda terms instead, see
-        :meth:`discopy.closed.markov.Diagram.to_term`.
+        :meth:`~discopy.closed.markov.Diagram.to_term`.
 
         Example
         -------
@@ -1911,7 +1911,7 @@ let(e(x2), lambda: h(x1), offset=1)))
     def equation_factory(cls, *terms: "Diagram") -> "Equation":
         """
         The equation of a law, compared on the nose. A hypergraph is faithful
-        only from :class:`discopy.symmetric.Diagram` on, whose
+        only from :class:`~discopy.symmetric.Diagram` on, whose
         ``equation_factory`` compares up to it: below, it is a quotient that
         forgets the regions of a planar diagram and the side of its scalars,
         identifies a braid with its inverse, a twist with the identity and
@@ -1930,7 +1930,8 @@ let(e(x2), lambda: h(x1), offset=1)))
         Translate a planar diagram into a hypergraph.
 
         The offset of each *state* (a box with an empty domain) is recorded on
-        the hypergraph, so :meth:`discopy.hypergraph.Hypergraph.to_diagram` can
+        the hypergraph, so :meth:`~discopy.hypergraph.Hypergraph.to_diagram`
+        can
         place it back without a swap. A state has no input wires for the
         boundary scan to follow, so without its offset that scan would default
         every state to the left and then need swaps to reorder them -- which a
@@ -1945,7 +1946,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         Like :meth:`to_map`, it identifies diagrams up to moving a closed
         component, i.e. a scalar, across a wire, which below braided
         categories presents the free spacial category, see
-        :mod:`discopy.spacial`. Decoding gives back a diagram with the same
+        :mod:`~discopy.spacial`. Decoding gives back a diagram with the same
         hypergraph, i.e. ``d.to_hypergraph().to_diagram().to_hypergraph()``
         is ``d.to_hypergraph()``, and that diagram is ``d`` up to the axioms
         and, below braided, up to where its scalars lie.
@@ -2000,7 +2001,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         diagram lives in a symmetric category with self-dual objects and its
         hypergraph is monogamous, causal and boundary-connected, the foliation
         is read off the hypergraph in one pass over the boundary (see
-        :meth:`discopy.hypergraph.Hypergraph.to_diagram`). The self-duality is
+        :meth:`~discopy.hypergraph.Hypergraph.to_diagram`). The self-duality is
         needed because that pass reconstructs the diagram with swaps, which
         would not be faithful in a rigid category such as pregroup, where the
         left and right adjoints of an object differ. Otherwise this scans top
@@ -2164,7 +2165,7 @@ let(e(x2), lambda: h(x1), offset=1)))
         come later, e.g. ``(f >> g) @ h``. Each layering of
         :meth:`dependencies` is foliated, then merged by the level's own
         :meth:`Layer.merge`, e.g. two permutations fuse in
-        :mod:`discopy.symmetric`.
+        :mod:`~discopy.symmetric`.
 
         Parameters:
             limit : The maximum number of foliations to return.
@@ -2350,15 +2351,15 @@ let(e(x2), lambda: h(x1), offset=1)))
         Note
         ----
         This is a planar rewrite, as are :meth:`interchange` and
-        :meth:`discopy.rigid.Diagram.snake_removal`, which yanks snakes
+        :meth:`~discopy.rigid.Diagram.snake_removal`, which yanks snakes
         before it interchanges boxes: their scope is the planar levels, from
-        :mod:`discopy.monoidal` to :mod:`discopy.rigid`. Above them, a braid,
+        :mod:`~discopy.monoidal` to :mod:`~discopy.rigid`. Above them, a braid,
         a swap or a trace is just one more box, so they do not compute a
         normal form for the axioms of the level, e.g. in
-        :mod:`discopy.symmetric` the diagrams
+        :mod:`~discopy.symmetric` the diagrams
         ``Swap(x, y) >> y @ f >> Swap(y, x)`` and ``f @ y`` have the same
         hypergraph and neither is rewritten into the other. From
-        :mod:`discopy.symmetric` up, the ``Equation`` of the level compares
+        :mod:`~discopy.symmetric` up, the ``Equation`` of the level compares
         diagrams up to their hypergraph instead.
         """
         diagram = self
@@ -2437,7 +2438,8 @@ class Box(cat.Box, Diagram):
     draw_as_spider : bool, optional
         Whether to draw the box as a spider.
     draw_as_wires : bool, optional
-        Whether to draw the box as wires, e.g. :class:`discopy.symmetric.Swap`.
+        Whether to draw the box as wires, e.g.
+        :class:`~discopy.symmetric.Swap`.
     draw_as_braid : bool, optional
         Whether to draw the box as a a braid, e.g. :class:`braided.Braid`.
     drawing_name : str, optional
@@ -2448,7 +2450,7 @@ class Box(cat.Box, Diagram):
     color : str, optional
         The color to use when drawing the box, one of
         :code:`"transparent", "red", "green", "blue", "yellow", "black"` or any
-        other matplotlib colour, e.g. :data:`discopy.config.TRANSPARENT`
+        other matplotlib colour, e.g. :data:`~discopy.config.TRANSPARENT`
         for a spider drawn unfilled.
         Default is :code:`"black" if draw_as_spider else "transparent"`.
     shape : str, optional
@@ -2615,7 +2617,7 @@ class Box(cat.Box, Diagram):
     @property
     def frame_colour(self):
         """ The colour of the frame, the default of
-        :data:`discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
+        :data:`~discopy.config.BOX_DRAWING_ATTRIBUTES` unless given. """
         return vars(self).get(
             "frame_colour", BOX_DRAWING_ATTRIBUTES['frame_colour'](self))
 
@@ -2692,36 +2694,51 @@ class Box(cat.Box, Diagram):
         if len(directions) > 1:
             raise ValueError(messages.MIXED_DIRECTIONS.format(self))
         if directions != {self.draw_left_to_right}:
-            framed = [arg.framed() for arg in args]
+            # The dagger of a box daggers its args, which its drawing does as
+            # it reflects them with the box: draw them as they were.
+            framed = [(arg[::-1].to_drawing() if self.is_dagger else drawing)
+                      .framed() for arg, drawing in zip(self.args, args)]
             height = max(arg.height for arg in framed)
             nested = tuple(
                 arg.stretch(height - arg.height) for arg in framed)
-            width = sum(arg.width for arg in nested)
+            width = sum(arg.width for arg in nested)\
+                + DRAWING_DEFAULT["nested_margin"] * (len(nested) - 1)
+            # As wide a margin around the args as above and below them, and
+            # room for the label in its corner.
             label = text_width(self.drawing_name) + .25\
                 if self.drawing_name else 0
             box = Box(
                 self.drawing_name, self.dom, self.cod, nested=nested,
                 color=getattr(self, "color", "white"),
                 frame_colour=self.frame_colour,
-                min_width=max(label + height + .5,
+                min_width=max(height + 1, label,
                               getattr(self, "min_width", 0)),
                 height=max(width + 1, getattr(self, "height", 0)))
-            # The box is drawn slanted as its own variant, its args as theirs.
+            # The box has a corner cut as its own variant, its args as theirs.
             box.is_dagger = self.is_dagger
             for attr in ("is_transpose", "is_conjugate"):
                 setattr(box, attr, bool(getattr(self, attr, False)))
             return box.to_drawing()
-        method = "frame" if self.draw_as_frame else "bubble"
         kwargs = dict(
             dom=self.dom.to_drawing(),
             cod=self.cod.to_drawing(),
-            name=self.drawing_name)
-        if self.draw_as_frame:
-            kwargs['draw_vertically'] = self.draw_vertically
-            kwargs['frame_colour'] = self.frame_colour
-        else:
+            name="" if self.draw_as_frame else self.drawing_name)
+        if not self.draw_as_frame:
             kwargs['draw_as_square'] = self.draw_as_square
-        return getattr(Drawing, method)(*args, **kwargs)
+            return Drawing.bubble(*args, **kwargs)
+        result = Drawing.frame(
+            *args, draw_vertically=self.draw_vertically,
+            frame_colour=self.frame_colour, min_width=text_width(
+                self.drawing_name) + .5 if self.drawing_name else 0,
+            **kwargs)
+        # Its top and bottom edges draw the corner cut off as for a box, and
+        # its label in the corner opposite, see Backend.draw_frame_corner.
+        corner = (0 if getattr(self, "is_conjugate", False) else
+                  1 if getattr(self, "is_transpose", False) else
+                  2 if self.is_dagger else 3)
+        for edge in (result.boxes[0], result.boxes[-1]):
+            edge.frame_corner, edge.frame_name = corner, self.drawing_name
+        return result
 
 
 class Sum(cat.Sum, Box):
@@ -2799,11 +2816,11 @@ class Functor(cat.Functor):
     Note
     ----
     A :class:`Layer` maps to the tensor of its images. When ``cod`` is a
-    :class:`discopy.abc.MonoidalCategory`, the first two are tensored with
+    :class:`~discopy.abc.MonoidalCategory`, the first two are tensored with
     ``@`` as in a fold, e.g. so that a type next to a
-    :class:`discopy.symmetric.Permutation` gives a wider permutation, and the
+    :class:`~discopy.symmetric.Permutation` gives a wider permutation, and the
     others are whiskered and tensored in one ``n``-ary call. Any other
-    ``cod`` folds ``@``, e.g. :class:`discopy.kleisli.multiplicative.Channel`.
+    ``cod`` folds ``@``, e.g. :class:`~discopy.kleisli.multiplicative.Channel`.
 
     Example
     -------
@@ -2856,7 +2873,7 @@ class Functor(cat.Functor):
     def to_tree(self) -> dict:
         """
         Serialise a functor whose maps are dictionaries, its colour map
-        included, see :meth:`discopy.cat.Functor.to_tree`.
+        included, see :meth:`~discopy.cat.Functor.to_tree`.
 
         >>> from discopy.utils import dumps, loads
         >>> x, y, red, blue = Ty('x'), Ty('y'), Colour('red'), Colour('blue')
@@ -3036,7 +3053,7 @@ class Equation(cat.Equation, RichDisplay):
     def to_tree(self) -> dict:
         """
         Serialise an equation of diagrams, with the space between its terms,
-        see :meth:`discopy.cat.Equation.to_tree`.
+        see :meth:`~discopy.cat.Equation.to_tree`.
 
         >>> from discopy.utils import dumps, loads
         >>> x = Ty('x')
@@ -3091,7 +3108,7 @@ Id = Diagram.id
 class TermBase(cat.TermBase):
     """
     A term of a monoidal category, i.e. of the planar linear kappa calculus:
-    a :class:`discopy.cat.TermBase` with a list of variables as context,
+    a :class:`~discopy.cat.TermBase` with a list of variables as context,
     each one wire, and a type as stack. A term in a context
     :math:`\\Gamma` with a stack :math:`A` of inputs still to be applied
     and one output :math:`b`
@@ -3208,7 +3225,7 @@ class TermBase(cat.TermBase):
                  letters: Sequence[str | None]) -> cat.TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
-        :meth:`discopy.closed.monoidal.TermBase.generate` does: its inputs are
+        :meth:`~discopy.closed.monoidal.TermBase.generate` does: its inputs are
         bound by a kappa or left free, named ``v0, v1, ...``, and the
         variable bound at each level is named by the letter at that level,
         see :class:`Sampler`.
@@ -3620,7 +3637,7 @@ class Sampler:
               shadowed: cat.Variable | None = None) -> cat.Variable:
         """
         The variable bound at a given level, named by its letter or after
-        the variable it shadows, see :meth:`discopy.cat.TermBase.bound_name`.
+        the variable it shadows, see :meth:`~discopy.cat.TermBase.bound_name`.
         """
         return self.terms.variable_factory(
             self.terms.bound_name(self.letters, level, shadowed), cod)

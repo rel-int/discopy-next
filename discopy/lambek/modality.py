@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 
 """
-The Lambek calculus with a relevant modality ``!L*``, i.e. the free biclosed
-category of :mod:`discopy.lambek.categorial` with the bang of
-:mod:`discopy.linear.monoidal`: a banged type ``!x`` may be copied by
-contraction, read once by dereliction and moved past any type by exchange, see
-McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
+The Lambek calculus with a relevant modality ``!L*``, i.e. the free
+biclosed category of :mod:`~discopy.lambek.categorial` with the bang of
+:mod:`linear.monoidal <discopy.linear.monoidal>`: a banged type ``!x`` may be
+copied by contraction, read once by dereliction and moved past any type by
+exchange, see McPheat, Wijnholds, Sadrzadeh, Correia and Toumi
 (`arXiv:2110.10641 <https://arxiv.org/abs/2110.10641>`_).
 
-A term is a kappa term of :mod:`discopy.linear.monoidal` whose functions are
-words of exponential type, applied by :class:`Eval`: a banged variable used
-twice is copied by :class:`Contraction`, brought where it is read by
-:class:`Exchange`, and every other variable is used once and in order.
+A term is a kappa term of :mod:`linear.monoidal <discopy.linear.monoidal>`
+whose functions are words of exponential type, applied by :class:`Eval`: a
+banged variable used twice is copied by :class:`Contraction`, brought where it
+is read by :class:`Exchange`, and every other variable is used once and in
+order.
 
 Summary
 -------
@@ -73,7 +74,7 @@ class Ty(bang.Ty, categorial.Ty):
     """
     A type of ``!L*``, a categorial type whose wires may be banged, called
     on a Python function for the kappa abstraction of
-    :mod:`discopy.linear.monoidal`.
+    :mod:`linear.monoidal <discopy.linear.monoidal>`.
 
     Example
     -------
@@ -148,7 +149,7 @@ class Functor(bang.Functor, categorial.Functor):
     evaluation and currying go through the closed structure of the codomain,
     and the bang and the structural boxes through its bang when it is
     linear. Into a category that is not biclosed, e.g. a monoidal one, send
-    the underlying monoidal diagram with a :class:`discopy.monoidal.Functor`,
+    the underlying monoidal diagram with a :class:`~discopy.monoidal.Functor`,
     which takes them through ``ob_map`` and ``ar_map`` like generators.
 
     Example
@@ -184,7 +185,7 @@ class Functor(bang.Functor, categorial.Functor):
 
 class TermBase(bang.TermBase):
     """
-    A kappa term of ``!L*``, see :class:`discopy.linear.monoidal.TermBase`.
+    A kappa term of ``!L*``, see :class:`~discopy.linear.monoidal.TermBase`.
     """
 
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Fused CUDA reductions for :class:`discopy.neural.geometric.Peers`.
+Fused CUDA reductions for :class:`~discopy.neural.geometric.Peers`.
 
 For the symmetric signed block relation ``A``, the forward map is
 ``sum_w A[v, w] relu(s[v] + x[w]) / degree``. Its two vector-Jacobian
