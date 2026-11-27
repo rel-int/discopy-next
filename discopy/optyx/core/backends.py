@@ -6,7 +6,7 @@ Overview
 Back-end abstraction layer for **Optyx** diagram evaluation.
 
 This module gathers several numerical engines under a single
-interface so that any :class:`discopy.optyx.channel.Diagram` can be reduced
+interface so that any :class:`~discopy.optyx.channel.Diagram` can be reduced
 to concrete data - amplitudes, density matrices or classical probability
 distributions.
 

@@ -500,20 +500,20 @@ class Diagram(frobenius.Diagram):
             burn_in : The number of ticks discarded first, certified from
                 `tol` for a passive diagram when not given.
             cap : The most photons an optical mode holds in an
-                :class:`discopy.optyx.sampling.Unravelling`.
+                :class:`~discopy.optyx.sampling.Unravelling`.
             shots : The number of independent trajectories, from the same
                 sampler; a list of them when given.
-            source : The :class:`discopy.optyx.sampling.Source` feeding the
+            source : The :class:`~discopy.optyx.sampling.Source` feeding the
                 inputs, one mode per input:
-                :class:`discopy.optyx.sampling.Fock`,
-                :class:`discopy.optyx.sampling.Coherent`,
-                :class:`discopy.optyx.sampling.Thermal` or a tensor of them.
+                :class:`~discopy.optyx.sampling.Fock`,
+                :class:`~discopy.optyx.sampling.Coherent`,
+                :class:`~discopy.optyx.sampling.Thermal` or a tensor of them.
 
         **Passive diagrams** — beam splitters, phase shifters and any other
-        linear optics, :class:`discopy.optyx.photonic.Create` boxes, photon
+        linear optics, :class:`~discopy.optyx.photonic.Create` boxes, photon
         loss and discards, on optical modes only, with loops starting in the
         vacuum — are sampled by their
-        :class:`discopy.optyx.sampling.Interferometer`: the loop is a Fock
+        :class:`~discopy.optyx.sampling.Interferometer`: the loop is a Fock
         state evolved by the unitary of the step, each output measured as
         soon as the modes it depends on are, so a tick costs
         what the photons in the loop and the inputs cost, not what every
@@ -524,7 +524,7 @@ class Diagram(frobenius.Diagram):
         probability and in one of its own otherwise.
 
         **Every other diagram** is sampled by its
-        :class:`discopy.optyx.sampling.Unravelling`, one box at a time on a
+        :class:`~discopy.optyx.sampling.Unravelling`, one box at a time on a
         pure state of the quantum wires and definite values of the classical
         ones:
 
@@ -538,7 +538,7 @@ class Diagram(frobenius.Diagram):
           measured, sampled and collapsed: these are the quantum
           trajectories of the channel;
         - a classical box, a
-          :class:`discopy.optyx.classical.ClassicalFunction` or a random
+          :class:`~discopy.optyx.classical.ClassicalFunction` or a random
           one, samples its outputs from its inputs, and a
           classically controlled box applies the box its values select;
         - photons with internal states are sampled on the diagram inflated
@@ -599,9 +599,9 @@ class Diagram(frobenius.Diagram):
                 burn_in: int = None, cap: int = 4, source=None) -> tuple:
         """
         The sampler of :meth:`sample` and its burn-in: the
-        :class:`discopy.optyx.sampling.Interferometer` of a passive diagram,
+        :class:`~discopy.optyx.sampling.Interferometer` of a passive diagram,
         with the burn-in it certifies within `tol` unless `burn_in` is given,
-        and the :class:`discopy.optyx.sampling.Unravelling` of any other,
+        and the :class:`~discopy.optyx.sampling.Unravelling` of any other,
         with the `burn_in` given, both fed by `source`.
         """
         try:
@@ -730,7 +730,7 @@ class Diagram(frobenius.Diagram):
         """
         The pure Kraus map of this channel diagram with every environment
         routed to the end of the codomain: a
-        :class:`discopy.optyx.core.diagram` diagram from `dom.single()` to
+        :class:`~discopy.optyx.core.diagram` diagram from `dom.single()` to
         `cod.single() @ env`.
 
         This is Stinespring dilation, layer by layer: a lossy channel is an
@@ -854,7 +854,7 @@ class Diagram(frobenius.Diagram):
 
         Loss is read off the diagram, not passed in: the one-step matrix is
         the path matrix of the loop's :meth:`dilate`, so a
-        :class:`discopy.optyx.photonic.PhotonLoss` or any other discarded
+        :class:`~discopy.optyx.photonic.PhotonLoss` or any other discarded
         environment in the loop enters `V_ll` as the isometry block it is,
         and shrinks its singular values by the amplitude it leaks.
 
@@ -1043,7 +1043,7 @@ class Diagram(frobenius.Diagram):
             max_steps : The maximum number of time steps, including the final
                 readout. The public `DEFAULT_MAX_STEPS` is sixty-four.
             backend : An optional
-                :class:`discopy.optyx.core.backends.AbstractBackend` for the
+                :class:`~discopy.optyx.core.backends.AbstractBackend` for the
                 certified contraction. DisCoPy evaluates with
                 ``tensor.Functor``; Quimb contracts the same doubled network
                 with an optimised path, compressed to `max_chi`. The
@@ -1459,7 +1459,7 @@ class Diagram(frobenius.Diagram):
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
         of a :class:`Diagram`, or a formal
-        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
+        :class:`~discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
         assert self.is_pure, "Diagram must be pure to convert to path."
@@ -2012,7 +2012,7 @@ class Feedback(Diagram, frobenius.Box):
     A feedback loop connecting the last `mem` outputs of a channel diagram
     back to its last `mem` inputs, one time step later.
 
-    See :class:`discopy.optyx.core.diagram.Feedback`; doubling the loop gives
+    See :class:`~discopy.optyx.core.diagram.Feedback`; doubling the loop gives
     the loop of the doubled diagram, so `double` and `unroll` commute.
 
     The one boundary with a natural default is the effect: discarding is the

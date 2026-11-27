@@ -528,7 +528,7 @@ class AbstractGate(Channel, ABC):
     @property
     def backend(self):
         """
-        The name of the :func:`discopy.matrix.backend` the array is computed
+        The name of the :func:`~discopy.matrix.backend` the array is computed
         in: that of the first parameter held by an array, e.g. a JAX tracer
         after :meth:`lambdify`, NumPy otherwise.
         """

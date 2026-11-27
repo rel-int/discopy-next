@@ -66,7 +66,7 @@ This example defines an open graph and compiles it into a fusion network and
 then into a series of instruction to be executed on a SEMM machine.
 
 This procedure is captured in the
-:meth:`discopy.optyx.compiler.semm.compile_to_semm`
+:meth:`~discopy.optyx.compiler.semm.compile_to_semm`
 method.
 
 >>> import networkx as nx
