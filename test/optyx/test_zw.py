@@ -551,20 +551,22 @@ def test_endo_grad_of_a_symbol():
 
 
 def test_zbox_equality_of_truncations_of_different_lengths():
-    """Two amplitude lists of different lengths are two truncations of the
-    same infinite list, which is what `compare_arrays_of_different_sizes`
-    says equality of ZW diagrams is: they used to raise on the broadcast."""
-    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
-    assert ZBox(1, 1, [1, 2, 3]) == ZBox(1, 1, [1, 2])
-    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, 3, 3])
+    """Two amplitude lists are equal when they agree once their trailing
+    zeros are dropped, which is the truncation case: `[1, 2]` and
+    `[1, 2, 0]` are one amplitude list, `[1, 2]` and `[1, 2, 3]` are two,
+    which only `is_close` compares by their common prefix (#364)."""
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 0, 0])
+    assert ZBox(1, 1, [1, 2, 0]) == ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, 2, 3])
+    assert ZBox(1, 1, [1, 2]).is_close(ZBox(1, 1, [1, 2, 3]))
+    assert not ZBox(1, 1, [1, 2]).is_close(ZBox(1, 1, [1, 3, 3]))
     assert ZBox(1, 1, [1, 2]) != ZBox(1, 2, [1, 2])
     assert ZBox(1, 1, [1, 2]) != W(2)
 
 
 def test_w_hash_agrees_with_eq():
-    """`W` overrides `__eq__`, so it needs a `__hash__` of its own or Python
-    sets it to None and the box cannot be a dict key. `W` compares on its
-    legs and its dagger flag, which is an equivalence, so it has one."""
+    """`W` compares through its setoid, its legs as its boundary and its
+    dagger flag, so it hashes as it compares and can be a dict key."""
     assert hash(W(2)) == hash(W(2))
     assert hash(W(2, is_dagger=True)) == hash(W(2).dagger())
     assert hash(W(2)) != hash(W(3))
@@ -573,29 +575,30 @@ def test_w_hash_agrees_with_eq():
     assert {W(2), W(2), W(3)} == {W(2), W(3)}
 
 
-def test_zbox_is_unhashable():
-    """A `ZBox` compares amplitudes by prefix, so its equality is not
-    transitive — `[1, 2]` equals both `[1, 2, 3]` and `[1, 2, 4]`, which are
-    unequal — and no hash can keep equal objects hashing equal. It is
-    unhashable rather than order-dependent as a dict key."""
-    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
-    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 4])
-    assert ZBox(1, 1, [1, 2, 3]) != ZBox(1, 1, [1, 2, 4])
-    assert ZBox.__hash__ is None
-    with pytest.raises(TypeError):
-        hash(ZBox(1, 1, [1, 2]))
+def test_zbox_is_a_setoid():
+    """`ZBox` equality is an equivalence relation, so a box hashes as its
+    one-layer diagram does: `[1, 2]` used to equal both `[1, 2, 3]` and
+    `[1, 2, 4]`, which are unequal, and so had no hash (#364)."""
+    one, two, three = ZBox(1, 1, [1, 2]), ZBox(1, 1, [1, 2, 3]), \
+        ZBox(1, 1, [1, 2, 4])
+    assert one != two and one != three and two != three
+    assert hash(one) == hash(ZBox(1, 1, [1, 2, 0]))
+    assert one == one >> Id(mode) and hash(one) == hash(one >> Id(mode))
+    assert {one: 1}[ZBox(1, 1, [1.0, 2.0])] == 1
 
 
-def test_zbox_equality_rejects_nan_amplitudes():
-    """`compare_arrays_of_different_sizes` reads `abs(x - y) <= tol`, which is
-    False whenever the difference is NaN, so a NaN amplitude is unequal to
-    everything, itself included, as it is for `np.allclose`."""
+def test_zbox_equality_is_reflexive_on_nan_amplitudes():
+    """The tolerant comparison is `np.allclose`'s, under which a NaN is
+    unequal to itself; the equality of a `ZBox` is exact, so a box with a
+    NaN amplitude is equal to itself and to nothing else (#364)."""
     inf, nan = float("inf"), float("nan")
     assert not compare_arrays_of_different_sizes([1, nan], [1, 2])
     assert not compare_arrays_of_different_sizes([1, nan], [1, nan])
-    assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, nan])
+    assert ZBox(1, 1, [1, nan]) == ZBox(1, 1, [1, nan])
     assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, 2])
-    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, nan])
+    assert ZBox(1, 1, [complex(nan, 1)]) != ZBox(1, 1, [complex(nan, 2)])
+    assert ZBox(1, 1, [complex(1, nan)]) == ZBox(1, 1, [complex(1, nan)])
+    assert not ZBox(1, 1, [1, nan]).is_close(ZBox(1, 1, [1, nan]))
     assert compare_arrays_of_different_sizes([1, inf], [1, inf])
     assert not compare_arrays_of_different_sizes([1, inf], [1, -inf])
     assert ZBox(1, 1, [1, inf]) == ZBox(1, 1, [1, inf])
