@@ -3432,6 +3432,20 @@ class Hypergraph[category](
         one of :meth:`make_monogamous`: it then goes beside the wire that the
         first box or output reading it reads next to it, if there is one.
 
+        Below symmetric categories, where a state cannot be swapped into
+        place, a boundary-connected hypergraph needs no offset: its wiring
+        determines where each state goes, read off the faces of its map by
+        :meth:`~discopy.cmap.CMap.sweep`. An offset only says where a scalar
+        lies, i.e. a component that does not reach the boundary.
+
+        >>> from discopy.monoidal import Ty, Box, Hypergraph as M
+        >>> x, y, z = map(Ty, "xyz")
+        >>> f, s = Box('f', x, y), Box('s', Ty(), z)
+        >>> graph = (x @ s >> f @ z).to_hypergraph()
+        >>> print(M(graph.dom, graph.cod, graph.boxes, graph.wires)\\
+        ...     .to_diagram())
+        x @ s >> f @ z
+
         Note
         ----
         Hypergraphs can be translated to planar diagrams in two different ways:
@@ -3481,6 +3495,14 @@ class Hypergraph[category](
                 raise AxiomError(messages.NOT_RIGID.format(
                     factory_name(self.category)))
             return self.make_monogamous().make_causal().to_diagram()
+        if self.is_boundary_connected\
+                and not issubclass(self.category, SymmetricCategory):
+            dom, vertices, cod = self.to_map().wiring()
+            decoder = Decoder(
+                self.category, self.dom, dom, foliate=True, fuse=True)
+            for i, offset in cmap.CMap.sweep(dom, vertices, cod):
+                decoder.place(self.boxes[i], *vertices[i], offset)
+            return decoder.close(cod)
         decoder = Decoder(
             self.category, self.dom, self.dom_wires,
             foliate=self.is_boundary_connected, fuse=True)

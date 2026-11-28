@@ -1931,11 +1931,9 @@ let(e(x2), lambda: h(x1), offset=1)))
 
         The offset of each *state* (a box with an empty domain) is recorded on
         the hypergraph, so :meth:`~discopy.hypergraph.Hypergraph.to_diagram`
-        can
-        place it back without a swap. A state has no input wires for the
-        boundary scan to follow, so without its offset that scan would default
-        every state to the left and then need swaps to reorder them -- which a
-        category without symmetry (e.g. a formal grammar) does not have.
+        can place it back without a swap when its wiring does not say where:
+        a state that reaches the boundary goes where its wiring puts it, and
+        only a scalar, which does not, is placed by its offset.
         The offsets are recorded for the states before the first box that
         the functor into the hypergraph turns into wiring, e.g. a swap, a cup
         or a copy: up to there the boxes of the hypergraph are those of the
