@@ -445,7 +445,7 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 for structural in (Feedback, Feedforward, Head, Tail):
     structural.is_linear = property(lambda self: self.arg.is_linear)

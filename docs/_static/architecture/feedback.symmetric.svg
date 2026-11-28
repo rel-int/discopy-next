@@ -80,13 +80,30 @@ Q 76.8 67.2 86.4 67.2
 Q 96 67.2 86.4 67.2 
 " clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
-   <g id="patch_3">
-    <path d="M 14.4 49.2 
-L 14.4 37.2 
-L 24 37.2 
-L 24 49.2 
-z
-" clip-path="url(#p0c606a4dba)" style="fill: #ffffff; stroke: #000000; stroke-linejoin: miter"/>
+   <g id="dark-stroke-12">
+    <path d="M 19.2 37.2 
+Q 19.2 49.2 19.2 49.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-13">
+    <path d="M 23.04 48 
+C 25.160832 48 26.88 45.85104 26.88 43.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-14">
+    <path d="M 26.88 43.2 
+C 26.88 40.54896 25.160832 38.4 23.04 38.4 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-15">
+    <path d="M 23.04 38.4 
+C 20.919168 38.4 19.2 40.54896 19.2 43.2 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
+   </g>
+   <g id="dark-stroke-16">
+    <path d="M 19.2 43.2 
+C 19.2 45.85104 20.919168 48 23.04 48 
+" clip-path="url(#p0c606a4dba)" style="fill: none; stroke: #000000; stroke-linejoin: miter"/>
    </g>
    <g id="PathCollection_1">
     <defs>
@@ -106,31 +123,7 @@ z
      <use xlink:href="#m299b4b6796" x="38.4" y="43.2" style="fill-opacity: 0; stroke: #000000; stroke-opacity: 0"/>
     </g>
    </g>
-   <g id="text_1">
-    <!-- w -->
-    <g transform="translate(15.110937 45.959375) scale(0.1 -0.1)">
-     <defs>
-      <path id="DejaVuSans-77" d="M 269 3500 
-L 844 3500 
-L 1563 769 
-L 2278 3500 
-L 2956 3500 
-L 3675 769 
-L 4391 3500 
-L 4966 3500 
-L 4050 0 
-L 3372 0 
-L 2619 2869 
-L 1863 0 
-L 1184 0 
-L 269 3500 
-z
-" transform="scale(0.015625)"/>
-     </defs>
-     <use xlink:href="#DejaVuSans-77"/>
-    </g>
-   </g>
-   <g id="dark-fill-12">
+   <g id="dark-fill-17">
     <!-- = -->
     <g transform="translate(33.372187 46.51125) scale(0.12 -0.12)">
      <defs>

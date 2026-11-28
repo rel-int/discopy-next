@@ -128,7 +128,7 @@ for law in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
     setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
         messages.CURRY_HAS_NO_DAGGER))
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry

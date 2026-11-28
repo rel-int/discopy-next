@@ -680,6 +680,25 @@ class DelayCategory[C0, C1: DelayCategory](Category[C0, C1]):
         del n_steps
         return self  # ty: ignore[invalid-return-type]
 
+    @classmethod
+    def wait(cls, dom: C0) -> C1:
+        """
+        The component at ``dom`` of the wait, the natural transformation from
+        the identity to the :meth:`delay`, the identity by default as the
+        delay is: a category that delays overrides both.
+
+        Parameters:
+            dom : The object to wait on.
+        """
+        return cls.id(dom)
+
+    @axiom
+    def wait_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, Delay[C1, B]]]:
+        """ The wait is natural: a morphism slides through it. """
+        return cls.equation_factory(
+            f.then(cls.wait(f.cod)), cls.wait(f.dom).then(f.delay()))
+
     @axiom
     def delay_unit[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
@@ -2435,6 +2454,37 @@ class BalancedTracedCategory[
             braid.trace(mem=x, left=True),  # ty: ignore[unknown-argument]
             cls.twist(x),
             braid.trace(mem=x))  # ty: ignore[unknown-argument]
+
+
+class SymmetricFeedbackCategory[
+        C0: ColouredMonoid, C1: SymmetricFeedbackCategory](
+            SymmetricCategory[C0, C1], FeedbackCategory[C0, C1]):
+    """
+    A symmetric feedback category is a :class:`FeedbackCategory` and a
+    :class:`SymmetricCategory` whose :meth:`wait` is the feedback of the
+    swap, the small loop equal to the big one, see :cite:t:`KatisEtAl02`
+    and :cite:t:`DiLavoreEtAl22`.
+    """
+    @classmethod
+    def wait(cls, dom: C0) -> C1:
+        """
+        The wait on an object, the feedback of its swap with its delay.
+
+        Parameters:
+            dom : The object to wait on.
+        """
+        delayed = cls.id(dom).delay().cod
+        return cls.swap(dom, delayed).feedback(
+            dom=dom, cod=delayed, mem=dom)
+
+    @axiom
+    def wait_swap[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, X, Delay[C1, X]]]:
+        """ The wait is the feedback of the swap with its delay. """
+        delayed = cls.id(x).delay().cod
+        return cls.equation_factory(
+            cls.wait(x), cls.swap(x, delayed).feedback(
+                dom=x, cod=delayed, mem=x))
 
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](

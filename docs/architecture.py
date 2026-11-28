@@ -66,17 +66,14 @@ def picture(name):
     if name in ("linear.monoidal", "linear.markov"):
         return m.Diagram.contraction(x)
     if name == "feedback.cat":
-        y = m.Ty("y")
-        g = m.Box("f", x, y)
-        wait = {z: m.Box("w", z, z.delay()) for z in (x, y)}
-        return m.Equation(g >> wait[y], wait[x] >> g.delay())
+        g = m.Box("f", x, m.Ty("y"))
+        return m.Equation(g >> m.Wait(g.cod), m.Wait(x) >> g.delay())
     if name == "feedback":
         return m.Box("f", x @ x.delay(), x @ x).feedback()
     if name == "feedback.balanced":
         return m.Braid(x, x).trace().to_braided()
     if name == "feedback.symmetric":
-        return m.Equation(m.Box("w", x, x.delay()),
-                          m.Swap(x, x.delay()).feedback())
+        return m.Equation(m.Wait(x), m.Swap(x, x.delay()).feedback())
     if name == "feedback.markov":
         return (m.Copy(x) >> x @ f).trace()
     if name == "feedback.comarkov":

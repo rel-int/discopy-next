@@ -72,6 +72,8 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "draw_as_brakets": lambda _: False,
     "draw_as_discards": lambda _: False,
     "draw_as_measures": lambda _: False,
+    # A wait, drawn as a small loop on its wire.
+    "draw_as_loop": lambda _: False,
     "draw_as_controlled": lambda _: False,
     "controlled": lambda _: None,  # Used for drawing controlled gates.
     "distance": lambda _: None,  # Used for drawing controlled gates.
@@ -89,7 +91,8 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
         box.draw_as_wires, box.draw_as_spider, box.draw_as_brakets,
         box.draw_as_controlled, box.draw_as_discards, box.draw_as_measures,
         box.draw_as_dual_rail_braid, box.draw_as_dual_rail_twist,
-        box.draw_as_dual_rail_cup, box.draw_as_dual_rail_cap]),
+        box.draw_as_dual_rail_cup, box.draw_as_dual_rail_cap,
+        box.draw_as_loop]),
     "min_width": lambda box:
         0 if box.no_label else text_width(box.drawing_name),
     "tikzstyle_name": lambda box: (

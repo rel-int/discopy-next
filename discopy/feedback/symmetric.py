@@ -25,6 +25,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Functor
     DualRail
@@ -33,13 +34,23 @@ Example
 -------
 >>> x = Ty('x')
 >>> assert Equation(Swap(x, x).trace(), Id(x))
->>> assert Diagram.wait(x) == Swap(x, x.delay()).feedback()
+
+The wait, the small loop, is a primitive equal to the big loop of the
+feedback of the swap, see
+:meth:`~discopy.abc.SymmetricFeedbackCategory.wait_swap`.
+
+>>> wait_swap = Equation(Wait(x), Swap(x, x.delay()).feedback())
+>>> wait_swap.draw(doctest="docs/_static/feedback/wait.svg")
+
+.. image:: /_static/feedback/wait.svg
+    :align: center
 """
 
 from __future__ import annotations
 
-from discopy import cmap, feedback, hypergraph, symmetric
-from discopy.abc import BalancedTracedCategory, TracedCategory
+from discopy import cmap, feedback, hypergraph, messages, symmetric
+from discopy.abc import (
+    BalancedTracedCategory, SymmetricFeedbackCategory, TracedCategory)
 from discopy.cat import factory, kappa_calculus
 from discopy.feedback import balanced
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
@@ -53,7 +64,8 @@ class Layer(symmetric.Layer, feedback.Layer):
 
 
 @factory
-class Diagram(symmetric.Diagram, balanced.Diagram):
+class Diagram(
+        symmetric.Diagram, balanced.Diagram, SymmetricFeedbackCategory):
     """
     A symmetric feedback diagram is a symmetric diagram and a balanced
     feedback diagram.
@@ -74,20 +86,8 @@ class Diagram(symmetric.Diagram, balanced.Diagram):
     trace_superposing_left = TracedCategory.trace_superposing_left
     trace_superposing_right = TracedCategory.trace_superposing_right
 
-    @classmethod
-    def wait(cls, dom: Ty) -> Diagram:
-        """
-        Wait one time step, i.e. `Swap(x, x.delay()).feedback()`.
-
-        Example
-        -------
-        >>> x = Ty('x')
-        >>> Diagram.wait(x).draw(doctest="docs/_static/feedback/wait.svg")
-
-        .. image:: /_static/feedback/wait.svg
-            :align: center
-        """
-        return cls.swap(dom, dom.delay()).feedback()
+    wait_swap = SymmetricFeedbackCategory.wait_swap.failing(
+        messages.FREE_WAIT_SWAP)
 
 
 class Box(symmetric.Box, balanced.Box, Diagram):
@@ -132,7 +132,7 @@ class DualRail(symmetric.DualRail, balanced.DualRail):
     dom = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor

@@ -1025,7 +1025,7 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor

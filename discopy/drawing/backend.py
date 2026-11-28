@@ -1262,6 +1262,7 @@ class Backend(ABC):
             ("draw_as_dual_rail_twist", "draw_dual_rail_twist"),
             ("draw_as_dual_rail_cup", "draw_dual_rail_cup"),
             ("draw_as_dual_rail_cap", "draw_dual_rail_cap"),
+            ("draw_as_loop", "draw_loop"),
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
@@ -1485,6 +1486,30 @@ class Backend(ABC):
                 source = (left + .1 * k, height - .1 * k)
                 target = (right - .1 * k, height - .1 * k)
                 self.draw_wire(source, target)
+
+    def draw_loop(self, positions, node, **params):
+        """
+        Draws a box as its wire with a small loop on its right, e.g. the
+        :class:`~discopy.feedback.Wait` of a type on one wire, the small
+        loop which the big loop of the feedback of a swap is equal to.
+        """
+        # pylint: disable=unused-argument  # draw_boxes passes params to all
+        j = node.j
+        adaptive = self.on_neutral_canvas(node.box.dom, node.box.cod)
+        bottom, top = (positions[Node(kind, i=0, j=j, x=x[0])] for kind, x in
+                       [("box_dom", node.box.dom), ("box_cod", node.box.cod)])
+        i, middle = positions[node]
+        self.draw_wire(bottom, top, adaptive=adaptive)
+        width, height = .2, .4 * abs(top[1] - bottom[1])
+        quarters = [(0, -1), (1, 0), (0, 1), (-1, 0), (0, -1)]
+        for (a, b), (c, d) in zip(quarters, quarters[1:]):
+            # A quarter of an ellipse right of the wire, from (a, b) to
+            # (c, d), each control point pulled towards the other end.
+            self.draw_bezier([
+                (i + width * (1 + x), middle + height * y) for x, y in [
+                    (a, b), (a + .5523 * c, b + .5523 * d),
+                    (c + .5523 * a, d + .5523 * b), (c, d)]],
+                adaptive=adaptive)
 
     def draw_measure(self, positions, node, **params):
         """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """

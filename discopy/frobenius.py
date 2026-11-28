@@ -1009,7 +1009,7 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 for name in ("map_agreement", "term_factory"):
     setattr(Diagram, name, vars(markov.Diagram)[name])

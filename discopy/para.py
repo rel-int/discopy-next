@@ -171,7 +171,7 @@ from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
     ClosedSymmetricCategory, ClosedMarkovCategory, ComarkovCategory,
     CompactCategory,
-    FeedbackCategory,
+    FeedbackCategory, SymmetricFeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, factory_name,
@@ -552,7 +552,7 @@ class Closed(Markov, ClosedMarkovCategory):
         return type(self)(self.dom[:-n], inside.cod, inside, self.param)
 
 
-class Feedback(Markov, FeedbackCategory):
+class Feedback(Markov, SymmetricFeedbackCategory):
     """
     Parametric maps over a feedback underlying `category` form a feedback
     category, with :meth:`delay` applied to all five components.
@@ -564,6 +564,8 @@ class Feedback(Markov, FeedbackCategory):
     strength = FeedbackCategory.strength.failing(
         messages.FREE_FEEDBACK)
     tightening = FeedbackCategory.tightening.failing(
+        messages.FREE_FEEDBACK)
+    wait_naturality = FeedbackCategory.wait_naturality.failing(
         messages.FREE_FEEDBACK)
     category = feedback_markov.Diagram
 

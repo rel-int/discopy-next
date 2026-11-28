@@ -695,6 +695,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
+    "feedback.Wait feedback.cat.Wait": "c(x)",
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False)',
     "feedback.{markov,closed}.Box":
     'c("f", x, y, data=v, is_deterministic=False).delay()',
@@ -867,7 +868,7 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy}":
+        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy,Wait}":
         "it has no stated rotation",
         "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace":
         "it raises for a rotation, only a pivotal trace rotates",

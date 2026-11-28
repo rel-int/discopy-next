@@ -421,7 +421,7 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor

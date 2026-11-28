@@ -28,6 +28,9 @@ FREE_TWIST = (
     "by the naturality of the twist.")
 NOT_FEEDBACK = (
     "Cannot loop {} around {}, expected {} as its domain and codomain.")
+STREAM_WAIT = (
+    "A morphism slides through the wait of streams only up to extensional "
+    "equivalence: f >> wait runs each step of f a step before wait >> f.d.")
 STREAM_SLIDING = (
     "A morphism slides along the feedback of streams only up to extensional "
     "equivalence, see discopy.feedback.")
@@ -141,6 +144,13 @@ FREE_CURRY = (
 FREE_FEEDBACK = (
     "A free feedback is a bubble, which a hypergraph keeps as a box: nothing "
     "slides into it.")
+FREE_WAIT = (
+    "A free wait is a box: the free feedback diagrams are not quotiented by "
+    "its naturality, a box does not slide through it.")
+FREE_WAIT_SWAP = (
+    "A free wait is a box and a free feedback a bubble: the free symmetric "
+    "feedback diagrams are not quotiented by the wait being the feedback of "
+    "the swap.")
 RIGID_TYPE_HAS_NO_DAGGER = "Rigid types have no dagger, use pivotal instead."
 RIGID_HAS_NO_DAGGER = (
     "Rigid cups and caps have no dagger, use pivotal instead.")

@@ -173,7 +173,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from discopy import messages, symmetric, testable
-from discopy.abc import FeedbackCategory, NamedGeneric
+from discopy.abc import DelayCategory, FeedbackCategory, NamedGeneric
 from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
@@ -617,6 +617,20 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     bifunctoriality = FeedbackCategory.bifunctoriality.modulo(up_to_memory)
     strength = FeedbackCategory.strength.modulo(up_to_memory)
     tightening = FeedbackCategory.tightening.modulo(up_to_memory)
+    wait_naturality = DelayCategory.wait_naturality.failing(
+        messages.STREAM_WAIT)
+
+    @classmethod
+    def wait(cls, dom: Ty) -> Stream:
+        """
+        The wait on a stream of types, the feedback of its swap with its
+        delay, as in :class:`~discopy.abc.SymmetricFeedbackCategory`.
+
+        Parameters:
+            dom : The stream of types to wait on.
+        """
+        return cls.swap(dom, dom.delay()).feedback(
+            dom=dom, cod=dom.delay(), mem=dom)
 
     @classmethod
     def ob_equation(cls, *objects: Ty) -> testable.Equation:
