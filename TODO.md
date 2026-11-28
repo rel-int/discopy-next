@@ -6,3 +6,4 @@
 - [ ] autosummaries: Wait in every module that exports it
 - [ ] feedback/symmetric docstring and changelog wording; Stream is not enrolled
 - [ ] codex: tensor.Diagram.wait builds a frobenius.Wait, not a tensor diagram
+- [ ] codex: neural Unroll expands a Wait as the swap fed back, so rounds=1 keeps its zero memory
