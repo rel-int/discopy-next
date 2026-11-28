@@ -18,6 +18,7 @@ Summary
     Ob
     Arrow
     Box
+    Wait
     Functor
 
 Example
@@ -29,16 +30,26 @@ Example
 >>> assert f.delay(2) == f.delay().delay() != f
 >>> print((f >> g).delay())
 f.d >> g.d
+
+The wait is a natural transformation from the identity to the delay, a
+primitive :class:`Wait` at each object, see
+:meth:`~discopy.abc.DelayCategory.wait`.
+
+>>> assert Arrow.wait(x) == Wait(x) and Wait(x).cod == x.d
+>>> print(f >> Arrow.wait(y))
+f >> Wait(y)
+>>> print(Arrow.wait(x) >> f.d)
+Wait(x) >> f.d
 """
 
 from __future__ import annotations
 
 from typing import ClassVar
 
-from discopy import cat
-from discopy.abc import DelayCategory
+from discopy import cat, messages
+from discopy.abc import DaggerCategory, DelayCategory
 from discopy.cat import factory
-from discopy.utils import assert_isinstance
+from discopy.utils import assert_isinstance, factory_name, from_tree
 
 
 def str_delayed(time_step: int) -> str:
@@ -120,7 +131,10 @@ class Arrow(cat.Arrow, DelayCategory):
     """
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
+    wait_factory: ClassVar[type["Wait"]]
     ob = Ob
+    wait_naturality = DelayCategory.wait_naturality.failing(
+        messages.FREE_WAIT)
 
     def delay(self, n_steps: int = 1) -> Arrow:
         """ The delay of an arrow, that of each of its boxes. """
@@ -129,6 +143,11 @@ class Arrow(cat.Arrow, DelayCategory):
             self.dom.delay(n_steps), self.cod.delay(n_steps))
 
     d = property(lambda self: self.delay())
+
+    @classmethod
+    def wait(cls, dom: Ob) -> Arrow:
+        """ The primitive :class:`Wait` on an object. """
+        return cls.wait_factory(dom)
 
 
 class Box(cat.Box, Arrow):
@@ -198,6 +217,55 @@ class Box(cat.Box, Arrow):
             time_step=tree.get('time_step', 0))
 
 
+class Wait(Box):
+    """
+    The wait on an object ``x``, from ``x`` to ``x.d``: the component at
+    ``x`` of the natural transformation from the identity to the delay.
+
+    Parameters:
+        x : The object to wait on.
+
+    Example
+    -------
+    >>> from discopy import feedback
+    >>> x = Ob('x')
+    >>> assert Wait(x).delay() == Wait(x.d) and eval(repr(Wait(x))) == Wait(x)
+    """
+    serialised_attrs = ("arg", "is_dagger")
+    arg: Ob = None  # ty: ignore[invalid-assignment]  # shadows Box.arg
+
+    def __init__(self, arg: Ob, is_dagger: bool = False):
+        self.arg = arg
+        dom, cod = (arg.delay(), arg) if is_dagger else (arg, arg.delay())
+        Box.__init__(self, f"Wait({arg})", dom, cod, is_dagger=is_dagger)
+
+    def delay(self, n_steps: int = 1) -> Wait:
+        return type(self)(self.arg.delay(n_steps), self.is_dagger)
+
+    def reset(self) -> Wait:
+        return self
+
+    def dagger(self) -> Wait:
+        return type(self)(self.arg, not self.is_dagger)
+
+    def __repr__(self):
+        is_dagger = ", is_dagger=True" if self.is_dagger else ""
+        return factory_name(type(self)) + f"({self.arg!r}{is_dagger})"
+
+    def __str__(self):
+        return self.name + (".dagger()" if self.is_dagger else "")
+
+    def to_tree(self) -> dict:
+        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Wait:
+        return cls(from_tree(tree['arg']), tree.get('is_dagger', False))
+
+
 class Functor(cat.Functor):
     """
     A delay functor is a functor that preserves the delay: an object or a box
@@ -225,6 +293,14 @@ class Functor(cat.Functor):
     dom = cod = Arrow
 
     def __call__(self, other):
+        if isinstance(other, Wait) and hasattr(self.cod, "wait") and (
+                not other.is_dagger or issubclass(self.cod, DaggerCategory)
+                and self.cod.has_dagger()) and (
+                self(other.dom) == self(other.cod) or getattr(
+                    self.cod.wait, "__func__", None)
+                is not DelayCategory.wait.__func__):
+            result = self.cod.wait(self(other.arg))
+            return result.dagger() if other.is_dagger else result
         if isinstance(other, (Ob, Box)) and other.time_step:
             result = self(other.reset())
             delay = getattr(result, "delay", None)
@@ -234,4 +310,5 @@ class Functor(cat.Functor):
 
 Arrow.generator_factory = Arrow.box_factory = Box
 Arrow.functor_factory = Functor
+Arrow.wait_factory = Wait
 Id = Arrow.id

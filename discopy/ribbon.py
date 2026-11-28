@@ -23,6 +23,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Functor
     DualRail
@@ -413,7 +414,7 @@ class DualRail(balanced.DualRail, Functor):
             return super().__call__(other)  # A single dual rail box crossing.
         if isinstance(other, Box) and not other.time_step\
                 and not other.args and not isinstance(
-                    other, (Sum, feedback.FollowedBy)):
+                    other, (Sum, feedback.FollowedBy, feedback.Wait)):
             # A generator is doubled into a box on the rails of its ribbons;
             # self doubles its domain and codomain per object.
             return Box(other.name, self(other.dom), self(other.cod),
@@ -421,7 +422,7 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor

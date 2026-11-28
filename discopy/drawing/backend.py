@@ -1262,6 +1262,7 @@ class Backend(ABC):
             ("draw_as_dual_rail_twist", "draw_dual_rail_twist"),
             ("draw_as_dual_rail_cup", "draw_dual_rail_cup"),
             ("draw_as_dual_rail_cap", "draw_dual_rail_cap"),
+            ("draw_as_loop", "draw_loop"),
             (None, "draw_box")]
         box_nodes = [node for node in graph.nodes if node.kind == "box"]
         for node in box_nodes:
@@ -1485,6 +1486,44 @@ class Backend(ABC):
                 source = (left + .1 * k, height - .1 * k)
                 target = (right - .1 * k, height - .1 * k)
                 self.draw_wire(source, target)
+
+    def draw_loop(self, positions, node, **params):
+        """
+        Draws a box as its wires, each with a small loop: the feedback of the
+        swap of the wire with its delay, the crossing then the wire going
+        down, round and back up over it, in a unit square right of the wire.
+        It is the :class:`~discopy.feedback.Wait` of a type, which the big
+        loop of the feedback of the swap is equal to.
+        """
+        # pylint: disable=unused-argument  # draw_boxes passes params to all
+        box, j = node.box, node.j
+        adaptive = self.on_neutral_canvas(box.dom, box.cod)
+        mid = positions[node][1]
+        top, bottom = mid + .5, mid - .5
+        wires = [tuple(positions[Node(kind, i=k, j=j, x=x[k])]
+                       for kind, x in [("box_dom", box.dom),
+                                       ("box_cod", box.cod)])
+                 for k in range(len(box.dom))]
+        # A loop is one unit wide, narrower when another wire is in reach.
+        nexts = [dom[0] for dom, _ in wires[1:]] + [float("inf")]
+        for (dom, cod), after in zip(wires, nexts):
+            left = dom[0]
+            right = left + min(1, after - left - .25)
+            cross = left + .4 * (right - left)
+            self.draw_wire(dom, (left, top), adaptive=adaptive)
+            self.draw_wire((left, bottom), cod, adaptive=adaptive)
+            for points in [
+                    [(left, top), (left, mid), (cross, mid),
+                     (cross, mid - .2)],
+                    [(cross, mid - .2), (cross, bottom), (right, bottom),
+                     (right, mid - .2)],
+                    [(right, mid - .2), (right, mid - .1), (right, mid + .1),
+                     (right, mid + .2)],
+                    [(right, mid + .2), (right, top), (cross, top),
+                     (cross, mid + .2)],
+                    [(cross, mid + .2), (cross, mid), (left, mid),
+                     (left, bottom)]]:
+                self.draw_bezier(points, adaptive=adaptive)
 
     def draw_measure(self, positions, node, **params):
         """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """

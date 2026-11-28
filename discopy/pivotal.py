@@ -28,6 +28,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Equation
     Functor
@@ -412,7 +413,7 @@ class Functor(rigid.Functor, planar.Functor):
     dom = cod = Diagram
 
 
-Feedback, Feedforward, Trace, FollowedBy, Head, Tail = \
+Feedback, Feedforward, Trace, FollowedBy, Head, Tail, Wait = \
     feedback.structural_boxes(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor

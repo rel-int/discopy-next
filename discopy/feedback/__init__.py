@@ -55,6 +55,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Functor
     TermBase
@@ -282,7 +283,8 @@ from typing import ClassVar, Self
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
+    DaggerCategory, DelayCategory, FeedbackCategory, MonoidalCategory,
+    TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -559,6 +561,7 @@ class Diagram(monoidal.Diagram, TracedCategory):
     head_factory: ClassVar[type["Head"]]
     tail_factory: ClassVar[type["Tail"]]
     followed_by_factory: ClassVar[type["FollowedBy"]]
+    wait_factory: ClassVar[type["Wait"]]
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
@@ -668,6 +671,22 @@ class Diagram(monoidal.Diagram, TracedCategory):
         """ Syntactic sugar for :class:`FollowedBy`. """
         return cls.followed_by_factory(dom)
 
+    @classmethod
+    def wait(cls, dom: Ty) -> Diagram:
+        """
+        The primitive :class:`Wait` on a type, drawn as a small loop, or the
+        wait of the abstract category when the primitive is not a diagram
+        of this one, e.g. a tensor diagram, whose delay is the identity. The
+        wait on the unit is its identity, as the feedback of its swap is.
+
+        >>> assert Diagram.wait(Ty()) == Diagram.id()
+        """
+        if not dom:
+            return cls.id(dom)
+        if not issubclass(cls.wait_factory, cls):
+            return super().wait(dom)
+        return cls.wait_factory(dom)
+
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
@@ -695,6 +714,8 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.FREE_FEEDBACK)
     strength = FeedbackCategory.strength.failing(
         messages.FREE_FEEDBACK)
+    wait_naturality = DelayCategory.wait_naturality.failing(
+        messages.FREE_WAIT)
 
 
 class Box(monoidal.Box, Diagram):
@@ -1286,6 +1307,106 @@ class FollowedBy(Box):
                    tree.get('time_step', 0))
 
 
+class Wait(Box):
+    """
+    The wait on a type ``x``, from ``x`` to ``x.d``: the component at ``x`` of
+    the natural transformation from the identity to the delay, see
+    :meth:`~discopy.abc.DelayCategory.wait`, drawn as a small loop. It is a
+    primitive, which a symmetric feedback category equates to the big loop
+    of the feedback of the swap, see
+    :meth:`~discopy.abc.SymmetricFeedbackCategory.wait_swap`.
+
+    Parameters:
+        x : The type to wait on.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> assert Wait(x).cod == x.d and Wait(x).delay() == Wait(x.d)
+    >>> Equation(f >> Wait(y), Wait(x) >> f.d).draw(
+    ...     doctest="docs/_static/feedback/wait-naturality.svg")
+
+    .. image:: /_static/feedback/wait-naturality.svg
+        :align: center
+    """
+    serialised_attrs = ("arg", "is_dagger")
+    arg: Ty = None  # ty: ignore[invalid-assignment]  # shadows Box.arg
+
+    def __init__(self, arg: Ty, is_dagger: bool = False):
+        self.arg = arg
+        dom, cod = (arg.delay(), arg) if is_dagger else (arg, arg.delay())
+        Box.__init__(self, f"Wait({arg})", dom, cod, is_dagger=is_dagger,
+                     draw_as_loop=True, height=2,
+                     min_width=len(arg) + 1)
+
+    def __getnewargs__(self):
+        """
+        The type a wait is built from, which its delay delays.
+
+        >>> from pickle import dumps, loads
+        >>> assert loads(dumps(Wait(Ty('x')))) == Wait(Ty('x'))
+        """
+        return self.arg, self.is_dagger
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the wait on a type.
+
+        Parameters:
+            types : The strategy to draw the type from.
+        """
+        return (cls.ob.strategy() if types is None else types).map(cls)
+
+    def dagger(self):
+        """
+        The dagger of a wait, from ``x.d`` back to ``x``.
+
+        >>> wait = Wait(Ty('x'))
+        >>> assert wait.dagger().dom == wait.cod and wait[::-1][::-1] == wait
+        """
+        return type(self)(self.arg, not self.is_dagger)
+
+    def rotate(self, left=False):
+        """
+        A wait has no rotation, as the feedback of the swap it equals has
+        none: its half-turn would feed its memory forward in time.
+
+        >>> from discopy import pivotal
+        >>> pivotal.Wait(pivotal.Ty('x')).r
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: ...
+        """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_ROTATION)
+
+    def __repr__(self):
+        is_dagger = ", is_dagger=True" if self.is_dagger else ""
+        return factory_name(type(self)) + f"({self.arg!r}{is_dagger})"
+
+    def __str__(self):
+        return self.name + (".dagger()" if self.is_dagger else "")
+
+    def to_tree(self) -> dict:
+        """
+        Serialise by the type and the direction.
+
+        >>> from discopy.utils import dumps, loads
+        >>> wait = Wait(Ty('x')).delay().dagger()
+        >>> assert loads(dumps(wait)) == wait
+        """
+        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Wait:
+        return cls(from_tree(tree['arg']), tree.get('is_dagger', False))
+
+
 class Sum(monoidal.Sum, Box):
     """
     A feedback sum is a sum of feedback diagrams, over which delay
@@ -1364,6 +1485,14 @@ class Functor(monoidal.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
+        if isinstance(other, Wait) and hasattr(self.cod, "wait") and (
+                not other.is_dagger or issubclass(self.cod, DaggerCategory)
+                and self.cod.has_dagger()) and (
+                self(other.dom) == self(other.cod) or getattr(
+                    self.cod.wait, "__func__", None)
+                is not DelayCategory.wait.__func__):
+            result = self.cod.wait(self(other.arg))
+            return result.dagger() if other.is_dagger else result
         if isinstance(other, Trace):
             arg = other.arg
             while len(arg.boxes) == 1 and isinstance(arg.boxes[0], Trace)\
@@ -1426,6 +1555,7 @@ Diagram.feedforward_factory = Feedforward
 Diagram.trace_factory = Trace
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
+Diagram.wait_factory = Wait
 Diagram.sum_factory = Sum
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
@@ -1439,15 +1569,17 @@ STRUCTURAL_BOXES = {
     "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
     "Head": ("head_factory", "The head of a {} diagram."),
     "Tail": ("tail_factory", "The tail of a {} diagram."),
+    "Wait": ("wait_factory", "The wait of a {} diagram."),
 }
 
 
 def structural_boxes(
         diagram: type, box: type
-        ) -> tuple[type, type, type, type, type, type]:
+        ) -> tuple[type, type, type, type, type, type, type]:
     """
     The :class:`Feedback`, :class:`Feedforward`, :class:`Trace`,
-    :class:`FollowedBy`, :class:`Head` and :class:`Tail` of a level of the
+    :class:`FollowedBy`, :class:`Head`, :class:`Tail` and :class:`Wait` of a
+    level of the
     hierarchy, generated rather than
     written by hand: each subclasses the one of every level ``diagram``
     subclasses and ``box``, lives in their module and is bound to the
@@ -1484,7 +1616,8 @@ def structural_boxes(
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
     return (result["Feedback"], result["Feedforward"], result["Trace"],
-            result["FollowedBy"], result["Head"], result["Tail"])
+            result["FollowedBy"], result["Head"], result["Tail"],
+            result["Wait"])
 
 
 def structural_wires(wire: type) -> tuple[type, type]:

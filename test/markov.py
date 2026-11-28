@@ -212,7 +212,7 @@ def test_from_callable():
 
 def test_stream_Diagram_repr():
     from discopy.feedback.markov import (
-        Box, Copy, Diagram, Feedback, FollowedBy, Swap, Ty)
+        Box, Copy, Diagram, Feedback, FollowedBy, Swap, Ty, Wait)
     x = Ty('x')
     plus = Box('plus', x @ x, x)
     zero = Box('zero', Ty(), x.head)
