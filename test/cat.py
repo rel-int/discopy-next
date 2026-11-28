@@ -868,9 +868,12 @@ BROKEN = {
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
     "rotation": {
-        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy,Wait}":
+        PIVOTALS + ".{Feedback,Feedforward,Head,Tail,FollowedBy}":
         "it has no stated rotation",
-        "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace":
+        "*.{Feedback,Feedforward} {feedback,feedback.*,neural.network}.Trace "
+        "{feedback,feedback.closed.*,neural.network}.Wait "
+        "feedback.{balanced,symmetric,markov,comarkov}.Wait "
+        + PIVOTALS + ".Wait":
         "it raises for a rotation, only a pivotal trace rotates",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },

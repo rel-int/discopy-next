@@ -1489,30 +1489,37 @@ class Backend(ABC):
 
     def draw_loop(self, positions, node, **params):
         """
-        Draws a box as its wires each with a small loop on its right, e.g.
-        the :class:`~discopy.feedback.Wait` of a type, the small loop which
-        the big loop of the feedback of a swap is equal to: the wait on the
-        unit draws nothing.
+        Draws a box as its wires, each with a small loop: the feedback of the
+        swap of the wire with its delay, the crossing then the wire going
+        down, round and back up over it, in a unit square right of the wire.
+        It is the :class:`~discopy.feedback.Wait` of a type, which the big
+        loop of the feedback of the swap is equal to.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         adaptive = self.on_neutral_canvas(box.dom, box.cod)
-        middle = positions[node][1]
-        quarters = [(0, -1), (1, 0), (0, 1), (-1, 0), (0, -1)]
+        mid = positions[node][1]
+        top, bottom = mid + .5, mid - .5
         for k in range(len(box.dom)):
-            bottom, top = (positions[Node(kind, i=k, j=j, x=x[k])]
-                           for kind, x in [("box_dom", box.dom),
-                                           ("box_cod", box.cod)])
-            self.draw_wire(bottom, top, adaptive=adaptive)
-            width, height = .2, .4 * abs(top[1] - bottom[1])
-            for (a, b), (c, d) in zip(quarters, quarters[1:]):
-                # A quarter of an ellipse right of the wire, from (a, b) to
-                # (c, d), each control point pulled towards the other end.
-                self.draw_bezier([
-                    (bottom[0] + width * (1 + x), middle + height * y)
-                    for x, y in [(a, b), (a + .5523 * c, b + .5523 * d),
-                                 (c + .5523 * a, d + .5523 * b), (c, d)]],
-                    adaptive=adaptive)
+            dom, cod = (positions[Node(kind, i=k, j=j, x=x[k])]
+                        for kind, x in [("box_dom", box.dom),
+                                        ("box_cod", box.cod)])
+            left, right = dom[0], dom[0] + 1
+            cross = left + .4
+            self.draw_wire(dom, (left, top), adaptive=adaptive)
+            self.draw_wire((left, bottom), cod, adaptive=adaptive)
+            for points in [
+                    [(left, top), (left, mid), (cross, mid),
+                     (cross, mid - .2)],
+                    [(cross, mid - .2), (cross, bottom), (right, bottom),
+                     (right, mid - .2)],
+                    [(right, mid - .2), (right, mid - .1), (right, mid + .1),
+                     (right, mid + .2)],
+                    [(right, mid + .2), (right, top), (cross, top),
+                     (cross, mid + .2)],
+                    [(cross, mid + .2), (cross, mid), (left, mid),
+                     (left, bottom)]]:
+                self.draw_bezier(points, adaptive=adaptive)
 
     def draw_measure(self, positions, node, **params):
         """ Draws a :class:`~discopy.quantum.circuit.Measure` box. """

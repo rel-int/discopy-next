@@ -9,6 +9,8 @@ docs/_static/architecture/, each drawn by its own module.
 import importlib
 from pathlib import Path
 
+from discopy import monoidal
+
 DOCS = Path(__file__).parent
 PICTURES = DOCS / "_static" / "architecture"
 
@@ -37,74 +39,86 @@ LABELS = {
 
 
 def picture(name):
-    """ The characteristic diagram of a module, drawn by itself. """
+    """ The equation that defines a module, drawn by itself. """
     m = importlib.import_module("discopy." + {
         "cat": "monoidal", "linear.cat": "linear.monoidal",
         "feedback.cat": "feedback"}.get(name, name))
-    x = m.Ty("x")
-    f = m.Box("f", x, x)
+    eq = getattr(m, "Equation", monoidal.Equation)
+    x, y = m.Ty("x"), m.Ty("y")
+    f, g = m.Box("f", x, x), m.Box("g", x, x)
     if name == "cat":
-        return f >> m.Box("g", x, x)
+        return eq(m.Id(x) >> f, f, f >> m.Id(x))
     if name == "monoidal":
-        return f @ m.Box("g", x, x)
+        return eq(f @ x >> x @ g, x @ g >> f @ x)
     if name == "spacial":
         s = m.Box("s", m.Ty(), m.Ty())
-        return m.Equation(s @ x, x @ s)
-    if name in ("braided", "linear.symmetric"):
-        return m.Diagram.braid(x, x) if name == "braided"\
-            else m.Diagram.exchange(x, x)
+        return eq(s @ x, x @ s)
+    if name == "braided":
+        return eq(f @ x >> m.Braid(x, x), m.Braid(x, x) >> x @ f)
     if name == "balanced":
-        return m.Twist(x).to_braided()
+        return eq(*(d.to_braided() for d in (
+            f >> m.Twist(x), m.Twist(x) >> f)))
     if name == "symmetric":
-        return m.Swap(x, x)
+        return eq(m.Swap(x, y) >> m.Swap(y, x), m.Id(x @ y))
     if name == "markov":
-        return m.Copy(x)
+        return eq(m.Copy(x) >> x @ m.Discard(x), m.Id(x))
     if name == "comarkov":
-        return m.Merge(x)
+        return eq(x @ m.Merge(x, 0) >> m.Merge(x), m.Id(x))
     if name == "linear.cat":
-        return m.Dereliction(x)
-    if name in ("linear.monoidal", "linear.markov"):
-        return m.Diagram.contraction(x)
+        return eq(
+            m.Digging(x) >> m.Dereliction(x.bang()), m.Id(x.bang()))
+    if name == "linear.monoidal":
+        return eq(m.Diagram.contraction(x)
+                  >> x.bang() @ m.Diagram.weakening(x), m.Id(x.bang()))
+    if name == "linear.symmetric":
+        contraction = m.Diagram.contraction(x)
+        return eq(
+            contraction >> m.Diagram.exchange(x, x.bang()), contraction)
+    if name == "linear.markov":
+        dereliction = m.Dereliction(x)
+        return eq(dereliction >> m.Copy(x),
+                  m.Copy(x.bang()) >> dereliction @ dereliction)
     if name == "feedback.cat":
-        g = m.Box("f", x, m.Ty("y"))
-        return m.Equation(g >> m.Wait(g.cod), m.Wait(x) >> g.delay())
+        f = m.Box("f", x, y)
+        return eq(f >> m.Wait(y), m.Wait(x) >> f.delay())
     if name == "feedback":
-        return m.Box("f", x @ x.delay(), x @ x).feedback()
+        f = m.Box("f", x @ x.delay(), x @ x)
+        return eq(
+            (f >> x @ g).feedback(), (x @ g.delay() >> f).feedback())
     if name == "feedback.balanced":
-        return m.Braid(x, x).trace().to_braided()
+        return eq(*(d.to_braided() for d in (
+            m.Braid(x, x).trace(), m.Twist(x))))
     if name == "feedback.symmetric":
-        return m.Equation(m.Wait(x), m.Swap(x, x.delay()).feedback())
+        return eq(m.Wait(x), m.Swap(x, x.delay()).feedback())
     if name == "feedback.markov":
-        return (m.Copy(x) >> x @ f).trace()
+        fix = (f >> m.Copy(x)).trace()
+        return eq(fix, fix >> f)
     if name == "feedback.comarkov":
-        return (f @ x >> m.Merge(x)).trace(left=True)
-    if name == "closed.monoidal":
-        return m.Eval(x << x)
-    if name == "closed.symmetric":
-        return m.Swap(x, x ** x) >> m.Eval(x ** x)
-    if name == "closed.markov":
-        return x ** x @ m.Copy(x) >> m.Eval(x ** x) @ x
-    if name == "feedback.closed.monoidal":
-        return m.Eval(x << x).trace()
-    if name == "feedback.closed.balanced":
-        return (m.Eval(x << x) @ x >> m.Braid(x, x)).trace()
-    if name == "feedback.closed.symmetric":
-        return (m.Swap(x, x ** x) >> m.Eval(x ** x)).trace(left=True)
-    if name == "feedback.closed.markov":
-        return (x ** x @ m.Copy(x) >> m.Eval(x ** x) @ x).trace()
+        cofix = (m.Merge(x) >> f).trace()
+        return eq(cofix, f >> cofix)
+    if name.startswith("closed."):
+        exp = x << y if name == "closed.monoidal" else x ** y
+        return eq(m.Eval(exp).curry(), m.Id(exp))
+    if name.startswith("feedback.closed."):
+        exp = x << x if name.endswith(("monoidal", "balanced")) else x ** x
+        ev = m.Eval(exp)
+        h = m.Box("h", x @ x, x @ exp @ x)
+        return eq((h >> x @ ev).trace(), (x @ ev >> h).trace(2))
     if name == "rigid":
-        return x @ m.Cap(x.r, x) >> m.Cup(x, x.r) @ x
+        return eq(x @ m.Cap(x.r, x) >> m.Cup(x, x.r) @ x, m.Id(x))
     if name == "pivotal":
-        g = m.Box("f", x, m.Ty("y"))
+        g = m.Box("f", x, y)
         transpose = m.Cap(x.r, x) @ g.cod.r >> x.r @ g @ g.cod.r\
             >> x.r @ m.Cup(g.cod, g.cod.r)
-        return m.Equation(transpose, g.r)
+        return eq(transpose, g.r)
     if name == "ribbon":
-        return (m.Cap(x, x.r) >> m.Braid(x, x.r)).to_ribbons()
+        return eq(*(d.to_ribbons() for d in (
+            m.Braid(x, x).trace(), m.Twist(x))))
     if name == "compact":
-        return m.Cap(x, x.r) >> m.Swap(x, x.r)
+        return eq(m.Swap(x, x).trace(), m.Id(x))
     if name == "frobenius":
-        return m.Spider(2, 2, x)
+        return eq(m.Spider(1, 2, x) @ x >> x @ m.Spider(2, 1, x),
+                  m.Spider(2, 2, x))
     raise KeyError(name)
 
 
@@ -115,8 +129,11 @@ def draw(name):
         if node.kind == "box":
             node.box.drawing_name = LABELS.get(
                 node.box.drawing_name, node.box.drawing_name)
-    drawing.draw(path=str(PICTURES / f"{name}.svg"), figsize=(1.6, 1.2),
-                 margins=(.1, .1), wire_labels=False, fontsize=10)
+    # Drawn to scale, at one unit per 0.4 inch and at least three units high:
+    # the images share a height in the table, so they share a scale up to it.
+    drawing.draw(path=str(PICTURES / f"{name}.svg"), margins=(.1, .1),
+                 wire_labels=False, fontsize=10, aspect="equal",
+                 figsize=(.4 * drawing.width, .4 * max(drawing.height, 3)))
 
 
 def link(name, text=None):

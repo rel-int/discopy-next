@@ -566,7 +566,7 @@ class Feedback(Markov, SymmetricFeedbackCategory):
     tightening = FeedbackCategory.tightening.failing(
         messages.FREE_FEEDBACK)
     wait_naturality = FeedbackCategory.wait_naturality.failing(
-        messages.FREE_FEEDBACK)
+        messages.FREE_WAIT)
     category = feedback_markov.Diagram
 
     def delay(self, n_steps: int = 1) -> Feedback:

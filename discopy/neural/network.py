@@ -346,9 +346,15 @@ class Network(markov.Diagram, comarkov.Diagram):
         return Unroll(rounds)(self)
 
     def assert_isfeedforward(self) -> None:
-        """ Raise ``NotImplementedError`` on a trace or a dagger: neither
-        compiles to a function on tensors. """
-        if any(isinstance(box, Trace) for box in self.boxes):
+        """ Raise ``NotImplementedError`` on a trace, a wait or a dagger: none
+        compiles to a function on tensors.
+
+        >>> Network.wait(Dims(2)).to_function()
+        Traceback (most recent call last):
+        ...
+        NotImplementedError: Wait(...) has a trace, ...
+        """
+        if any(isinstance(box, (Trace, Wait)) for box in self.boxes):
             raise NotImplementedError(
                 f"{self} has a trace, only feedforward networks compile.")
         for box in self.boxes:
@@ -684,7 +690,7 @@ class Unroll(Functor):
 
     def __call__(self, other):
         if isinstance(other, Wait):
-            wait = Network.swap(other.arg, other.arg).trace()
+            wait = Network.swap(other.arg, other.arg).trace(mem=other.arg)
             return self(wait.dagger() if other.is_dagger else wait)
         if not isinstance(other, Trace):
             return super().__call__(other)

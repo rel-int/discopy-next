@@ -1337,7 +1337,7 @@ class Wait(Box):
         self.arg = arg
         dom, cod = (arg.delay(), arg) if is_dagger else (arg, arg.delay())
         Box.__init__(self, f"Wait({arg})", dom, cod, is_dagger=is_dagger,
-                     draw_as_loop=True)
+                     draw_as_loop=True, height=2, min_width=2)
 
     def __getnewargs__(self):
         """
@@ -1367,6 +1367,19 @@ class Wait(Box):
         >>> assert wait.dagger().dom == wait.cod and wait[::-1][::-1] == wait
         """
         return type(self)(self.arg, not self.is_dagger)
+
+    def rotate(self, left=False):
+        """
+        A wait has no rotation, as the feedback of the swap it equals has
+        none: its half-turn would feed its memory forward in time.
+
+        >>> from discopy import pivotal
+        >>> pivotal.Wait(pivotal.Ty('x')).r
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: ...
+        """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_ROTATION)
 
     def __repr__(self):
         is_dagger = ", is_dagger=True" if self.is_dagger else ""
