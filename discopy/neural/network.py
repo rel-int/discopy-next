@@ -95,7 +95,8 @@ from discopy import (
     feedback, lens, messages, monoidal, para, python, testable)
 from discopy.feedback import comarkov, markov
 from discopy.abc import (
-    DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MarkovCategory)
+    ComarkovCategory, DaggerCategory, DaggerMonoidalCategory,
+    FeedbackCategory, MarkovCategory)
 from discopy.cat import factory
 from discopy.monoidal import Dim
 from discopy.testable import axiom
@@ -260,18 +261,12 @@ class Network(markov.Diagram, comarkov.Diagram):
     sliding = FeedbackCategory.sliding
     strength = FeedbackCategory.strength
     tightening = FeedbackCategory.tightening
-
-    @classmethod
-    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
-        """
-        The spiders of a network are its copies and merges, with one leg in
-        or one leg out: there is no Frobenius law between the two.
-        """
-        if phase is not None or 1 not in (n_legs_in, n_legs_out):
-            raise ValueError(messages.NO_SUCH_SPIDER.format(
-                factory_name(cls), "copies and merges"))
-        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
-            else cls.merge_factory(typ, n_legs_in)
+    merge_associativity = ComarkovCategory.merge_associativity.failing(
+        messages.MERGE_IS_A_BOX)
+    merge_commutativity = ComarkovCategory.merge_commutativity.failing(
+        messages.MERGE_IS_A_BOX)
+    merge_unitality = ComarkovCategory.merge_unitality.failing(
+        messages.MERGE_IS_A_BOX)
 
     def to_function(self, tensor: type = object, rounds: int | None = None
                     ) -> python.Function:

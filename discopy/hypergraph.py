@@ -83,11 +83,11 @@ from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cat, cmap, messages
 from discopy.abc import (
-    BalancedCategory, BraidedCategory, ColouredMonoid, ComarkovCategory,
+    BalancedCategory, BraidedCategory, ClosedMonoidalCategory,
+    ClosedSymmetricCategory, ColouredMonoid, ComarkovCategory,
     CompactCategory, DaggerCategory, DaggerMonoidalCategory,
-    HypergraphCategory,
-    MarkovCategory, PivotalCategory, RigidCategory, SymmetricCategory,
-    TracedCategory)
+    HypergraphCategory, MarkovCategory, MonoidalCategory, PivotalCategory,
+    RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.drawing import Node, backend
 from discopy.python.finset import Function, Permutation
@@ -222,12 +222,42 @@ def assert_transparent(diagram: "Diagram") -> None:
             raise AxiomError(messages.COLOURED_QUOTIENT.format(typ))
 
 
+class BoxedCurry:
+    """
+    The currying laws of a hypergraph or a map over a closed category that is
+    not rigid, declared failing: its curry is a box, which nothing evaluates.
+    """
+    currying_left = ClosedMonoidalCategory.currying_left.failing(
+        messages.FREE_CURRY)
+    currying_right = ClosedMonoidalCategory.currying_right.failing(
+        messages.FREE_CURRY)
+    currying_eta_left = ClosedMonoidalCategory.currying_eta_left.failing(
+        messages.FREE_CURRY)
+    currying_eta_right = ClosedMonoidalCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = ClosedMonoidalCategory\
+        .currying_naturality_left.failing(messages.FREE_CURRY)
+    currying_naturality_right = ClosedMonoidalCategory\
+        .currying_naturality_right.failing(messages.FREE_CURRY)
+
+
+class BoxedSymmetricCurry(BoxedCurry):
+    """ :class:`BoxedCurry` over a closed symmetric category. """
+    currying_symmetry = ClosedSymmetricCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
+
+
 def level(category: type) -> tuple[type, ...]:
     """
     The categories of the hierarchy that a hypergraph or a map of the diagrams
     of ``category`` represents, i.e. the abstract base classes ``category``
     subclasses up to :class:`HypergraphCategory`, the most specific ones only:
-    the linear part of a level, which no wiring can carry, is left out.
+    the linear part of a level, which no wiring can carry, is left out, and
+    so is the comarkov part of a Markov category that is not a hypergraph
+    category: its copies are spiders and its merges boxes, since spiders
+    for both would prove the Frobenius law, which e.g. copy and addition
+    break. A closed level that is not rigid comes with :class:`BoxedCurry`
+    first, declaring its currying laws failing.
 
     >>> from discopy import braided, frobenius, closed, linear, markov
     >>> from discopy.abc import (
@@ -236,17 +266,27 @@ def level(category: type) -> tuple[type, ...]:
     >>> assert level(frobenius.Diagram) == (HypergraphCategory, )
     >>> assert ClosedMarkovCategory in level(closed.markov.Diagram)
     >>> assert level(linear.markov.Diagram) == level(markov.Diagram)
+    >>> from discopy.neural.network import Network
+    >>> assert ComarkovCategory not in level(Network)
     """
+    shared = isclass(category) and issubclass(category, MarkovCategory)\
+        and not issubclass(category, HypergraphCategory)
     found = [
         base for base in HypergraphCategory.__mro__
         if isclass(category) and issubclass(category, base)
-        and base not in (DaggerCategory, DaggerMonoidalCategory)]
-    return tuple(base for base in found if not any(
+        and base not in (DaggerCategory, DaggerMonoidalCategory)
+        and not (shared and issubclass(base, ComarkovCategory))]
+    curry = () if not isclass(category)\
+        or not issubclass(category, ClosedMonoidalCategory)\
+        or issubclass(category, RigidCategory)\
+        else (BoxedSymmetricCurry, ) if issubclass(
+            category, ClosedSymmetricCategory) else (BoxedCurry, )
+    return curry + tuple(base for base in found if not any(
         other is not base and issubclass(other, base) for other in found))
 
 
 class Hypergraph[category](
-        DaggerMonoidalCategory["Ty", "Hypergraph"], TestableGeneric,
+        MonoidalCategory["Ty", "Hypergraph"], TestableGeneric,
         Serialisable):
     """
     A hypergraph is given by:
@@ -359,27 +399,51 @@ class Hypergraph[category](
 
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
-    level_bases = classmethod(lambda cls, values: level(values[0]))
+
+    @classmethod
+    def level_bases(cls, values: tuple) -> tuple[type, ...]:
+        """
+        The categories of :func:`level`, and a dagger unless the category
+        is Markov or comarkov but not a hypergraph category, where the
+        dagger of a copy, a spider, is a merge, which it does not have.
+
+        >>> from discopy import markov, symmetric
+        >>> from discopy.abc import DaggerCategory
+        >>> assert issubclass(Hypergraph[symmetric.Diagram], DaggerCategory)
+        >>> assert not issubclass(Hypergraph[markov.Diagram], DaggerCategory)
+        """
+        category, = values
+        one_sided = isclass(category) and issubclass(
+            category, (MarkovCategory, ComarkovCategory))\
+            and not issubclass(category, HypergraphCategory)
+        return (() if one_sided else (DaggerMonoidalCategory, ))\
+            + level(category)
 
     @classmethod
     def ev(cls, base, exponent, left=True) -> "Hypergraph":
         """
-        Evaluation, that of :meth:`CMap.ev` on the same category: the wiring
-        of cups when it is rigid, a box otherwise.
+        Evaluation: the wiring of cups when the host category is rigid, and
+        otherwise the box of :meth:`CMap.ev` on the same category.
         """
+        if issubclass(cls.category, RigidCategory):
+            # pylint: disable-next=no-member  # a rigid level_bases
+            return super().ev(base, exponent, left)
         return cls.from_map(
             cmap.CMap[cls.category].ev(base, exponent, left))
 
     def curry(self, n=1, left=True) -> "Hypergraph":
         """
-        Currying, that of :meth:`CMap.curry` on the map of the hypergraph:
-        the wiring of caps when the category is rigid, a curry box otherwise.
+        Currying: the wiring of caps when the host category is rigid, and
+        otherwise the curry box of :meth:`CMap.curry` on its map.
 
         >>> from discopy.closed.symmetric import Ty, Box
         >>> x, y, z = map(Ty, "xyz")
         >>> f = Box("f", x @ y, z)
         >>> assert f.to_hypergraph().curry().boxes == (f.curry(), )
         """
+        if issubclass(self.category, RigidCategory):
+            # pylint: disable-next=no-member  # a rigid level_bases
+            return super().curry(n, left)
         return self.from_map(self.to_map().curry(n, left))
 
     @axiom
@@ -459,12 +523,16 @@ class Hypergraph[category](
         Raise unless the wiring is that of a morphism of :attr:`category`,
         i.e. of the structure its level absorbs into wires, checked by
         :meth:`__init__` unless it is given ``_scan=False``. A hypergraph
-        category takes any spider, a compact one spiders with two ports, a
+        category takes any spider, a rigid one spiders with two ports, its
+        cups and caps, along which a cycle is a snake rather than a trace, a
         Markov category spiders with one producer, which copy or discard it,
         a comarkov one spiders with one consumer and any other monogamous
-        spiders; only a symmetric traced or a compact category has cycles,
-        and below symmetric categories a boundary-connected wiring is
-        planar, i.e. some line sweeps its map, see
+        spiders, with one producer and one consumer; a symmetric traced
+        category also takes a copy or a merge looped back onto itself,
+        whose spider is left with no producer or no consumer, and only a
+        symmetric traced or a rigid category has cycles,
+        and below symmetric categories a boundary-connected monogamous wiring
+        is planar, i.e. some line sweeps its map, see
         :meth:`~discopy.cmap.CMap.sweep`.
 
         The hypergraphs of a level are thus a subclass of those of a level
@@ -487,26 +555,28 @@ class Hypergraph[category](
         if not isclass(category) or issubclass(category, HypergraphCategory):
             return
         symmetric = issubclass(category, SymmetricCategory)
-        if issubclass(category, CompactCategory):
+        rigid = issubclass(category, RigidCategory)
+        traced = symmetric and issubclass(category, TracedCategory)
+        if rigid:
             spiders, need = self.is_bijective, "a spider with two ports"
-        elif issubclass(category, MarkovCategory) and issubclass(
-                category, ComarkovCategory):
-            spiders, need = all(len(x) == 1 or len(y) == 1 for x, y in (
-                self.spider_wires)), "one producer or one consumer"
         elif issubclass(category, MarkovCategory):
-            spiders, need = self.is_left_monogamous, "one producer"
+            spiders, need = all(
+                len(x) == 1 or traced and not x
+                for x, y in self.spider_wires if x | y), "one producer"
         elif issubclass(category, ComarkovCategory):
-            spiders, need = self.is_right_monogamous, "one consumer"
+            spiders, need = all(
+                len(y) == 1 or traced and not y
+                for x, y in self.spider_wires if x | y), "one consumer"
         else:
-            spiders, need = self.is_monogamous, "a monogamous spider"
+            spiders, need = self.is_monogamous, \
+                "one producer and one consumer"
         if not spiders:
             raise AxiomError(messages.NOT_A_MORPHISM.format(
                 factory_name(category), f"each spider needs {need}"))
-        if not (symmetric and issubclass(category, TracedCategory)
-                or self.is_acyclic):
+        if not (rigid or traced or self.is_acyclic):
             raise AxiomError(messages.NOT_A_MORPHISM.format(
                 factory_name(category), "it has a cycle and no trace"))
-        if not symmetric and self.is_boundary_connected:
+        if not symmetric and self.is_monogamous and self.is_boundary_connected:
             dom, vertices, cod = self.to_map().wiring()
             try:
                 cmap.CMap.sweep(dom, vertices, cod)
@@ -858,6 +928,22 @@ class Hypergraph[category](
 
     @classmethod
     def merge(cls, typ, n=2) -> "Hypergraph":
+        """
+        The merge of a spider, or that of the host category as a box when it
+        is Markov and not a hypergraph category, see :func:`level`: copy and
+        merge on one spider would satisfy the Frobenius law.
+
+        >>> from discopy.neural.network import Network, Dims
+        >>> x, H = Dims(2), Hypergraph[Network]
+        >>> frobenius = H.copy(x) @ x >> x @ H.merge(x)
+        >>> assert frobenius != H.merge(x) >> H.copy(x)
+        """
+        category = cls.category
+        if issubclass(category, MarkovCategory)\
+                and not issubclass(category, HypergraphCategory):
+            merge = category.merge(typ, n)
+            return cls.from_box(merge) if len(typ) == 1\
+                and isinstance(merge, cat.Box) else cls.from_diagram(merge)
         return cls.spiders(n, 1, typ)
 
     cup_factory = classmethod(lambda cls, left, right: cls.from_box(
@@ -1100,7 +1186,11 @@ class Hypergraph[category](
         Glue the last ``n`` outputs to the last ``n`` inputs, or the first
         when ``left``, i.e. the pushout that identifies their spiders. This
         is the :meth:`trace` over a traced symmetric category, and it needs
-        no trace when the result is acyclic, as in :meth:`plug`.
+        no trace when the result is acyclic, as in :meth:`plug`. It keeps
+        the spiders of a morphism of the category, each gluing a spider its
+        producer writes to one its consumer reads, and is not checked by
+        :meth:`scan_level`, so that the cycle it may close in a category
+        with no trace waits for the plug that opens it.
 
         Parameters:
             n : The number of wires to glue.
@@ -1141,7 +1231,8 @@ class Hypergraph[category](
             find(spider): typ for spider, typ in enumerate(self.spider_types)}
         return type(self)(
             dom, cod, self.boxes, wires, spider_types, self.offsets,
-            add_phases(zip(map(find, range(self.n_spiders)), self.phases)))
+            add_phases(zip(map(find, range(self.n_spiders)), self.phases)),
+            _scan=False)
 
     def interchange(self, i: int, j: int) -> "Hypergraph":
         """
@@ -2317,7 +2408,9 @@ class Hypergraph[category](
         >>> assert (f @ f >> H.spiders(2, 1, y)).is_cocausal
         >>> assert (H.spiders(0, 1, x) >> f).is_cocausal
         >>> assert not (f @ f >> H.spiders(2, 1, y)).is_causal
-        >>> assert not H.spiders(1, 2, x).is_cocausal
+        >>> from discopy import frobenius
+        >>> copy = frobenius.Hypergraph.spiders(1, 2, frobenius.Ty('x'))
+        >>> assert copy.is_causal and not copy.is_cocausal
         """
         return all(len(output_wires) == 1 and all(
             u < v for u in input_wires for v in output_wires)

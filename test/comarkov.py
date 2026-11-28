@@ -129,8 +129,8 @@ def test_hypergraph():
     assert Equation(decoded, h @ h >> Merge(x))
     assert decoded.boxes == [h, h, Merge(x)]
     assert Diagram.permutation([1, 0], x @ x).simplify() == Swap(x, x)
-    with raises(ValueError, match="only spiders of comarkov.Diagram"):
-        Hypergraph.spiders(1, 2, x).to_diagram()
+    with raises(AxiomError, match="each spider needs one consumer"):
+        Hypergraph.spiders(1, 2, x)
 
 
 def test_hypergraph_trace():

@@ -128,6 +128,10 @@ NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
 NOT_A_MORPHISM = "This wiring is no morphism of {}: {}."
+MERGE_IS_A_BOX = (
+    "A merge is a box of the hypergraph of a Markov category that is not a "
+    "hypergraph category, compared on the nose: a spider for both copy and "
+    "merge would prove the Frobenius law.")
 NOT_INVERTIBLE = "{} has no inverse, it is not sqrt(2) ** n times a phase."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."

@@ -123,9 +123,8 @@ def test_Hypergraph_pass_token():
     assert F((g @ g).to_hypergraph())(1, 1) == (2, 1)
 
     # A wire consumed twice is a copy, which a disjoint union does not have.
-    copy = Hypergraph[Function](X, X @ X, (), ((0, ), (), (0, 0)))
-    with raises(AxiomError, match="is not right-monogamous"):
-        copy(1)
+    with raises(AxiomError, match="each spider needs one consumer"):
+        Hypergraph[Function](X, X @ X, (), ((0, ), (), (0, 0)))
 
 
 def test_subclass_as_functor_codomain():

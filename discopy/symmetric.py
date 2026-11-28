@@ -267,12 +267,14 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> with raises(AxiomError) as err:
     ...     Diagram.from_callable(x, x @ x)(lambda x: (x, x))
     >>> print(err.value)
-    symmetric.Diagram has no cups or caps for the wiring of this map.
+    This wiring is no morphism of symmetric.Diagram: each spider needs one \
+producer and one consumer.
 
     >>> with raises(AxiomError) as err:
     ...     Diagram.from_callable(x, Ty())(lambda x: ())
     >>> print(err.value)
-    symmetric.Diagram has no cups or caps for the wiring of this map.
+    This wiring is no morphism of symmetric.Diagram: each spider needs one \
+producer and one consumer.
 
     Note
     ----

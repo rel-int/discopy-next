@@ -60,7 +60,8 @@ def test_effects_are_kept():
 
 def test_rewrite_refusals():
     graph = Markov.from_diagram(sample >> f)
-    merge = Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
+    with raises(AxiomError, match="each spider needs one producer"):
+        Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
     cyclic = Markov.from_diagram(f).merge(0, 1)
     with raises(AxiomError):
         cyclic.rewrite((0, ), (), (1, ), Box('c', Ty(), x).to_hypergraph())
@@ -72,8 +73,7 @@ def test_rewrite_refusals():
             ((0, ), (0, ), (1, ), f.to_hypergraph()),
             ((1, ), (1, ), (2, ), sample.to_hypergraph()),
             ((1, ), (0, ), (2, ), g.to_hypergraph()),
-            ((1, ), (1, ), (2, ), Box('h', x @ x, x).to_hypergraph()),
-            ((1, ), (1, 1), (2, ), merge)]:
+            ((1, ), (1, ), (2, ), Box('h', x @ x, x).to_hypergraph())]:
         with raises(AxiomError):
             graph.rewrite(region, dom, cod, rhs)
 
@@ -340,11 +340,11 @@ def test_equal_up_to_renaming_spiders():
 
 
 def test_sharing_and_classes_are_checked():
-    two_producers = Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
-    loop = Hypergraph[Diagram](Ty(), Ty(), (f, ), ((), (((0, ), (0, )), ), ()))
-    for graph in (two_producers, loop):
-        with raises(AxiomError, match="sharing"):
-            Markov(graph)
+    for match, wires in [
+            ("one producer", (x @ x, x, (), ((0, 0), (), (0, )))),
+            ("no trace", (Ty(), Ty(), (f, ), ((), (((0, ), (0, )), ), ())))]:
+        with raises(AxiomError, match=match):
+            Hypergraph[Diagram](*wires)
     k = Box('k', x, Ty('y'))
     for graph, classes in [(f.to_hypergraph(), (0, )),
                            (k.to_hypergraph(), (0, 0))]:

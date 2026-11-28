@@ -295,9 +295,12 @@ def test_comarkov_copy_merges_backward():
     assert discard.dom == A and discard.cod == Ty[Dims]()
     assert discard.get == Network.discard(a)
     assert discard.put == Network.discard(a) @ Network.noise(a)
-    for law in (lenses.copy_counitality, lenses.copy_cocommutativity,
-                lenses.copy_coassociativity):
-        assert law(A), law
+    from discopy import frobenius
+    x = frobenius.Ty('x')
+    for law in (Comarkov[frobenius.Diagram].copy_counitality,
+                Comarkov[frobenius.Diagram].copy_cocommutativity,
+                Comarkov[frobenius.Diagram].copy_coassociativity):
+        assert law(Ty[frobenius.Ty](x, x)), law
     assert lenses.copy_coherence(A, Ty[Dims](b, b))
     assert lenses.discard_coherence(A, Ty[Dims](b, b))
     layer = lenses(A, Ty[Dims](b, b), Layer('f', a, b), Layer("f'", a @ b, a))

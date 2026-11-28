@@ -307,18 +307,16 @@ def test_spider_producers_and_consumers():
     f, g, h = (
         compact.Box('f', e, x), compact.Box('g', e, x), compact.Box('h', x, e))
     # A spider with two producers (f, g) and a consumer (h) is a genuine
-    # merge, not a cup, so the adjointness check should not apply even
-    # though x is not self-dual, see issue #390.
-    merge = K(e, e, (f, g, h),
-              ((), (((), (0,)), ((), (0,)), ((0,), ())), ()))
-    assert merge.spider_wires == [({0, 1}, {2})]
+    # merge, not a cup, which a compact category does not have: it is
+    # refused as such, not by the adjointness of x, see issue #390.
+    with raises(AxiomError, match="a spider with two ports"):
+        K(e, e, (f, g, h), ((), (((), (0,)), ((), (0,)), ((0,), ())), ()))
 
     # Symmetrically, a spider with a producer and two consumers is a
     # genuine copy, not a cap.
     g, h = compact.Box('g', x, e), compact.Box('h', x, e)
-    copy = K(e, e, (f, g, h),
-             ((), (((), (0,)), ((0,), ()), ((0,), ())), ()))
-    assert copy.spider_wires == [({0}, {1, 2})]
+    with raises(AxiomError, match="a spider with two ports"):
+        K(e, e, (f, g, h), ((), (((), (0,)), ((0,), ()), ((0,), ())), ()))
 
 
 def test_cups():
@@ -709,11 +707,8 @@ def test_a_spider_needs_a_category_with_spiders():
     from discopy import symmetric, compact
     from discopy.utils import AxiomError
     for module in (symmetric, compact):
-        spider = module.Hypergraph.spiders(1, 2, module.Ty('x'))
-        with raises(AxiomError, match="has no spiders"):
-            spider.make_bijective()
-    with raises(AxiomError, match="has no spiders"):
-        compact.Hypergraph.spiders(1, 2, compact.Ty('x')).to_diagram()
+        with raises(AxiomError, match="is no morphism of"):
+            module.Hypergraph.spiders(1, 2, module.Ty('x'))
 
 
 def test_coloured_diagram_has_no_hypergraph():
@@ -1052,12 +1047,11 @@ def test_Rewriter_errors():
 
 
 def test_Rewriter_rules_are_rewritable():
-    from discopy import symmetric
-    x, f = symmetric.Ty('x'), symmetric.Box('f', symmetric.Ty('x'),
-                                            symmetric.Ty('x'))
+    from discopy import markov
+    x, f = markov.Ty('x'), markov.Box('f', markov.Ty('x'), markov.Ty('x'))
     host = (f >> f).to_hypergraph()
-    for cod, wires in [(x @ x, (1, 1)), (symmetric.Ty(), ())]:
-        rule = symmetric.Hypergraph(
+    for cod, wires in [(x @ x, (1, 1)), (markov.Ty(), ())]:
+        rule = markov.Hypergraph(
             x, cod, (f, ), ((0, ), (((0, ), (1, )), ), wires))
         with raises(AxiomError, match="not rewritable"):
             Rewriter(host).normalize((rule, rule))

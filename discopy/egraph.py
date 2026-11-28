@@ -1051,7 +1051,9 @@ class EGraph[category](
         least, on the classes of its inputs and outputs, and every sample.
         Two rebuilt e-graphs reduce to the same hypergraph, up to renaming,
         exactly when they have the same e-nodes on the same classes, whatever
-        duplicates of a box each keeps. It need not be left-monogamous.
+        duplicates of a box each keeps. It need not be left-monogamous, so
+        it is no morphism of the category and skips
+        :meth:`~discopy.hypergraph.Hypergraph.scan_level`.
 
         >>> from discopy.markov import Ty, Box, Diagram
         >>> x = Ty('x')
@@ -1074,7 +1076,7 @@ class EGraph[category](
             (spiders(graph.dom_wires), tuple(tuple(map(
                 spiders, graph.box_wires[j])) for j in found.values()),
              spiders(graph.cod_wires)),
-            [graph.spider_types[q] for q in number])
+            [graph.spider_types[q] for q in number], _scan=False)
 
     def roots(self) -> tuple[int, ...]:
         """ The boxes every section keeps, not affine, once for equal

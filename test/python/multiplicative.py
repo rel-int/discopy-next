@@ -200,10 +200,9 @@ def test_Hypergraph_axioms():
         not_causal(5)
 
     # Not left-monogamous: wire 0 is produced by the input and the box.
-    not_left_monogamous = Hypergraph[Function](
-        Ty(int), Ty(int), (add, ), ((0, ), (((0, 0), (0, )), ), (0, )))
-    with raises(AxiomError, match="is not left-monogamous"):
-        not_left_monogamous(5)
+    with raises(AxiomError, match="each spider needs one producer"):
+        Hypergraph[Function](
+            Ty(int), Ty(int), (add, ), ((0, ), (((0, 0), (0, )), ), (0, )))
 
 
 def test_Hypergraph_representation():
