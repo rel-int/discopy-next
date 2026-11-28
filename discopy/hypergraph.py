@@ -450,10 +450,10 @@ class Hypergraph[category](
             (tuple(map(index, x)), tuple(map(index, y))) for x, y in box_wires
         ), tuple(map(index, cod_wires)))
         self.dom_wires, self.box_wires, self.cod_wires = self.wires
+        self.offsets = offsets or tuple(len(boxes) * [None])
         if _scan:
             self.scan_types()
-
-        self.offsets = offsets or tuple(len(boxes) * [None])
+            self.scan_level()
 
     @staticmethod
     def reduce_phase(phase):
@@ -462,6 +462,65 @@ class Hypergraph[category](
         modulo a turn in :class:`~discopy.quantum.zx.Hypergraph`.
         """
         return phase
+
+    def scan_level(self) -> None:
+        """
+        Raise unless the wiring is that of a morphism of :attr:`category`,
+        i.e. of the structure its level absorbs into wires, checked by
+        :meth:`__init__` unless it is given ``_scan=False``. A hypergraph
+        category takes any spider, a compact one spiders with two ports, a
+        Markov category spiders with one producer, which copy or discard it,
+        a comarkov one spiders with one consumer and any other monogamous
+        spiders; only a symmetric traced or a compact category has cycles,
+        and below symmetric categories a boundary-connected wiring is
+        planar, i.e. some line sweeps its map, see
+        :meth:`~discopy.cmap.CMap.sweep`.
+
+        The hypergraphs of a level are thus a subclass of those of a level
+        above it, as Python cannot say: the categories they represent are a
+        superclass, which is what :func:`level` declares.
+
+        >>> from discopy import monoidal, symmetric
+        >>> x, y = monoidal.Ty('x'), monoidal.Ty('y')
+        >>> Hypergraph[monoidal.Diagram](x @ y, y @ x, (), ((0, 1), (), (1, 0)))
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: This wiring is no morphism of ...
+        >>> Hypergraph[symmetric.Diagram].copy(symmetric.Ty('x'))
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: This wiring is no morphism of ...
+        """
+        category = self.category
+        if not isclass(category) or issubclass(category, HypergraphCategory):
+            return
+        symmetric = issubclass(category, SymmetricCategory)
+        if issubclass(category, CompactCategory):
+            spiders, need = self.is_bijective, "a spider with two ports"
+        elif issubclass(category, MarkovCategory) and issubclass(
+                category, ComarkovCategory):
+            spiders, need = all(len(x) == 1 or len(y) == 1 for x, y in (
+                self.spider_wires)), "one producer or one consumer"
+        elif issubclass(category, MarkovCategory):
+            spiders, need = self.is_left_monogamous, "one producer"
+        elif issubclass(category, ComarkovCategory):
+            spiders, need = self.is_right_monogamous, "one consumer"
+        else:
+            spiders, need = self.is_monogamous, "a monogamous spider"
+        if not spiders:
+            raise AxiomError(messages.NOT_A_MORPHISM.format(
+                factory_name(category), f"each spider needs {need}"))
+        if not (symmetric and issubclass(category, TracedCategory)
+                or self.is_acyclic):
+            raise AxiomError(messages.NOT_A_MORPHISM.format(
+                factory_name(category), "it has a cycle and no trace"))
+        if not symmetric and self.is_boundary_connected:
+            dom, vertices, cod = self.to_map().wiring()
+            try:
+                cmap.CMap.sweep(dom, vertices, cod)
+            except AxiomError as error:
+                raise AxiomError(messages.NOT_A_MORPHISM.format(
+                    factory_name(category), "it is not planar")) from error
 
     def scan_wires(self, wires: Wiring) -> None:
         """

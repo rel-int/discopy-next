@@ -127,6 +127,7 @@ NO_BRAID_GROUP = (
 NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
+NOT_A_MORPHISM = "This wiring is no morphism of {}: {}."
 NOT_INVERTIBLE = "{} has no inverse, it is not sqrt(2) ** n times a phase."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
