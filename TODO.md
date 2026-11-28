@@ -9,6 +9,6 @@
 - [x] `Hypergraph[C]` and `CMap[C]` declare the abcs of `C` up to `HypergraphCategory`, set when the subscript is built
 - [x] `from_diagram` and `to_compact` take the highest functor whose `requires` the subscript satisfies; `requires` is checked on the subscript, not its origin
 - [ ] a subscript refuses at construction a wiring that is not a term of its level (producers and consumers per spider, cycles, planarity)
-- [ ] `to_diagram` places a state from the wire it feeds, so the offsets of a boundary-connected hypergraph are not needed
+- [WIP] @T-d55d90a2-2026-11-28 11:40 `to_diagram` places a state from the wire it feeds, so the offsets of a boundary-connected hypergraph are not needed
 - [ ] property matrix: the new Hypergraph and CMap cells, currying declared failing as on the free closed diagrams
 - [ ] docs, changelog, ADR, `ABC.lean` regenerated, every check of CONTRIBUTING.md
