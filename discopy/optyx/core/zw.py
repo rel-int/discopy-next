@@ -210,6 +210,9 @@ class IndexableAmplitudes:
             return False  # pragma: no cover
         return self.func.__code__.co_code == other.func.__code__.co_code
 
+    def __hash__(self) -> int:
+        return hash(self.func.__code__.co_code)
+
 
 class W(ZWBox):
     """
@@ -264,17 +267,6 @@ class W(ZWBox):
     def __repr__(self):
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.n_legs}{dagger})"
-
-    def __eq__(self, other: "W") -> bool:
-        if not isinstance(other, W):
-            return False
-        return (self.n_legs, self.is_dagger) == (
-            other.n_legs,
-            other.is_dagger,
-        )
-
-    def __hash__(self) -> int:
-        return hash((W, self.n_legs, self.is_dagger))
 
 
 class ZBox(diagram.Spider, ZWBox):
@@ -407,7 +399,34 @@ class ZBox(diagram.Spider, ZWBox):
 
     __str__ = __repr__
 
-    def __eq__(self, other: "ZBox") -> bool:
+    def setoid(self):
+        """
+        A Z box is compared exactly on its amplitudes with the trailing zeros
+        dropped, so that two truncations of one amplitude list are equal and
+        equality is an equivalence relation. The tolerant comparison is
+        :meth:`is_close`.
+
+        >>> assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 0])
+        >>> assert ZBox(1, 1, [1]) != ZBox(1, 1, [1, 2])
+        >>> nan = float("nan")
+        >>> assert ZBox(1, 1, [nan]) == ZBox(1, 1, [nan])
+        >>> assert hash(ZBox(1, 1, [1, 2])) == hash(ZBox(1, 1, [1, 2, 0]))
+        """
+        amplitudes = self.amplitudes
+        if not isinstance(amplitudes, IndexableAmplitudes):
+            amplitudes = list(np.asarray(amplitudes, dtype=complex).flatten())
+            while amplitudes and amplitudes[-1] == 0:
+                amplitudes.pop()
+            amplitudes = tuple(
+                "nan" if np.isnan(a) else a for a in amplitudes)
+        return super().setoid() + (amplitudes, )
+
+    def is_close(self, other: "ZBox") -> bool:
+        """
+        Whether two Z boxes agree up to rounding on their common amplitudes.
+
+        >>> assert ZBox(1, 1, [1]).is_close(ZBox(1, 1, [1 + 1e-10, 2]))
+        """
         if (
             not isinstance(other, ZBox)
             or self.legs_in != other.legs_in
