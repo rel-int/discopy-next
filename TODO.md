@@ -5,6 +5,6 @@
 - [x] quantum.Channel on Array, dagger compact with copy and discard on classical wires, to_tensor an explicit doubling functor
 - [x] peirce.alpha tests for Array rather than Matrix
 - [ ] requires on every functor class, checked at construction, call-time fallbacks deleted
-- [ ] Hypergraph and CMap, after the design thread T-d55d90a2 reports
+- [x] Hypergraph and CMap, after the design thread T-d55d90a2 reports, filed as #783
 - [ ] merge amp/dataflow once it is pushed
 - [ ] changelog, ADR, checks
