@@ -2,7 +2,7 @@
 >
 > the delay morphism itself should be formulated as a natural transformation from identity to delay
 
-- [ ] abc: the wait, a natural transformation from the identity to the delay, `DelayCategory.wait(x): x -> x.d`, the identity by default, with its naturality axiom `f >> wait(B) == wait(A) >> f.d`
+- [x] abc: the wait, a natural transformation from the identity to the delay, `DelayCategory.wait(x): x -> x.d`, the identity by default, with its naturality axiom `f >> wait(B) == wait(A) >> f.d`
 - [ ] feedback.cat: a primitive `Wait` box, drawn as a small loop, with naturality declared on the free levels
 - [ ] feedback.symmetric: the axiom `wait(x) == Swap(x, x.d).feedback()`, and `Diagram.wait` the primitive
 - [ ] docs/architecture.py: feedback.cat shows naturality, feedback.symmetric the axiom; regenerate the SVGs and ABC.lean
