@@ -2,7 +2,7 @@
 
 - [x] backend.py: draw a loop on every wire of a multi-wire Wait, none on the unit
 - [x] abc.py: a waiting rule typing wait(x): x -> x.d, ABC.lean regenerated
-- [ ] feedback and feedback.cat functors: a daggered Wait goes through wait only into a dagger codomain
+- [x] feedback and feedback.cat functors: a daggered Wait goes through wait only into a dagger codomain
 - [ ] autosummaries: Wait in every module that exports it
 - [ ] feedback/symmetric docstring and changelog wording; Stream is not enrolled
 - [ ] codex: tensor.Diagram.wait builds a frobenius.Wait, not a tensor diagram
