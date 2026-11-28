@@ -364,32 +364,23 @@ class Hypergraph[category](
     @classmethod
     def ev(cls, base, exponent, left=True) -> "Hypergraph":
         """
-        Evaluation: the wiring of cups when the host category is rigid, and
-        its evaluation as a box otherwise, as for :meth:`CMap.ev`.
+        Evaluation, that of :meth:`CMap.ev` on the same category: the wiring
+        of cups when it is rigid, a box otherwise.
         """
-        if issubclass(cls.category, RigidCategory):
-            return super().ev(base, exponent, left)
-        return cls.from_box(cls.category.ev(base, exponent, left))
+        return cls.from_map(
+            cmap.CMap[cls.category].ev(base, exponent, left))
 
     def curry(self, n=1, left=True) -> "Hypergraph":
         """
-        Currying: the wiring of caps when the host category is rigid, and a
-        curry box of the decoded diagram otherwise, as for
-        :meth:`CMap.curry`.
+        Currying, that of :meth:`CMap.curry` on the map of the hypergraph:
+        the wiring of caps when the category is rigid, a curry box otherwise.
 
-        >>> from discopy.closed.symmetric import Ty, Box, Hypergraph as H
+        >>> from discopy.closed.symmetric import Ty, Box
         >>> x, y, z = map(Ty, "xyz")
-        >>> f = Box("f", x @ y, z).to_hypergraph()
-        >>> assert f.curry().boxes == (Box("f", x @ y, z).curry(), )
+        >>> f = Box("f", x @ y, z)
+        >>> assert f.to_hypergraph().curry().boxes == (f.curry(), )
         """
-        if issubclass(self.category, RigidCategory):
-            return super().curry(n, left)
-        if n < 0 or n > len(self.dom):
-            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
-        if not n:
-            return self
-        return self.from_box(self.category.curry_factory(
-            self.to_diagram(), n, left))
+        return self.from_map(self.to_map().curry(n, left))
 
     @axiom
     def str_transparency(cls, term: Self) -> Equation[Self]:
@@ -482,7 +473,8 @@ class Hypergraph[category](
 
         >>> from discopy import monoidal, symmetric
         >>> x, y = monoidal.Ty('x'), monoidal.Ty('y')
-        >>> Hypergraph[monoidal.Diagram](x @ y, y @ x, (), ((0, 1), (), (1, 0)))
+        >>> M = Hypergraph[monoidal.Diagram]
+        >>> M(x @ y, y @ x, (), ((0, 1), (), (1, 0)))
         Traceback (most recent call last):
         ...
         discopy.utils.AxiomError: This wiring is no morphism of ...

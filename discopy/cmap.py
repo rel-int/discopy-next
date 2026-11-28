@@ -1357,6 +1357,7 @@ class CMap[category](
         wiring of cups when the host category is rigid.
         """
         if issubclass(cls.category, RigidCategory):
+            # pylint: disable-next=no-member  # a rigid level_bases
             return super().ev(base, exponent, left)
         return cls.from_box(cls.category.ev(base, exponent, left))
 
@@ -1381,6 +1382,7 @@ class CMap[category](
             :align: center
         """
         if issubclass(self.category, RigidCategory):
+            # pylint: disable-next=no-member  # a rigid level_bases
             return super().curry(n, left)
         if n < 0 or n > len(self.dom):
             raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
@@ -1400,8 +1402,10 @@ class CMap[category](
         """
         return self.category.base_and_exponent(self, n, left)
 
+    # pylint: disable=no-member  # transpose: a rigid level_bases
     l = property(lambda self: self.transpose(left=True))
     r = property(lambda self: self.transpose(left=False))
+    # pylint: enable=no-member
 
     def dagger(self) -> "CMap":
         """
