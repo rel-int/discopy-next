@@ -1337,7 +1337,8 @@ class Wait(Box):
         self.arg = arg
         dom, cod = (arg.delay(), arg) if is_dagger else (arg, arg.delay())
         Box.__init__(self, f"Wait({arg})", dom, cod, is_dagger=is_dagger,
-                     draw_as_loop=True, height=2, min_width=2)
+                     draw_as_loop=True, height=2,
+                     min_width=len(arg) + 1)
 
     def __getnewargs__(self):
         """

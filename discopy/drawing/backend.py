@@ -1500,12 +1500,16 @@ class Backend(ABC):
         adaptive = self.on_neutral_canvas(box.dom, box.cod)
         mid = positions[node][1]
         top, bottom = mid + .5, mid - .5
-        for k in range(len(box.dom)):
-            dom, cod = (positions[Node(kind, i=k, j=j, x=x[k])]
-                        for kind, x in [("box_dom", box.dom),
-                                        ("box_cod", box.cod)])
-            left, right = dom[0], dom[0] + 1
-            cross = left + .4
+        wires = [tuple(positions[Node(kind, i=k, j=j, x=x[k])]
+                       for kind, x in [("box_dom", box.dom),
+                                       ("box_cod", box.cod)])
+                 for k in range(len(box.dom))]
+        # A loop is one unit wide, narrower when another wire is in reach.
+        nexts = [dom[0] for dom, _ in wires[1:]] + [float("inf")]
+        for (dom, cod), after in zip(wires, nexts):
+            left = dom[0]
+            right = left + min(1, after - left - .25)
+            cross = left + .4 * (right - left)
             self.draw_wire(dom, (left, top), adaptive=adaptive)
             self.draw_wire((left, bottom), cod, adaptive=adaptive)
             for points in [
