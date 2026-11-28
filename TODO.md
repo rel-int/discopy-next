@@ -10,5 +10,5 @@
 - [x] `from_diagram` and `to_compact` take the highest functor whose `requires` the subscript satisfies; `requires` is checked on the subscript, not its origin
 - [x] a subscript refuses at construction a wiring that is not a term of its level (producers and consumers per spider, cycles, planarity)
 - [x] `to_diagram` places a state from the wire it feeds, so the offsets of a boundary-connected hypergraph are not needed
-- [ ] property matrix: the new Hypergraph and CMap cells, currying declared failing as on the free closed diagrams
+- [WIP] @T-d55d90a2-2026-11-28 13:12 property matrix: the new Hypergraph and CMap cells, currying declared failing as on the free closed diagrams
 - [ ] docs, changelog, ADR, `ABC.lean` regenerated, every check of CONTRIBUTING.md
