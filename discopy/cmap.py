@@ -145,7 +145,7 @@ class Port:
 
 
 class CMap[category](
-        CompactCategory, DaggerMonoidalCategory, TestableGeneric,
+        DaggerMonoidalCategory, TestableGeneric,
         Serialisable):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
@@ -250,11 +250,14 @@ class CMap[category](
         coherence theorem of.
         """
         # pylint: disable-next=import-outside-toplevel  # they import this
-        from discopy import compact, symmetric
-        return (symmetric.Diagram, compact.Diagram)
+        from discopy import comarkov, compact, markov, symmetric
+        return (symmetric.Diagram, markov.Diagram, comarkov.Diagram,
+                compact.Diagram)
 
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
+    level_bases = classmethod(
+        lambda cls, values: hypergraph.level(values[0]))
 
     dom: "Ty"
     cod: "Ty"
@@ -887,7 +890,8 @@ class CMap[category](
         >>> assert f @ g != g @ f >> CMap.swap(x, x)
         >>> assert CMap.equation_factory(f @ g, g @ f >> CMap.swap(x, x))
         """
-        return Equation(*terms, up_to=cls.to_hypergraph)
+        return Equation(
+            *terms, up_to=lambda term: term.to_diagram().to_hypergraph())
 
     @classmethod
     def id(cls, dom=None) -> "CMap":

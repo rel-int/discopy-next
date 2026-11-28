@@ -117,12 +117,9 @@ from typing import ClassVar, Self
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
 from discopy.abc import (
-    BalancedCategory, ClosedMonoidalCategory, ClosedSymmetricCategory,
-    CompactCategory,
-    DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
+    BalancedCategory, DaggerMonoidalCategory, SpacialCategory,
     SymmetricCategory)
-from discopy.testable import (
-    FUEL, Axiom, Equation as AbstractEquation, Rule, axiom)
+from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
@@ -920,13 +917,6 @@ class DualRail(balanced.DualRail, Functor):
 
 
 CMap = cmap.CMap[Diagram]
-
-for level in (
-        ClosedMonoidalCategory, ClosedSymmetricCategory, RigidCategory,
-        PivotalCategory, CompactCategory):
-    for name, law in vars(level).items():
-        if isinstance(law, (Axiom, Rule)):
-            setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
 
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor

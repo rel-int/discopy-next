@@ -84,7 +84,8 @@ from networkx.algorithms.isomorphism import is_isomorphic
 from discopy import cat, cmap, messages
 from discopy.abc import (
     BalancedCategory, BraidedCategory, ColouredMonoid, ComarkovCategory,
-    CompactCategory, DaggerMonoidalCategory, HypergraphCategory,
+    CompactCategory, DaggerCategory, DaggerMonoidalCategory,
+    HypergraphCategory,
     MarkovCategory, PivotalCategory, RigidCategory, SymmetricCategory,
     TracedCategory)
 from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
@@ -221,6 +222,29 @@ def assert_transparent(diagram: "Diagram") -> None:
             raise AxiomError(messages.COLOURED_QUOTIENT.format(typ))
 
 
+def level(category: type) -> tuple[type, ...]:
+    """
+    The categories of the hierarchy that a hypergraph or a map of the diagrams
+    of ``category`` represents, i.e. the abstract base classes ``category``
+    subclasses up to :class:`HypergraphCategory`, the most specific ones only:
+    the linear part of a level, which no wiring can carry, is left out.
+
+    >>> from discopy import braided, frobenius, closed, linear, markov
+    >>> from discopy.abc import (
+    ...     BraidedCategory, ClosedMarkovCategory, HypergraphCategory)
+    >>> assert level(braided.Diagram) == (BraidedCategory, )
+    >>> assert level(frobenius.Diagram) == (HypergraphCategory, )
+    >>> assert ClosedMarkovCategory in level(closed.markov.Diagram)
+    >>> assert level(linear.markov.Diagram) == level(markov.Diagram)
+    """
+    found = [
+        base for base in HypergraphCategory.__mro__
+        if isclass(category) and issubclass(category, base)
+        and base not in (DaggerCategory, DaggerMonoidalCategory)]
+    return tuple(base for base in found if not any(
+        other is not base and issubclass(other, base) for other in found))
+
+
 class Hypergraph[category](
         DaggerMonoidalCategory["Ty", "Hypergraph"], TestableGeneric,
         Serialisable):
@@ -335,6 +359,37 @@ class Hypergraph[category](
 
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
+    level_bases = classmethod(lambda cls, values: level(values[0]))
+
+    @classmethod
+    def ev(cls, base, exponent, left=True) -> "Hypergraph":
+        """
+        Evaluation: the wiring of cups when the host category is rigid, and
+        its evaluation as a box otherwise, as for :meth:`CMap.ev`.
+        """
+        if issubclass(cls.category, RigidCategory):
+            return super().ev(base, exponent, left)
+        return cls.from_box(cls.category.ev(base, exponent, left))
+
+    def curry(self, n=1, left=True) -> "Hypergraph":
+        """
+        Currying: the wiring of caps when the host category is rigid, and a
+        curry box of the decoded diagram otherwise, as for
+        :meth:`CMap.curry`.
+
+        >>> from discopy.closed.symmetric import Ty, Box, Hypergraph as H
+        >>> x, y, z = map(Ty, "xyz")
+        >>> f = Box("f", x @ y, z).to_hypergraph()
+        >>> assert f.curry().boxes == (Box("f", x @ y, z).curry(), )
+        """
+        if issubclass(self.category, RigidCategory):
+            return super().curry(n, left)
+        if n < 0 or n > len(self.dom):
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
+        if not n:
+            return self
+        return self.from_box(self.category.curry_factory(
+            self.to_diagram(), n, left))
 
     @axiom
     def str_transparency(cls, term: Self) -> Equation[Self]:

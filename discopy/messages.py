@@ -162,9 +162,6 @@ COMPACT_EXPONENTIALS = (
     "A compact category has left and right exponentials y @ x.l and x.r @ y, "
     "isomorphic and not equal, which the law takes to be one.")
 
-MAP_HAS_NO_ADJOINTS = (
-    "A map is compact whatever category hosts it, but a host that is not "
-    "rigid has no adjoints or curries for the laws to quantify over.")
 MAP_HAS_NO_SPIDERS = (
     "A map has no spiders: it keeps a copy or a merge as a box where a "
     "hypergraph merges its wires.")

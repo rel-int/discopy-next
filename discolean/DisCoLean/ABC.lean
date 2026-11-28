@@ -23,7 +23,7 @@ does not compile yet:
 - `RibbonCategory`: it extends PivotalCategory, BalancedTracedCategory
 - `GoISituation`: it extends LinearCategory, TracedCategory, SymmetricCategory
 - `CompactCategory`: it extends RibbonCategory, ClosedSymmetricCategory
-- `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
+- `HypergraphCategory`: it extends CompactCategory, ClosedMarkovCategory, ComarkovCategory
 -/
 
 namespace DisCoLean.ABC
