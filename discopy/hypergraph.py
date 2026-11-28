@@ -3123,10 +3123,11 @@ class Hypergraph[category](
             min_leaves : The minimum number of boxes.
             max_leaves : The maximum number of boxes, not counting the
                 balancing box.
-            acyclic : Whether every consumer comes after its producers. By
-                default this always holds when the category is not traced,
-                and holds for two hypergraphs in three when it is, shrinking
-                to acyclic. Only applies to the directed wirings.
+            acyclic : Whether every consumer comes after its producers. It
+                always holds when the category is not traced, which has no
+                cycle, and by default for two hypergraphs in three when it
+                is, shrinking to acyclic. Only applies to the directed
+                wirings.
             max_scalars : The maximum number of spiders with no port, by
                 default one in a traced category unless ``acyclic``. A
                 scalar is sampled for about one hypergraph in four.
@@ -3158,8 +3159,8 @@ class Hypergraph[category](
             n_boxes = draw(
                 st.integers(min_leaves, max(min_leaves, max_leaves)))
             # In a traced category, two hypergraphs in three are acyclic.
-            is_acyclic = not is_traced or draw(st.integers(0, 2)) < 2\
-                if acyclic is None else acyclic
+            is_acyclic = not is_traced or (
+                draw(st.integers(0, 2)) < 2 if acyclic is None else acyclic)
             bounds = {"dom": dom, "cod": cod, "n_boxes": n_boxes}
             if issubclass(category, HypergraphCategory):
                 wiring = cls.draw_any(draw, types, **bounds)
