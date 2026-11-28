@@ -45,6 +45,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Functor
     Unroll
     Lens
@@ -682,6 +683,9 @@ class Unroll(Functor):
         super().__init__(ob_map=lambda leg: leg, ar_map=lambda box: box)
 
     def __call__(self, other):
+        if isinstance(other, Wait):
+            wait = Network.swap(other.arg, other.arg).trace()
+            return self(wait.dagger() if other.is_dagger else wait)
         if not isinstance(other, Trace):
             return super().__call__(other)
         mem, x, y, body = other.mem, other.dom, other.cod, self(other.arg)

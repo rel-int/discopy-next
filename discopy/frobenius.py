@@ -37,6 +37,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Functor
     Equation
 

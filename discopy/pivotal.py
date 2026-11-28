@@ -28,6 +28,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Equation
     Functor

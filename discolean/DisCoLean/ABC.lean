@@ -221,8 +221,10 @@ structure PRO.Functor (cat : PRO Hom) (cat' : PRO Hom') extends toMonoidalCatego
 
 /-- `discopy.abc.DelayCategory`: A delay category is a `Category` with an endofunctor `delay`, the part of a `FeedbackCategory` that needs no tensor. `discopy.feedback.cat` is the free one. -/
 structure DelayCategory (Ob : Type u) (Hom : Type v) extends Category Ob Hom where
-  delay : Hom → Nat → Hom
   wait : Ob → Hom
+  delay : Hom → Nat → Hom
+  /-- `waiting`: The wait on an object, from it to its delay. -/
+  waiting : ∀ (X : Ob), dom (wait X) = X ∧ cod (wait X) = dom (delay (id X) 1)
   /-- `delaying`: The delay of a morphism by one time step. -/
   delaying : ∀ (A B : Ob) (f : Hom), dom f = A → cod f = B → dom (delay f 1) = dom (delay (id A) 1) ∧ cod (delay f 1) = dom (delay (id B) 1)
 
@@ -246,8 +248,8 @@ structure DelayCategory.Laws (cat : DelayCategory Ob Hom) : Prop extends toCateg
 
 /-- A functor of `DelayCategory`: it preserves each of its operations. -/
 structure DelayCategory.Functor (cat : DelayCategory Ob Hom) (cat' : DelayCategory Ob' Hom') extends toCategory : Category.Functor cat.toCategory cat'.toCategory where
-  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
   map_wait : ∀ (X : Ob), map (cat.wait X) = cat'.wait (ob X)
+  map_delay : ∀ (f : Hom) (n : Nat), map (cat.delay f n) = cat'.delay (map f) n
 
 /-- `discopy.abc.FeedbackCategory`: A feedback category is a `MonoidalCategory` and a `DelayCategory` whose delay is monoidal, with an operator `feedback` from morphisms `x @ m.delay() -> y @ m` to morphisms `x -> y`, see `KatisEtAl02` and `DiLavoreEtAl22`. -/
 structure FeedbackCategory (Ob : Type u) (Hom : Type v) extends DelayCategory Ob Hom, MonoidalCategory Ob Hom where

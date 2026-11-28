@@ -35,8 +35,9 @@ Example
 >>> x = Ty('x')
 >>> assert Equation(Swap(x, x).trace(), Id(x))
 
-The wait, the small loop, is a primitive equal to the big loop of the
-feedback of the swap, see
+The wait, the small loop, is a primitive which a symmetric feedback category
+equates to the big loop of the feedback of the swap: the free diagrams keep
+the two apart, see
 :meth:`~discopy.abc.SymmetricFeedbackCategory.wait_swap`.
 
 >>> wait_swap = Equation(Wait(x), Swap(x, x.delay()).feedback())

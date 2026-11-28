@@ -47,7 +47,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from discopy import cat, messages
-from discopy.abc import DelayCategory
+from discopy.abc import DaggerCategory, DelayCategory
 from discopy.cat import factory
 from discopy.utils import assert_isinstance, factory_name, from_tree
 
@@ -294,6 +294,8 @@ class Functor(cat.Functor):
 
     def __call__(self, other):
         if isinstance(other, Wait) and hasattr(self.cod, "wait") and (
+                not other.is_dagger or issubclass(self.cod, DaggerCategory)
+                and self.cod.has_dagger()) and (
                 self(other.dom) == self(other.cod) or getattr(
                     self.cod.wait, "__func__", None)
                 is not DelayCategory.wait.__func__):

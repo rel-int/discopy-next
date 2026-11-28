@@ -699,6 +699,12 @@ class DelayCategory[C0, C1: DelayCategory](Category[C0, C1]):
         return cls.equation_factory(
             f.then(cls.wait(f.cod)), cls.wait(f.dom).then(f.delay()))
 
+    @rule
+    def waiting[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Hom[C1, X, Delay[C1, X]]:
+        """ The wait on an object, from it to its delay. """
+        return cls.wait(x)
+
     @axiom
     def delay_unit[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:

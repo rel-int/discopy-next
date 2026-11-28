@@ -35,6 +35,7 @@ Summary
     FollowedBy
     Head
     Tail
+    Wait
     Sum
     Functor
     DualRail

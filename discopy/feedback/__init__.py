@@ -673,7 +673,18 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
-        """ The primitive :class:`Wait` on a type, drawn as a small loop. """
+        """
+        The primitive :class:`Wait` on a type, drawn as a small loop, or the
+        wait of the abstract category when the primitive is not a diagram
+        of this one, e.g. a tensor diagram, whose delay is the identity. The
+        wait on the unit is its identity, as the feedback of its swap is.
+
+        >>> assert Diagram.wait(Ty()) == Diagram.id()
+        """
+        if not dom:
+            return cls.id(dom)
+        if not issubclass(cls.wait_factory, cls):
+            return super().wait(dom)
         return cls.wait_factory(dom)
 
     def to_drawing(self):
@@ -1461,6 +1472,8 @@ class Functor(monoidal.Functor):
 
     def __call__(self, other):
         if isinstance(other, Wait) and hasattr(self.cod, "wait") and (
+                not other.is_dagger or issubclass(self.cod, DaggerCategory)
+                and self.cod.has_dagger()) and (
                 self(other.dom) == self(other.cod) or getattr(
                     self.cod.wait, "__func__", None)
                 is not DelayCategory.wait.__func__):
