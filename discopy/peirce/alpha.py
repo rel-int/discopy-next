@@ -49,7 +49,7 @@ from copy import copy
 import numpy
 
 from discopy import monoidal
-from discopy.matrix import Matrix
+from discopy.matrix import Array
 from discopy.monoidal import Colour
 from discopy.tensor import Dim, Tensor
 from discopy.testable import no_strategy
@@ -273,12 +273,12 @@ class Functor(monoidal.Functor):
     """
     An alpha functor is a monoidal functor that sends a :class:`Cut` to the
     cut of its image, or to its elementwise negation in a category of
-    matrices, e.g. :class:`~discopy.tensor.Tensor` of ``bool``.
+    arrays, e.g. :class:`~discopy.tensor.Tensor` of ``bool``.
     """
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Cut) and issubclass(self.cod, Matrix):
+        if isinstance(other, Cut) and issubclass(self.cod, Array):
             result = self(other.arg).map(operator.not_, dtype=bool)
             for _ in range(abs(getattr(other, "z", 0))):
                 result = result.r if other.z > 0 else result.l

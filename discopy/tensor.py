@@ -57,14 +57,15 @@ from discopy import (
     messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
+from discopy.abc import DaggerMonoidalCategory, HypergraphCategory
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
-    Matrix, backend, set_backend, get_backend, repr_nonfinite,
+    Array, Matrix, backend, set_backend, get_backend, repr_nonfinite,
     Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
     factory_key, factory_name, assert_isinstance, product, assert_isatomic,
-    assert_istraceable)
+    assert_istraceable, unbiased)
 
 if TYPE_CHECKING:
     import sympy
@@ -73,10 +74,15 @@ if TYPE_CHECKING:
 
 
 @factory
-class Tensor(Matrix):
+class Tensor(Array, HypergraphCategory, DaggerMonoidalCategory):
     """
-    A tensor is a :class:`Matrix` with dimensions as domain and codomain and
-    the Kronecker product as tensor.
+    A tensor is an :class:`~discopy.matrix.Array` with dimensions as domain
+    and codomain and the Kronecker product as tensor, a sibling of
+    :class:`Matrix` and its direct sum. Its spiders make it a
+    :class:`~discopy.abc.HypergraphCategory`, which a
+    :class:`~discopy.frobenius.Functor` requires of its codomain: the copy and
+    merge of a tensor are spiders, where those of a matrix are the diagonal
+    and codiagonal of the direct sum.
 
     Parameters:
         inside : The array inside the tensor.
@@ -143,12 +149,14 @@ class Tensor(Matrix):
         """
         return ()
 
-    def __init__(self, array, dom: Dim, cod: Dim):
-        assert_isinstance(dom, Dim)
-        assert_isinstance(cod, Dim)
-        super().__init__(array, product(dom.inside), product(cod.inside))
-        self.array = self.array.reshape(dom.inside + cod.inside)
-        self.dom, self.cod = dom, cod
+    @classmethod
+    def shape(cls, dom: Dim, cod: Dim) -> tuple:
+        """
+        One axis for each factor of the domain and the codomain.
+
+        >>> assert Tensor.shape(Dim(2, 3), Dim(4)) == (2, 3, 4)
+        """
+        return dom.inside + cod.inside
 
     @classmethod
     def id(cls, dom=Dim(1)) -> Tensor:
@@ -183,10 +191,8 @@ class Tensor(Matrix):
             lambda tensor: product(tensor.dom.inside + tensor.cod.inside)
             <= max_entries)
 
-    def then(self, *others: Tensor) -> Tensor:
-        if len(others) != 1:
-            return super().then(*others)
-        other, = others
+    @unbiased
+    def then(self, other: Tensor) -> Tensor:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
         cls = self.promote(other)
@@ -324,6 +330,8 @@ class Tensor(Matrix):
         with backend() as np:
             return cls(np.moveaxis(array, source, target), dom, cod)
 
+    braid = swap
+
     @classmethod
     def permutation(cls, xs: Sequence[int], doms: Sequence[Dim]) -> Tensor:
         xs = finset.Permutation(xs, len(doms))
@@ -391,6 +399,42 @@ class Tensor(Matrix):
         """
         return cls.spiders(1, n, x)
 
+    @classmethod
+    def merge(cls, x: Dim, n: int = 2) -> Tensor:
+        """
+        Constructs spiders of dimension `x` with `n` legs in and one leg out.
+
+        Parameters:
+            x : The type of the spiders.
+            n : The number of legs in for each spider.
+
+        Example
+        -------
+        >>> assert Tensor.merge(Dim(2)) == Tensor.copy(Dim(2)).dagger()
+        >>> assert Tensor.noise(Dim(2)) == Tensor([1, 1], Dim(1), Dim(2))
+        """
+        return cls.spiders(n, 1, x)
+
+    @classmethod
+    def basis(cls, x: Dim, i: int) -> Tensor:
+        """
+        The ``i``-th vector of the computational basis of ``x``, counting
+        the basis of a product in row-major order.
+
+        Parameters:
+            x : The dimension of the basis vector.
+            i : The index of the basis vector.
+
+        Example
+        -------
+        >>> assert Tensor.basis(Dim(2, 2), 1)\\
+        ...     == Tensor.basis(Dim(2), 0) @ Tensor.basis(Dim(2), 1)
+        """
+        with backend('numpy') as np:
+            array = np.zeros(product(x.inside), dtype=cls.dtype or int)
+            array[i] = 1
+        return cls(array, Dim(1), x)
+
     def transpose(self, left=False) -> Tensor:
         """
         Returns the diagrammatic transpose.
@@ -426,20 +470,6 @@ class Tensor(Matrix):
         with backend() as np:
             array = np.conj(np.moveaxis(self.array, source, target))
         return type(self)(array, self.dom[::-1], self.cod[::-1])
-
-    @classmethod
-    def zero(cls, dom: Dim, cod: Dim) -> Tensor:
-        """
-        Returns the zero tensor of a given shape.
-
-        Examples
-        --------
-        >>> assert Tensor.zero(Dim(2), Dim(2))\\
-        ...     == Tensor([0, 0, 0, 0], Dim(2), Dim(2))
-        """
-        with backend() as np:
-            return cls(np.zeros((dom @ cod).inside, dtype=cls.dtype or int),
-                       dom, cod)
 
     def jacobian(self, *variables: "list[sympy.Symbol]", **params) -> Tensor:
         """
