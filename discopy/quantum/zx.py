@@ -59,6 +59,7 @@ from typing import ClassVar, NamedTuple
 
 from discopy import (
     cat, frobenius, hypergraph, messages, rigid, tensor, quantum)
+from discopy.abc import DaggerMonoidalCategory, HypergraphCategory
 from discopy.cat import factory
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
@@ -915,7 +916,8 @@ class Number:
 ONE = Number()
 
 
-class Hypergraph(hypergraph.Hypergraph):
+class Hypergraph(
+        hypergraph.Hypergraph, DaggerMonoidalCategory, HypergraphCategory):
     """
     A ZX diagram as a hypergraph, graph-like in the sense of
     :cite:t:`DuncanEtAl20`: its spiders are the green spiders, each with its

@@ -117,12 +117,9 @@ from typing import ClassVar, Self
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
 from discopy.abc import (
-    BalancedCategory, ClosedMonoidalCategory, ClosedSymmetricCategory,
-    CompactCategory,
-    DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
+    BalancedCategory, DaggerMonoidalCategory, SpacialCategory,
     SymmetricCategory)
-from discopy.testable import (
-    FUEL, Axiom, Equation as AbstractEquation, Rule, axiom)
+from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
@@ -270,12 +267,14 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> with raises(AxiomError) as err:
     ...     Diagram.from_callable(x, x @ x)(lambda x: (x, x))
     >>> print(err.value)
-    symmetric.Diagram has no cups or caps for the wiring of this map.
+    This wiring is no morphism of symmetric.Diagram: each spider needs one \
+producer and one consumer.
 
     >>> with raises(AxiomError) as err:
     ...     Diagram.from_callable(x, Ty())(lambda x: ())
     >>> print(err.value)
-    symmetric.Diagram has no cups or caps for the wiring of this map.
+    This wiring is no morphism of symmetric.Diagram: each spider needs one \
+producer and one consumer.
 
     Note
     ----
@@ -920,13 +919,6 @@ class DualRail(balanced.DualRail, Functor):
 
 
 CMap = cmap.CMap[Diagram]
-
-for level in (
-        ClosedMonoidalCategory, ClosedSymmetricCategory, RigidCategory,
-        PivotalCategory, CompactCategory):
-    for name, law in vars(level).items():
-        if isinstance(law, (Axiom, Rule)):
-            setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
 
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor

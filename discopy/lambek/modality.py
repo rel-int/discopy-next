@@ -66,7 +66,6 @@ from discopy.linear import monoidal as bang
 from discopy.abc import ClosedMonoidalCategory
 from discopy.cat import factory
 from discopy.lambek import categorial
-from discopy.utils import get_origin
 
 
 @factory
@@ -177,7 +176,7 @@ class Functor(bang.Functor, categorial.Functor):
 
     def __init__(self, ob_map, ar_map, **params):
         cod = params.get("cod") or type(self).cod
-        if not issubclass(get_origin(cod), self.requires):
+        if not issubclass(cod, self.requires):
             raise TypeError("A functor from !L* needs a closed monoidal "
                             f"codomain, got {cod}.")
         super().__init__(ob_map, ar_map, **params)

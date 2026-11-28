@@ -2637,7 +2637,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
 
 
 class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
-        CompactCategory[C0, C1], MarkovCategory[C0, C1],
+        CompactCategory[C0, C1], ClosedMarkovCategory[C0, C1],
         ComarkovCategory[C0, C1]):
     """
     A hypergraph category is a symmetric category with a supply of spiders,
@@ -2645,7 +2645,8 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
 
     This makes it a :class:`CompactCategory`, a :class:`MarkovCategory` and
     a :class:`ComarkovCategory`, the Frobenius law and speciality
-    identifying the comonoids with the monoids.
+    identifying the comonoids with the monoids, hence a
+    :class:`ClosedMarkovCategory` since compact categories are closed.
     """
     @classmethod
     @abstractmethod

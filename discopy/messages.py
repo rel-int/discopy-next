@@ -127,6 +127,11 @@ NO_BRAID_GROUP = (
 NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
+NOT_A_MORPHISM = "This wiring is no morphism of {}: {}."
+MERGE_IS_A_BOX = (
+    "A merge is a box of the hypergraph of a Markov category that is not a "
+    "hypergraph category, compared on the nose: a spider for both copy and "
+    "merge would prove the Frobenius law.")
 NOT_INVERTIBLE = "{} has no inverse, it is not sqrt(2) ** n times a phase."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
@@ -162,9 +167,6 @@ COMPACT_EXPONENTIALS = (
     "A compact category has left and right exponentials y @ x.l and x.r @ y, "
     "isomorphic and not equal, which the law takes to be one.")
 
-MAP_HAS_NO_ADJOINTS = (
-    "A map is compact whatever category hosts it, but a host that is not "
-    "rigid has no adjoints or curries for the laws to quantify over.")
 MAP_HAS_NO_SPIDERS = (
     "A map has no spiders: it keeps a copy or a merge as a box where a "
     "hypergraph merges its wires.")

@@ -319,6 +319,14 @@ class NamedGeneric:
     >>> from discopy import frobenius
     >>> frobenius.Hypergraph.__name__
     'Hypergraph[frobenius.Diagram]'
+
+    A class with a ``level_bases`` classmethod adds the bases it returns for
+    the values to those of its subscripts, e.g. a hypergraph of the diagrams
+    of a level declares the categories of that level, see
+    :func:`~discopy.hypergraph.level`.
+
+    >>> from discopy.abc import HypergraphCategory
+    >>> assert issubclass(frobenius.Hypergraph, HypergraphCategory)
     """
     if TYPE_CHECKING:
         #: The names of the type parameters in DisCoPy, declared so that
@@ -361,8 +369,9 @@ class NamedGeneric:
             NamedGeneric._cache[cls] = {cls_values: cls}
         if values not in NamedGeneric._cache[cls]:
             origin = get_origin(cls)
+            bases = getattr(origin, "level_bases", lambda _: ())(values)
 
-            class C(origin):
+            class C(origin, *bases):
                 __is_named_generic__ = True
 
                 def __reduce__(self):

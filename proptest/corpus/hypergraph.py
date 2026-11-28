@@ -1,11 +1,11 @@
 """
 The corpus of :class:`discopy.hypergraph.Hypergraph` over a closed category,
 aimed at what its strategy does not draw: the hypergraph of a curry, which
-has no dagger, see ``closed.markov.Diagram.dagger_involution``.
+has no dagger, see ``closed.markov.Diagram.dagger_involution``. A hypergraph
+of a closed Markov category has no dagger at all, its merges being boxes.
 """
 
 from discopy import closed
-from discopy.lambek import abstract
 
 
 def curried(module):
@@ -28,4 +28,4 @@ CORPUS = {
             "a curry beside an identity": lambda module=module: {
                 "f": curried(module)[0], "g": curried(module)[1]},
         },
-    } for module in (closed.markov, abstract)}
+    } for module in (closed.symmetric, )}
