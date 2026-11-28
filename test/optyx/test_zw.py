@@ -596,6 +596,8 @@ def test_zbox_equality_is_reflexive_on_nan_amplitudes():
     assert not compare_arrays_of_different_sizes([1, nan], [1, nan])
     assert ZBox(1, 1, [1, nan]) == ZBox(1, 1, [1, nan])
     assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [complex(nan, 1)]) != ZBox(1, 1, [complex(nan, 2)])
+    assert ZBox(1, 1, [complex(1, nan)]) == ZBox(1, 1, [complex(1, nan)])
     assert not ZBox(1, 1, [1, nan]).is_close(ZBox(1, 1, [1, nan]))
     assert compare_arrays_of_different_sizes([1, inf], [1, inf])
     assert not compare_arrays_of_different_sizes([1, inf], [1, -inf])

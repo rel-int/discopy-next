@@ -410,6 +410,7 @@ class ZBox(diagram.Spider, ZWBox):
         >>> assert ZBox(1, 1, [1]) != ZBox(1, 1, [1, 2])
         >>> nan = float("nan")
         >>> assert ZBox(1, 1, [nan]) == ZBox(1, 1, [nan])
+        >>> assert ZBox(1, 1, [nan + 1j]) != ZBox(1, 1, [nan + 2j])
         >>> assert hash(ZBox(1, 1, [1, 2])) == hash(ZBox(1, 1, [1, 2, 0]))
         """
         amplitudes = self.amplitudes
@@ -417,8 +418,9 @@ class ZBox(diagram.Spider, ZWBox):
             amplitudes = list(np.asarray(amplitudes, dtype=complex).flatten())
             while amplitudes and amplitudes[-1] == 0:
                 amplitudes.pop()
-            amplitudes = tuple(
-                "nan" if np.isnan(a) else a for a in amplitudes)
+            amplitudes = tuple(tuple(
+                "nan" if np.isnan(x) else x for x in (a.real, a.imag))
+                for a in amplitudes)
         return super().setoid() + (amplitudes, )
 
     def is_close(self, other: "ZBox") -> bool:
