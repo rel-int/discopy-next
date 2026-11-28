@@ -737,9 +737,6 @@ Ty.constant_factory = Constant
 Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Hypergraph = hypergraph.Hypergraph[Diagram]
-for law in (
-        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
-    setattr(Hypergraph, law, vars(closed.markov.Hypergraph)[law])
 
 Position = Ty("o")
 """ The atomic type of positions in a string, an arbitrary atom. """

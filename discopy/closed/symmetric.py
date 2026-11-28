@@ -45,7 +45,8 @@ from functools import cached_property
 from typing import ClassVar
 
 from discopy import closed, cmap, hypergraph, messages, monoidal, symmetric
-from discopy.abc import BalancedCategory, ClosedSymmetricCategory
+from discopy.abc import (
+    BalancedCategory, ClosedSymmetricCategory, DaggerMonoidalCategory)
 from discopy.cat import factory
 from discopy.utils import factory_name
 
@@ -220,6 +221,10 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
 Hypergraph = hypergraph.Hypergraph[Diagram]
+for law in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(Hypergraph, law, getattr(DaggerMonoidalCategory, law).failing(
+        messages.CURRY_HAS_NO_DAGGER))
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Id = Diagram.id
 
